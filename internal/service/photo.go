@@ -18,6 +18,10 @@ const photoSearchTimeout = 6 * time.Second
 // photoQueries builds search queries from a German phrase, most specific first.
 // German nouns are capitalized, so they are the best keywords for a picture.
 func photoQueries(text string) []string {
+	// Phrases about time/dates get precise English visual keywords (clock, calendar, sunset…).
+	if tq := timeQueries(text); len(tq) > 0 {
+		return tq
+	}
 	words := Tokenize(text, "de")
 	var nouns []string
 	for _, w := range words {
