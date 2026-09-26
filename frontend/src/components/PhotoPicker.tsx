@@ -77,5 +77,5 @@ export function PhotoPicker({ contextId, onClose }: { contextId: string; onClose
         </p>
       </div>
     </div>
-}
   )
+}
