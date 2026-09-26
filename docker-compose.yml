@@ -56,5 +56,4 @@ services:
 
 volumes:
   pgdata:
-  miniodata:
   frontend_node_modules:
