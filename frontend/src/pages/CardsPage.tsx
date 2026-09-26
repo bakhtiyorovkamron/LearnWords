@@ -17,16 +17,42 @@ export function CardsPage() {
   }, [data, q])
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Все карточки</h1>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по слову или переводу…"
-        className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none" />
-      {isLoading && <p className="text-slate-500">Загрузка…</p>}
-      {error && <p className="text-red-600">{errorMessage(error)}</p>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((c) => <WordCardView key={c.id} card={c} />)}
+    <div className="space-y-8">
+      <div className="animate-rise flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="display text-3xl font-extrabold md:text-4xl">
+            Моя <span className="text-lime-300">коллекция</span> 🃏
+          </h1>
+          <p className="mt-2 text-emerald-100/70">
+            {data ? `${data.length} слов в копилке` : 'Все ваши слова в одном месте'}
+          </p>
+        </div>
+        <div className="relative w-full md:w-80">
+          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-emerald-300/60">🔍</span>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по слову или переводу…"
+            className="field pl-11" />
+        </div>
       </div>
-      {data && !filtered.length && <p className="text-slate-500">Ничего не найдено</p>}
+
+      {isLoading && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-emerald-800/30" />
+          ))}
+        </div>
+      )}
+      {error && <p className="text-red-300">{errorMessage(error)}</p>}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((c, i) => <WordCardView key={c.id} card={c} index={i} />)}
+      </div>
+
+      {data && !filtered.length && (
+        <div className="glass p-10 text-center">
+          <div className="text-5xl">🍃</div>
+          <p className="mt-3 text-emerald-100/70">{q ? 'Ничего не найдено' : 'Коллекция пока пуста'}</p>
+        </div>
+      )}
     </div>
   )
 }

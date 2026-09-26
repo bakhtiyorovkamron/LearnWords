@@ -26,14 +26,7 @@ export const authApi = {
 export const contextsApi = {
   list: () => api.get<Page<Context>>('/contexts').then((r) => r.data.items),
   words: (id: string) => api.get<Page<WordCard>>(`/contexts/${id}/words`).then((r) => r.data.items),
-  create(input: { text?: string; image?: File; language?: string }) {
-    if (input.image) {
-      const fd = new FormData()
-      fd.append('image', input.image)
-      if (input.text) fd.append('text', input.text)
-      fd.append('language', input.language ?? 'de')
-      return api.post<ContextWithCards>('/contexts', fd).then((r) => r.data)
-    }
+  create(input: { text: string; language?: string }) {
     return api
       .post<ContextWithCards>('/contexts', { text: input.text, language: input.language ?? 'de' })
       .then((r) => r.data)

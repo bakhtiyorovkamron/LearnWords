@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Unbounded", "Inter", ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-emerald-950 text-emerald-50 antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 10% -10%, rgb(16 185 129 / 0.35), transparent 60%),
+      radial-gradient(50rem 35rem at 110% 10%, rgb(132 204 22 / 0.25), transparent 60%),
+      radial-gradient(40rem 30rem at 50% 120%, rgb(20 184 166 / 0.25), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply rounded-3xl border border-emerald-400/15 bg-emerald-900/40 shadow-xl shadow-emerald-950/50 backdrop-blur-xl;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lime-400 via-emerald-400 to-teal-400 px-6 py-3 font-semibold text-emerald-950 shadow-lg shadow-emerald-500/30 transition hover:scale-[1.02] hover:shadow-emerald-400/50 active:scale-95 disabled:opacity-60 disabled:hover:scale-100;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/10;
+  }
+  .field {
+    @apply w-full rounded-2xl border border-emerald-400/20 bg-emerald-950/60 px-4 py-3 text-emerald-50 placeholder:text-emerald-300/40 outline-none transition focus:border-lime-400 focus:ring-4 focus:ring-lime-400/20;
+  }
+  .display {
+    font-family: var(--font-display);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-12px) rotate(3deg); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise { animation: rise 0.5s ease-out both; }
