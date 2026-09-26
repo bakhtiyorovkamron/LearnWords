@@ -67,6 +67,41 @@ func (h *ContextHandler) WordCards(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "limit": limit, "offset": offset})
 }
 
+func (h *ContextHandler) Photos(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	photos, err := h.svc.SearchPhotos(c.Request.Context(), userID(c), id, c.Query("q"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": photos})
+}
+
+type setPhotoRequest struct {
+	URL    string `json:"url" binding:"required"`
+	Credit string `json:"credit"`
+}
+
+func (h *ContextHandler) SetPhoto(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	var req setPhotoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badRequest(c, "url is required")
+		return
+	}
+	if err := h.svc.SetPhoto(c.Request.Context(), userID(c), id, req.URL, req.Credit); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *ContextHandler) RegenerateAudio(c *gin.Context) {
 	id, ok := pathUUID(c, "id")
 	if !ok {

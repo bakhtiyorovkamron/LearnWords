@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
+import { PhotoPicker } from '../components/PhotoPicker'
 
 export function ContextDetailPage() {
   const { id = '' } = useParams()
@@ -10,17 +12,44 @@ export function ContextDetailPage() {
   const contexts = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
   const words = useQuery({ queryKey: ['context-words', id], queryFn: () => contextsApi.words(id) })
   const ctx = contexts.data?.find((c) => c.id === id)
+  const [picking, setPicking] = useState(false)
 
   if (words.error) return <p className="text-red-300">{errorMessage(words.error)}</p>
 
   return (
     <div className="space-y-8">
+      {picking && <PhotoPicker contextId={id} onClose={() => setPicking(false)} />}
       <Link to="/contexts" className="btn-ghost">← Все контексты</Link>
 
       <div className="grid gap-8 lg:grid-cols-5">
         <section className="lg:col-span-2">
           <div className="glass animate-rise sticky top-24 overflow-hidden p-8">
             <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-lime-400/20 blur-3xl" />
+
+            {ctx?.image_url ? (
+              <figure className="group relative -mx-8 -mt-8 mb-6">
+                <img src={ctx.image_url} alt="" className="aspect-[4/3] w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-transparent to-transparent" />
+                {ctx.photo_credit && (
+                  <figcaption className="absolute inset-x-0 bottom-0 truncate px-8 pb-2 text-[10px] text-emerald-100/60">
+                    {ctx.photo_credit}
+                  </figcaption>
+                )}
+                <button onClick={() => setPicking(true)}
+                  className="absolute right-3 top-3 rounded-full bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-lime-300 backdrop-blur transition hover:bg-emerald-950">
+                  🔄 Другое фото
+                </button>
+              </figure>
+            ) : (
+              ctx && (
+                <button onClick={() => setPicking(true)}
+                  className="relative mb-6 flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/30 text-emerald-200/70 transition hover:border-lime-400 hover:text-lime-300">
+                  <span className="text-4xl">🖼</span>
+                  <span className="text-sm font-semibold">Подобрать фото к фразе</span>
+                </button>
+              )
+            )}
+
             <p className="text-xs uppercase tracking-widest text-lime-300/80">Оригинал · Deutsch</p>
             <blockquote className="display relative mt-4 text-2xl font-semibold leading-snug text-white">
               „{ctx?.source_text ?? '…'}“

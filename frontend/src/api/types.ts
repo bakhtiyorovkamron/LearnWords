@@ -14,9 +14,17 @@ export interface Context {
   id: string
   user_id: string
   image_url?: string
+  photo_credit?: string
   source_text: string
   language: string
   created_at: string
+}
+
+export interface Photo {
+  url: string
+  original: string
+  credit: string
+  source_url: string
 }
 
 export interface WordCard {

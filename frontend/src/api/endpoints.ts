@@ -1,5 +1,5 @@
 import { api, tokenStore } from './client'
-import type { AuthResponse, Context, ContextWithCards, Page, WordCard } from './types'
+import type { AuthResponse, Context, ContextWithCards, Page, Photo, WordCard } from './types'
 
 export interface Credentials {
   email: string
@@ -26,6 +26,10 @@ export const authApi = {
 export const contextsApi = {
   list: () => api.get<Page<Context>>('/contexts').then((r) => r.data.items),
   words: (id: string) => api.get<Page<WordCard>>(`/contexts/${id}/words`).then((r) => r.data.items),
+  photos: (id: string, q?: string) =>
+    api.get<Page<Photo>>(`/contexts/${id}/photos`, { params: q ? { q } : {} }).then((r) => r.data.items),
+  setPhoto: (id: string, photo: Photo) =>
+    api.put(`/contexts/${id}/photo`, { url: photo.url, credit: photo.credit }),
   create(input: { text: string; language?: string }) {
     return api
       .post<ContextWithCards>('/contexts', { text: input.text, language: input.language ?? 'de' })

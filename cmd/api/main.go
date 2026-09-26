@@ -16,6 +16,7 @@ import (
 	"learnwords/internal/config"
 	"learnwords/internal/handler"
 	"learnwords/internal/provider/mock"
+	"learnwords/internal/provider/openverse"
 	"learnwords/internal/repository/postgres"
 	"learnwords/internal/service"
 	"learnwords/internal/telemetry"
@@ -73,6 +74,10 @@ func run() error {
 		Transcriber: mock.Transcriber{},
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
+	}
+	// Photo search via Openverse (free, no key). Disable with PHOTO_SEARCH=off.
+	if os.Getenv("PHOTO_SEARCH") != "off" {
+		providers.Images = openverse.New()
 	}
 
 	// Services

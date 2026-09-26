@@ -32,6 +32,7 @@ type Providers struct {
 	Transcriber provider.Transcriber
 	TTS         provider.TTS
 	Storage     provider.FileStorage
+	Images      provider.ImageSearch // optional; nil disables photo search
 }
 
 type ContextService struct {
@@ -102,6 +103,15 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 			return nil, s.fail(span, "build card", err)
 		}
 		cards = append(cards, card)
+	}
+
+	// Best effort: a missing photo must never fail context creation.
+	if c.ImageURL == nil {
+		if photos, err := s.findPhotos(ctx, text, 1); err == nil && len(photos) > 0 {
+			c.ImageURL, c.PhotoCredit = &photos[0].Thumbnail, &photos[0].Credit
+		} else if err != nil {
+			span.RecordError(err)
+		}
 	}
 
 	if err := s.contexts.CreateWithCards(ctx, &c, cards); err != nil {
