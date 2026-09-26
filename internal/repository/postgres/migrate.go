@@ -53,15 +53,20 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		if err != nil {
 			return err
 		}
-		err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-			if _, err := tx.Exec(ctx, string(sql)); err != nil {
-				return err
-			}
-			_, err := tx.Exec(ctx, `INSERT INTO schema_migrations (version) VALUES ($1)`, version)
-			return err
-		})
+		tx, err := conn.Begin(ctx)
 		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, string(sql)); err != nil {
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("apply %s: %w", f, err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO schema_migrations (version) VALUES ($1)`, version); err != nil {
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("record %s: %w", f, err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit %s: %w", f, err)
 		}
 	}
 	return nil
