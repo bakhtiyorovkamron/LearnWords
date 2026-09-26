@@ -48,18 +48,18 @@ func run() error {
 		_ = shutdownTracing(c)
 	}()
 
-	if cfg.AutoMigrate {
-		if err := postgres.Migrate(cfg.DatabaseURL); err != nil {
-			return err
-		}
-		slog.Info("migrations applied")
-	}
-
 	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL, cfg.DBMaxConns)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
+
+	if cfg.AutoMigrate {
+		if err := postgres.Migrate(ctx, pool); err != nil {
+			return err
+		}
+		slog.Info("migrations applied")
+	}
 
 	// Repositories
 	userRepo := postgres.NewUserRepository(pool)
