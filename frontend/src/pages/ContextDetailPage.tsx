@@ -5,6 +5,8 @@ import { contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
 import { PhotoPicker } from '../components/PhotoPicker'
+import { ClockFace } from '../components/ClockFace'
+import { parseGermanTime } from '../lib/germanTime'
 
 export function ContextDetailPage() {
   const { id = '' } = useParams()

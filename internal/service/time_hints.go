@@ -9,7 +9,16 @@ import (
 // Openverse is tagged mostly in English, so German time words ("Uhr", "Abend", "Montag")
 // match random photos. For phrases about time we search with English visual keywords instead.
 
-var clockRe = regexp.MustCompile(`(?i)\b\d{1,2}([:.]\d{2})?\s*uhr\b|\b\d{1,2}:\d{2}\b|\b(halb|viertel)\s+(nach|vor)?\s*\w+`)
+const hourWords = `(ein|eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|\d{1,2})`
+
+var clockRe = regexp.MustCompile(`(?i)\d{1,2}[:.]\d{2}|\d{1,2}\s*uhr|` +
+	`(^|[^\p{L}])(halb|viertel|dreiviertel)\s+(nach\s+|vor\s+)?` + hourWords + `([^\p{L}]|$)|` +
+	`(^|[^\p{L}])` + hourWords + `\s+uhr([^\p{L}]|$)|` +
+	`(^|[^\p{L}])(\p{L}+|\d{1,2})\s+(nach|vor)\s+(halb\s+)?` + hourWords + `([^\p{L}]|$)`)
+
+// hasClockTime reports whether the phrase names a concrete clock time ("halb acht", "8 Uhr", "14:30").
+// Such phrases are illustrated by a rendered clock on the frontend instead of a photo.
+func hasClockTime(text string) bool { return clockRe.MatchString(text) }
 
 // Keys are exact tokens (case matters: "Morgen" = morning, "morgen" = tomorrow).
 var timeHints = map[string]string{
