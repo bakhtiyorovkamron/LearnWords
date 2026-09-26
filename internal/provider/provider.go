@@ -1,5 +1,5 @@
 // Package provider defines interfaces for external integrations (OCR, translation, TTS, storage).
-// Real implementations (Tesseract/Vision, DeepL/Google, Google TTS/Azure, MinIO) plug in here.
+// Real implementations (Tesseract/Vision, DeepL/Google, Google TTS/Azure, S3/local disk) plug in here.
 package provider
 
 import "context"
