@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS word_cards;
+DROP TABLE IF EXISTS contexts;
+DROP TABLE IF EXISTS users;
