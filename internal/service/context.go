@@ -108,7 +108,7 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	// Best effort: a missing photo must never fail context creation.
 	if c.ImageURL == nil {
 		if photos, err := s.findPhotos(ctx, text, 1); err == nil && len(photos) > 0 {
-			c.ImageURL, c.PhotoCredit = &photos[0].Thumbnail, &photos[0].Credit
+			c.ImageURL, c.PhotoCredit = &photos[0].URL, &photos[0].Credit
 		} else if err != nil {
 			span.RecordError(err)
 		}
