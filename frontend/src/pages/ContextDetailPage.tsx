@@ -5,7 +5,7 @@ import { contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
 import { PhotoPicker } from '../components/PhotoPicker'
-import { ClockFace } from '../components/ClockFace'
+import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
 
 export function ContextDetailPage() {
@@ -15,6 +15,8 @@ export function ContextDetailPage() {
   const words = useQuery({ queryKey: ['context-words', id], queryFn: () => contextsApi.words(id) })
   const ctx = contexts.data?.find((c) => c.id === id)
   const [picking, setPicking] = useState(false)
+  // Clock-time phrases ("halb neun") get a generated time image instead of a photo.
+  const time = ctx ? parseGermanTime(ctx.source_text) : null
 
   if (words.error) return <p className="text-red-300">{errorMessage(words.error)}</p>
 
@@ -28,7 +30,11 @@ export function ContextDetailPage() {
           <div className="glass animate-rise sticky top-24 overflow-hidden p-8">
             <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-lime-400/20 blur-3xl" />
 
-            {ctx?.image_url ? (
+            {time ? (
+              <div className="-mx-8 -mt-8 mb-6">
+                <TimeImage time={time} />
+              </div>
+            ) : ctx?.image_url ? (
               <figure className="group relative -mx-8 -mt-8 mb-6">
                 <img src={ctx.image_url} alt="" className="aspect-[4/3] w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-transparent to-transparent" />

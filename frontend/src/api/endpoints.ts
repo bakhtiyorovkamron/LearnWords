@@ -40,4 +40,5 @@ export const contextsApi = {
 export const cardsApi = {
   list: () => api.get<Page<WordCard>>('/word-cards', { params: { limit: 100 } }).then((r) => r.data.items),
   regenerateAudio: (id: string) => api.post<WordCard>(`/word-cards/${id}/audio`).then((r) => r.data),
+  remove: (id: string) => api.delete(`/word-cards/${id}`),
 }

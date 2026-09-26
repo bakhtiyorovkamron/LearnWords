@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { cardsApi, contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { ClockFace } from '../components/ClockFace'
+import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
 
 export function ContextsPage() {
@@ -51,12 +51,18 @@ export function ContextsPage() {
           </div>
         )}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {data?.map((c, i) => (
+          {data?.map((c, i) => {
+            const time = parseGermanTime(c.source_text)
+            return (
             <Link key={c.id} to={`/contexts/${c.id}`}
               style={{ animationDelay: `${Math.min(i, 12) * 50}ms` }}
               className="animate-rise group relative overflow-hidden rounded-3xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/50 via-emerald-900/40 to-teal-900/40 p-6 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-2xl hover:shadow-emerald-500/20">
               <div className="absolute left-0 top-0 z-10 h-full w-1 bg-gradient-to-b from-lime-300 to-emerald-500 opacity-60 transition group-hover:opacity-100" />
-              {c.image_url && (
+              {time ? (
+                <div className="-mx-6 -mt-6 mb-4 h-40 overflow-hidden">
+                  <TimeImage time={time} compact />
+                </div>
+              ) : c.image_url && (
                 <div className="-mx-6 -mt-6 mb-4 h-40 overflow-hidden">
                   <img src={c.image_url} alt="" loading="lazy"
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
@@ -68,7 +74,8 @@ export function ContextsPage() {
                 <span className="font-semibold text-lime-300 opacity-0 transition group-hover:opacity-100">Открыть →</span>
               </div>
             </Link>
-          ))}
+            )
+          })}
         </div>
       </section>
     </div>

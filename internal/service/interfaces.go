@@ -29,6 +29,7 @@ type WordCardRepository interface {
 	ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.WordCard, error)
 	GetByID(ctx context.Context, userID, id uuid.UUID) (*domain.WordCard, error)
 	UpdateAudioURL(ctx context.Context, userID, id uuid.UUID, url string) error
+	Delete(ctx context.Context, userID, id uuid.UUID) error
 }
 
 type TokenManager interface {

@@ -24,11 +24,23 @@ export function WordCardView({ card, index = 0 }: { card: WordCard; index?: numb
     mutationFn: () => cardsApi.regenerateAudio(card.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cards'] }),
   })
+  const remove = useMutation({
+    mutationFn: () => cardsApi.remove(card.id),
+    onSuccess: () => {
+      // Drop the card from every cached list immediately.
+      qc.setQueriesData<WordCard[]>({ queryKey: ['cards'] }, (old) => old?.filter((c) => c.id !== card.id))
+      qc.setQueriesData<WordCard[]>({ queryKey: ['context-words'] }, (old) => old?.filter((c) => c.id !== card.id))
+    },
+  })
+
+  function onDelete() {
+    if (window.confirm(`Удалить слово «${card.word}»?`)) remove.mutate()
+  }
 
   return (
     <div
       style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-      className="animate-rise group relative overflow-hidden rounded-2xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/60 to-emerald-900/40 p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20"
+      className={`animate-rise group relative overflow-hidden rounded-2xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/60 to-emerald-900/40 p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20 ${remove.isPending ? 'pointer-events-none opacity-40' : ''}`}
     >
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-lime-400/10 blur-2xl transition group-hover:bg-lime-400/25" />
       <div className="relative flex items-center gap-3">
@@ -52,7 +64,16 @@ export function WordCardView({ card, index = 0 }: { card: WordCard; index?: numb
         >
           ↻
         </button>
+        <button
+          onClick={onDelete}
+          disabled={remove.isPending}
+          title="Удалить слово"
+          className="grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
+        >
+          🗑
+        </button>
       </div>
+      {remove.error && <p className="relative mt-2 text-xs text-red-300">Не удалось удалить</p>}
     </div>
   )
 }

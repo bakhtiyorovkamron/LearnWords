@@ -1,6 +1,6 @@
 import { formatClock, type ClockTime } from '../lib/germanTime'
 
-export function ClockFace({ time, size = 220 }: { time: ClockTime; size?: number }) {
+export function ClockFace({ time, size = 220, hideLabel = false }: { time: ClockTime; size?: number; hideLabel?: boolean }) {
   const hourDeg = ((time.h % 12) + time.m / 60) * 30
   const minDeg = time.m * 6
 
@@ -38,7 +38,7 @@ export function ClockFace({ time, size = 220 }: { time: ClockTime; size?: number
           transform={`rotate(${minDeg} 100 100)`} />
         <circle cx="100" cy="100" r="6" fill="#a3e635" />
       </svg>
-      <div className="display text-3xl font-extrabold tracking-wider text-lime-300">{formatClock(time)}</div>
+      {!hideLabel && <div className="display text-3xl font-extrabold tracking-wider text-lime-300">{formatClock(time)}</div>}
     </div>
   )
 }
