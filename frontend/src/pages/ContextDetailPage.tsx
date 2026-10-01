@@ -89,7 +89,7 @@ export function ContextDetailPage() {
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {words.data?.map((w, i) => <WordCardView key={w.id} card={w} index={i}
-              meaning={words.data!.length === 1 ? ctx?.meaning : undefined} />)}
+              meaning={ctx?.meaning} />)}
           </div>
         </section>
       </div>

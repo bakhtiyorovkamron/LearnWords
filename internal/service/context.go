@@ -79,6 +79,14 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	c.SourceText = text
 
 	words := Tokenize(text, in.Language)
+	// A single typed word (e.g. "ich") must become a card even if it is a stopword.
+	if len(words) == 0 {
+		if fields := strings.Fields(text); len(fields) == 1 {
+			if w := strings.Trim(fields[0], ".,;:!?\"“„'()-"); w != "" {
+				words = []string{w}
+			}
+		}
+	}
 	if len(words) > maxWordsPerCtx {
 		words = words[:maxWordsPerCtx]
 	}
