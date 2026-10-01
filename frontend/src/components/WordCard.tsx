@@ -18,7 +18,7 @@ function speak(card: WordCard) {
   window.speechSynthesis.speak(u)
 }
 
-export function WordCardView({ card, index = 0 }: { card: WordCard; index?: number }) {
+export function WordCardView({ card, index = 0, meaning }: { card: WordCard; index?: number; meaning?: string }) {
   const qc = useQueryClient()
   const regen = useMutation({
     mutationFn: () => cardsApi.regenerateAudio(card.id),
