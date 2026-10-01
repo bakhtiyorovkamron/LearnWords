@@ -62,9 +62,19 @@ type ContextWithCards struct {
 	Cards   []WordCard `json:"cards"`
 }
 
-type TokenPair struct {
-	AccessToken      string    `json:"access_token"`
-	RefreshToken     string    `json:"refresh_token"`
-	AccessExpiresAt  time.Time `json:"access_expires_at"`
-	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
+// Progress is the Leitner-box state of a word card.
+type Progress struct {
+	WordID             uuid.UUID  `json:"word_id"`
+	UserID             uuid.UUID  `json:"user_id"`
+	BoxLevel           int        `json:"box_level"`
+	CorrectStreakAtMax int        `json:"correct_streak_at_max"`
+	IsLearned          bool       `json:"is_learned"`
+	NextReviewAt       time.Time  `json:"next_review_at"` // date (UTC midnight)
+	LastReviewedAt     *time.Time `json:"last_reviewed_at,omitempty"`
+}
+
+// DueCard is a word card due for review today.
+type DueCard struct {
+	WordCard
+	BoxLevel int `json:"box_level"`
 }

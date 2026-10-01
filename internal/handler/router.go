@@ -17,6 +17,7 @@ type RouterDeps struct {
 	Tokens      service.TokenManager
 	Auth        *AuthHandler
 	Contexts    *ContextHandler
+	Review      *ReviewHandler
 	HealthCheck func() error
 }
 

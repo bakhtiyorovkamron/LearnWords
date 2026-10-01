@@ -16,7 +16,7 @@ export function Logo() {
         W
       </span>
       <span>
-        Learn<span className="text-lime-300">Words</span>
+        Wort<span className="text-lime-300">kontext</span>
       </span>
     </span>
   )
