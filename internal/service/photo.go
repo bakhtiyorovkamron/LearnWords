@@ -2,110 +2,36 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
-	"net/url"
-	"strings"
-	"time"
-	"unicode"
+	"net/http"
 
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
 )
 
-const photoSearchTimeout = 6 * time.Second
-
-// photoQueries builds search queries from a German phrase, most specific first.
-// German nouns are capitalized, so they are the best keywords for a picture.
-func photoQueries(text string) []string {
-	// Phrases about time/dates get precise English visual keywords (clock, calendar, sunset…).
-	if tq := timeQueries(text); len(tq) > 0 {
-		return tq
+// imageDataURL validates an uploaded image and encodes it as a data: URL,
+// so it can be shown directly in <img> without a separate file server.
+func imageDataURL(data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", fmt.Errorf("%w: empty image", domain.ErrValidation)
 	}
-	words := Tokenize(text, "de")
-	var nouns []string
-	for _, w := range words {
-		if r := []rune(w); len(r) > 2 && unicode.IsUpper(r[0]) {
-			nouns = append(nouns, w)
-		}
+	if len(data) > MaxImageSize {
+		return "", fmt.Errorf("%w: image too large", domain.ErrValidation)
 	}
-	var qs []string
-	if len(nouns) >= 2 {
-		qs = append(qs, nouns[0]+" "+nouns[1])
+	ct := http.DetectContentType(data)
+	if _, ok := allowedImageTypes[ct]; !ok {
+		return "", fmt.Errorf("%w: unsupported image type %s", domain.ErrValidation, ct)
 	}
-	qs = append(qs, nouns...)
-	if len(qs) == 0 && len(words) > 0 {
-		qs = append(qs, words[0])
-	}
-	if len(qs) > 3 {
-		qs = qs[:3]
-	}
-	return qs
+	return "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 }
 
-// findPhotos tries queries in order and returns the first non-empty result set.
-func (s *ContextService) findPhotos(ctx context.Context, text string, limit int) ([]domain.Photo, error) {
-	if s.p.Images == nil {
-		return nil, nil
-	}
-	ctx, cancel := context.WithTimeout(ctx, photoSearchTimeout)
-	defer cancel()
-
-	var lastErr error
-	for _, q := range photoQueries(text) {
-		photos, err := s.p.Images.Search(ctx, q, limit)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if len(photos) > 0 {
-			return photos, nil
-		}
-	}
-	return nil, lastErr
-}
-
-// SearchPhotos returns photo candidates for a context. A custom query overrides auto keywords.
-func (s *ContextService) SearchPhotos(ctx context.Context, userID, contextID uuid.UUID, query string) ([]domain.Photo, error) {
-	ctx, span := tracer.Start(ctx, "ContextService.SearchPhotos")
-	defer span.End()
-
-	c, err := s.contexts.GetByID(ctx, userID, contextID)
+// UploadPhoto stores a user-uploaded photo for a context.
+func (s *ContextService) UploadPhoto(ctx context.Context, userID, contextID uuid.UUID, data []byte) error {
+	url, err := imageDataURL(data)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if s.p.Images == nil {
-		return []domain.Photo{}, nil
-	}
-
-	query = strings.TrimSpace(query)
-	var photos []domain.Photo
-	if query != "" {
-		if len([]rune(query)) > 100 {
-			return nil, fmt.Errorf("%w: query too long", domain.ErrValidation)
-		}
-		sctx, cancel := context.WithTimeout(ctx, photoSearchTimeout)
-		defer cancel()
-		photos, err = s.p.Images.Search(sctx, query, 12)
-	} else {
-		photos, err = s.findPhotos(ctx, c.SourceText, 12)
-	}
-	if err != nil {
-		return nil, s.fail(span, "search photos", err)
-	}
-	if photos == nil {
-		photos = []domain.Photo{}
-	}
-	return photos, nil
-}
-
-func (s *ContextService) SetPhoto(ctx context.Context, userID, contextID uuid.UUID, photoURL, credit string) error {
-	u, err := url.Parse(photoURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || len(photoURL) > 2048 {
-		return fmt.Errorf("%w: photo url must be a valid https URL", domain.ErrValidation)
-	}
-	if len([]rune(credit)) > 500 {
-		credit = string([]rune(credit)[:500])
-	}
-	return s.contexts.UpdatePhoto(ctx, userID, contextID, photoURL, strings.TrimSpace(credit))
+	return s.contexts.UpdatePhoto(ctx, userID, contextID, url, "")
 }

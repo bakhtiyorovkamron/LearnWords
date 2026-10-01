@@ -38,22 +38,17 @@ export function ContextDetailPage() {
               <figure className="group relative -mx-8 -mt-8 mb-6">
                 <img src={ctx.image_url} alt="" className="aspect-[4/3] w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-transparent to-transparent" />
-                {ctx.photo_credit && (
-                  <figcaption className="absolute inset-x-0 bottom-0 truncate px-8 pb-2 text-[10px] text-emerald-100/60">
-                    {ctx.photo_credit}
-                  </figcaption>
-                )}
                 <button onClick={() => setPicking(true)}
                   className="absolute right-3 top-3 rounded-full bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-lime-300 backdrop-blur transition hover:bg-emerald-950">
-                  🔄 Другое фото
+                  🔄 Заменить фото
                 </button>
               </figure>
             ) : (
               ctx && (
                 <button onClick={() => setPicking(true)}
                   className="relative mb-6 flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/30 text-emerald-200/70 transition hover:border-lime-400 hover:text-lime-300">
-                  <span className="text-4xl">🖼</span>
-                  <span className="text-sm font-semibold">Подобрать фото к фразе</span>
+                  <span className="text-4xl">📷</span>
+                  <span className="text-sm font-semibold">Загрузить фото</span>
                 </button>
               )
             )}
@@ -62,6 +57,12 @@ export function ContextDetailPage() {
             <blockquote className="display relative mt-4 text-2xl font-semibold leading-snug text-white">
               „{ctx?.source_text ?? '…'}“
             </blockquote>
+            {ctx?.meaning && (
+              <>
+                <p className="mt-5 text-xs uppercase tracking-widest text-lime-300/80">Значение</p>
+                <p className="mt-2 text-lg text-emerald-50">{ctx.meaning}</p>
+              </>
+            )}
             {ctx && (
               <p className="mt-6 text-xs text-emerald-300/50">
                 Добавлено {new Date(ctx.created_at).toLocaleString()}

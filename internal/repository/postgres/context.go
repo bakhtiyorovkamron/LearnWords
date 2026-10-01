@@ -29,8 +29,8 @@ func scanContext(row pgx.Row) (domain.Context, error) {
 func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO contexts (`+contextCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			c.ID, c.UserID, c.ImageURL, c.PhotoCredit, c.SourceText, c.Language, c.CreatedAt); err != nil {
+			`INSERT INTO contexts (`+contextCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			c.ID, c.UserID, c.ImageURL, c.PhotoCredit, c.SourceText, c.Language, c.CreatedAt, c.Meaning); err != nil {
 			return err
 		}
 		batch := &pgx.Batch{}

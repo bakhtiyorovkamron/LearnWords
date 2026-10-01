@@ -32,6 +32,7 @@ type Context struct {
 	ImageURL    *string   `json:"image_url,omitempty"`
 	PhotoCredit *string   `json:"photo_credit,omitempty"`
 	SourceText  string    `json:"source_text"`
+	Meaning     string    `json:"meaning"`
 	Language    string    `json:"language"`
 	CreatedAt   time.Time `json:"created_at"`
 }

@@ -1,5 +1,5 @@
 import { api, tokenStore } from './client'
-import type { AuthResponse, Context, ContextWithCards, Page, Photo, WordCard } from './types'
+import type { AuthResponse, Context, ContextWithCards, Page, WordCard } from './types'
 
 export interface Credentials {
   email: string

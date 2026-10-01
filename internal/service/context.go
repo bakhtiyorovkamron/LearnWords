@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 var tracer = otel.Tracer("learnwords/service")
 
 const (
-	MaxImageSize   = 10 << 20
+	MaxImageSize   = 5 << 20
 	maxWordsPerCtx = 50
 )
 
@@ -32,7 +31,6 @@ type Providers struct {
 	Transcriber provider.Transcriber
 	TTS         provider.TTS
 	Storage     provider.FileStorage
-	Images      provider.ImageSearch // optional; nil disables photo search
 }
 
 type ContextService struct {
@@ -48,6 +46,7 @@ func NewContextService(contexts ContextRepository, cards WordCardRepository, p P
 
 type CreateContextInput struct {
 	Text     string
+	Meaning  string
 	Image    []byte
 	Language string
 }
@@ -61,31 +60,21 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	}
 	c := domain.Context{ID: uuid.New(), UserID: userID, Language: in.Language, CreatedAt: time.Now().UTC()}
 	text := strings.TrimSpace(in.Text)
+	meaning := strings.TrimSpace(in.Meaning)
+	if len([]rune(meaning)) > 500 {
+		return nil, fmt.Errorf("%w: meaning too long", domain.ErrValidation)
+	}
+	c.Meaning = meaning
 
 	if len(in.Image) > 0 {
-		if len(in.Image) > MaxImageSize {
-			return nil, fmt.Errorf("%w: image too large", domain.ErrValidation)
-		}
-		ct := http.DetectContentType(in.Image)
-		ext, ok := allowedImageTypes[ct]
-		if !ok {
-			return nil, fmt.Errorf("%w: unsupported image type %s", domain.ErrValidation, ct)
-		}
-		url, err := s.p.Storage.Upload(ctx, fmt.Sprintf("images/%s/%s.%s", userID, c.ID, ext), in.Image, ct)
+		url, err := imageDataURL(in.Image)
 		if err != nil {
-			return nil, s.fail(span, "upload image", err)
+			return nil, err
 		}
 		c.ImageURL = &url
-		if text == "" {
-			ocrText, err := s.p.OCR.ExtractText(ctx, in.Image, in.Language)
-			if err != nil {
-				return nil, s.fail(span, "ocr", err)
-			}
-			text = strings.TrimSpace(ocrText)
-		}
 	}
 	if text == "" {
-		return nil, fmt.Errorf("%w: text or image with readable text is required", domain.ErrValidation)
+		return nil, fmt.Errorf("%w: text is required", domain.ErrValidation)
 	}
 	c.SourceText = text
 
@@ -101,6 +90,10 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 		card, err := s.buildCard(ctx, c, w)
 		if err != nil {
 			return nil, s.fail(span, "build card", err)
+		}
+		// A single-word phrase: the user's meaning is the word's translation.
+		if len(words) == 1 && meaning != "" {
+			card.Translation = meaning
 		}
 		cards = append(cards, card)
 	}

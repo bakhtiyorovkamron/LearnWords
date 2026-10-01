@@ -1,14 +1,20 @@
 package service
 
 import (
-	"reflect"
+	"strings"
 	"testing"
 )
 
-func TestPhotoQueries(t *testing.T) {
-	got := photoQueries("Ich hätte gern einen Kaffee mit Milch, bitte.")
-	want := []string{"Kaffee Milch", "Kaffee", "Milch"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %v, want %v", got, want)
+func TestImageDataURL(t *testing.T) {
+	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+	got, err := imageDataURL(png)
+	if err != nil || !strings.HasPrefix(got, "data:image/png;base64,") {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if _, err := imageDataURL([]byte("not an image")); err == nil {
+		t.Fatal("expected error for non-image")
+	}
+	if _, err := imageDataURL(nil); err == nil {
+		t.Fatal("expected error for empty")
 	}
 }

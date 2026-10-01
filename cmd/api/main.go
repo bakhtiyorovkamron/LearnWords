@@ -74,10 +74,6 @@ func run() error {
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
 	}
-	// Photo search via Openverse (free, no key). Disable with PHOTO_SEARCH=off.
-	if os.Getenv("PHOTO_SEARCH") != "off" {
-		providers.Images = openverse.New()
-	}
 
 	// Services
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)

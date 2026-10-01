@@ -65,6 +65,36 @@ export function NewContextPage() {
         </div>
 
         <div>
+          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Значение</label>
+          <input
+            value={meaning}
+            onChange={(e) => setMeaning(e.target.value.slice(0, 500))}
+            placeholder="Что означает слово или фраза?"
+            className="field"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Фото (необязательно)</label>
+          {preview ? (
+            <div className="relative overflow-hidden rounded-2xl">
+              <img src={preview} alt="" className="aspect-[4/3] w-full object-cover" />
+              <button type="button" onClick={() => setPhoto(null)}
+                className="absolute right-3 top-3 rounded-full bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-lime-300 backdrop-blur hover:bg-emerald-950">
+                ✕ Убрать
+              </button>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/30 py-8 text-emerald-200/70 transition hover:border-lime-400 hover:text-lime-300">
+              <span className="text-3xl">📷</span>
+              <span className="text-sm font-semibold">Загрузить фото</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                onChange={(e) => { void pickPhoto(e.target.files?.[0]); e.target.value = '' }} />
+            </label>
+          )}
+        </div>
+
+        <div>
           <p className="mb-2 text-xs uppercase tracking-wider text-emerald-300/60">Или попробуйте пример</p>
           <div className="flex flex-wrap gap-2">
             {examples.map((ex) => (

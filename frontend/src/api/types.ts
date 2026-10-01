@@ -16,16 +16,11 @@ export interface Context {
   image_url?: string
   photo_credit?: string
   source_text: string
+  meaning?: string
   language: string
   created_at: string
 }
 
-export interface Photo {
-  url: string
-  original: string
-  credit: string
-  source_url: string
-}
 
 export interface WordCard {
   id: string

@@ -1,0 +1,1 @@
+ALTER TABLE contexts DROP COLUMN IF EXISTS meaning;
