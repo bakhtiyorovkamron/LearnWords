@@ -59,6 +59,11 @@ export const wordsApi = {
       .then((r) => r.data),
 }
 
+export const statsApi = {
+  get: (period: 'week' | 'month') =>
+    api.get<Stats>('/stats', { params: { period } }).then((r) => r.data),
+}
+
 export const reviewApi = {
   due: () => api.get<{ cards: DueCard[] }>('/review/due').then((r) => r.data.cards),
   answer: (id: string, correct: boolean) =>

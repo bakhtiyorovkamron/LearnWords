@@ -21,6 +21,7 @@ export default function App() {
           <Route path="/contexts/new" element={<NewContextPage />} />
           <Route path="/contexts/:id" element={<ContextDetailPage />} />
           <Route path="/cards" element={<CardsPage />} />
+          <Route path="/stats" element={<StatsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/contexts" replace />} />
