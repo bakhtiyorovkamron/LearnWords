@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
+import { resizeImage } from '../lib/image'
 
 const MAX_LEN = 2000
 
