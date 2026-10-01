@@ -17,9 +17,10 @@ type ContextHandler struct{ svc *service.ContextService }
 func NewContextHandler(svc *service.ContextService) *ContextHandler { return &ContextHandler{svc: svc} }
 
 type createContextJSON struct {
-	Text     string `json:"text" binding:"required,max=2000"`
-	Meaning  string `json:"meaning" binding:"max=500"`
-	Language string `json:"language"`
+	Text          string `json:"text" binding:"required,max=2000"`
+	Meaning       string `json:"meaning" binding:"max=500"`
+	Pronunciation string `json:"pronunciation" binding:"max=200"`
+	Language      string `json:"language"`
 }
 
 // readPhoto reads an optional uploaded file from the given multipart field.
@@ -45,6 +46,7 @@ func (h *ContextHandler) Create(c *gin.Context) {
 	if strings.HasPrefix(c.ContentType(), "multipart/") {
 		in.Text = c.PostForm("text")
 		in.Meaning = c.PostForm("meaning")
+		in.Pronunciation = c.PostForm("pronunciation")
 		in.Language = c.PostForm("language")
 		if strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 2000 {
 			badRequest(c, "text is required (max 2000 chars)")
@@ -62,7 +64,7 @@ func (h *ContextHandler) Create(c *gin.Context) {
 			badRequest(c, "text is required (max 2000 chars)")
 			return
 		}
-		in = service.CreateContextInput{Text: req.Text, Meaning: req.Meaning, Language: req.Language}
+		in = service.CreateContextInput{Text: req.Text, Meaning: req.Meaning, Pronunciation: req.Pronunciation, Language: req.Language}
 	}
 
 	res, err := h.svc.Create(c.Request.Context(), userID(c), in)

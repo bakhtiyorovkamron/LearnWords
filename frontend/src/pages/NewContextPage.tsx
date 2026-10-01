@@ -19,6 +19,7 @@ export function NewContextPage() {
   const qc = useQueryClient()
   const [text, setText] = useState('')
   const [meaning, setMeaning] = useState('')
+  const [pronunciation, setPronunciation] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -44,7 +45,8 @@ export function NewContextPage() {
   }
 
   const mutation = useMutation({
-    mutationFn: () => contextsApi.create({ text: text.trim(), meaning: meaning.trim(), photo, language: 'de' }),
+    mutationFn: () =>
+      contextsApi.create({ text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), photo, language: 'de' }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['contexts'] })
       qc.invalidateQueries({ queryKey: ['cards'] })
@@ -56,7 +58,9 @@ export function NewContextPage() {
   function submit(e: FormEvent) {
     e.preventDefault()
     setLocalError(null)
-    if (!text.trim()) return setLocalError('Введите немецкую фразу')
+    if (!text.trim()) return setLocalError('Введите немецкое слово или фразу')
+    if (!meaning.trim()) return setLocalError('Введите перевод')
+    if (!pronunciation.trim()) return setLocalError('Введите произношение')
     mutation.mutate()
   }
 
@@ -89,11 +93,23 @@ export function NewContextPage() {
         </div>
 
         <div>
-          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Значение</label>
+          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Перевод *</label>
           <input
             value={meaning}
+            required
             onChange={(e) => setMeaning(e.target.value.slice(0, 500))}
             placeholder="Что означает слово или фраза?"
+            className="field"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Произношение *</label>
+          <input
+            value={pronunciation}
+            required
+            onChange={(e) => setPronunciation(e.target.value.slice(0, 200))}
+            placeholder="например: [ихь]"
             className="field"
           />
         </div>

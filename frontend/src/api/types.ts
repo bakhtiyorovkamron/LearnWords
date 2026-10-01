@@ -33,6 +33,18 @@ export interface WordCard {
   created_at: string
 }
 
+export interface DueCard extends WordCard {
+  box_level: number
+}
+
+export interface Progress {
+  word_id: string
+  box_level: number
+  correct_streak_at_max: number
+  is_learned: boolean
+  next_review_at: string
+}
+
 export interface ContextWithCards {
   context: Context
   cards: WordCard[]

@@ -70,7 +70,7 @@ func ApplyAnswer(p domain.Progress, correct bool, now time.Time) domain.Progress
 		p.BoxLevel = 1
 		p.CorrectStreakAtMax = 0
 		p.IsLearned = false
-		p.NextReviewAt = today
+		p.NextReviewAt = today.AddDate(0, 0, 1)
 	}
 	p.LastReviewedAt = &now
 	return p

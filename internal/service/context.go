@@ -100,8 +100,13 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 			return nil, s.fail(span, "build card", err)
 		}
 		// A single-word phrase: the user's meaning is the word's translation.
-		if len(words) == 1 && meaning != "" {
-			card.Translation = meaning
+		if len(words) == 1 {
+			if meaning != "" {
+				card.Translation = meaning
+			}
+			if p := strings.TrimSpace(in.Pronunciation); p != "" {
+				card.Transcription = p
+			}
 		}
 		cards = append(cards, card)
 	}

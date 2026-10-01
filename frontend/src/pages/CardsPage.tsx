@@ -3,8 +3,24 @@ import { useQuery } from '@tanstack/react-query'
 import { cardsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
+import { ReviewSession } from '../components/ReviewSession'
 
 export function CardsPage() {
+  const [tab, setTab] = useState<'review' | 'all'>('review')
+  return (
+    <div className="space-y-8">
+      <div className="flex gap-2">
+        {([['review', 'Повторение'], ['all', 'Коллекция']] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)}
+            className={tab === k ? 'btn-primary' : 'btn-ghost'}>{label}</button>
+        ))}
+      </div>
+      {tab === 'review' ? <ReviewSession /> : <Collection />}
+    </div>
+  )
+}
+
+function Collection() {
   const { data, isLoading, error } = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
   const [q, setQ] = useState('')
 

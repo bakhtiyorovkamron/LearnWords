@@ -1,5 +1,5 @@
 import { api, tokenStore } from './client'
-import type { AuthResponse, Context, ContextWithCards, Page, WordCard } from './types'
+import type { AuthResponse, Context, ContextWithCards, DueCard, Page, Progress, WordCard } from './types'
 
 export interface Credentials {
   email: string
@@ -26,15 +26,26 @@ export const authApi = {
 export const contextsApi = {
   list: () => api.get<Page<Context>>('/contexts').then((r) => r.data.items),
   words: (id: string) => api.get<Page<WordCard>>(`/contexts/${id}/words`).then((r) => r.data.items),
-  photos: (id: string, q?: string) =>
-    api.get<Page<Photo>>(`/contexts/${id}/photos`, { params: q ? { q } : {} }).then((r) => r.data.items),
-  setPhoto: (id: string, photo: Photo) =>
-    api.put(`/contexts/${id}/photo`, { url: photo.url, credit: photo.credit }),
-  create(input: { text: string; language?: string }) {
-    return api
-      .post<ContextWithCards>('/contexts', { text: input.text, language: input.language ?? 'de' })
-      .then((r) => r.data)
+  setPhoto: (id: string, file: File) => {
+    const fd = new FormData()
+    fd.append('photo', file)
+    return api.put(`/contexts/${id}/photo`, fd)
   },
+  create(input: { text: string; meaning?: string; pronunciation?: string; photo?: File | null; language?: string }) {
+    const fd = new FormData()
+    fd.append('text', input.text)
+    fd.append('meaning', input.meaning ?? '')
+    fd.append('pronunciation', input.pronunciation ?? '')
+    fd.append('language', input.language ?? 'de')
+    if (input.photo) fd.append('photo', input.photo)
+    return api.post<ContextWithCards>('/contexts', fd).then((r) => r.data)
+  },
+}
+
+export const reviewApi = {
+  due: () => api.get<{ cards: DueCard[] }>('/review/due').then((r) => r.data.cards),
+  answer: (id: string, correct: boolean) =>
+    api.post<Progress>(`/review/${id}/answer`, { correct }).then((r) => r.data),
 }
 
 export const cardsApi = {
