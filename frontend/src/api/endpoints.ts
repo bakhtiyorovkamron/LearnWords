@@ -26,6 +26,7 @@ export const authApi = {
 export const contextsApi = {
   list: () => api.get<Page<Context>>('/contexts').then((r) => r.data.items),
   words: (id: string) => api.get<Page<WordCard>>(`/contexts/${id}/words`).then((r) => r.data.items),
+  remove: (id: string) => api.delete(`/contexts/${id}`),
   setPhoto: (id: string, file: File) => {
     const fd = new FormData()
     fd.append('photo', file)

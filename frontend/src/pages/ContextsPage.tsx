@@ -1,13 +1,32 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cardsApi, contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
+import type { Context } from '../api/types'
 import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
 
 export function ContextsPage() {
+  const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
   const cards = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
+
+  const remove = useMutation({
+    mutationFn: (id: string) => contextsApi.remove(id),
+    onSuccess: (_r, id) => {
+      // Drop the context from the cached list right away: the list and the "Контекстов" counter update together.
+      qc.setQueryData<Context[]>(['contexts'], (old) => old?.filter((c) => c.id !== id))
+      qc.removeQueries({ queryKey: ['context-words', id] })
+      qc.invalidateQueries({ queryKey: ['cards'] })
+      qc.invalidateQueries({ queryKey: ['review-due'] })
+    },
+  })
+
+  function onDelete(e: { preventDefault(): void; stopPropagation(): void }, id: string) {
+    e.preventDefault() // the card is wrapped in a <Link>
+    e.stopPropagation()
+    if (window.confirm('Удалить этот контекст?')) remove.mutate(id)
+  }
 
   const stats = [
     { label: 'Контекстов', value: data?.length ?? 0, icon: '📚' },
@@ -43,6 +62,7 @@ export function ContextsPage() {
         <h2 className="display mb-4 text-xl font-bold">Мои контексты</h2>
         {isLoading && <SkeletonGrid />}
         {error && <p className="text-red-300">{errorMessage(error)}</p>}
+        {remove.error && <p className="mb-3 text-red-300">Не удалось удалить: {errorMessage(remove.error)}</p>}
         {data && !data.length && (
           <div className="glass p-10 text-center">
             <div className="text-5xl">🌿</div>
@@ -58,6 +78,12 @@ export function ContextsPage() {
               style={{ animationDelay: `${Math.min(i, 12) * 50}ms` }}
               className="animate-rise group relative overflow-hidden rounded-3xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/50 via-emerald-900/40 to-teal-900/40 p-6 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-2xl hover:shadow-emerald-500/20">
               <div className="absolute left-0 top-0 z-10 h-full w-1 bg-gradient-to-b from-lime-300 to-emerald-500 opacity-60 transition group-hover:opacity-100" />
+              <button type="button" onClick={(e) => onDelete(e, c.id)}
+                disabled={remove.isPending && remove.variables === c.id}
+                title="Удалить контекст" aria-label="Удалить контекст"
+                className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-emerald-950/70 text-emerald-200/80 backdrop-blur transition hover:bg-red-500/30 hover:text-red-200 disabled:opacity-50">
+                🗑
+              </button>
               {time ? (
                 <div className="-mx-6 -mt-6 mb-4 h-40 overflow-hidden">
                   <TimeImage time={time} compact />
