@@ -69,6 +69,7 @@ export function ContextsPage() {
                 </div>
               )}
               <p className="line-clamp-4 text-lg leading-relaxed text-white">„{c.source_text}“</p>
+              {c.meaning && <p className="mt-2 line-clamp-2 text-sm text-lime-200">— {c.meaning}</p>}
               <div className="mt-4 flex items-center justify-between text-xs text-emerald-300/60">
                 <span>{new Date(c.created_at).toLocaleDateString()}</span>
                 <span className="font-semibold text-lime-300 opacity-0 transition group-hover:opacity-100">Открыть →</span>

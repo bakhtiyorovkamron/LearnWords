@@ -47,7 +47,7 @@ export function WordCardView({ card, index = 0 }: { card: WordCard; index?: numb
         <div className="min-w-0 flex-1">
           <div className="truncate text-lg font-bold text-white">{card.word}</div>
           <div className="font-mono text-xs text-lime-300/80">{card.transcription}</div>
-          <div className="mt-1 text-sm text-emerald-100/80">{card.translation}</div>
+          <div className="mt-1 text-sm text-emerald-100/80">{meaning || card.translation}</div>
         </div>
         <button
           onClick={() => play(card)}
