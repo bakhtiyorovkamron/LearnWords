@@ -27,55 +27,55 @@ export function StatsPage() {
     { icon: '🏆', value: t ? `${t.longest_streak_days} ${pluralDays(t.longest_streak_days)}` : '—', label: 'Лучший streak' },
   ]
   const total = data?.daily.reduce((s, d) => s + d.reviewed, 0) ?? 0
-}
-  )
-    </div>
-      </section>
-        )}
-          </>
-            )}
-              </p>
-                Пока нет данных — пройдите тренировку в разделе «Карточки».
-              <p className="mt-2 text-center text-sm text-emerald-300/60">
-            {total === 0 && (
-            </p>
-              За период: {total} повторений, {newWords} новых слов
-            <p className="mt-4 text-center text-sm text-emerald-100/70">
-            <ReviewsChart data={data.daily} />
-          <>
-        {data && (
-        {error && <p className="text-red-300">{errorMessage(error)}</p>}
-        {isLoading && <div className="h-56 animate-pulse rounded-2xl bg-emerald-800/30" />}
-
-        </div>
-          </div>
-            ))}
-              </button>
-                {label}
-              <button key={k} onClick={() => setPeriod(k)} className={period === k ? 'btn-primary' : 'btn-ghost'}>
-            {([['week', 'Неделя'], ['month', 'Месяц']] as const).map(([k, label]) => (
-          <div className="flex gap-2">
-          <h2 className="display text-xl font-bold">Повторений за день</h2>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <section className="glass p-6">
-
-      </section>
-        ))}
-          </div>
-            <div className="text-xs text-emerald-100/60">{c.label}</div>
-            <div className="display mt-1 text-2xl font-extrabold text-lime-300">{c.value}</div>
-            <div className="text-2xl">{c.icon}</div>
-          <div key={c.label} className="glass p-5 text-center">
-        {cards.map((c) => (
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-
-      </div>
-        <p className="mt-2 text-emerald-100/70">Прогресс обучения по дням.</p>
-        </h1>
-          Моя <span className="text-lime-300">статистика</span> 📈
-        <h1 className="display text-3xl font-extrabold md:text-4xl">
-      <div className="animate-rise">
-    <div className="space-y-8">
-  return (
-
   const newWords = data?.daily.reduce((s, d) => s + d.new_words, 0) ?? 0
+
+  return (
+    <div className="space-y-8">
+      <div className="animate-rise">
+        <h1 className="display text-3xl font-extrabold md:text-4xl">
+          Моя <span className="text-lime-300">статистика</span> 📈
+        </h1>
+        <p className="mt-2 text-emerald-100/70">Прогресс обучения по дням.</p>
+      </div>
+
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {cards.map((c) => (
+          <div key={c.label} className="glass p-5 text-center">
+            <div className="text-2xl">{c.icon}</div>
+            <div className="display mt-1 text-2xl font-extrabold text-lime-300">{c.value}</div>
+            <div className="text-xs text-emerald-100/60">{c.label}</div>
+          </div>
+        ))}
+      </section>
+
+      <section className="glass p-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="display text-xl font-bold">Повторений за день</h2>
+          <div className="flex gap-2">
+            {([['week', 'Неделя'], ['month', 'Месяц']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setPeriod(k)} className={period === k ? 'btn-primary' : 'btn-ghost'}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isLoading && <div className="h-56 animate-pulse rounded-2xl bg-emerald-800/30" />}
+        {error && <p className="text-red-300">{errorMessage(error)}</p>}
+        {data && (
+          <>
+            <ReviewsChart data={data.daily} />
+            <p className="mt-4 text-center text-sm text-emerald-100/70">
+              За период: {total} повторений, {newWords} новых слов
+            </p>
+            {total === 0 && (
+              <p className="mt-2 text-center text-sm text-emerald-300/60">
+                Пока нет данных — пройдите тренировку в разделе «Карточки».
+              </p>
+            )}
+          </>
+        )}
+      </section>
+    </div>
+  )
+}
