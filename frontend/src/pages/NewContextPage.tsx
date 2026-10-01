@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { contextsApi } from '../api/endpoints'
@@ -18,10 +18,33 @@ export function NewContextPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [text, setText] = useState('')
+  const [meaning, setMeaning] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!photo) {
+      setPreview(null)
+      return
+    }
+    const url = URL.createObjectURL(photo)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photo])
+
+  async function pickPhoto(file?: File) {
+    if (!file) return
+    setLocalError(null)
+    try {
+      setPhoto(await resizeImage(file))
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : 'Не удалось загрузить фото')
+    }
+  }
+
   const mutation = useMutation({
-    mutationFn: () => contextsApi.create({ text: text.trim(), language: 'de' }),
+    mutationFn: () => contextsApi.create({ text: text.trim(), meaning: meaning.trim(), photo, language: 'de' }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['contexts'] })
       qc.invalidateQueries({ queryKey: ['cards'] })
