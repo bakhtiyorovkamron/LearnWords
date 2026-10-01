@@ -1,81 +1,84 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { reviewApi } from '../api/endpoints'
+import { cardsApi, reviewApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { DueCard } from '../api/types'
+import { QuizQuestion } from './QuizQuestion'
+import { ReviewResult } from './ReviewResult'
 
-// Leitner review: show the German word, flip to see translation + pronunciation, then self-grade.
+// Daily training: Leitner "due" words, multiple-choice questions, progress saved after every answer.
 export function ReviewSession() {
   const qc = useQueryClient()
   const due = useQuery({ queryKey: ['review-due'], queryFn: reviewApi.due, staleTime: 0, refetchOnWindowFocus: false })
+  // Whole dictionary: source of wrong answer options.
+  const pool = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
+
+  const [deck, setDeck] = useState<DueCard[] | null>(null) // null = not started
   const [index, setIndex] = useState(0)
-  const [flipped, setFlipped] = useState(false)
-  const [known, setKnown] = useState(0)
+  const [correct, setCorrect] = useState(0)
 
   const answer = useMutation({
-    mutationFn: ({ id, correct }: { id: string; correct: boolean }) => reviewApi.answer(id, correct),
-    onSuccess: (_p, v) => {
-      if (v.correct) setKnown((k) => k + 1)
-      setFlipped(false)
-      setIndex((i) => i + 1)
-    },
+    mutationFn: ({ id, ok }: { id: string; ok: boolean }) => reviewApi.answer(id, ok),
   })
 
-  if (due.isLoading) return <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />
+  function start() {
+    setDeck(due.data ?? [])
+    setIndex(0)
+    setCorrect(0)
+    answer.reset()
+  }
+
+  function restart() {
+    setDeck(null)
+    qc.invalidateQueries({ queryKey: ['review-due'] })
+  }
+
+  if (due.isLoading || pool.isLoading) return <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />
   if (due.error) return <p className="text-red-300">{errorMessage(due.error)}</p>
 
-  const cards: DueCard[] = due.data ?? []
-  const card = cards[index]
-
-  if (!card) {
+  // Start screen / nothing to review.
+  if (!deck) {
+    const count = due.data?.length ?? 0
+    if (!count) {
+      return (
+        <div className="glass p-10 text-center">
+          <div className="text-5xl">🎉</div>
+          <p className="mt-3 text-lg font-semibold">На сегодня слов для повторения нет 🎉</p>
+          <p className="mt-1 text-sm text-emerald-100/70">Загляните завтра или добавьте новые слова.</p>
+        </div>
+      )
+    }
     return (
       <div className="glass p-10 text-center">
-        <div className="text-5xl">🎉</div>
-        <p className="mt-3 text-lg font-semibold">
-          {cards.length ? `Готово! Вспомнили: ${known} из ${cards.length}` : 'На сегодня повторять нечего'}
-        </p>
-        <button className="btn-primary mt-6" onClick={() => {
-          setIndex(0); setKnown(0); setFlipped(false)
-          qc.invalidateQueries({ queryKey: ['review-due'] })
-        }}>Обновить</button>
+        <div className="text-5xl">🃏</div>
+        <p className="mt-3 text-lg font-semibold">Слов для повторения сегодня: {count}</p>
+        <button type="button" onClick={start} className="btn-primary mt-6 text-lg">Начать тренировку</button>
       </div>
     )
   }
 
+  if (index >= deck.length) {
+    return <ReviewResult correct={correct} total={deck.length} onRestart={restart} />
+  }
+
+  const card = deck[index]
   return (
-    <div className="mx-auto max-w-xl space-y-4">
-      <div className="flex items-center justify-between text-sm text-emerald-100/70">
-        <span>{index + 1} / {cards.length}</span>
-        <span>Коробка {card.box_level} из 5</span>
-      </div>
-
-      <button type="button" onClick={() => setFlipped((f) => !f)}
-        className="glass flex min-h-[16rem] w-full flex-col items-center justify-center gap-3 p-8 text-center transition hover:border-lime-400/40">
-        <div className="display text-4xl font-extrabold text-white">{card.word}</div>
-        {flipped ? (
-          <>
-            <div className="text-2xl text-lime-200">{card.translation}</div>
-            <div className="font-mono text-sm text-lime-300/80">{card.transcription}</div>
-          </>
-        ) : (
-          <div className="text-sm text-emerald-300/60">Вспомните перевод и нажмите, чтобы перевернуть</div>
-        )}
-      </button>
-
-      {answer.error && <p className="text-sm text-red-300">{errorMessage(answer.error)}</p>}
-
-      {flipped && (
-        <div className="grid grid-cols-2 gap-3">
-          <button disabled={answer.isPending} onClick={() => answer.mutate({ id: card.id, correct: false })}
-            className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 font-semibold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50">
-            ✗ Не знал
-          </button>
-          <button disabled={answer.isPending} onClick={() => answer.mutate({ id: card.id, correct: true })}
-            className="btn-primary">
-            ✓ Знал
-          </button>
-        </div>
-      )}
-    </div>
+    <QuizQuestion
+      key={card.id}
+      card={card}
+      pool={pool.data ?? []}
+      position={index + 1}
+      total={deck.length}
+      saving={answer.isPending}
+      error={answer.error ? errorMessage(answer.error) : null}
+      onAnswer={(ok) => {
+        if (ok) setCorrect((c) => c + 1)
+        answer.mutate({ id: card.id, ok }) // saved immediately, not at the end
+      }}
+      onNext={() => {
+        answer.reset()
+        setIndex((i) => i + 1)
+      }}
+    />
   )
 }
