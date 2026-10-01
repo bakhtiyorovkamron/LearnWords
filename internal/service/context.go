@@ -45,10 +45,11 @@ func NewContextService(contexts ContextRepository, cards WordCardRepository, p P
 }
 
 type CreateContextInput struct {
-	Text     string
-	Meaning  string
-	Image    []byte
-	Language string
+	Text          string
+	Meaning       string
+	Pronunciation string
+	Image         []byte
+	Language      string
 }
 
 func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in CreateContextInput) (*domain.ContextWithCards, error) {
