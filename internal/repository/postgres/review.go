@@ -40,7 +40,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 }
 
 // Apply loads (creating if absent) the progress row under a row lock, transforms it and saves it atomically.
-func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time,
+func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time, correct bool,
 	fn func(p domain.Progress) domain.Progress) (*domain.Progress, error) {
 
 	tx, err := r.pool.Begin(ctx)

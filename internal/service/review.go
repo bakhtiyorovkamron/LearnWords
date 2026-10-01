@@ -20,8 +20,8 @@ var boxIntervalDays = map[int]int{1: 1, 2: 2, 3: 4, 4: 7, 5: 14}
 
 type ReviewRepository interface {
 	ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int) ([]domain.DueCard, error)
-	// Apply runs fn on the current progress inside a transaction and stores the result.
-	Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time,
+	// Apply runs fn on the current progress inside a transaction, stores the result and logs the answer.
+	Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time, correct bool,
 		fn func(p domain.Progress) domain.Progress) (*domain.Progress, error)
 }
 
