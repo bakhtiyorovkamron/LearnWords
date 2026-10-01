@@ -57,25 +57,25 @@ export function ReviewSession() {
             <div className="text-2xl text-lime-200">{card.translation}</div>
             <div className="font-mono text-sm text-lime-300/80">{card.transcription}</div>
           </>
-}
-  )
-    </div>
-      )}
-        </div>
-          </button>
-            ✓ Знал
-            className="btn-primary">
-          <button disabled={answer.isPending} onClick={() => answer.mutate({ id: card.id, correct: true })}
-          </button>
-            ✗ Не знал
-            className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 font-semibold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50">
-          <button disabled={answer.isPending} onClick={() => answer.mutate({ id: card.id, correct: false })}
-        <div className="grid grid-cols-2 gap-3">
-      {flipped && (
+        ) : (
+          <div className="text-sm text-emerald-300/60">Вспомните перевод и нажмите, чтобы перевернуть</div>
+        )}
+      </button>
 
       {answer.error && <p className="text-sm text-red-300">{errorMessage(answer.error)}</p>}
 
-      </button>
-        )}
-          <div className="text-sm text-emerald-300/60">Вспомните перевод и нажмите, чтобы перевернуть</div>
-        ) : (
+      {flipped && (
+        <div className="grid grid-cols-2 gap-3">
+          <button disabled={answer.isPending} onClick={() => answer.mutate({ id: card.id, correct: false })}
+            className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 font-semibold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50">
+            ✗ Не знал
+          </button>
+          <button disabled={answer.isPending} onClick={() => answer.mutate({ id: card.id, correct: true })}
+            className="btn-primary">
+            ✓ Знал
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
