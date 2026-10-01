@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cardsApi, contextsApi } from '../api/endpoints'
+import { cardsApi, contextsApi, statsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { Context } from '../api/types'
 import { TimeImage } from '../components/TimeImage'
@@ -10,6 +10,8 @@ export function ContextsPage() {
   const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
   const cards = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
+  const stats7 = useQuery({ queryKey: ['stats', 'week'], queryFn: () => statsApi.get('week') })
+  const streak = stats7.data?.totals.current_streak_days ?? 0
 
   const remove = useMutation({
     mutationFn: (id: string) => contextsApi.remove(id),
@@ -31,6 +33,7 @@ export function ContextsPage() {
   const stats = [
     { label: 'Контекстов', value: data?.length ?? 0, icon: '📚' },
     { label: 'Слов изучено', value: cards.data?.length ?? 0, icon: '🌱' },
+    { label: 'Дней подряд', value: streak, icon: '🔥' },
     { label: 'Язык', value: 'DE', icon: '🇩🇪' },
   ]
 
@@ -47,7 +50,7 @@ export function ContextsPage() {
           </div>
           <Link to="/contexts/new" className="btn-primary shrink-0">✨ Новая фраза</Link>
         </div>
-        <div className="relative mt-8 grid grid-cols-3 gap-4">
+        <div className="relative mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {stats.map((s) => (
             <div key={s.label} className="rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-4 text-center">
               <div className="text-2xl">{s.icon}</div>

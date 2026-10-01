@@ -15,6 +15,7 @@ var (
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrValidation         = errors.New("validation error")
 	ErrUnavailable        = errors.New("feature unavailable")
+	ErrUpstream           = errors.New("upstream service error")
 )
 
 type User struct {

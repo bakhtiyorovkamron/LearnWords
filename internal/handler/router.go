@@ -18,6 +18,7 @@ type RouterDeps struct {
 	Auth        *AuthHandler
 	Contexts    *ContextHandler
 	Review      *ReviewHandler
+	Stats       *StatsHandler
 	HealthCheck func() error
 }
 
@@ -70,6 +71,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/words/generate-example", d.Contexts.GenerateExample)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
+		protected.GET("/stats", d.Stats.Get)
 	}
 	return r
 }

@@ -48,7 +48,7 @@ func (s *ReviewService) Due(ctx context.Context, userID uuid.UUID) ([]domain.Due
 func (s *ReviewService) Answer(ctx context.Context, userID, wordID uuid.UUID, correct bool) (*domain.Progress, error) {
 	now := s.now()
 	today := dateOf(now)
-	return s.repo.Apply(ctx, userID, wordID, today, func(p domain.Progress) domain.Progress {
+	return s.repo.Apply(ctx, userID, wordID, today, correct, func(p domain.Progress) domain.Progress {
 		return ApplyAnswer(p, correct, now)
 	})
 }

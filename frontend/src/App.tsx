@@ -6,6 +6,7 @@ import { ContextsPage } from './pages/ContextsPage'
 import { NewContextPage } from './pages/NewContextPage'
 import { ContextDetailPage } from './pages/ContextDetailPage'
 import { CardsPage } from './pages/CardsPage'
+import { StatsPage } from './pages/StatsPage'
 
 export default function App() {
   return (

@@ -85,6 +85,12 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 		wordID, p.BoxLevel, p.CorrectStreakAtMax, p.IsLearned, p.NextReviewAt, p.LastReviewedAt); err != nil {
 		return nil, err
 	}
+	// Log the answer for statistics (same transaction: progress and log stay consistent).
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO review_logs (user_id, word_id, is_correct) VALUES ($1, $2, $3)`,
+		userID, wordID, correct); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}

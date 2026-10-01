@@ -31,6 +31,9 @@ func writeError(c *gin.Context, err error) {
 		status, msg = http.StatusUnauthorized, "unauthorized"
 	case errors.Is(err, domain.ErrUnavailable):
 		status, msg = http.StatusServiceUnavailable, "example generation is not configured"
+	case errors.Is(err, domain.ErrUpstream):
+		slog.ErrorContext(c.Request.Context(), "upstream failed", "err", err, "path", c.FullPath())
+		status, msg = http.StatusBadGateway, err.Error()
 	default:
 		slog.ErrorContext(c.Request.Context(), "request failed", "err", err, "path", c.FullPath())
 	}

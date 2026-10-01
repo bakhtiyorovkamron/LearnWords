@@ -47,6 +47,23 @@ export interface Progress {
   next_review_at: string
 }
 
+export interface DayStat {
+  date: string
+  reviewed: number
+  correct: number
+  new_words: number
+}
+
+export interface Stats {
+  daily: DayStat[]
+  totals: {
+    total_words_learned: number
+    current_streak_days: number
+    longest_streak_days: number
+    accuracy_percent: number
+  }
+}
+
 export interface ContextWithCards {
   context: Context
   cards: WordCard[]

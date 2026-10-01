@@ -19,6 +19,7 @@ export function ReviewSession() {
 
   const answer = useMutation({
     mutationFn: ({ id, ok }: { id: string; ok: boolean }) => reviewApi.answer(id, ok),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stats'] }),
   })
 
   function start() {

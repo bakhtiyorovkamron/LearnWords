@@ -97,6 +97,7 @@ func run() error {
 		Auth:        handler.NewAuthHandler(authSvc, cfg.CookieSecure),
 		Contexts:    handler.NewContextHandler(contextSvc),
 		Review:      handler.NewReviewHandler(service.NewReviewService(postgres.NewReviewRepository(pool))),
+		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

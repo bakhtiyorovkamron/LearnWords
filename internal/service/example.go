@@ -40,7 +40,8 @@ func (s *ContextService) GenerateExample(ctx context.Context, word, translation 
 	}
 	ex, err := s.p.Examples.Generate(ctx, word, translation)
 	if err != nil {
-		return nil, s.fail(span, "generate example", err)
+		span.RecordError(err)
+		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
 	return &ex, nil
 }
