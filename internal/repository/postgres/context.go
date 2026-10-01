@@ -17,11 +17,11 @@ func NewContextRepository(pool *pgxpool.Pool) *ContextRepository {
 	return &ContextRepository{pool: pool}
 }
 
-const contextCols = `id, user_id, image_url, photo_credit, source_text, language, created_at`
+const contextCols = `id, user_id, image_url, photo_credit, source_text, language, created_at, meaning`
 
 func scanContext(row pgx.Row) (domain.Context, error) {
 	var c domain.Context
-	err := row.Scan(&c.ID, &c.UserID, &c.ImageURL, &c.PhotoCredit, &c.SourceText, &c.Language, &c.CreatedAt)
+	err := row.Scan(&c.ID, &c.UserID, &c.ImageURL, &c.PhotoCredit, &c.SourceText, &c.Language, &c.CreatedAt, &c.Meaning)
 	return c, err
 }
 
