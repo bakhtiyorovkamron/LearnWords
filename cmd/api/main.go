@@ -16,7 +16,6 @@ import (
 	"learnwords/internal/config"
 	"learnwords/internal/handler"
 	"learnwords/internal/provider/mock"
-	"learnwords/internal/provider/openverse"
 	"learnwords/internal/repository/postgres"
 	"learnwords/internal/service"
 	"learnwords/internal/telemetry"
