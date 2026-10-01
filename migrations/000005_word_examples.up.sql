@@ -1,0 +1,2 @@
+ALTER TABLE word_cards ADD COLUMN IF NOT EXISTS example_sentence    TEXT NOT NULL DEFAULT '';
+ALTER TABLE word_cards ADD COLUMN IF NOT EXISTS example_translation TEXT NOT NULL DEFAULT '';

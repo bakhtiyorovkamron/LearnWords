@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { contextsApi } from '../api/endpoints'
+import { contextsApi, wordsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { resizeImage } from '../lib/image'
 
@@ -20,9 +20,22 @@ export function NewContextPage() {
   const [text, setText] = useState('')
   const [meaning, setMeaning] = useState('')
   const [pronunciation, setPronunciation] = useState('')
+  const [exampleSentence, setExampleSentence] = useState('')
+  const [exampleTranslation, setExampleTranslation] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
+
+  // AI example generation works for a single word (the word is replaced by ___ in the sentence).
+  const singleWord = text.trim() !== '' && !/\s/.test(text.trim())
+  const generate = useMutation({
+    mutationFn: () => wordsApi.generateExample(text.trim(), meaning.trim()),
+    onSuccess: (r) => {
+      // Fill the fields; the user can still edit them before saving.
+      setExampleSentence(r.example_sentence)
+      setExampleTranslation(r.example_translation)
+    },
+  })
 
   useEffect(() => {
     if (!photo) {
@@ -46,7 +59,10 @@ export function NewContextPage() {
 
   const mutation = useMutation({
     mutationFn: () =>
-      contextsApi.create({ text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), photo, language: 'de' }),
+      contextsApi.create({
+        text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), photo, language: 'de',
+        exampleSentence: exampleSentence.trim(), exampleTranslation: exampleTranslation.trim(),
+      }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['contexts'] })
       qc.invalidateQueries({ queryKey: ['cards'] })
@@ -112,6 +128,43 @@ export function NewContextPage() {
             placeholder="например: [ихь]"
             className="field"
           />
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-xs uppercase tracking-wider text-emerald-300/60">Пример предложения</label>
+            <button type="button" onClick={() => generate.mutate()}
+              disabled={generate.isPending || !singleWord || !meaning.trim()}
+              title={singleWord ? 'Нужны слово и перевод' : 'Доступно, когда введено одно слово'}
+              className="btn-ghost shrink-0 disabled:opacity-50">
+              {generate.isPending ? (
+                <>
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />
+                  Генерируем…
+                </>
+              ) : (
+                '✨ Сгенерировать автоматически'
+              )}
+            </button>
+          </div>
+          <input
+            value={exampleSentence}
+            onChange={(e) => setExampleSentence(e.target.value.slice(0, 500))}
+            placeholder="Ich esse eine ___."
+            className="field"
+          />
+          <input
+            value={exampleTranslation}
+            onChange={(e) => setExampleTranslation(e.target.value.slice(0, 500))}
+            placeholder="Перевод примера"
+            className="field"
+          />
+          {generate.error && (
+            <p className="text-sm text-red-300">Не удалось сгенерировать пример, попробуйте снова</p>
+          )}
+          {!exampleSentence && (
+            <p className="text-xs text-emerald-300/50">Если оставить пустым, пример для одного слова добавится автоматически после сохранения.</p>
+          )}
         </div>
 
         <div>

@@ -15,6 +15,7 @@ import (
 	"learnwords/internal/auth"
 	"learnwords/internal/config"
 	"learnwords/internal/handler"
+	"learnwords/internal/provider/anthropic"
 	"learnwords/internal/provider/mock"
 	"learnwords/internal/repository/postgres"
 	"learnwords/internal/service"
@@ -73,6 +74,12 @@ func run() error {
 		Transcriber: mock.Transcriber{},
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
+	}
+	// AI example sentences: enabled only when the key is provided via environment.
+	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+		providers.Examples = anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
+	} else {
+		slog.Warn("ANTHROPIC_API_KEY is not set: example generation is disabled")
 	}
 
 	// Services

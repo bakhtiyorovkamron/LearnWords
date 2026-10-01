@@ -32,15 +32,31 @@ export const contextsApi = {
     fd.append('photo', file)
     return api.put(`/contexts/${id}/photo`, fd)
   },
-  create(input: { text: string; meaning?: string; pronunciation?: string; photo?: File | null; language?: string }) {
+  create(input: {
+    text: string; meaning?: string; pronunciation?: string; photo?: File | null; language?: string
+    exampleSentence?: string; exampleTranslation?: string
+  }) {
     const fd = new FormData()
     fd.append('text', input.text)
     fd.append('meaning', input.meaning ?? '')
     fd.append('pronunciation', input.pronunciation ?? '')
+    fd.append('example_sentence', input.exampleSentence ?? '')
+    fd.append('example_translation', input.exampleTranslation ?? '')
     fd.append('language', input.language ?? 'de')
     if (input.photo) fd.append('photo', input.photo)
     return api.post<ContextWithCards>('/contexts', fd).then((r) => r.data)
   },
+}
+
+export const wordsApi = {
+  generateExample: (word: string, translation: string) =>
+    api
+      .post<{ example_sentence: string; example_translation: string; full_sentence: string }>(
+        '/words/generate-example',
+        { word, translation },
+        { timeout: 45_000 },
+      )
+      .then((r) => r.data),
 }
 
 export const reviewApi = {

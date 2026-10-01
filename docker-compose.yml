@@ -27,6 +27,7 @@ services:
       JWT_SECRET: dev-secret-change-me-0123456789abcdef
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:15173,http://129.121.97.22:15173}
       COOKIE_SECURE: "false"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GIN_MODE: debug
     ports: ["${BACKEND_PORT:-18080}:8080"]

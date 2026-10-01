@@ -29,6 +29,8 @@ func writeError(c *gin.Context, err error) {
 		status, msg = http.StatusUnauthorized, "invalid email or password"
 	case errors.Is(err, domain.ErrUnauthorized):
 		status, msg = http.StatusUnauthorized, "unauthorized"
+	case errors.Is(err, domain.ErrUnavailable):
+		status, msg = http.StatusServiceUnavailable, "example generation is not configured"
 	default:
 		slog.ErrorContext(c.Request.Context(), "request failed", "err", err, "path", c.FullPath())
 	}

@@ -36,9 +36,11 @@ func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Conte
 		batch := &pgx.Batch{}
 		for _, w := range cards {
 			batch.Queue(`INSERT INTO word_cards
-				(id, context_id, user_id, word, translation, transcription, audio_url, language, created_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-				w.ID, w.ContextID, w.UserID, w.Word, w.Translation, w.Transcription, w.AudioURL, w.Language, w.CreatedAt)
+				(id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
+				 example_sentence, example_translation)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+				w.ID, w.ContextID, w.UserID, w.Word, w.Translation, w.Transcription, w.AudioURL, w.Language, w.CreatedAt,
+				w.ExampleSentence, w.ExampleTranslation)
 		}
 		return tx.SendBatch(ctx, batch).Close()
 	})

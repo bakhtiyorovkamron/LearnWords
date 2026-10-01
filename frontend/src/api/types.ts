@@ -31,6 +31,8 @@ export interface WordCard {
   audio_url?: string
   language: string
   created_at: string
+  example_sentence?: string
+  example_translation?: string
 }
 
 export interface DueCard extends WordCard {

@@ -51,6 +51,12 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
           {meaning && meaning !== card.translation && (
             <div className="mt-1 text-sm font-semibold text-lime-200">— {meaning}</div>
           )}
+          {card.example_sentence && (
+            <div className="mt-2 border-t border-emerald-400/10 pt-2 text-xs text-emerald-100/70">
+              <div className="italic">{card.example_sentence}</div>
+              {card.example_translation && <div className="text-emerald-100/50">{card.example_translation}</div>}
+            </div>
+          )}
         </div>
         <button
           onClick={() => play(card)}

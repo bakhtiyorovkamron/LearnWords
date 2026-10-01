@@ -14,6 +14,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrValidation         = errors.New("validation error")
+	ErrUnavailable        = errors.New("feature unavailable")
 )
 
 type User struct {
@@ -56,6 +57,16 @@ type WordCard struct {
 	AudioURL      *string   `json:"audio_url,omitempty"`
 	Language      string    `json:"language"`
 	CreatedAt     time.Time `json:"created_at"`
+
+	ExampleSentence    string `json:"example_sentence"`    // sentence with the word replaced by ___
+	ExampleTranslation string `json:"example_translation"` // Russian translation of the full sentence
+}
+
+// Example is an AI-generated example sentence for a word.
+type Example struct {
+	SentenceWithGap string `json:"sentence_with_gap"`
+	FullSentence    string `json:"full_sentence"`
+	Translation     string `json:"translation"`
 }
 
 type ContextWithCards struct {

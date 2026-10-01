@@ -31,6 +31,7 @@ type Providers struct {
 	Transcriber provider.Transcriber
 	TTS         provider.TTS
 	Storage     provider.FileStorage
+	Examples    ExampleGenerator // optional; nil disables AI example generation
 }
 
 type ContextService struct {
@@ -48,8 +49,11 @@ type CreateContextInput struct {
 	Text          string
 	Meaning       string
 	Pronunciation string
-	Image         []byte
-	Language      string
+	// Optional example sentence entered (or already generated) by the user.
+	ExampleSentence    string
+	ExampleTranslation string
+	Image              []byte
+	Language           string
 }
 
 func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in CreateContextInput) (*domain.ContextWithCards, error) {
@@ -108,12 +112,21 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 			if p := strings.TrimSpace(in.Pronunciation); p != "" {
 				card.Transcription = p
 			}
+			card.ExampleSentence = strings.TrimSpace(in.ExampleSentence)
+			card.ExampleTranslation = strings.TrimSpace(in.ExampleTranslation)
+			if len([]rune(card.ExampleSentence)) > 500 || len([]rune(card.ExampleTranslation)) > 500 {
+				return nil, fmt.Errorf("%w: example too long", domain.ErrValidation)
+			}
 		}
 		cards = append(cards, card)
 	}
 
 	if err := s.contexts.CreateWithCards(ctx, &c, cards); err != nil {
 		return nil, s.fail(span, "save context", err)
+	}
+	// No example entered manually: generate one in the background after saving.
+	if len(cards) == 1 && cards[0].ExampleSentence == "" {
+		s.generateExampleAsync(userID, cards[0])
 	}
 	return &domain.ContextWithCards{Context: c, Cards: cards}, nil
 }

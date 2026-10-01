@@ -67,6 +67,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/word-cards", d.Contexts.WordCards)
 		protected.POST("/word-cards/:id/audio", d.Contexts.RegenerateAudio)
 		protected.DELETE("/word-cards/:id", d.Contexts.DeleteCard)
+		protected.POST("/words/generate-example", d.Contexts.GenerateExample)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
 	}
