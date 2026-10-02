@@ -41,6 +41,7 @@ export function Layout() {
           <NavLink to="/contexts/new" className={link}>✨ Добавить</NavLink>
           <NavLink to="/cards" className={link}>🃏 Карточки</NavLink>
           <NavLink to="/stats" className={link}>📈 Статистика</NavLink>
+          <NavLink to="/story" className={link}>📖 История дня</NavLink>
           <button onClick={logout} className="btn-ghost ml-auto">Выйти</button>
         </nav>
       </header>

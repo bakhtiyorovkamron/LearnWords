@@ -19,6 +19,7 @@ type RouterDeps struct {
 	Contexts    *ContextHandler
 	Review      *ReviewHandler
 	Stats       *StatsHandler
+	Stories     *StoryHandler
 	HealthCheck func() error
 }
 

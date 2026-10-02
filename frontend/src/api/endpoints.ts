@@ -59,6 +59,20 @@ export const wordsApi = {
       .then((r) => r.data),
 }
 
+export interface StoryWord { word: string; translation: string }
+export interface DailyStory {
+  id: string; date: string; genre: string; title: string
+  story_de: string; story_ru: string; words_used: StoryWord[]; created_at: string
+}
+
+export const storiesApi = {
+  today: () =>
+    api.get<{ story: DailyStory | null; words_today: StoryWord[]; genres: string[] }>('/stories/today').then((r) => r.data),
+  list: () => api.get<{ stories: DailyStory[] }>('/stories').then((r) => r.data.stories),
+  generate: (genre?: string) =>
+    api.post<DailyStory>('/stories/generate', { genre: genre ?? '' }, { timeout: 120_000 }).then((r) => r.data),
+}
+
 export const statsApi = {
   get: (period: 'week' | 'month') =>
     api.get<Stats>('/stats', { params: { period } }).then((r) => r.data),
