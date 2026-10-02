@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -75,17 +76,37 @@ func run() error {
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
 	}
-	// AI example sentences: enabled only when the key is provided via environment.
+	// AI: example sentences + daily stories, enabled only when the key is provided via environment.
+	var storyGen service.StoryGenerator
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
-		providers.Examples = anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
+		ai := anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
+		providers.Examples = ai
+		storyGen = ai
 	} else {
-		slog.Warn("ANTHROPIC_API_KEY is not set: example generation is disabled")
+		slog.Warn("ANTHROPIC_API_KEY is not set: example and story generation are disabled")
 	}
 
 	// Services
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
+	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen)
+
+	// Daily story cron: STORY_CRON_HOUR (default 23) in STORY_CRON_TZ (default Europe/Berlin).
+	cronHour := 23
+	if h, err := strconv.Atoi(os.Getenv("STORY_CRON_HOUR")); err == nil && h >= 0 && h < 24 {
+		cronHour = h
+	}
+	cronTZ := os.Getenv("STORY_CRON_TZ")
+	if cronTZ == "" {
+		cronTZ = "Europe/Berlin"
+	}
+	loc, err := time.LoadLocation(cronTZ)
+	if err != nil {
+		slog.Warn("invalid STORY_CRON_TZ, using UTC", "tz", cronTZ)
+		loc = time.UTC
+	}
+	go storySvc.RunScheduler(ctx, cronHour, loc)
 
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -98,6 +119,7 @@ func run() error {
 		Contexts:    handler.NewContextHandler(contextSvc),
 		Review:      handler.NewReviewHandler(service.NewReviewService(postgres.NewReviewRepository(pool))),
 		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
+		Stories:     handler.NewStoryHandler(storySvc),
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

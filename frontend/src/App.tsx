@@ -23,6 +23,7 @@ export default function App() {
           <Route path="/contexts/:id" element={<ContextDetailPage />} />
           <Route path="/cards" element={<CardsPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/story" element={<StoryPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/contexts" replace />} />

@@ -73,6 +73,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
 		protected.GET("/stats", d.Stats.Get)
+		protected.GET("/stories", d.Stories.List)
+		protected.GET("/stories/today", d.Stories.Today)
+		protected.POST("/stories/generate", d.Stories.Generate)
+		protected.GET("/stories/:date", d.Stories.ByDate)
 	}
 	return r
 }
