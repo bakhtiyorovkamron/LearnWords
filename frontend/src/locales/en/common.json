@@ -1,13 +1,6 @@
 {
-  "common": {
-    "unknownError": "Unknown error",
-    "loading": "Loading…"
-  },
-  "lang": {
-    "label": "Interface language",
-    "ru": "Русский",
-    "en": "English"
-  },
+  "common": { "unknownError": "Unknown error", "loading": "Loading…" },
+  "lang": { "label": "Interface language", "ru": "Русский", "en": "English" },
   "nav": {
     "contexts": "Contexts",
     "add": "Add",

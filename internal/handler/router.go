@@ -20,6 +20,7 @@ type RouterDeps struct {
 	Review      *ReviewHandler
 	Stats       *StatsHandler
 	Stories     *StoryHandler
+	Settings    *SettingsHandler
 	HealthCheck func() error
 }
 
@@ -77,6 +78,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/stories/today", d.Stories.Today)
 		protected.POST("/stories/generate", d.Stories.Generate)
 		protected.GET("/stories/:date", d.Stories.ByDate)
+		protected.GET("/me/settings", d.Settings.Get)
+		protected.PUT("/me/settings", d.Settings.Update)
 	}
 	return r
 }

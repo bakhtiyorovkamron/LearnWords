@@ -1,13 +1,6 @@
 {
-  "common": {
-    "unknownError": "Неизвестная ошибка",
-    "loading": "Загрузка…"
-  },
-  "lang": {
-    "label": "Язык интерфейса",
-    "ru": "Русский",
-    "en": "English"
-  },
+  "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…" },
+  "lang": { "label": "Язык интерфейса", "ru": "Русский", "en": "English" },
   "nav": {
     "contexts": "Контексты",
     "add": "Добавить",

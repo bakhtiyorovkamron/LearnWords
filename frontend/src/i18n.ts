@@ -31,16 +31,13 @@ void i18n.use(initReactI18next).init({
   defaultNS: 'common',
   ns: ['common'],
   interpolation: { escapeValue: false }, // React already escapes
-  returnNull: false,
 })
 
-function applyHtmlLang(lng: string) {
-  document.documentElement.lang = lng
-}
-applyHtmlLang(i18n.language)
+document.documentElement.lang = i18n.language
 
+// Persist the choice so it survives page reloads.
 i18n.on('languageChanged', (lng) => {
-  applyHtmlLang(lng)
+  document.documentElement.lang = lng
   try {
     localStorage.setItem(STORAGE_KEY, lng)
   } catch {

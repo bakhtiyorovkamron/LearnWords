@@ -120,6 +120,7 @@ func run() error {
 		Review:      handler.NewReviewHandler(service.NewReviewService(postgres.NewReviewRepository(pool))),
 		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		Stories:     handler.NewStoryHandler(storySvc),
+		Settings:    handler.NewSettingsHandler(userRepo),
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
