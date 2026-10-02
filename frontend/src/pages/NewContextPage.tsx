@@ -160,7 +160,11 @@ export function NewContextPage() {
             className="field"
           />
           {generate.error && (
-            <p className="text-sm text-red-300">Не удалось сгенерировать пример, попробуйте снова</p>
+            <p className="text-sm text-red-300">
+              {(generate.error as { response?: { status?: number } }).response?.status === 503
+                ? 'Автогенерация не настроена на сервере (нет ANTHROPIC_API_KEY)'
+                : 'Не удалось сгенерировать пример, попробуйте снова'}
+            </p>
           )}
           {!exampleSentence && (
             <p className="text-xs text-emerald-300/50">Если оставить пустым, пример для одного слова добавится автоматически после сохранения.</p>
