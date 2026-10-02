@@ -51,7 +51,7 @@ export function ContextsPage() {
           </div>
           <Link to="/contexts/new" className="btn-primary shrink-0">✨ Новая фраза</Link>
         </div>
-        <div className="relative mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="relative mt-8 grid grid-cols-3 gap-4">
           {stats.map((s) => (
             <div key={s.label} className="rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-4 text-center">
               <div className="text-2xl">{s.icon}</div>
