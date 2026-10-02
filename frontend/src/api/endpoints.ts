@@ -78,6 +78,31 @@ export const settingsApi = {
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
 }
 
+export interface Me { id: string; email: string; role: 'user' | 'admin' }
+
+export const meApi = {
+  get: () => api.get<Me>('/me').then((r) => r.data),
+}
+
+export interface AdminUser {
+  id: string; email: string; role: 'user' | 'admin'; is_banned: boolean
+  created_at: string; words_count: number; last_activity_at: string | null
+}
+
+export interface AdminStats {
+  total_users: number; banned_users: number; new_users_7d: number; active_users_7d: number
+  total_words: number; total_reviews: number; training_sessions: number
+  total_stories: number; stories_30d: number
+}
+
+// All of these are additionally guarded on the backend (RequireAdmin → 403 for non-admins).
+export const adminApi = {
+  users: () => api.get<{ users: AdminUser[] }>('/admin/users').then((r) => r.data.users),
+  stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
+  remove: (id: string) => api.delete(`/admin/users/${id}`),
+  setBanned: (id: string, banned: boolean) => api.patch(`/admin/users/${id}/ban`, { banned }),
+}
+
 export const statsApi = {
   get: (period: 'week' | 'month') =>
     api.get<Stats>('/stats', { params: { period } }).then((r) => r.data),

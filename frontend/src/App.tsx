@@ -8,6 +8,7 @@ import { ContextDetailPage } from './pages/ContextDetailPage'
 import { CardsPage } from './pages/CardsPage'
 import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
+import { AdminPage } from './pages/AdminPage'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/cards" element={<CardsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/contexts" replace />} />

@@ -29,6 +29,10 @@ func writeError(c *gin.Context, err error) {
 		status, msg = http.StatusUnauthorized, "invalid email or password"
 	case errors.Is(err, domain.ErrUnauthorized):
 		status, msg = http.StatusUnauthorized, "unauthorized"
+	case errors.Is(err, domain.ErrBanned):
+		status, msg = http.StatusForbidden, "account is banned"
+	case errors.Is(err, domain.ErrForbidden):
+		status, msg = http.StatusForbidden, "forbidden"
 	case errors.Is(err, domain.ErrUnavailable):
 		status, msg = http.StatusServiceUnavailable, "example generation is not configured"
 	case errors.Is(err, domain.ErrUpstream):

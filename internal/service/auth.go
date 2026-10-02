@@ -40,7 +40,7 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*do
 		return nil, domain.TokenPair{}, err
 	}
 	now := time.Now().UTC()
-	u := &domain.User{ID: uuid.New(), Email: email, PasswordHash: string(hash), CreatedAt: now, UpdatedAt: now}
+	u := &domain.User{ID: uuid.New(), Email: email, PasswordHash: string(hash), Role: domain.RoleUser, CreatedAt: now, UpdatedAt: now}
 	if err := s.users.Create(ctx, u); err != nil {
 		return nil, domain.TokenPair{}, err
 	}
@@ -61,6 +61,10 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (domain
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return domain.TokenPair{}, domain.ErrInvalidCredentials
 	}
+	// Checked after the password so a ban doesn't reveal that the email exists.
+	if u.IsBanned {
+		return domain.TokenPair{}, domain.ErrBanned
+	}
 	return s.tokens.IssuePair(u.ID)
 }
 
@@ -69,11 +73,15 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (domain.
 	if err != nil {
 		return domain.TokenPair{}, domain.ErrUnauthorized
 	}
-	if _, err := s.users.GetByID(ctx, uid); err != nil {
+	u, err := s.users.GetByID(ctx, uid)
+	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.TokenPair{}, domain.ErrUnauthorized
 		}
 		return domain.TokenPair{}, err
+	}
+	if u.IsBanned {
+		return domain.TokenPair{}, domain.ErrBanned
 	}
 	return s.tokens.IssuePair(uid)
 }

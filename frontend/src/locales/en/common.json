@@ -7,6 +7,7 @@
     "cards": "Cards",
     "stats": "Statistics",
     "dailyStory": "Daily Story",
+    "admin": "Admin",
     "logout": "Log out"
   },
   "auth": {
@@ -38,7 +39,8 @@
     "noAccount": "No account? ",
     "haveAccount": "Already have an account? ",
     "registerLink": "Sign up",
-    "loginLink": "Log in"
+    "loginLink": "Log in",
+    "banned": "Your account has been banned"
   },
   "home": {
     "greeting": "Hallo!",
@@ -191,5 +193,41 @@
       "повседневная жизнь": "everyday life",
       "романтика": "romance"
     }
+  },
+  "admin": {
+    "titleA": "Admin ",
+    "titleB": "panel",
+    "subtitle": "Users and service statistics.",
+    "stats": {
+      "users": "Users",
+      "usersHint": "+{{new7}} in 7 days · banned: {{banned}}",
+      "active7d": "Active in 7 days",
+      "words": "Words added",
+      "trainings": "Training sessions",
+      "answers": "answers: {{count}}",
+      "stories": "AI stories",
+      "stories30d": "last 30 days: {{count}}"
+    },
+    "users": "Users",
+    "search": "Search by email or ID…",
+    "col": {
+      "email": "Email",
+      "registered": "Registered",
+      "words": "Words",
+      "lastActivity": "Last activity",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "banned": "banned",
+    "active": "active",
+    "you": "you",
+    "ban": "Ban",
+    "unban": "Unban",
+    "delete": "Delete",
+    "confirmBan": "Ban {{email}}? They won't be able to log in.",
+    "confirmUnban": "Unban {{email}}?",
+    "confirmDelete": "Delete {{email}} and ALL their data permanently?",
+    "actionFailed": "Action failed: {{error}}",
+    "nothingFound": "No users found"
   }
 }

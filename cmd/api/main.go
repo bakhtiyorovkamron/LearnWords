@@ -91,6 +91,7 @@ func run() error {
 	authSvc := service.NewAuthService(userRepo, tokens)
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen)
+	adminRepo := postgres.NewAdminRepository(pool)
 
 	// Daily story cron: STORY_CRON_HOUR (default 23) in STORY_CRON_TZ (default Europe/Berlin).
 	cronHour := 23
@@ -121,6 +122,8 @@ func run() error {
 		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		Stories:     handler.NewStoryHandler(storySvc),
 		Settings:    handler.NewSettingsHandler(userRepo),
+		Admin:       handler.NewAdminHandler(adminRepo, userRepo),
+		UserStatus:  adminRepo,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

@@ -40,7 +40,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     mutation.mutate()
   }
 
-  const error = localError ?? (mutation.error ? errorMessage(mutation.error) : null)
+  const error = localError ?? (mutation.error
+    ? ((mutation.error as { response?: { status?: number } }).response?.status === 403
+      ? t('auth.banned')
+      : errorMessage(mutation.error))
+    : null)
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">

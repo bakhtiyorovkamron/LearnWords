@@ -16,12 +16,21 @@ var (
 	ErrValidation         = errors.New("validation error")
 	ErrUnavailable        = errors.New("feature unavailable")
 	ErrUpstream           = errors.New("upstream service error")
+	ErrForbidden          = errors.New("forbidden")
+	ErrBanned             = errors.New("account is banned")
+)
+
+const (
+	RoleUser  = "user"
+	RoleAdmin = "admin"
 )
 
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
+	Role         string    `json:"role"`
+	IsBanned     bool      `json:"is_banned"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

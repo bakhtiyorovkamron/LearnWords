@@ -21,6 +21,8 @@ type RouterDeps struct {
 	Stats       *StatsHandler
 	Stories     *StoryHandler
 	Settings    *SettingsHandler
+	Admin       *AdminHandler
+	UserStatus  UserStatusStore
 	HealthCheck func() error
 }
 
@@ -60,7 +62,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		a.POST("/logout", d.Auth.Logout)
 	}
 
-	protected := api.Group("", AuthRequired(d.Tokens))
+	// ActiveUser re-checks ban/role in the DB on every authenticated request.
+	protected := api.Group("", AuthRequired(d.Tokens), ActiveUser(d.UserStatus))
 	{
 		protected.POST("/contexts", d.Contexts.Create)
 		protected.GET("/contexts", d.Contexts.List)
@@ -80,6 +83,16 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/stories/:date", d.Stories.ByDate)
 		protected.GET("/me/settings", d.Settings.Get)
 		protected.PUT("/me/settings", d.Settings.Update)
+		protected.GET("/me", d.Admin.Me)
+	}
+
+	// Every /api/admin/* route goes through AuthRequired + ActiveUser + RequireAdmin (role from the DB).
+	admin := protected.Group("/admin", RequireAdmin())
+	{
+		admin.GET("/users", d.Admin.Users)
+		admin.GET("/stats", d.Admin.Stats)
+		admin.DELETE("/users/:id", d.Admin.DeleteUser)
+		admin.PATCH("/users/:id/ban", d.Admin.Ban)
 	}
 	return r
 }

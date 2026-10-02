@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { authApi } from '../api/endpoints'
+import { authApi, meApi } from '../api/endpoints'
 import { LanguageSwitcher } from './LanguageSwitcher'
 
 const link = ({ isActive }: { isActive: boolean }) =>
@@ -28,6 +28,9 @@ export function Layout() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  // Only decides whether to show the link; the backend checks the role on every /api/admin request.
+  const me = useQuery({ queryKey: ['me'], queryFn: meApi.get, staleTime: 5 * 60_000 })
+  const isAdmin = me.data?.role === 'admin'
 
   async function logout() {
     await authApi.logout()
@@ -45,6 +48,7 @@ export function Layout() {
           <NavLink to="/cards" className={link}>🃏 {t('nav.cards')}</NavLink>
           <NavLink to="/stats" className={link}>📈 {t('nav.stats')}</NavLink>
           <NavLink to="/story" className={link}>📖 {t('nav.dailyStory')}</NavLink>
+          {isAdmin && <NavLink to="/admin" className={link}>🛡 {t('nav.admin')}</NavLink>}
           <div className="ml-auto flex items-center gap-2">
             <LanguageSwitcher />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
