@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { cardsApi, reviewApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { DueCard } from '../api/types'
@@ -8,6 +9,7 @@ import { ReviewResult } from './ReviewResult'
 
 // Daily training: Leitner "due" words, multiple-choice questions, progress saved after every answer.
 export function ReviewSession() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const due = useQuery({ queryKey: ['review-due'], queryFn: reviewApi.due, staleTime: 0, refetchOnWindowFocus: false })
   // Whole dictionary: source of wrong answer options.
@@ -44,16 +46,16 @@ export function ReviewSession() {
       return (
         <div className="glass p-10 text-center">
           <div className="text-5xl">🎉</div>
-          <p className="mt-3 text-lg font-semibold">На сегодня слов для повторения нет 🎉</p>
-          <p className="mt-1 text-sm text-emerald-100/70">Загляните завтра или добавьте новые слова.</p>
+          <p className="mt-3 text-lg font-semibold">{t('review.nothingToday')}</p>
+          <p className="mt-1 text-sm text-emerald-100/70">{t('review.comeBack')}</p>
         </div>
       )
     }
     return (
       <div className="glass p-10 text-center">
         <div className="text-5xl">🃏</div>
-        <p className="mt-3 text-lg font-semibold">Слов для повторения сегодня: {count}</p>
-        <button type="button" onClick={start} className="btn-primary mt-6 text-lg">Начать тренировку</button>
+        <p className="mt-3 text-lg font-semibold">{t('review.dueCount', { count })}</p>
+        <button type="button" onClick={start} className="btn-primary mt-6 text-lg">{t('review.start')}</button>
       </div>
     )
   }

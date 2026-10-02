@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { WordCard } from '../api/types'
 
 export interface QuizResult {
@@ -56,6 +57,7 @@ interface Props {
 
 // One multiple-choice question: German word -> pick the right Russian translation.
 export function QuizQuestion({ card, pool, position, total, saving, error, onAnswer, onNext }: Props) {
+  const { t } = useTranslation()
   const { options, lacking } = useMemo(() => buildOptions(card, pool), [card, pool])
   const [picked, setPicked] = useState<number | null>(null)
   const answered = picked !== null
@@ -84,15 +86,15 @@ export function QuizQuestion({ card, pool, position, total, saving, error, onAns
       </div>
 
       <div className="glass p-8 text-center">
-        <p className="text-xs uppercase tracking-widest text-lime-300/80">Выберите перевод</p>
+        <p className="text-xs uppercase tracking-widest text-lime-300/80">{t('quiz.choose')}</p>
         <div className="display mt-3 text-4xl font-extrabold text-white">{card.word}</div>
-        <button type="button" onClick={() => speak(card)} className="btn-ghost mt-2" title="Прослушать">▶ Прослушать</button>
+        <button type="button" onClick={() => speak(card)} className="btn-ghost mt-2" title={t('quiz.listenTitle')}>{t('quiz.listen')}</button>
 
         {answered && (
           <div className="mt-4 space-y-1">
             <div className="font-mono text-sm text-lime-300/90">{card.transcription || '—'}</div>
             <div className="text-sm text-emerald-100/70">
-              {options[picked!].correct ? '✓ Верно!' : `✗ Правильно: ${card.translation}`}
+              {options[picked!].correct ? t('quiz.correct') : t('quiz.correctAnswer', { answer: card.translation })}
             </div>
           </div>
         )}
@@ -107,13 +109,13 @@ export function QuizQuestion({ card, pool, position, total, saving, error, onAns
       </div>
 
       {lacking && (
-        <p className="text-center text-xs text-amber-200/80">Добавьте больше слов, чтобы в тесте были настоящие варианты ответа.</p>
+        <p className="text-center text-xs text-amber-200/80">{t('quiz.lacking')}</p>
       )}
-      {error && <p className="text-center text-sm text-red-300">Не удалось сохранить ответ: {error}</p>}
+      {error && <p className="text-center text-sm text-red-300">{t('quiz.saveFailed', { error })}</p>}
 
       {answered && (
         <button type="button" onClick={onNext} disabled={saving} className="btn-primary w-full text-lg">
-          {position === total ? 'Завершить' : 'Далее →'}
+          {position === total ? t('quiz.finish') : t('quiz.next')}
         </button>
       )}
     </div>

@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { authApi } from '../api/endpoints'
+import { LanguageSwitcher } from './LanguageSwitcher'
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -23,6 +25,7 @@ export function Logo() {
 }
 
 export function Layout() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
 
@@ -37,12 +40,15 @@ export function Layout() {
       <header className="sticky top-0 z-20 border-b border-emerald-400/10 bg-emerald-950/70 backdrop-blur-xl">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
           <NavLink to="/contexts" className="mr-4"><Logo /></NavLink>
-          <NavLink to="/contexts" end className={link}>📚 Контексты</NavLink>
-          <NavLink to="/contexts/new" className={link}>✨ Добавить</NavLink>
-          <NavLink to="/cards" className={link}>🃏 Карточки</NavLink>
-          <NavLink to="/stats" className={link}>📈 Статистика</NavLink>
-          <NavLink to="/story" className={link}>📖 История дня</NavLink>
-          <button onClick={logout} className="btn-ghost ml-auto">Выйти</button>
+          <NavLink to="/contexts" end className={link}>📚 {t('nav.contexts')}</NavLink>
+          <NavLink to="/contexts/new" className={link}>✨ {t('nav.add')}</NavLink>
+          <NavLink to="/cards" className={link}>🃏 {t('nav.cards')}</NavLink>
+          <NavLink to="/stats" className={link}>📈 {t('nav.stats')}</NavLink>
+          <NavLink to="/story" className={link}>📖 {t('nav.dailyStory')}</NavLink>
+          <div className="ml-auto flex items-center gap-2">
+            <LanguageSwitcher />
+            <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
+          </div>
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-10">

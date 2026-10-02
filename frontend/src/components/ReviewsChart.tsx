@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next'
 import type { DayStat } from '../api/types'
 
 // Dependency-free bar chart: reviewed answers per day, correct part highlighted.
 export function ReviewsChart({ data }: { data: DayStat[] }) {
+  const { t } = useTranslation()
   const max = Math.max(1, ...data.map((d) => d.reviewed))
   const dense = data.length > 14
   const label = (iso: string) => {
@@ -17,7 +19,7 @@ export function ReviewsChart({ data }: { data: DayStat[] }) {
           const correctH = d.reviewed ? (d.correct / d.reviewed) * 100 : 0
           return (
             <div key={d.date} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end"
-              title={`${label(d.date)}: ${d.reviewed} повторений, верно ${d.correct}, новых слов ${d.new_words}`}>
+              title={t('chart.tooltip', { date: label(d.date), reviewed: d.reviewed, correct: d.correct, newWords: d.new_words })}>
               <span className="mb-1 text-center text-[10px] text-emerald-100/70">{d.reviewed || ''}</span>
               <div className="relative w-full overflow-hidden rounded-t-lg bg-red-400/40 transition-all"
                 style={{ height: `${h}%`, minHeight: d.reviewed ? 4 : 0 }}>
@@ -36,8 +38,8 @@ export function ReviewsChart({ data }: { data: DayStat[] }) {
         ))}
       </div>
       <div className="mt-4 flex justify-center gap-5 text-xs text-emerald-100/70">
-        <span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-lime-300" /> верно</span>
-        <span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-red-400/60" /> неверно</span>
+        <span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-lime-300" /> {t('chart.correct')}</span>
+        <span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-red-400/60" /> {t('chart.wrong')}</span>
       </div>
     </div>
   )

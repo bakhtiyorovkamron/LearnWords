@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
 
@@ -19,6 +20,7 @@ function speak(card: WordCard) {
 }
 
 export function WordCardView({ card, index = 0, meaning }: { card: WordCard; index?: number; meaning?: string }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const regen = useMutation({
     mutationFn: () => cardsApi.regenerateAudio(card.id),
@@ -34,7 +36,7 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
   })
 
   function onDelete() {
-    if (window.confirm(`Удалить слово «${card.word}»?`)) remove.mutate()
+    if (window.confirm(t('wordCard.deleteConfirm', { word: card.word }))) remove.mutate()
   }
 
   return (
@@ -60,7 +62,7 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
         </div>
         <button
           onClick={() => play(card)}
-          title="Прослушать"
+          title={t('wordCard.listen')}
           className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-lime-300 to-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/40 transition hover:scale-110 active:scale-95"
         >
           ▶
@@ -68,7 +70,7 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
         <button
           onClick={() => regen.mutate()}
           disabled={regen.isPending}
-          title="Перегенерировать аудио"
+          title={t('wordCard.regenAudio')}
           className={`grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300 disabled:opacity-50 ${regen.isPending ? 'animate-spin' : ''}`}
         >
           ↻
@@ -76,13 +78,13 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
         <button
           onClick={onDelete}
           disabled={remove.isPending}
-          title="Удалить слово"
+          title={t('wordCard.delete')}
           className="grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
         >
           🗑
         </button>
       </div>
-      {remove.error && <p className="relative mt-2 text-xs text-red-300">Не удалось удалить</p>}
+      {remove.error && <p className="relative mt-2 text-xs text-red-300">{t('wordCard.deleteFailed')}</p>}
     </div>
   )
 }

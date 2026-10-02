@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { AuthResponse } from './types'
+import i18n from '../i18n'
 
 // Access token lives only in memory (not localStorage) to limit XSS exposure.
 // The refresh token is an httpOnly cookie set by the backend.
@@ -65,5 +66,5 @@ export function errorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     return (err.response?.data as { error?: string } | undefined)?.error ?? err.message
   }
-  return err instanceof Error ? err.message : 'Неизвестная ошибка'
+  return err instanceof Error ? err.message : i18n.t('common.unknownError')
 }

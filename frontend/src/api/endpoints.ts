@@ -73,6 +73,11 @@ export const storiesApi = {
     api.post<DailyStory>('/stories/generate', { genre: genre ?? '' }, { timeout: 120_000 }).then((r) => r.data),
 }
 
+export const settingsApi = {
+  get: () => api.get<{ interface_language: string }>('/me/settings').then((r) => r.data),
+  setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
+}
+
 export const statsApi = {
   get: (period: 'week' | 'month') =>
     api.get<Stats>('/stats', { params: { period } }).then((r) => r.data),

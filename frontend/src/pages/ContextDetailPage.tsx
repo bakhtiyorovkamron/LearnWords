@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
+import { dateLocale } from '../i18n'
 
 export function ContextDetailPage() {
+  const { t } = useTranslation()
   const { id = '' } = useParams()
   // No GET /contexts/:id yet — take the context from the cached list.
   const contexts = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
@@ -23,7 +26,7 @@ export function ContextDetailPage() {
   return (
     <div className="space-y-8">
       {picking && <PhotoPicker contextId={id} onClose={() => setPicking(false)} />}
-      <Link to="/contexts" className="btn-ghost">← Все контексты</Link>
+      <Link to="/contexts" className="btn-ghost">{t('detail.back')}</Link>
 
       <div className="grid gap-8 lg:grid-cols-5">
         <section className="lg:col-span-2">
@@ -40,7 +43,7 @@ export function ContextDetailPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-transparent to-transparent" />
                 <button onClick={() => setPicking(true)}
                   className="absolute right-3 top-3 rounded-full bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-lime-300 backdrop-blur transition hover:bg-emerald-950">
-                  🔄 Заменить фото
+                  {t('detail.replacePhoto')}
                 </button>
               </figure>
             ) : (
@@ -48,24 +51,24 @@ export function ContextDetailPage() {
                 <button onClick={() => setPicking(true)}
                   className="relative mb-6 flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/30 text-emerald-200/70 transition hover:border-lime-400 hover:text-lime-300">
                   <span className="text-4xl">📷</span>
-                  <span className="text-sm font-semibold">Загрузить фото</span>
+                  <span className="text-sm font-semibold">{t('detail.uploadPhoto')}</span>
                 </button>
               )
             )}
 
-            <p className="text-xs uppercase tracking-widest text-lime-300/80">Оригинал · Deutsch</p>
+            <p className="text-xs uppercase tracking-widest text-lime-300/80">{t('detail.original')}</p>
             <blockquote className="display relative mt-4 text-2xl font-semibold leading-snug text-white">
               „{ctx?.source_text ?? '…'}“
             </blockquote>
             {ctx?.meaning && (
               <>
-                <p className="mt-5 text-xs uppercase tracking-widest text-lime-300/80">Значение</p>
+                <p className="mt-5 text-xs uppercase tracking-widest text-lime-300/80">{t('detail.meaning')}</p>
                 <p className="mt-2 text-lg text-emerald-50">{ctx.meaning}</p>
               </>
             )}
             {ctx && (
               <p className="mt-6 text-xs text-emerald-300/50">
-                Добавлено {new Date(ctx.created_at).toLocaleString()}
+                {t('detail.added', { date: new Date(ctx.created_at).toLocaleString(dateLocale()) })}
               </p>
             )}
           </div>
@@ -73,7 +76,7 @@ export function ContextDetailPage() {
 
         <section className="space-y-4 lg:col-span-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="display text-xl font-bold">Слова</h2>
+            <h2 className="display text-xl font-bold">{t('detail.words')}</h2>
             {words.data && (
               <span className="rounded-full bg-lime-400/15 px-3 py-1 text-sm font-semibold text-lime-300">
                 {words.data.length}

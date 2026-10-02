@@ -1,0 +1,202 @@
+{
+  "common": {
+    "unknownError": "Unknown error",
+    "loading": "Loading…"
+  },
+  "lang": {
+    "label": "Interface language",
+    "ru": "Русский",
+    "en": "English"
+  },
+  "nav": {
+    "contexts": "Contexts",
+    "add": "Add",
+    "cards": "Cards",
+    "stats": "Statistics",
+    "dailyStory": "Daily Story",
+    "logout": "Log out"
+  },
+  "auth": {
+    "heroTitle1": "German ",
+    "heroTitleAccent": "through context",
+    "heroTitle2": ", not rote learning",
+    "heroText": "Paste a phrase from a series, a song or a chat — we'll break it into words with translation, transcription and pronunciation.",
+    "badgeTranslation": "🌍 Translation",
+    "badgeTranscription": "🔤 Transcription",
+    "badgeAudio": "🔊 Audio",
+    "floating": {
+      "Fernweh": "longing for faraway places",
+      "Gemütlich": "cozy",
+      "Schmetterling": "butterfly",
+      "Feierabend": "end of the working day"
+    },
+    "welcomeBack": "Welcome back! 👋",
+    "createAccount": "Create an account 🌱",
+    "loginSubtitle": "Log in to continue learning",
+    "registerSubtitle": "Start building your word collection",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Repeat password",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "passwordsMismatch": "Passwords do not match",
+    "wait": "One moment…",
+    "login": "Log in",
+    "register": "Sign up",
+    "noAccount": "No account? ",
+    "haveAccount": "Already have an account? ",
+    "registerLink": "Sign up",
+    "loginLink": "Log in"
+  },
+  "home": {
+    "greeting": "Hallo!",
+    "greetingAccent": "Was lernen wir heute?",
+    "subtitle": "Each phrase is a set of new words in a living context.",
+    "newPhrase": "✨ New phrase",
+    "myContexts": "My contexts",
+    "empty": "Nothing here yet. Add your first German phrase!",
+    "start": "Start",
+    "open": "Open →",
+    "deleteConfirm": "Delete this context?",
+    "deleteTitle": "Delete context",
+    "deleteFailed": "Could not delete: {{error}}"
+  },
+  "stats": {
+    "wordsAdded": "Words added",
+    "streak": "Day streak",
+    "language": "Language",
+    "titleA": "My ",
+    "titleB": "statistics",
+    "subtitle": "Learning progress by day.",
+    "streakLong": "Streak",
+    "accuracy": "Accuracy",
+    "learned": "Words learned",
+    "bestStreak": "Best streak",
+    "perDay": "Reviews per day",
+    "week": "Week",
+    "month": "Month",
+    "summary": "This period: {{reviews}} reviews, {{words}} new words",
+    "noData": "No data yet — do a training session in the “Cards” section.",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
+  },
+  "chart": {
+    "tooltip": "{{date}}: {{reviewed}} reviews, {{correct}} correct, {{newWords}} new words",
+    "correct": "correct",
+    "wrong": "wrong"
+  },
+  "newContext": {
+    "titleA": "New ",
+    "titleB": "phrase",
+    "subtitle": "Paste text from a movie, a song or a chat — we'll break down every word.",
+    "translation": "Translation *",
+    "translationPlaceholder": "What does the word or phrase mean?",
+    "pronunciation": "Pronunciation *",
+    "pronunciationPlaceholder": "e.g. [ɪç]",
+    "example": "Example sentence",
+    "hintNeedTranslation": "Word and translation are required",
+    "hintSingleWord": "Available when a single word is entered",
+    "generating": "Generating…",
+    "generate": "✨ Generate automatically",
+    "exampleTranslationPlaceholder": "Example translation",
+    "generateNotConfigured": "Auto-generation is not configured on the server (no ANTHROPIC_API_KEY)",
+    "generateFailed": "Could not generate an example, please try again",
+    "autoExampleHint": "If left empty, an example for a single word will be added automatically after saving.",
+    "photo": "Photo (optional)",
+    "removePhoto": "✕ Remove",
+    "uploadPhoto": "Upload photo",
+    "tryExample": "Or try an example",
+    "analyzing": "Analyzing words…",
+    "submit": "Analyze phrase →",
+    "errTextRequired": "Enter a German word or phrase",
+    "errTranslationRequired": "Enter a translation",
+    "errPronunciationRequired": "Enter the pronunciation",
+    "errPhoto": "Could not upload the photo"
+  },
+  "detail": {
+    "back": "← All contexts",
+    "replacePhoto": "🔄 Replace photo",
+    "uploadPhoto": "Upload photo",
+    "original": "Original · Deutsch",
+    "meaning": "Meaning",
+    "added": "Added {{date}}",
+    "words": "Words"
+  },
+  "cards": {
+    "tabReview": "Review",
+    "tabCollection": "Collection",
+    "titleA": "My ",
+    "titleB": "collection",
+    "count_one": "{{count}} word collected",
+    "count_other": "{{count}} words collected",
+    "allInOnePlace": "All your words in one place",
+    "search": "Search by word or translation…",
+    "nothingFound": "Nothing found",
+    "empty": "The collection is empty"
+  },
+  "wordCard": {
+    "deleteConfirm": "Delete the word “{{word}}”?",
+    "listen": "Listen",
+    "regenAudio": "Regenerate audio",
+    "delete": "Delete word",
+    "deleteFailed": "Could not delete"
+  },
+  "review": {
+    "nothingToday": "No words to review today 🎉",
+    "comeBack": "Come back tomorrow or add new words.",
+    "dueCount": "Words to review today: {{count}}",
+    "start": "Start training"
+  },
+  "quiz": {
+    "choose": "Choose the translation",
+    "listen": "▶ Listen",
+    "listenTitle": "Listen",
+    "correct": "✓ Correct!",
+    "correctAnswer": "✗ Correct answer: {{answer}}",
+    "lacking": "Add more words so the quiz has real answer options.",
+    "saveFailed": "Could not save the answer: {{error}}",
+    "finish": "Finish",
+    "next": "Next →"
+  },
+  "result": {
+    "done": "Training complete",
+    "correct": "correct",
+    "wrong": "wrong",
+    "total": "Total words: {{count}}",
+    "restart": "Try again",
+    "home": "Back to home"
+  },
+  "photo": {
+    "titleA": "Upload ",
+    "titleB": "photo",
+    "uploading": "Uploading…",
+    "choose": "Choose a file (PNG, JPEG, WebP)"
+  },
+  "story": {
+    "titleA": "Daily ",
+    "titleB": "Story",
+    "subtitle": "A short German story built from the words you added today.",
+    "noWords": "You haven't added any words today. Add at least one to generate a story ✍️",
+    "wordsToday": "Words today:",
+    "randomGenre": "🎲 Random genre",
+    "generating": "⏳ Writing the story…",
+    "regenerate": "🔄 Generate again",
+    "generate": "✨ Generate story",
+    "generateFailed": "Could not generate the story: {{error}}",
+    "notConfigured": "Generation is not configured on the server (no ANTHROPIC_API_KEY)",
+    "noWordsError": "No words have been added today yet",
+    "showTranslation": "Show translation",
+    "hideTranslation": "Hide translation",
+    "archive": "Story archive",
+    "noArchive": "No past stories yet.",
+    "noStoryForDate": "No story for this date.",
+    "genres": {
+      "приключение": "adventure",
+      "детектив": "detective",
+      "комедия": "comedy",
+      "сказка": "fairy tale",
+      "фантастика": "science fiction",
+      "повседневная жизнь": "everyday life",
+      "романтика": "romance"
+    }
+  }
+}

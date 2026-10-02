@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { cardsApi, contextsApi, statsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { Context } from '../api/types'
 import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
+import { dateLocale } from '../i18n'
 
 export function ContextsPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
   const cards = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
@@ -16,7 +19,7 @@ export function ContextsPage() {
   const remove = useMutation({
     mutationFn: (id: string) => contextsApi.remove(id),
     onSuccess: (_r, id) => {
-      // Drop the context from the cached list right away: the list and the "Контекстов" counter update together.
+      // Drop the context from the cached list right away.
       qc.setQueryData<Context[]>(['contexts'], (old) => old?.filter((c) => c.id !== id))
       qc.removeQueries({ queryKey: ['context-words', id] })
       qc.invalidateQueries({ queryKey: ['cards'] })
@@ -27,15 +30,13 @@ export function ContextsPage() {
   function onDelete(e: { preventDefault(): void; stopPropagation(): void }, id: string) {
     e.preventDefault() // the card is wrapped in a <Link>
     e.stopPropagation()
-    if (window.confirm('Удалить этот контекст?')) remove.mutate(id)
+    if (window.confirm(t('home.deleteConfirm'))) remove.mutate(id)
   }
 
   const stats = [
-    { label: 'Контекстов', value: data?.length ?? 0, icon: '📚' },
-    { label: 'Слов добавлено', value: cards.data?.length ?? 0, icon: '📝' },
-    { label: 'Слов изучено', value: stats7.data?.totals.total_words_learned ?? 0, icon: '🌱' },
-    { label: 'Дней подряд', value: streak, icon: '🔥' },
-    { label: 'Язык', value: 'DE', icon: '🇩🇪' },
+    { label: t('stats.wordsAdded'), value: cards.data?.length ?? 0, icon: '📝' },
+    { label: t('stats.streak'), value: streak, icon: '🔥' },
+    { label: t('stats.language'), value: 'DE', icon: '🇩🇪' },
   ]
 
   return (
@@ -45,15 +46,15 @@ export function ContextsPage() {
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="display text-3xl font-extrabold md:text-4xl">
-              Hallo! <span className="text-lime-300">Was lernen wir heute?</span>
+              {t('home.greeting')} <span className="text-lime-300">{t('home.greetingAccent')}</span>
             </h1>
-            <p className="mt-2 text-emerald-100/70">Каждая фраза — это набор новых слов в живом контексте.</p>
+            <p className="mt-2 text-emerald-100/70">{t('home.subtitle')}</p>
           </div>
-          <Link to="/contexts/new" className="btn-primary shrink-0">✨ Новая фраза</Link>
+          <Link to="/contexts/new" className="btn-primary shrink-0">{t('home.newPhrase')}</Link>
         </div>
         <div className="relative mt-8 grid grid-cols-3 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-4 text-center">
+            <div key={s.icon} className="rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-4 text-center">
               <div className="text-2xl">{s.icon}</div>
               <div className="display mt-1 text-2xl font-extrabold text-lime-300">{s.value}</div>
               <div className="text-xs text-emerald-100/60">{s.label}</div>
@@ -63,15 +64,15 @@ export function ContextsPage() {
       </section>
 
       <section>
-        <h2 className="display mb-4 text-xl font-bold">Мои контексты</h2>
+        <h2 className="display mb-4 text-xl font-bold">{t('home.myContexts')}</h2>
         {isLoading && <SkeletonGrid />}
         {error && <p className="text-red-300">{errorMessage(error)}</p>}
-        {remove.error && <p className="mb-3 text-red-300">Не удалось удалить: {errorMessage(remove.error)}</p>}
+        {remove.error && <p className="mb-3 text-red-300">{t('home.deleteFailed', { error: errorMessage(remove.error) })}</p>}
         {data && !data.length && (
           <div className="glass p-10 text-center">
             <div className="text-5xl">🌿</div>
-            <p className="mt-3 text-emerald-100/70">Пока пусто. Добавьте первую немецкую фразу!</p>
-            <Link to="/contexts/new" className="btn-primary mt-6">Начать</Link>
+            <p className="mt-3 text-emerald-100/70">{t('home.empty')}</p>
+            <Link to="/contexts/new" className="btn-primary mt-6">{t('home.start')}</Link>
           </div>
         )}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -84,7 +85,7 @@ export function ContextsPage() {
               <div className="absolute left-0 top-0 z-10 h-full w-1 bg-gradient-to-b from-lime-300 to-emerald-500 opacity-60 transition group-hover:opacity-100" />
               <button type="button" onClick={(e) => onDelete(e, c.id)}
                 disabled={remove.isPending && remove.variables === c.id}
-                title="Удалить контекст" aria-label="Удалить контекст"
+                title={t('home.deleteTitle')} aria-label={t('home.deleteTitle')}
                 className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-emerald-950/70 text-emerald-200/80 backdrop-blur transition hover:bg-red-500/30 hover:text-red-200 disabled:opacity-50">
                 🗑
               </button>
@@ -101,8 +102,8 @@ export function ContextsPage() {
               <p className="line-clamp-4 text-lg leading-relaxed text-white">„{c.source_text}“</p>
               {c.meaning && <p className="mt-2 line-clamp-2 text-sm text-lime-200">— {c.meaning}</p>}
               <div className="mt-4 flex items-center justify-between text-xs text-emerald-300/60">
-                <span>{new Date(c.created_at).toLocaleDateString()}</span>
-                <span className="font-semibold text-lime-300 opacity-0 transition group-hover:opacity-100">Открыть →</span>
+                <span>{new Date(c.created_at).toLocaleDateString(dateLocale())}</span>
+                <span className="font-semibold text-lime-300 opacity-0 transition group-hover:opacity-100">{t('home.open')}</span>
               </div>
             </Link>
             )

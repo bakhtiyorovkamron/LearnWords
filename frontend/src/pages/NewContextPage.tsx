@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { contextsApi, wordsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { resizeImage } from '../lib/image'
 
 const MAX_LEN = 2000
 
+// German sample phrases are learning content — not translated.
 const examples = [
   'Guten Morgen! Wie geht es dir heute?',
   'Ich hätte gern einen Kaffee mit Milch, bitte.',
@@ -15,6 +17,7 @@ const examples = [
 ]
 
 export function NewContextPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [text, setText] = useState('')
@@ -53,7 +56,7 @@ export function NewContextPage() {
     try {
       setPhoto(await resizeImage(file))
     } catch (e) {
-      setLocalError(e instanceof Error ? e.message : 'Не удалось загрузить фото')
+      setLocalError(e instanceof Error ? e.message : t('newContext.errPhoto'))
     }
   }
 
@@ -66,6 +69,7 @@ export function NewContextPage() {
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['contexts'] })
       qc.invalidateQueries({ queryKey: ['cards'] })
+      qc.invalidateQueries({ queryKey: ['stories'] })
       qc.setQueryData(['context-words', res.context.id], res.cards)
       navigate(`/contexts/${res.context.id}`)
     },
@@ -74,23 +78,22 @@ export function NewContextPage() {
   function submit(e: FormEvent) {
     e.preventDefault()
     setLocalError(null)
-    if (!text.trim()) return setLocalError('Введите немецкое слово или фразу')
-    if (!meaning.trim()) return setLocalError('Введите перевод')
-    if (!pronunciation.trim()) return setLocalError('Введите произношение')
+    if (!text.trim()) return setLocalError(t('newContext.errTextRequired'))
+    if (!meaning.trim()) return setLocalError(t('newContext.errTranslationRequired'))
+    if (!pronunciation.trim()) return setLocalError(t('newContext.errPronunciationRequired'))
     mutation.mutate()
   }
 
   const error = localError ?? (mutation.error ? errorMessage(mutation.error) : null)
+  const labelCls = 'mb-2 block text-xs uppercase tracking-wider text-emerald-300/60'
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="animate-rise text-center">
         <h1 className="display text-3xl font-extrabold md:text-4xl">
-          Новая <span className="text-lime-300">фраза</span> ✨
+          {t('newContext.titleA')}<span className="text-lime-300">{t('newContext.titleB')}</span> ✨
         </h1>
-        <p className="mt-2 text-emerald-100/70">
-          Вставьте текст из фильма, песни или переписки — мы разберём каждое слово.
-        </p>
+        <p className="mt-2 text-emerald-100/70">{t('newContext.subtitle')}</p>
       </div>
 
       <form onSubmit={submit} className="glass animate-rise space-y-5 p-6 md:p-8">
@@ -109,41 +112,41 @@ export function NewContextPage() {
         </div>
 
         <div>
-          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Перевод *</label>
+          <label className={labelCls}>{t('newContext.translation')}</label>
           <input
             value={meaning}
             required
             onChange={(e) => setMeaning(e.target.value.slice(0, 500))}
-            placeholder="Что означает слово или фраза?"
+            placeholder={t('newContext.translationPlaceholder')}
             className="field"
           />
         </div>
 
         <div>
-          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Произношение *</label>
+          <label className={labelCls}>{t('newContext.pronunciation')}</label>
           <input
             value={pronunciation}
             required
             onChange={(e) => setPronunciation(e.target.value.slice(0, 200))}
-            placeholder="например: [ихь]"
+            placeholder={t('newContext.pronunciationPlaceholder')}
             className="field"
           />
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <label className="text-xs uppercase tracking-wider text-emerald-300/60">Пример предложения</label>
+            <label className="text-xs uppercase tracking-wider text-emerald-300/60">{t('newContext.example')}</label>
             <button type="button" onClick={() => generate.mutate()}
               disabled={generate.isPending || !singleWord || !meaning.trim()}
-              title={singleWord ? 'Нужны слово и перевод' : 'Доступно, когда введено одно слово'}
+              title={singleWord ? t('newContext.hintNeedTranslation') : t('newContext.hintSingleWord')}
               className="btn-ghost shrink-0 disabled:opacity-50">
               {generate.isPending ? (
                 <>
                   <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />
-                  Генерируем…
+                  {t('newContext.generating')}
                 </>
               ) : (
-                '✨ Сгенерировать автоматически'
+                t('newContext.generate')
               )}
             </button>
           </div>
@@ -156,35 +159,35 @@ export function NewContextPage() {
           <input
             value={exampleTranslation}
             onChange={(e) => setExampleTranslation(e.target.value.slice(0, 500))}
-            placeholder="Перевод примера"
+            placeholder={t('newContext.exampleTranslationPlaceholder')}
             className="field"
           />
           {generate.error && (
             <p className="text-sm text-red-300">
               {(generate.error as { response?: { status?: number } }).response?.status === 503
-                ? 'Автогенерация не настроена на сервере (нет ANTHROPIC_API_KEY)'
-                : 'Не удалось сгенерировать пример, попробуйте снова'}
+                ? t('newContext.generateNotConfigured')
+                : t('newContext.generateFailed')}
             </p>
           )}
           {!exampleSentence && (
-            <p className="text-xs text-emerald-300/50">Если оставить пустым, пример для одного слова добавится автоматически после сохранения.</p>
+            <p className="text-xs text-emerald-300/50">{t('newContext.autoExampleHint')}</p>
           )}
         </div>
 
         <div>
-          <label className="mb-2 block text-xs uppercase tracking-wider text-emerald-300/60">Фото (необязательно)</label>
+          <label className={labelCls}>{t('newContext.photo')}</label>
           {preview ? (
             <div className="relative overflow-hidden rounded-2xl">
               <img src={preview} alt="" className="aspect-[4/3] w-full object-cover" />
               <button type="button" onClick={() => setPhoto(null)}
                 className="absolute right-3 top-3 rounded-full bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-lime-300 backdrop-blur hover:bg-emerald-950">
-                ✕ Убрать
+                {t('newContext.removePhoto')}
               </button>
             </div>
           ) : (
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/30 py-8 text-emerald-200/70 transition hover:border-lime-400 hover:text-lime-300">
               <span className="text-3xl">📷</span>
-              <span className="text-sm font-semibold">Загрузить фото</span>
+              <span className="text-sm font-semibold">{t('newContext.uploadPhoto')}</span>
               <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
                 onChange={(e) => { void pickPhoto(e.target.files?.[0]); e.target.value = '' }} />
             </label>
@@ -192,7 +195,7 @@ export function NewContextPage() {
         </div>
 
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wider text-emerald-300/60">Или попробуйте пример</p>
+          <p className="mb-2 text-xs uppercase tracking-wider text-emerald-300/60">{t('newContext.tryExample')}</p>
           <div className="flex flex-wrap gap-2">
             {examples.map((ex) => (
               <button key={ex} type="button" onClick={() => setText(ex)}
@@ -211,10 +214,10 @@ export function NewContextPage() {
           {mutation.isPending ? (
             <>
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-950 border-t-transparent" />
-              Разбираем слова…
+              {t('newContext.analyzing')}
             </>
           ) : (
-            'Разобрать фразу →'
+            t('newContext.submit')
           )}
         </button>
       </form>

@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { cardsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
 import { ReviewSession } from '../components/ReviewSession'
 
 export function CardsPage() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<'review' | 'all'>('review')
+  const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
   return (
     <div className="space-y-8">
       <div className="flex gap-2">
-        {([['review', 'Повторение'], ['all', 'Коллекция']] as const).map(([k, label]) => (
+        {tabs.map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={tab === k ? 'btn-primary' : 'btn-ghost'}>{label}</button>
         ))}
@@ -21,6 +24,7 @@ export function CardsPage() {
 }
 
 function Collection() {
+  const { t } = useTranslation()
   const { data, isLoading, error } = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
   const [q, setQ] = useState('')
 
@@ -37,15 +41,15 @@ function Collection() {
       <div className="animate-rise flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="display text-3xl font-extrabold md:text-4xl">
-            Моя <span className="text-lime-300">коллекция</span> 🃏
+            {t('cards.titleA')}<span className="text-lime-300">{t('cards.titleB')}</span> 🃏
           </h1>
           <p className="mt-2 text-emerald-100/70">
-            {data ? `${data.length} слов в копилке` : 'Все ваши слова в одном месте'}
+            {data ? t('cards.count', { count: data.length }) : t('cards.allInOnePlace')}
           </p>
         </div>
         <div className="relative w-full md:w-80">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-emerald-300/60">🔍</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по слову или переводу…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('cards.search')}
             className="field pl-11" />
         </div>
       </div>
@@ -66,7 +70,7 @@ function Collection() {
       {data && !filtered.length && (
         <div className="glass p-10 text-center">
           <div className="text-5xl">🍃</div>
-          <p className="mt-3 text-emerald-100/70">{q ? 'Ничего не найдено' : 'Коллекция пока пуста'}</p>
+          <p className="mt-3 text-emerald-100/70">{q ? t('cards.nothingFound') : t('cards.empty')}</p>
         </div>
       )}
     </div>
