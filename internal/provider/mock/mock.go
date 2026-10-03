@@ -23,17 +23,20 @@ var dict = map[string]string{
 	"dir": "тебе", "heute": "сегодня", "hallo": "привет", "danke": "спасибо",
 }
 
+// Translate knows only a tiny dictionary. For unknown words it returns "" (no translation)
+// instead of a fake "[ru] word" placeholder, so mock data never ends up in the user's cards.
 func (Translator) Translate(_ context.Context, text, _, target string) (string, error) {
 	if t, ok := dict[strings.ToLower(text)]; ok && target == "ru" {
 		return t, nil
 	}
-	return "[" + target + "] " + text, nil
+	return "", nil
 }
 
 type Transcriber struct{}
 
-func (Transcriber) Transcribe(_ context.Context, word, _ string) (string, error) {
-	return "[" + strings.ToLower(word) + "]", nil
+// Transcribe has no real IPA data: returns "" rather than a "[word]" placeholder.
+func (Transcriber) Transcribe(context.Context, string, string) (string, error) {
+	return "", nil
 }
 
 type TTS struct{}

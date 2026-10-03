@@ -14,7 +14,8 @@ function play(card: WordCard) {
 
 function speak(card: WordCard) {
   if (!('speechSynthesis' in window)) return
-  const u = new SpeechSynthesisUtterance(card.word)
+  // "der Samstag / der Sonnabend" → pronounce only the first variant.
+  const u = new SpeechSynthesisUtterance(card.word.split('/')[0].trim())
   u.lang = card.language === 'de' ? 'de-DE' : card.language
   window.speechSynthesis.speak(u)
 }

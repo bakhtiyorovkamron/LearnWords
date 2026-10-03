@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -83,7 +84,15 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	}
 	c.SourceText = text
 
-	words := Tokenize(text, in.Language)
+	// "der Samstag / der Sonnabend": one word with equivalent spellings → one card.
+	// The card keeps both variants; translation/pronunciation come from the user (or the first variant).
+	var variants []string
+	var words []string
+	if variants = SplitVariants(text); variants != nil {
+		words = []string{strings.Join(variants, " / ")}
+	} else {
+		words = Tokenize(text, in.Language)
+	}
 	// A single typed word (e.g. "ich") must become a card even if it is a stopword.
 	if len(words) == 0 {
 		if fields := strings.Fields(text); len(fields) == 1 {
@@ -100,10 +109,11 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	// Sequential for now; can be parallelized (errgroup) or moved to an async worker queue.
 	cards := make([]domain.WordCard, 0, len(words))
 	for _, w := range words {
-		card, err := s.buildCard(ctx, c, w)
-		if err != nil {
-			return nil, s.fail(span, "build card", err)
+		lookup := w
+		if variants != nil {
+			lookup = variants[0] // generate only for the first variant
 		}
+		card := s.buildCard(ctx, c, w, lookup)
 		// A single-word phrase: the user's meaning is the word's translation.
 		if len(words) == 1 {
 			if meaning != "" {
@@ -125,30 +135,40 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 		return nil, s.fail(span, "save context", err)
 	}
 	// No example entered manually: generate one in the background after saving.
-	if len(cards) == 1 && cards[0].ExampleSentence == "" {
-		s.generateExampleAsync(userID, cards[0])
+	if len(cards) == 1 && cards[0].ExampleSentence == "" && cards[0].Translation != "" {
+		forExample := cards[0]
+		if variants != nil {
+			forExample.Word = variants[0]
+		}
+		s.generateExampleAsync(userID, forExample)
 	}
 	return &domain.ContextWithCards{Context: c, Cards: cards}, nil
 }
 
-func (s *ContextService) buildCard(ctx context.Context, c domain.Context, word string) (domain.WordCard, error) {
+// buildCard creates a card for word. Translation/transcription/audio are generated for lookup
+// (the first spelling variant). Generation failures are logged and the field is left EMPTY —
+// never filled with a placeholder — so the user sees what is missing instead of fake data.
+func (s *ContextService) buildCard(ctx context.Context, c domain.Context, word, lookup string) domain.WordCard {
 	card := domain.WordCard{
 		ID: uuid.New(), ContextID: c.ID, UserID: c.UserID,
 		Word: word, Language: c.Language, CreatedAt: c.CreatedAt,
 	}
-	var err error
-	if card.Translation, err = s.p.Translator.Translate(ctx, word, c.Language, s.targetLang); err != nil {
-		return card, fmt.Errorf("translate %q: %w", word, err)
+	if tr, err := s.p.Translator.Translate(ctx, lookup, c.Language, s.targetLang); err != nil {
+		slog.WarnContext(ctx, "translation failed", "word", lookup, "err", err)
+	} else {
+		card.Translation = strings.TrimSpace(tr)
 	}
-	if card.Transcription, err = s.p.Transcriber.Transcribe(ctx, word, c.Language); err != nil {
-		return card, fmt.Errorf("transcribe %q: %w", word, err)
+	if ts, err := s.p.Transcriber.Transcribe(ctx, lookup, c.Language); err != nil {
+		slog.WarnContext(ctx, "transcription failed", "word", lookup, "err", err)
+	} else {
+		card.Transcription = strings.TrimSpace(ts)
 	}
-	url, err := s.synthesize(ctx, c.UserID, card.ID, word, c.Language)
-	if err != nil {
-		return card, err
+	if url, err := s.synthesize(ctx, c.UserID, card.ID, lookup, c.Language); err != nil {
+		slog.WarnContext(ctx, "audio synthesis failed", "word", lookup, "err", err)
+	} else {
+		card.AudioURL = &url
 	}
-	card.AudioURL = &url
-	return card, nil
+	return card
 }
 
 func (s *ContextService) synthesize(ctx context.Context, userID, cardID uuid.UUID, word, lang string) (string, error) {
@@ -183,7 +203,7 @@ func (s *ContextService) RegenerateAudio(ctx context.Context, userID, cardID uui
 	if err != nil {
 		return nil, err
 	}
-	url, err := s.synthesize(ctx, userID, card.ID, card.Word, card.Language)
+	url, err := s.synthesize(ctx, userID, card.ID, firstVariant(card.Word), card.Language)
 	if err != nil {
 		return nil, s.fail(span, "synthesize", err)
 	}
@@ -198,4 +218,12 @@ func (s *ContextService) fail(span trace.Span, op string, err error) error {
 	span.RecordError(err)
 	span.SetStatus(codes.Error, op)
 	return fmt.Errorf("%s: %w", op, err)
+}
+
+// firstVariant returns "der Samstag" for "der Samstag / der Sonnabend" (or the word itself).
+func firstVariant(word string) string {
+	if v := SplitVariants(word); v != nil {
+		return v[0]
+	}
+	return word
 }
