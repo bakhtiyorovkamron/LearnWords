@@ -54,6 +54,8 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+      # Old dev URL http://IP:15173 → redirected to https://yodla.fun (stop caddy before using the dev profile).
+      - "15173:15173"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

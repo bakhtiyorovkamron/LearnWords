@@ -8,6 +8,17 @@ www.yodla.fun {
 	redir https://yodla.fun{uri} permanent
 }
 
+# Requests by bare IP (http://129.121.97.22) or any unknown host → main domain.
+# Without this Caddy closes the connection (ERR_EMPTY_RESPONSE).
+http:// {
+	redir https://yodla.fun{uri} permanent
+}
+
+# Old dev address http://129.121.97.22:15173 → main domain.
+http://:15173 {
+	redir https://yodla.fun{uri} permanent
+}
+
 yodla.fun {
 	encode zstd gzip
 
