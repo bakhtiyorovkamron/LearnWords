@@ -128,6 +128,24 @@
     "nothingFound": "Nothing found",
     "empty": "The collection is empty"
   },
+  "collection": {
+    "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned" },
+    "period": { "today": "Today", "week": "This week", "all": "All time" },
+    "sortLabel": "Sort",
+    "sort": {
+      "date": "By date (newest first)",
+      "alpha": "Alphabetically",
+      "progress": "By progress (weakest first)"
+    },
+    "view": { "list": "List", "flip": "Flashcards" },
+    "status": { "new": "new", "learning": "learning", "learned": "learned" },
+    "boxTitle": "Level {{level}} of 5",
+    "flipHint": "Click to flip",
+    "keysHint": "← → to browse, Space to flip",
+    "prev": "Back",
+    "next": "Next",
+    "loadMore": "Show more ({{shown}} of {{total}})"
+  },
   "wordCard": {
     "deleteConfirm": "Delete the word “{{word}}”?",
     "listen": "Listen",

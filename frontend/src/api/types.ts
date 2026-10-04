@@ -40,6 +40,16 @@ export interface DueCard extends WordCard {
   has_example: boolean
 }
 
+// Card with Leitner progress (Collection page).
+export interface CollectionCard extends WordCard {
+  box_level: number
+  is_learned: boolean
+}
+
+export type CollectionStatus = 'all' | 'new' | 'learning' | 'learned'
+export type CollectionPeriod = 'all' | 'today' | 'week'
+export type CollectionSort = 'date' | 'alpha' | 'progress'
+
 export interface Progress {
   word_id: string
   box_level: number

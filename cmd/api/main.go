@@ -123,6 +123,7 @@ func run() error {
 		Stories:     handler.NewStoryHandler(storySvc),
 		Settings:    handler.NewSettingsHandler(userRepo),
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo),
+		Collection:  handler.NewCollectionHandler(cardRepo),
 		UserStatus:  adminRepo,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)

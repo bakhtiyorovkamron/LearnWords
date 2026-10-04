@@ -1,5 +1,8 @@
 import { api, tokenStore } from './client'
-import type { AuthResponse, Context, ContextWithCards, DueCard, Page, Progress, Stats, WordCard } from './types'
+import type {
+  AuthResponse, CollectionCard, CollectionPeriod, CollectionSort, CollectionStatus,
+  Context, ContextWithCards, DueCard, Page, Progress, Stats, WordCard,
+} from './types'
 
 export interface Credentials {
   email: string
@@ -119,4 +122,19 @@ export const cardsApi = {
   list: () => api.get<Page<WordCard>>('/word-cards', { params: { limit: 100 } }).then((r) => r.data.items),
   regenerateAudio: (id: string) => api.post<WordCard>(`/word-cards/${id}/audio`).then((r) => r.data),
   remove: (id: string) => api.delete(`/word-cards/${id}`),
+}
+
+export interface CollectionQuery {
+  status: CollectionStatus; period: CollectionPeriod; sort: CollectionSort; q: string
+  limit?: number; offset?: number
+}
+
+// Filtering/sorting happen on the backend (SQL), one page at a time.
+export const collectionApi = {
+  list: (f: CollectionQuery) =>
+    api
+      .get<{ items: CollectionCard[]; total: number }>('/collection', {
+        params: { status: f.status, period: f.period, sort: f.sort, q: f.q || undefined, limit: f.limit ?? 48, offset: f.offset ?? 0 },
+      })
+      .then((r) => r.data),
 }

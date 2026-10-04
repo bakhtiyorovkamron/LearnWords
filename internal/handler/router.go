@@ -22,6 +22,7 @@ type RouterDeps struct {
 	Stories     *StoryHandler
 	Settings    *SettingsHandler
 	Admin       *AdminHandler
+	Collection  *CollectionHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 }
@@ -71,6 +72,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/contexts/:id/words", d.Contexts.Words)
 		protected.PUT("/contexts/:id/photo", d.Contexts.SetPhoto)
 		protected.GET("/word-cards", d.Contexts.WordCards)
+		protected.GET("/collection", d.Collection.List)
 		protected.POST("/word-cards/:id/audio", d.Contexts.RegenerateAudio)
 		protected.DELETE("/word-cards/:id", d.Contexts.DeleteCard)
 		protected.POST("/words/generate-example", d.Contexts.GenerateExample)

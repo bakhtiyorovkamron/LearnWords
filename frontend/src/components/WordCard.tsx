@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
+import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
 
 // Mock storage returns mock:// URLs which browsers can't play — fall back to Web Speech API.
 function play(card: WordCard) {
@@ -20,7 +21,11 @@ function speak(card: WordCard) {
   window.speechSynthesis.speak(u)
 }
 
-export function WordCardView({ card, index = 0, meaning }: { card: WordCard; index?: number; meaning?: string }) {
+export function WordCardView({ card, index = 0, meaning, progress }: {
+  card: WordCard; index?: number; meaning?: string
+  // When given (Collection page): status colour + 5-dot box_level indicator.
+  progress?: { boxLevel: number; isLearned: boolean }
+}) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const regen = useMutation({
@@ -33,6 +38,7 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
       // Drop the card from every cached list immediately.
       qc.setQueriesData<WordCard[]>({ queryKey: ['cards'] }, (old) => old?.filter((c) => c.id !== card.id))
       qc.setQueriesData<WordCard[]>({ queryKey: ['context-words'] }, (old) => old?.filter((c) => c.id !== card.id))
+      qc.invalidateQueries({ queryKey: ['collection'] })
     },
   })
 
@@ -40,12 +46,19 @@ export function WordCardView({ card, index = 0, meaning }: { card: WordCard; ind
     if (window.confirm(t('wordCard.deleteConfirm', { word: card.word }))) remove.mutate()
   }
 
+  const tone = progress
+    ? STATUS_STYLE[knowledgeStatus(progress.boxLevel, progress.isLearned)].card
+    : 'border-emerald-400/15 from-emerald-800/60 to-emerald-900/40'
+
   return (
     <div
       style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-      className={`animate-rise group relative overflow-hidden rounded-2xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/60 to-emerald-900/40 p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20 ${remove.isPending ? 'pointer-events-none opacity-40' : ''}`}
+      className={`animate-rise group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${tone} p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20 ${remove.isPending ? 'pointer-events-none opacity-40' : ''}`}
     >
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-lime-400/10 blur-2xl transition group-hover:bg-lime-400/25" />
+      {progress && (
+        <div className="relative mb-2"><ProgressDots boxLevel={progress.boxLevel} isLearned={progress.isLearned} /></div>
+      )}
       <div className="relative flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-lg font-bold text-white">{card.word}</div>
