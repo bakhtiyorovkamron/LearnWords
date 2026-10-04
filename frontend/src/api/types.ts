@@ -37,6 +37,7 @@ export interface WordCard {
 
 export interface DueCard extends WordCard {
   box_level: number
+  has_example: boolean
 }
 
 export interface Progress {

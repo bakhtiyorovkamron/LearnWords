@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,7 +21,8 @@ func NewReviewRepository(pool *pgxpool.Pool) *ReviewRepository { return &ReviewR
 func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int) ([]domain.DueCard, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
-		       w.language, w.created_at, COALESCE(p.box_level, 1)
+		       w.language, w.created_at, COALESCE(p.box_level, 1),
+		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, '')
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		WHERE w.user_id = $1
@@ -34,7 +36,10 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.DueCard, error) {
 		var d domain.DueCard
 		err := row.Scan(&d.ID, &d.ContextID, &d.UserID, &d.Word, &d.Translation, &d.Transcription,
-			&d.AudioURL, &d.Language, &d.CreatedAt, &d.BoxLevel)
+			&d.AudioURL, &d.Language, &d.CreatedAt, &d.BoxLevel,
+			&d.ExampleSentence, &d.ExampleTranslation)
+		// Gap-fill questions need a sentence that actually contains the ___ gap.
+		d.HasExample = strings.Contains(d.ExampleSentence, "___")
 		return d, err
 	})
 }

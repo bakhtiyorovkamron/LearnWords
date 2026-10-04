@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cardsApi, reviewApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import type { DueCard } from '../api/types'
+import { buildQueue, type QuizItem } from '../lib/quiz'
 import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
 
@@ -15,7 +15,7 @@ export function ReviewSession() {
   // Whole dictionary: source of wrong answer options.
   const pool = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
 
-  const [deck, setDeck] = useState<DueCard[] | null>(null) // null = not started
+  const [deck, setDeck] = useState<QuizItem[] | null>(null) // null = not started
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
 
@@ -25,7 +25,8 @@ export function ReviewSession() {
   })
 
   function start() {
-    setDeck(due.data ?? [])
+    // Random suitable format per word (gap only with an example, typing only for box 3+).
+    setDeck(buildQueue(due.data ?? []))
     setIndex(0)
     setCorrect(0)
     answer.reset()
@@ -64,11 +65,11 @@ export function ReviewSession() {
     return <ReviewResult correct={correct} total={deck.length} onRestart={restart} />
   }
 
-  const card = deck[index]
+  const item = deck[index]
   return (
     <QuizQuestion
-      key={card.id}
-      card={card}
+      key={item.card.id}
+      item={item}
       pool={pool.data ?? []}
       position={index + 1}
       total={deck.length}
@@ -76,7 +77,7 @@ export function ReviewSession() {
       error={answer.error ? errorMessage(answer.error) : null}
       onAnswer={(ok) => {
         if (ok) setCorrect((c) => c + 1)
-        answer.mutate({ id: card.id, ok }) // saved immediately, not at the end
+        answer.mutate({ id: item.card.id, ok }) // saved immediately, not at the end
       }}
       onNext={() => {
         answer.reset()

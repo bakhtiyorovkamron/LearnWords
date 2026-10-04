@@ -143,6 +143,16 @@
   },
   "quiz": {
     "choose": "Choose the translation",
+    "prompt": {
+      "de_ru": "Choose the translation",
+      "ru_de": "Choose the German word",
+      "ru_de_type": "Type it in German",
+      "gap": "Fill in the missing word"
+    },
+    "typePlaceholder": "German word (with article)",
+    "check": "Check",
+    "almostArticle": "≈ Almost! With the right article: {{answer}}",
+    "almostTypo": "≈ Accepted — check the typo: {{answer}}",
     "listen": "▶ Listen",
     "listenTitle": "Listen",
     "correct": "✓ Correct!",

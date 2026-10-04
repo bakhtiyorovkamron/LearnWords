@@ -98,7 +98,8 @@ type Progress struct {
 // DueCard is a word card due for review today.
 type DueCard struct {
 	WordCard
-	BoxLevel int `json:"box_level"`
+	BoxLevel   int  `json:"box_level"`
+	HasExample bool `json:"has_example"` // example_sentence with a ___ gap → gap-fill question possible
 }
 
 type TokenPair struct {
