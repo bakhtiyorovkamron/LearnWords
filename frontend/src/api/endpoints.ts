@@ -69,8 +69,9 @@ export const storiesApi = {
   today: () =>
     api.get<{ story: DailyStory | null; words_today: StoryWord[]; genres: string[] }>('/stories/today').then((r) => r.data),
   list: () => api.get<{ stories: DailyStory[] }>('/stories').then((r) => r.data.stories),
+  // The backend retries the AI call up to 3 times, so allow several minutes.
   generate: (genre?: string) =>
-    api.post<DailyStory>('/stories/generate', { genre: genre ?? '' }, { timeout: 120_000 }).then((r) => r.data),
+    api.post<DailyStory>('/stories/generate', { genre: genre ?? '' }, { timeout: 420_000 }).then((r) => r.data),
 }
 
 export const settingsApi = {

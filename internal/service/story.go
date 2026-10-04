@@ -28,7 +28,9 @@ type StoryRepository interface {
 
 var StoryGenres = []string{"приключение", "детектив", "комедия", "сказка", "фантастика", "повседневная жизнь", "романтика"}
 
-const maxStoryWords = 40
+// maxStoryWords caps how many of the day's words go into one story: long word lists make the
+// answer huge (DE + RU text) and much more likely to be cut off or malformed.
+const maxStoryWords = 12
 
 type StoryService struct {
 	repo StoryRepository
@@ -64,6 +66,8 @@ func (s *StoryService) generateFor(ctx context.Context, userID uuid.UUID, day, g
 		return nil, nil
 	}
 	if len(words) > maxStoryWords {
+		// Random sample, so every word gets a chance across regenerations.
+		rand.Shuffle(len(words), func(i, j int) { words[i], words[j] = words[j], words[i] })
 		words = words[:maxStoryWords]
 	}
 	genre = strings.TrimSpace(genre)
@@ -135,7 +139,8 @@ func (s *StoryService) generateForAll(ctx context.Context, day string) {
 	}
 	slog.Info("daily story cron started", "date", day, "users", len(users))
 	for _, uid := range users {
-		c, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		// Up to 3 attempts per story inside the generator.
+		c, cancel := context.WithTimeout(ctx, 7*time.Minute)
 		if _, err := s.generateFor(c, uid, day, ""); err != nil {
 			slog.Warn("daily story cron: generation failed", "user", uid, "err", err)
 		}

@@ -136,8 +136,9 @@ func run() error {
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		// Story generation may retry the LLM call up to 3 times (each up to ~2 min).
+		WriteTimeout: 7 * time.Minute,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	errCh := make(chan error, 1)

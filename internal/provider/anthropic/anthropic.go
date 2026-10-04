@@ -71,7 +71,9 @@ type response struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"content"`
-	Error *struct {
+	// "end_turn" normally; "max_tokens" means the answer was cut off (JSON incomplete).
+	StopReason string `json:"stop_reason"`
+	Error      *struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
