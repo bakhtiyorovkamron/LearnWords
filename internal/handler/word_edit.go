@@ -44,12 +44,12 @@ func (h *WordEditHandler) Update(c *gin.Context) {
 		"word": u.Word, "translation": u.Translation, "transcription": u.Transcription,
 		"example_sentence": u.ExampleSentence, "example_translation": u.ExampleTranslation,
 	}
-	any := false
+	changed := false
 	for name, p := range fields {
 		if p == nil {
 			continue
 		}
-		any = true
+		changed = true
 		*p = strings.TrimSpace(*p)
 		if len([]rune(*p)) > wordFieldLimits[name] {
 			badRequest(c, name+" is too long")
