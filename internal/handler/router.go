@@ -23,6 +23,7 @@ type RouterDeps struct {
 	Settings    *SettingsHandler
 	Admin       *AdminHandler
 	Collection  *CollectionHandler
+	WordEdit    *WordEditHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 }
@@ -75,6 +76,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/collection", d.Collection.List)
 		protected.POST("/word-cards/:id/audio", d.Contexts.RegenerateAudio)
 		protected.DELETE("/word-cards/:id", d.Contexts.DeleteCard)
+		protected.PATCH("/words/:id", d.WordEdit.Update)
 		protected.POST("/words/generate-example", d.Contexts.GenerateExample)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)

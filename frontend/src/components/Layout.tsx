@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { Toaster } from './Toaster'
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -61,6 +62,7 @@ export function Layout() {
       <footer className="py-8 text-center text-xs text-emerald-300/40">
         Deutsch lernen — Wort für Wort 🌿
       </footer>
+      <Toaster />
     </div>
   )
 }

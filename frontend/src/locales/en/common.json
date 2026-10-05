@@ -1,11 +1,12 @@
 {
   "common": { "unknownError": "Unknown error", "loading": "Loading…" },
+  "direction": { "label": "Direction", "de_ru": "DE → RU", "ru_de": "RU → DE", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English" },
   "nav": {
     "contexts": "Contexts",
     "add": "Add",
     "cards": "Cards",
-    "cards": "Cards",
+    "stats": "Statistics",
     "dailyStory": "Daily Story",
     "admin": "Admin",
     "logout": "Log out"
@@ -145,6 +146,23 @@
     "prev": "Back",
     "next": "Next",
     "loadMore": "Show more ({{shown}} of {{total}})"
+  },
+  "editWord": {
+    "title": "Edit",
+    "word": "German word",
+    "translation": "Translation",
+    "pronunciation": "Pronunciation",
+    "example": "Example sentence (with a ___ gap)",
+    "examplePlaceholder": "Ich esse eine ___.",
+    "exampleTranslation": "Example translation",
+    "progressKept": "Learning progress for this word is kept.",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "saved": "Word updated",
+    "saveFailed": "Could not save: {{error}}",
+    "errWord": "Enter the German word",
+    "errTranslation": "Enter a translation"
   },
   "wordCard": {
     "deleteConfirm": "Delete the word “{{word}}”?",

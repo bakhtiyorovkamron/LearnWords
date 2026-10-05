@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
 import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
+import { EditWordModal } from './EditWordModal'
 
 // Mock storage returns mock:// URLs which browsers can't play — fall back to Web Speech API.
 function play(card: WordCard) {
@@ -28,6 +30,7 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
   const regen = useMutation({
     mutationFn: () => cardsApi.regenerateAudio(card.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cards'] }),
@@ -90,6 +93,14 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
           ↻
         </button>
         <button
+          onClick={() => setEditing(true)}
+          title={t('editWord.title')}
+          aria-label={t('editWord.title')}
+          className="grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300"
+        >
+          ✏️
+        </button>
+        <button
           onClick={onDelete}
           disabled={remove.isPending}
           title={t('wordCard.delete')}
@@ -99,6 +110,7 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
         </button>
       </div>
       {remove.error && <p className="relative mt-2 text-xs text-red-300">{t('wordCard.deleteFailed')}</p>}
+      {editing && <EditWordModal card={card} onClose={() => setEditing(false)} />}
     </div>
   )
 }

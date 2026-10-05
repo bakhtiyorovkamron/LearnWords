@@ -151,6 +151,23 @@
     "next": "Вперёд",
     "loadMore": "Показать ещё ({{shown}} из {{total}})"
   },
+  "editWord": {
+    "title": "Редактировать",
+    "word": "Немецкое слово",
+    "translation": "Перевод",
+    "pronunciation": "Произношение",
+    "example": "Пример предложения (с пропуском ___)",
+    "examplePlaceholder": "Ich esse eine ___.",
+    "exampleTranslation": "Перевод примера",
+    "progressKept": "Прогресс изучения слова сохранится.",
+    "save": "Сохранить",
+    "saving": "Сохраняем…",
+    "cancel": "Отмена",
+    "saved": "Слово обновлено",
+    "saveFailed": "Не удалось сохранить: {{error}}",
+    "errWord": "Введите немецкое слово",
+    "errTranslation": "Введите перевод"
+  },
   "wordCard": {
     "deleteConfirm": "Удалить слово «{{word}}»?",
     "listen": "Прослушать",

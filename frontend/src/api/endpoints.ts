@@ -60,6 +60,13 @@ export const wordsApi = {
         { timeout: 45_000 },
       )
       .then((r) => r.data),
+  // Only changed fields are sent; learning progress is not affected.
+  update: (id: string, u: WordUpdate) => api.patch<WordCard>(`/words/${id}`, u).then((r) => r.data),
+}
+
+export interface WordUpdate {
+  word?: string; translation?: string; transcription?: string
+  example_sentence?: string; example_translation?: string
 }
 
 export interface StoryWord { word: string; translation: string }

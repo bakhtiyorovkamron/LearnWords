@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
 import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
+import { EditWordModal } from './EditWordModal'
 
 function speak(card: CollectionCard) {
   if (!('speechSynthesis' in window)) return
@@ -21,6 +22,7 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
   const { t } = useTranslation()
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     setIndex(0)
@@ -41,6 +43,7 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (editing) return // typing in the edit form must not flip/scroll cards
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
       if (e.key === 'ArrowLeft') go(-1)
       else if (e.key === 'ArrowRight') go(1)
@@ -51,7 +54,7 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go])
+  }, [go, editing])
 
   if (!cards.length) return null
   const card = cards[Math.min(index, cards.length - 1)]
@@ -84,7 +87,17 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
         </div>
       </div>
 
-      <div className="[perspective:1200px]">
+      <div className="relative [perspective:1200px]">
+        {/* Outside the flipping button, so clicking it never flips the card. */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+          title={t('editWord.title')}
+          aria-label={t('editWord.title')}
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/20 text-emerald-100/80 transition hover:bg-lime-400/20 hover:text-lime-200"
+        >
+          ✏️
+        </button>
         <button
           type="button"
           onClick={() => setFlipped((f) => !f)}
@@ -119,6 +132,7 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
         </button>
       </div>
       <p className="text-center text-xs text-emerald-100/40">{t('collection.keysHint')}</p>
+      {editing && <EditWordModal card={card} onClose={() => setEditing(false)} />}
     </div>
   )
 }

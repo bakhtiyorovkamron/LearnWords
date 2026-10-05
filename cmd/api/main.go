@@ -124,6 +124,7 @@ func run() error {
 		Settings:    handler.NewSettingsHandler(userRepo),
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo),
 		Collection:  handler.NewCollectionHandler(cardRepo),
+		WordEdit:    handler.NewWordEditHandler(cardRepo),
 		UserStatus:  adminRepo,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
