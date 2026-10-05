@@ -1,5 +1,6 @@
 {
   "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…" },
+  "direction": { "label": "Направление", "de_ru": "DE → RU", "ru_de": "RU → DE", "mixed": "Смешанно" },
   "lang": { "label": "Язык интерфейса", "ru": "Русский", "en": "English" },
   "nav": {
     "contexts": "Контексты",

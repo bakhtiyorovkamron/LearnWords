@@ -7,9 +7,11 @@ import type { CollectionPeriod, CollectionSort, CollectionStatus } from '../api/
 import { WordCardView } from '../components/WordCard'
 import { ReviewSession } from '../components/ReviewSession'
 import { FlipCards } from '../components/FlipCards'
+import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
 
 const PAGE = 48
 const VIEW_KEY = 'collection-view'
+const FLIP_DIRECTIONS = ['de_ru', 'ru_de'] as const
 
 export function CardsPage() {
   const { t } = useTranslation()
@@ -64,6 +66,7 @@ function Collection() {
   const [view, setView] = useState<'list' | 'flip'>(() =>
     localStorage.getItem(VIEW_KEY) === 'flip' ? 'flip' : 'list')
   const search = useDebounced(q.trim(), 300)
+  const [flipDirection, setFlipDirection] = useStoredChoice('flip-direction', FLIP_DIRECTIONS, 'de_ru')
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view) }, [view])
 
@@ -146,11 +149,17 @@ function Collection() {
             ))}
           </div>
         ) : (
-          <FlipCards
-            cards={cards}
-            resetKey={JSON.stringify({ status, period, sort, search })}
-            onNearEnd={query.hasNextPage && !query.isFetchingNextPage ? () => void query.fetchNextPage() : undefined}
-          />
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <DirectionToggle value={flipDirection} onChange={setFlipDirection} options={FLIP_DIRECTIONS} />
+            </div>
+            <FlipCards
+              cards={cards}
+              direction={flipDirection}
+              resetKey={JSON.stringify({ status, period, sort, search })}
+              onNearEnd={query.hasNextPage && !query.isFetchingNextPage ? () => void query.fetchNextPage() : undefined}
+            />
+          </div>
         )}
       </div>
 

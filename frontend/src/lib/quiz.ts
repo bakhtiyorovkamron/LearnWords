@@ -34,23 +34,37 @@ export function firstVariant(word: string): string {
   return variants(word)[0] ?? word
 }
 
-/** Formats that make sense for this card. Typing is for box 3+ only; gap only with an example. */
-export function availableFormats(card: DueCard): QuizFormat[] {
+/** Training direction: what is shown (DE word or RU translation). "mixed" picks per word. */
+export type Direction = 'de_ru' | 'ru_de' | 'mixed'
+
+/**
+ * Formats that make sense for this card in the chosen direction.
+ * - DE → RU: German word → choose translation; gap-fill (German sentence) too.
+ * - RU → DE: translation → choose German word, or type it (box 3+ only); gap-fill too.
+ * - mixed: every word randomly gets one of the two directions, then a format of that direction.
+ * Gap only with an example; words without a translation can only be asked as gap-fill.
+ */
+export function availableFormats(card: DueCard, direction: Direction = 'mixed'): QuizFormat[] {
+  const dir = direction === 'mixed' ? (Math.random() < 0.5 ? 'de_ru' : 'ru_de') : direction
   const hasTranslation = card.translation.trim() !== ''
   const out: QuizFormat[] = []
   if (hasTranslation) {
-    out.push('de_ru', 'ru_de')
-    if (card.box_level >= 3) out.push('ru_de_type')
+    if (dir === 'de_ru') {
+      out.push('de_ru')
+    } else {
+      out.push('ru_de')
+      if (card.box_level >= 3) out.push('ru_de_type')
+    }
   }
   if (card.has_example) out.push('gap')
   return out
 }
 
 /** Builds the session queue: a random suitable format per card; cards with nothing to ask are skipped. */
-export function buildQueue(cards: DueCard[]): QuizItem[] {
+export function buildQueue(cards: DueCard[], direction: Direction = 'mixed'): QuizItem[] {
   const items: QuizItem[] = []
   for (const card of cards) {
-    const formats = availableFormats(card)
+    const formats = availableFormats(card, direction)
     if (!formats.length) continue
     items.push({ card, format: formats[Math.floor(Math.random() * formats.length)] })
   }

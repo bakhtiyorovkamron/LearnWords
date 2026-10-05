@@ -3,9 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cardsApi, reviewApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { buildQueue, type QuizItem } from '../lib/quiz'
+import { buildQueue, type Direction, type QuizItem } from '../lib/quiz'
 import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
+import { DirectionToggle, useStoredChoice } from './DirectionToggle'
+
+const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
 // Daily training: Leitner "due" words, multiple-choice questions, progress saved after every answer.
 export function ReviewSession() {
@@ -18,6 +21,8 @@ export function ReviewSession() {
   const [deck, setDeck] = useState<QuizItem[] | null>(null) // null = not started
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
+  // Only changes how words are asked; progress (box_level) is shared by all directions.
+  const [direction, setDirection] = useStoredChoice<Direction>('review-direction', DIRECTIONS, 'mixed')
 
   const answer = useMutation({
     mutationFn: ({ id, ok }: { id: string; ok: boolean }) => reviewApi.answer(id, ok),
@@ -26,7 +31,7 @@ export function ReviewSession() {
 
   function start() {
     // Random suitable format per word (gap only with an example, typing only for box 3+).
-    setDeck(buildQueue(due.data ?? []))
+    setDeck(buildQueue(due.data ?? [], direction))
     setIndex(0)
     setCorrect(0)
     answer.reset()
@@ -56,6 +61,10 @@ export function ReviewSession() {
       <div className="glass p-10 text-center">
         <div className="text-5xl">🃏</div>
         <p className="mt-3 text-lg font-semibold">{t('review.dueCount', { count })}</p>
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('direction.label')}</span>
+          <DirectionToggle value={direction} onChange={setDirection} options={DIRECTIONS} />
+        </div>
         <button type="button" onClick={start} className="btn-primary mt-6 text-lg">{t('review.start')}</button>
       </div>
     )

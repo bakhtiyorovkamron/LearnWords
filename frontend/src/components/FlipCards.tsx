@@ -12,10 +12,11 @@ function speak(card: CollectionCard) {
 
 // Paper-flashcard mode: one card at a time, click/Space to flip, ←/→ to move.
 // Pure self-check — nothing is sent to the backend.
-export function FlipCards({ cards, resetKey, onNearEnd }: {
+export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
   cards: CollectionCard[]
   resetKey: string // changes when filters change → back to the first card
   onNearEnd?: () => void // load the next page before the user reaches the last card
+  direction?: 'de_ru' | 'ru_de' // which side is shown first
 }) {
   const { t } = useTranslation()
   const [index, setIndex] = useState(0)
@@ -25,6 +26,9 @@ export function FlipCards({ cards, resetKey, onNearEnd }: {
     setIndex(0)
     setFlipped(false)
   }, [resetKey])
+
+  // Switching direction turns the current card back to its (new) front side.
+  useEffect(() => { setFlipped(false) }, [direction])
 
   useEffect(() => {
     if (onNearEnd && index >= cards.length - 3) onNearEnd()
@@ -53,6 +57,23 @@ export function FlipCards({ cards, resetKey, onNearEnd }: {
   const card = cards[Math.min(index, cards.length - 1)]
   const tone = STATUS_STYLE[knowledgeStatus(card.box_level, card.is_learned)].card
   const face = `absolute inset-0 flex flex-col items-center justify-center rounded-3xl border bg-gradient-to-br ${tone} p-8 text-center shadow-2xl [backface-visibility:hidden]`
+  const ruFirst = direction === 'ru_de'
+
+  // German side: word + pronunciation + example. Russian side: translation only.
+  const germanSide = (
+    <>
+      <div className={ruFirst ? 'display text-4xl font-extrabold text-white' : 'text-lg font-bold text-white'}>{card.word}</div>
+      <div className="mt-1 font-mono text-sm text-lime-300/90">{card.transcription || '—'}</div>
+      {!ruFirst && <div className="display mt-4 text-3xl font-extrabold text-lime-200">{card.translation || '—'}</div>}
+      {ruFirst && card.translation && <div className="mt-3 text-sm text-emerald-100/70">{card.translation}</div>}
+      {card.example_sentence && (
+        <div className="mt-5 border-t border-white/10 pt-3 text-sm text-emerald-100/80">
+          <div className="italic">{card.example_sentence}</div>
+          {card.example_translation && <div className="text-emerald-100/50">{card.example_translation}</div>}
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
@@ -70,23 +91,17 @@ export function FlipCards({ cards, resetKey, onNearEnd }: {
           aria-label={t('collection.flipHint')}
           className={`relative h-80 w-full transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? '[transform:rotateY(180deg)]' : ''}`}
         >
-          {/* Front: German only */}
+          {/* Front: only the side being asked (German word or Russian translation) */}
           <div className={face}>
             <div className="absolute left-5 top-5"><ProgressDots boxLevel={card.box_level} isLearned={card.is_learned} /></div>
-            <div className="display text-4xl font-extrabold text-white">{card.word}</div>
+            <div className="display text-4xl font-extrabold text-white">
+              {ruFirst ? (card.translation || '—') : card.word}
+            </div>
             <div className="absolute bottom-5 text-xs text-emerald-100/50">{t('collection.flipHint')}</div>
           </div>
-          {/* Back: translation, pronunciation, example */}
+          {/* Back: the answer + pronunciation + example */}
           <div className={`${face} [transform:rotateY(180deg)]`}>
-            <div className="text-lg font-bold text-white">{card.word}</div>
-            <div className="mt-1 font-mono text-sm text-lime-300/90">{card.transcription || '—'}</div>
-            <div className="display mt-4 text-3xl font-extrabold text-lime-200">{card.translation || '—'}</div>
-            {card.example_sentence && (
-              <div className="mt-5 border-t border-white/10 pt-3 text-sm text-emerald-100/80">
-                <div className="italic">{card.example_sentence}</div>
-                {card.example_translation && <div className="text-emerald-100/50">{card.example_translation}</div>}
-              </div>
-            )}
+            {germanSide}
           </div>
         </button>
       </div>
@@ -95,7 +110,10 @@ export function FlipCards({ cards, resetKey, onNearEnd }: {
         <button type="button" onClick={() => go(-1)} disabled={index === 0} className="btn-ghost disabled:opacity-30">
           ← {t('collection.prev')}
         </button>
-        <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')}>▶</button>
+        {/* In RU → DE, listening before flipping would give the answer away. */}
+        {(!ruFirst || flipped) ? (
+          <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')}>▶</button>
+        ) : <span />}
         <button type="button" onClick={() => go(1)} disabled={index >= cards.length - 1} className="btn-ghost disabled:opacity-30">
           {t('collection.next')} →
         </button>
