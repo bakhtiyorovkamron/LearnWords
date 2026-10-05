@@ -88,7 +88,7 @@
     "subtitle": "Вставьте текст из фильма, песни или переписки — мы разберём каждое слово.",
     "translation": "Перевод *",
     "translationPlaceholder": "Что означает слово или фраза?",
-    "pronunciation": "Произношение *",
+    "pronunciation": "Произношение (необязательно)",
     "pronunciationPlaceholder": "например: [ихь]",
     "example": "Пример предложения",
     "hintNeedTranslation": "Нужны слово и перевод",

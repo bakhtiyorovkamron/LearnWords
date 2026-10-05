@@ -80,7 +80,7 @@ export function NewContextPage() {
     setLocalError(null)
     if (!text.trim()) return setLocalError(t('newContext.errTextRequired'))
     if (!meaning.trim()) return setLocalError(t('newContext.errTranslationRequired'))
-    if (!pronunciation.trim()) return setLocalError(t('newContext.errPronunciationRequired'))
+    // Pronunciation is optional.
     mutation.mutate()
   }
 
@@ -126,7 +126,6 @@ export function NewContextPage() {
           <label className={labelCls}>{t('newContext.pronunciation')}</label>
           <input
             value={pronunciation}
-            required
             onChange={(e) => setPronunciation(e.target.value.slice(0, 200))}
             placeholder={t('newContext.pronunciationPlaceholder')}
             className="field"

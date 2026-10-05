@@ -86,7 +86,7 @@
     "subtitle": "Paste text from a movie, a song or a chat — we'll break down every word.",
     "translation": "Translation *",
     "translationPlaceholder": "What does the word or phrase mean?",
-    "pronunciation": "Pronunciation *",
+    "pronunciation": "Pronunciation (optional)",
     "pronunciationPlaceholder": "e.g. [ɪç]",
     "example": "Example sentence",
     "hintNeedTranslation": "Word and translation are required",
