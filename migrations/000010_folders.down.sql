@@ -1,0 +1,2 @@
+ALTER TABLE word_cards DROP COLUMN IF EXISTS folder_id;
+DROP TABLE IF EXISTS folders;

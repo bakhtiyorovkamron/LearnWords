@@ -19,10 +19,14 @@ func (r *WordCardRepository) UpdateContent(ctx context.Context, userID, id uuid.
 		  translation         = COALESCE($4, translation),
 		  transcription       = COALESCE($5, transcription),
 		  example_sentence    = COALESCE($6, example_sentence),
-		  example_translation = COALESCE($7, example_translation)
+		  example_translation = COALESCE($7, example_translation),
+		  -- only a folder of the same user can be assigned (otherwise it becomes NULL)
+		  folder_id           = CASE WHEN $8 THEN (SELECT f.id FROM folders f WHERE f.id = $9 AND f.user_id = $2)
+		                             ELSE folder_id END
 		WHERE id = $1 AND user_id = $2
 		RETURNING `+cardCols,
-		id, userID, u.Word, u.Translation, u.Transcription, u.ExampleSentence, u.ExampleTranslation))
+		id, userID, u.Word, u.Translation, u.Transcription, u.ExampleSentence, u.ExampleTranslation,
+		u.SetFolder, u.Folder))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrNotFound // not found or belongs to another user
 	}

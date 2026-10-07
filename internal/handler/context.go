@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
 	"learnwords/internal/service"
@@ -23,6 +24,20 @@ type createContextJSON struct {
 	ExampleSentence    string `json:"example_sentence" binding:"max=500"`
 	ExampleTranslation string `json:"example_translation" binding:"max=500"`
 	Language           string `json:"language"`
+	FolderID           string `json:"folder_id"`
+}
+
+// parseOptionalFolder: "" → nil (no folder), otherwise a UUID.
+func parseOptionalFolder(s string) (*uuid.UUID, error) {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "none" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid folder_id", domain.ErrValidation)
+	}
+	return &id, nil
 }
 
 // readPhoto reads an optional uploaded file from the given multipart field.
@@ -45,6 +60,7 @@ func readPhoto(c *gin.Context, field string) ([]byte, error) {
 // Create accepts multipart/form-data (text, meaning, language, photo) or JSON {"text","meaning","language"}.
 func (h *ContextHandler) Create(c *gin.Context) {
 	var in service.CreateContextInput
+	var folder string
 	if strings.HasPrefix(c.ContentType(), "multipart/") {
 		in.Text = c.PostForm("text")
 		in.Meaning = c.PostForm("meaning")
@@ -52,6 +68,7 @@ func (h *ContextHandler) Create(c *gin.Context) {
 		in.ExampleSentence = c.PostForm("example_sentence")
 		in.ExampleTranslation = c.PostForm("example_translation")
 		in.Language = c.PostForm("language")
+		folder = c.PostForm("folder_id")
 		if strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 2000 {
 			badRequest(c, "text is required (max 2000 chars)")
 			return
@@ -70,7 +87,14 @@ func (h *ContextHandler) Create(c *gin.Context) {
 		}
 		in = service.CreateContextInput{Text: req.Text, Meaning: req.Meaning, Pronunciation: req.Pronunciation,
 			ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, Language: req.Language}
+		folder = req.FolderID
 	}
+	folderID, err := parseOptionalFolder(folder)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	in.FolderID = folderID
 
 	res, err := h.svc.Create(c.Request.Context(), userID(c), in)
 	if err != nil {

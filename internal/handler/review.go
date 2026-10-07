@@ -12,9 +12,13 @@ type ReviewHandler struct{ svc *service.ReviewService }
 
 func NewReviewHandler(svc *service.ReviewService) *ReviewHandler { return &ReviewHandler{svc: svc} }
 
-// Due handles GET /api/review/due.
+// Due handles GET /api/review/due[?folder_id=<uuid>|none].
 func (h *ReviewHandler) Due(c *gin.Context) {
-	cards, err := h.svc.Due(c.Request.Context(), userID(c))
+	folder, ok := parseFolderFilter(c)
+	if !ok {
+		return
+	}
+	cards, err := h.svc.Due(c.Request.Context(), userID(c), folder)
 	if err != nil {
 		writeError(c, err)
 		return

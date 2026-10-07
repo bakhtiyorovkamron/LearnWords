@@ -7,6 +7,7 @@ import { buildQueue, type Direction, type QuizItem } from '../lib/quiz'
 import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
 import { DirectionToggle, useStoredChoice } from './DirectionToggle'
+import { FolderSelect } from './Folders'
 
 const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
@@ -14,7 +15,13 @@ const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 export function ReviewSession() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const due = useQuery({ queryKey: ['review-due'], queryFn: reviewApi.due, staleTime: 0, refetchOnWindowFocus: false })
+  // '' = all words (default). Only narrows which words are asked; progress is per word.
+  const [folder, setFolder] = useState(() => localStorage.getItem('review-folder') ?? '')
+  const due = useQuery({
+    queryKey: ['review-due', folder],
+    queryFn: () => reviewApi.due(folder),
+    staleTime: 0, refetchOnWindowFocus: false,
+  })
   // Whole dictionary: source of wrong answer options.
   const pool = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
 
@@ -45,6 +52,17 @@ export function ReviewSession() {
   if (due.isLoading || pool.isLoading) return <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />
   if (due.error) return <p className="text-red-300">{errorMessage(due.error)}</p>
 
+  const chooseFolder = (v: string) => {
+    setFolder(v)
+    localStorage.setItem('review-folder', v)
+  }
+  const folderPicker = (
+    <div className="mt-5 flex flex-col items-center gap-2">
+      <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('folders.trainOn')}</span>
+      <FolderSelect value={folder} onChange={chooseFolder} includeAll />
+    </div>
+  )
+
   // Start screen / nothing to review.
   if (!deck) {
     const count = due.data?.length ?? 0
@@ -54,6 +72,7 @@ export function ReviewSession() {
           <div className="text-5xl">🎉</div>
           <p className="mt-3 text-lg font-semibold">{t('review.nothingToday')}</p>
           <p className="mt-1 text-sm text-emerald-100/70">{t('review.comeBack')}</p>
+          {folderPicker}
         </div>
       )
     }
@@ -61,6 +80,7 @@ export function ReviewSession() {
       <div className="glass p-10 text-center">
         <div className="text-5xl">🃏</div>
         <p className="mt-3 text-lg font-semibold">{t('review.dueCount', { count })}</p>
+        {folderPicker}
         <div className="mt-5 flex flex-col items-center gap-2">
           <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('direction.label')}</span>
           <DirectionToggle value={direction} onChange={setDirection} options={DIRECTIONS} />

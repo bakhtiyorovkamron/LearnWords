@@ -1,7 +1,7 @@
 import { api, tokenStore } from './client'
 import type {
   AuthResponse, CollectionCard, CollectionPeriod, CollectionSort, CollectionStatus,
-  Context, ContextWithCards, DueCard, Page, Progress, Stats, WordCard,
+  Context, ContextWithCards, DueCard, Folder, FolderSelection, Page, Progress, Stats, WordCard,
 } from './types'
 
 export interface Credentials {
@@ -37,7 +37,7 @@ export const contextsApi = {
   },
   create(input: {
     text: string; meaning?: string; pronunciation?: string; photo?: File | null; language?: string
-    exampleSentence?: string; exampleTranslation?: string
+    exampleSentence?: string; exampleTranslation?: string; folderId?: string
   }) {
     const fd = new FormData()
     fd.append('text', input.text)
@@ -46,7 +46,7 @@ export const contextsApi = {
     fd.append('example_sentence', input.exampleSentence ?? '')
     fd.append('example_translation', input.exampleTranslation ?? '')
     fd.append('language', input.language ?? 'de')
-    if (input.photo) fd.append('photo', input.photo)
+    if (input.folderId) fd.append('folder_id', input.folderId)
     return api.post<ContextWithCards>('/contexts', fd).then((r) => r.data)
   },
 }
@@ -67,6 +67,15 @@ export const wordsApi = {
 export interface WordUpdate {
   word?: string; translation?: string; transcription?: string
   example_sentence?: string; example_translation?: string
+  folder_id?: string // '' = remove from folder
+}
+
+// Folders are optional grouping only; progress/stories/stats don't depend on them.
+export const foldersApi = {
+  list: () => api.get<{ folders: Folder[] }>('/folders').then((r) => r.data.folders),
+  create: (name: string, color: string) => api.post<Folder>('/folders', { name, color }).then((r) => r.data),
+  update: (id: string, u: { name?: string; color?: string }) => api.patch<Folder>(`/folders/${id}`, u).then((r) => r.data),
+  remove: (id: string) => api.delete(`/folders/${id}`),
 }
 
 export interface StoryWord { word: string; translation: string }
@@ -120,7 +129,8 @@ export const statsApi = {
 }
 
 export const reviewApi = {
-  due: () => api.get<{ cards: DueCard[] }>('/review/due').then((r) => r.data.cards),
+  due: (folder: FolderSelection = '') =>
+    api.get<{ cards: DueCard[] }>('/review/due', { params: { folder_id: folder || undefined } }).then((r) => r.data.cards),
   answer: (id: string, correct: boolean) =>
     api.post<Progress>(`/review/${id}/answer`, { correct }).then((r) => r.data),
 }
@@ -133,6 +143,7 @@ export const cardsApi = {
 
 export interface CollectionQuery {
   status: CollectionStatus; period: CollectionPeriod; sort: CollectionSort; q: string
+  folder?: FolderSelection
   limit?: number; offset?: number
 }
 
@@ -141,7 +152,10 @@ export const collectionApi = {
   list: (f: CollectionQuery) =>
     api
       .get<{ items: CollectionCard[]; total: number }>('/collection', {
-        params: { status: f.status, period: f.period, sort: f.sort, q: f.q || undefined, limit: f.limit ?? 48, offset: f.offset ?? 0 },
+        params: {
+          status: f.status, period: f.period, sort: f.sort, q: f.q || undefined,
+          folder_id: f.folder || undefined, limit: f.limit ?? 48, offset: f.offset ?? 0,
+        },
       })
       .then((r) => r.data),
 }

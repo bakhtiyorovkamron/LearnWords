@@ -56,9 +56,17 @@ func (h *WordEditHandler) Update(c *gin.Context) {
 			return
 		}
 	}
-	if !changed {
+	if !changed && u.FolderID == nil {
 		badRequest(c, "nothing to update")
 		return
+	}
+	if u.FolderID != nil {
+		fid, err := parseOptionalFolder(*u.FolderID)
+		if err != nil {
+			writeError(c, err)
+			return
+		}
+		u.SetFolder, u.Folder = true, fid
 	}
 	if u.Word != nil && *u.Word == "" {
 		badRequest(c, "word must not be empty")

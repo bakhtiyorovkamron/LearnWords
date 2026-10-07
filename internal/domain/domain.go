@@ -70,6 +70,8 @@ type WordCard struct {
 
 	ExampleSentence    string `json:"example_sentence"`    // sentence with the word replaced by ___
 	ExampleTranslation string `json:"example_translation"` // Russian translation of the full sentence
+
+	FolderID *uuid.UUID `json:"folder_id"` // optional grouping; nil = no folder
 }
 
 // Example is an AI-generated example sentence for a word.

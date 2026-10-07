@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { cardsApi } from '../api/endpoints'
+import { cardsApi, wordsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
 import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
 import { EditWordModal } from './EditWordModal'
+import { FolderSelect } from './Folders'
+import { toast } from './Toaster'
 
 // Mock storage returns mock:// URLs which browsers can't play — fall back to Web Speech API.
 function play(card: WordCard) {
@@ -31,6 +33,16 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
+  // Move to folder: only changes grouping, progress stays the same.
+  const move = useMutation({
+    mutationFn: (folder: string) => wordsApi.update(card.id, { folder_id: folder }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collection'] })
+      qc.invalidateQueries({ queryKey: ['folders'] })
+      qc.invalidateQueries({ queryKey: ['review-due'] })
+      toast(t('folders.moved'))
+    },
+  })
   const regen = useMutation({
     mutationFn: () => cardsApi.regenerateAudio(card.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cards'] }),
@@ -110,6 +122,14 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
         </button>
       </div>
       {remove.error && <p className="relative mt-2 text-xs text-red-300">{t('wordCard.deleteFailed')}</p>}
+      {progress && (
+        <div className="relative mt-3 flex items-center gap-2 text-xs text-emerald-100/60">
+          <span>📁 {t('folders.moveTo')}</span>
+          <FolderSelect value={card.folder_id ?? ''} onChange={(v) => move.mutate(v)}
+            className={`!py-1 !text-xs ${move.isPending ? 'opacity-50' : ''}`} />
+          {move.error && <span className="text-red-300">{t('folders.moveFailed')}</span>}
+        </div>
+      )}
       {editing && <EditWordModal card={card} onClose={() => setEditing(false)} />}
     </div>
   )

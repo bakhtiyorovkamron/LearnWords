@@ -8,6 +8,7 @@ import { WordCardView } from '../components/WordCard'
 import { ReviewSession } from '../components/ReviewSession'
 import { FlipCards } from '../components/FlipCards'
 import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
+import { FolderBar } from '../components/Folders'
 
 const PAGE = 48
 const VIEW_KEY = 'collection-view'
@@ -63,6 +64,7 @@ function Collection() {
   const [status, setStatus] = useState<CollectionStatus>('all')
   const [period, setPeriod] = useState<CollectionPeriod>('all')
   const [sort, setSort] = useState<CollectionSort>('date')
+  const [folder, setFolder] = useState('') // '' = all words (default, as before)
   const [view, setView] = useState<'list' | 'flip'>(() =>
     localStorage.getItem(VIEW_KEY) === 'flip' ? 'flip' : 'list')
   const search = useDebounced(q.trim(), 300)
@@ -72,9 +74,9 @@ function Collection() {
 
   // Filtering/sorting/search are done by the backend; pages of 48 are loaded on demand.
   const query = useInfiniteQuery({
-    queryKey: ['collection', { status, period, sort, search }],
+    queryKey: ['collection', { status, period, sort, search, folder }],
     queryFn: ({ pageParam }) =>
-      collectionApi.list({ status, period, sort, q: search, limit: PAGE, offset: pageParam }),
+      collectionApi.list({ status, period, sort, q: search, folder, limit: PAGE, offset: pageParam }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.items.length, 0)
@@ -85,7 +87,7 @@ function Collection() {
 
   const cards = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data])
   const total = query.data?.pages[0]?.total
-  const filtersActive = status !== 'all' || period !== 'all' || !!search
+  const filtersActive = status !== 'all' || period !== 'all' || !!search || !!folder
 
   return (
     <div className="space-y-6">
@@ -104,6 +106,8 @@ function Collection() {
             className="field pl-11" />
         </div>
       </div>
+
+      <FolderBar value={folder} onChange={setFolder} />
 
       <div className="glass flex flex-col gap-3 p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
         <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
@@ -156,7 +160,7 @@ function Collection() {
             <FlipCards
               cards={cards}
               direction={flipDirection}
-              resetKey={JSON.stringify({ status, period, sort, search })}
+              resetKey={JSON.stringify({ status, period, sort, search, folder })}
               onNearEnd={query.hasNextPage && !query.isFetchingNextPage ? () => void query.fetchNextPage() : undefined}
             />
           </div>

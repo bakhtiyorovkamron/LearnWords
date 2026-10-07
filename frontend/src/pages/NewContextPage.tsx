@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { contextsApi, wordsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { resizeImage } from '../lib/image'
+import { FolderSelect } from '../components/Folders'
 
 const MAX_LEN = 2000
 
@@ -28,6 +29,7 @@ export function NewContextPage() {
   const [photo, setPhoto] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [folderId, setFolderId] = useState('') // optional; '' = no folder
 
   // AI example generation works for a single word (the word is replaced by ___ in the sentence).
   const singleWord = text.trim() !== '' && !/\s/.test(text.trim())
@@ -65,11 +67,14 @@ export function NewContextPage() {
       contextsApi.create({
         text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), photo, language: 'de',
         exampleSentence: exampleSentence.trim(), exampleTranslation: exampleTranslation.trim(),
+        folderId: folderId || undefined,
       }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['contexts'] })
       qc.invalidateQueries({ queryKey: ['cards'] })
       qc.invalidateQueries({ queryKey: ['stories'] })
+      qc.invalidateQueries({ queryKey: ['folders'] })
+      qc.invalidateQueries({ queryKey: ['collection'] })
       qc.setQueryData(['context-words', res.context.id], res.cards)
       navigate(`/contexts/${res.context.id}`)
     },
@@ -130,6 +135,11 @@ export function NewContextPage() {
             placeholder={t('newContext.pronunciationPlaceholder')}
             className="field"
           />
+        </div>
+
+        <div>
+          <label className={labelCls}>{t('folders.fieldLabel')}</label>
+          <FolderSelect value={folderId} onChange={setFolderId} className="w-full" />
         </div>
 
         <div className="space-y-3">

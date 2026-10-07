@@ -125,6 +125,7 @@ func run() error {
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo),
 		Collection:  handler.NewCollectionHandler(cardRepo),
 		WordEdit:    handler.NewWordEditHandler(cardRepo),
+		Folders:     handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
 		UserStatus:  adminRepo,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)

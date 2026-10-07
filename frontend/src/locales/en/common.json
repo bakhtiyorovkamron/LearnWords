@@ -147,6 +147,24 @@
     "next": "Next",
     "loadMore": "Show more ({{shown}} of {{total}})"
   },
+  "folders": {
+    "label": "Folder",
+    "fieldLabel": "Folder (optional)",
+    "all": "All words",
+    "none": "No folder",
+    "new": "New folder",
+    "namePlaceholder": "Name, e.g. “Work”",
+    "rename": "Edit folder",
+    "delete": "Delete folder",
+    "deleteConfirm": "Delete the folder “{{name}}”? Its words are kept, just without a folder.",
+    "deleted": "Folder deleted",
+    "created": "Folder created",
+    "saved": "Folder saved",
+    "moveTo": "Folder:",
+    "moved": "Word moved",
+    "moveFailed": "Could not move",
+    "trainOn": "Train words from"
+  },
   "editWord": {
     "title": "Edit",
     "word": "German word",

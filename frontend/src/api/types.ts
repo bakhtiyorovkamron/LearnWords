@@ -33,7 +33,19 @@ export interface WordCard {
   created_at: string
   example_sentence?: string
   example_translation?: string
+  folder_id?: string | null // optional folder; null = no folder
 }
+
+export interface Folder {
+  id: string
+  name: string
+  color: string
+  created_at: string
+  words_count: number
+}
+
+/** '' = all words, 'none' = words without a folder, otherwise a folder id. */
+export type FolderSelection = string
 
 export interface DueCard extends WordCard {
   box_level: number

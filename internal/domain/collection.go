@@ -14,6 +14,7 @@ type CollectionFilter struct {
 	Period string
 	Sort   string
 	Q      string
+	Folder *FolderFilter // nil = all words
 	Limit  int
 	Offset int
 }

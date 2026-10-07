@@ -18,18 +18,31 @@ type ReviewRepository struct{ pool *pgxpool.Pool }
 func NewReviewRepository(pool *pgxpool.Pool) *ReviewRepository { return &ReviewRepository{pool: pool} }
 
 // ListDue returns unlearned cards due today. Cards without a progress row are treated as box 1, due today.
-func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int) ([]domain.DueCard, error) {
+// folder (optional) limits the queue to one folder or to folder-less words; nil = all words.
+func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error) {
+	var folderOnly *uuid.UUID
+	noFolder := false
+	if folder != nil {
+		if folder.None {
+			noFolder = true
+		} else {
+			id := folder.ID
+			folderOnly = &id
+		}
+	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 		       w.language, w.created_at, COALESCE(p.box_level, 1),
-		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, '')
+		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), w.folder_id
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		WHERE w.user_id = $1
 		  AND COALESCE(p.is_learned, false) = false
 		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
+		  AND ($4::uuid IS NULL OR w.folder_id = $4::uuid)
+		  AND (NOT $5::bool OR w.folder_id IS NULL)
 		ORDER BY COALESCE(p.next_review_at, $2::date), w.created_at
-		LIMIT $3`, userID, today, limit)
+		LIMIT $3`, userID, today, limit, folderOnly, noFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +50,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		var d domain.DueCard
 		err := row.Scan(&d.ID, &d.ContextID, &d.UserID, &d.Word, &d.Translation, &d.Transcription,
 			&d.AudioURL, &d.Language, &d.CreatedAt, &d.BoxLevel,
-			&d.ExampleSentence, &d.ExampleTranslation)
+			&d.ExampleSentence, &d.ExampleTranslation, &d.FolderID)
 		// Gap-fill questions need a sentence that actually contains the ___ gap.
 		d.HasExample = strings.Contains(d.ExampleSentence, "___")
 		return d, err

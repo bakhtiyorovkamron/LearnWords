@@ -55,6 +55,8 @@ type CreateContextInput struct {
 	ExampleTranslation string
 	Image              []byte
 	Language           string
+	// Optional folder for all created cards (ignored if it isn't the user's folder).
+	FolderID *uuid.UUID
 }
 
 func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in CreateContextInput) (*domain.ContextWithCards, error) {
@@ -114,6 +116,7 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 			lookup = variants[0] // generate only for the first variant
 		}
 		card := s.buildCard(ctx, c, w, lookup)
+		card.FolderID = in.FolderID
 		// A single-word phrase: the user's meaning is the word's translation.
 		if len(words) == 1 {
 			if meaning != "" {

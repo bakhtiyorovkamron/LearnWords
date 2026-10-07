@@ -19,7 +19,7 @@ const (
 var boxIntervalDays = map[int]int{1: 1, 2: 2, 3: 4, 4: 7, 5: 14}
 
 type ReviewRepository interface {
-	ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int) ([]domain.DueCard, error)
+	ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error)
 	// Apply runs fn on the current progress inside a transaction, stores the result and logs the answer.
 	Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time, correct bool,
 		fn func(p domain.Progress) domain.Progress) (*domain.Progress, error)
@@ -39,9 +39,10 @@ func dateOf(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// Due returns words that should be reviewed today.
-func (s *ReviewService) Due(ctx context.Context, userID uuid.UUID) ([]domain.DueCard, error) {
-	return s.repo.ListDue(ctx, userID, dateOf(s.now()), defaultDueLimit)
+// Due returns words that should be reviewed today, optionally only from one folder.
+// The Leitner logic itself is per word and does not depend on folders.
+func (s *ReviewService) Due(ctx context.Context, userID uuid.UUID, folder *domain.FolderFilter) ([]domain.DueCard, error) {
+	return s.repo.ListDue(ctx, userID, dateOf(s.now()), defaultDueLimit, folder)
 }
 
 // Answer applies the user's answer to the word's Leitner state.

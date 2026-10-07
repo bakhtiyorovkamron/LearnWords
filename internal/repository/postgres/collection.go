@@ -47,6 +47,15 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 		where = append(where, "(w.word ILIKE "+p+" OR w.translation ILIKE "+p+")")
 	}
 
+	// Optional folder filter; without it all words are returned (unchanged behaviour).
+	if f.Folder != nil {
+		if f.Folder.None {
+			where = append(where, "w.folder_id IS NULL")
+		} else {
+			where = append(where, "w.folder_id = "+arg(f.Folder.ID))
+		}
+	}
+
 	// Fixed whitelist → no SQL injection through the sort parameter.
 	order := "w.created_at DESC"
 	switch f.Sort {
@@ -66,7 +75,7 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 
 	q := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''),
-	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false)` +
+	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id` +
 		base + ` ORDER BY ` + order + ` LIMIT ` + arg(f.Limit) + ` OFFSET ` + arg(f.Offset)
 	rows, err := r.pool.Query(ctx, q, args...)
 	if err != nil {
@@ -75,7 +84,7 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.CollectionCard, error) {
 		var c domain.CollectionCard
 		err := row.Scan(&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL,
-			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned)
+			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned, &c.FolderID)
 		return c, err
 	})
 	return items, total, err

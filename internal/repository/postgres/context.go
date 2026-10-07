@@ -35,12 +35,14 @@ func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Conte
 		}
 		batch := &pgx.Batch{}
 		for _, w := range cards {
+			// folder_id is taken only if that folder belongs to the same user (otherwise NULL).
 			batch.Queue(`INSERT INTO word_cards
 				(id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
-				 example_sentence, example_translation)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+				 example_sentence, example_translation, folder_id)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+				        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3))`,
 				w.ID, w.ContextID, w.UserID, w.Word, w.Translation, w.Transcription, w.AudioURL, w.Language, w.CreatedAt,
-				w.ExampleSentence, w.ExampleTranslation)
+				w.ExampleSentence, w.ExampleTranslation, w.FolderID)
 		}
 		return tx.SendBatch(ctx, batch).Close()
 	})

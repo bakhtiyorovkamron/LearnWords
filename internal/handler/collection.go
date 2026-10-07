@@ -34,6 +34,11 @@ func (h *CollectionHandler) List(c *gin.Context) {
 		Sort:   c.Query("sort"),
 		Q:      c.Query("q"),
 	}
+	folder, ok := parseFolderFilter(c)
+	if !ok {
+		return
+	}
+	f.Folder = folder
 	if !collectionStatuses[f.Status] || !collectionPeriods[f.Period] || !collectionSorts[f.Sort] {
 		badRequest(c, "invalid status, period or sort")
 		return
