@@ -15,35 +15,20 @@ import (
 	"learnwords/internal/domain"
 )
 
-const searchPromptTemplate = `Пользователь ищет немецкое слово (или дал перевод, по которому нужно найти немецкое слово): "{{query}}"
-
-Определи, какое это слово (если дан русский перевод — найди соответствующее немецкое слово). Верни информацию о нём.
-
-Если слово — существительное: добавь артикль (der/die/das) и форму множественного числа. В поле "word" пиши слово БЕЗ артикля.
-Если слово — глагол: укажи, слабый он или сильный, дай спряжение в Präsens (ich/du/er/wir/ihr/sie) и форму Perfekt (hat/ist + Partizip II), а также Präteritum (прошедшее время, 3-е лицо ед.ч.).
-Если слово — прилагательное: дай степени сравнения (Komparativ, Superlativ), если применимо.
-
-Ответь ТОЛЬКО валидным JSON, без пояснений до или после объекта и без markdown. Все строки должны быть корректно экранированы для JSON:
-{
-  "word": "немецкое слово",
-  "word_type": "noun | verb | adjective | adverb | other",
-  "article": "der/die/das или null, если не существительное",
-  "plural": "форма множественного числа или null",
-  "translation": "перевод на русский",
-  "pronunciation": "произношение русскими буквами",
-  "verb_type": "weak | strong | null",
-  "conjugation_present": {"ich": "...", "du": "...", "er_sie_es": "...", "wir": "...", "ihr": "...", "sie_Sie": "..."} или null,
-  "perfekt": "строка вида 'hat gemacht' или null",
-  "praeteritum": "строка, например 'machte' или null",
-  "comparative": "форма сравнительной степени или null",
-  "superlative": "форма превосходной степени или null",
-  "example_sentence": "пример предложения на немецком",
-  "example_translation": "перевод примера на русский"
-}`
+// Compact prompt: only the JSON schema + rules. Shorter input and output = faster answer.
+const searchPromptTemplate = `Немецкое слово или русский перевод: "{{query}}". Найди немецкое слово и верни JSON строго по схеме (null — если неприменимо; word без артикля):
+{"word":"","word_type":"noun|verb|adjective|adverb|other","article":"der|die|das|null","plural":null,"translation":"перевод на русский","pronunciation":"русскими буквами","verb_type":"weak|strong|null","conjugation_present":{"ich":"","du":"","er_sie_es":"","wir":"","ihr":"","sie_Sie":""},"perfekt":"hat/ist + Partizip II","praeteritum":"3 л. ед.ч.","comparative":null,"superlative":null,"example_sentence":"","example_translation":""}
+conjugation_present/perfekt/praeteritum/verb_type — только для глаголов, comparative/superlative — для прилагательных, article/plural — для существительных. Только JSON.`
 
 const (
-	searchAttempts  = 3
-	searchMaxTokens = 1500
+	// Haiku: dictionary data doesn't need Sonnet, and it answers 2-4x faster.
+	searchModel     = "claude-haiku-4-5"
+	searchMaxTokens = 1000
+	// Prefill "{" makes invalid JSON rare, so 2 quick attempts are enough.
+	searchAttempts = 2
+	searchBackoff  = 400 * time.Millisecond
+	searchTimeout  = 30 * time.Second
+	searchPrefill  = "{"
 )
 
 func buildSearchPrompt(query string) string {
@@ -51,13 +36,14 @@ func buildSearchPrompt(query string) string {
 }
 
 // LookupWord returns a dictionary entry for a German word or a Russian translation.
-// Same robustness as the daily story: JSON is cut out of the answer, repaired if needed,
-// and the call is retried on bad JSON / overload / network errors.
+// JSON is cut out of the answer and repaired if needed; transient failures are retried once.
 func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo, error) {
 	prompt := buildSearchPrompt(query)
 	var lastErr error
 	for attempt := 1; attempt <= searchAttempts; attempt++ {
-		text, err := c.complete(ctx, prompt, searchMaxTokens, 60*time.Second)
+		start := time.Now()
+		text, err := c.completeWith(ctx, searchModel, prompt, searchPrefill, searchMaxTokens, searchTimeout)
+		slog.InfoContext(ctx, "search-word ai call", "attempt", attempt, "took_ms", time.Since(start).Milliseconds(), "ok", err == nil)
 		if err == nil {
 			info, perr := ParseWordInfo(text)
 			if perr == nil {
@@ -72,22 +58,35 @@ func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo,
 			return domain.WordInfo{}, err
 		}
 		slog.WarnContext(ctx, "search-word attempt failed", "attempt", attempt, "err", err)
+		if attempt == searchAttempts {
+			break
+		}
 		select {
 		case <-ctx.Done():
 			return domain.WordInfo{}, ctx.Err()
-		case <-time.After(time.Duration(attempt) * time.Second):
+		case <-time.After(searchBackoff):
 		}
 	}
 	return domain.WordInfo{}, fmt.Errorf("word lookup failed after %d attempts: %w", searchAttempts, lastErr)
 }
 
-// complete performs one Messages API call and returns the concatenated text.
-// Transient failures (network, 429, 5xx, truncated output) are wrapped in retryableError.
+// complete performs one Messages API call with the client's default model.
 func (c *Client) complete(ctx context.Context, prompt string, maxTokens int, timeout time.Duration) (string, error) {
+	return c.completeWith(ctx, c.model, prompt, "", maxTokens, timeout)
+}
+
+// completeWith performs one Messages API call and returns the text. A non-empty prefill is sent
+// as the start of the assistant's answer and prepended to the returned text (the API doesn't echo it).
+// Transient failures (network, 429, 5xx, truncated output) are wrapped in retryableError.
+func (c *Client) completeWith(ctx context.Context, model, prompt, prefill string, maxTokens int, timeout time.Duration) (string, error) {
+	msgs := []message{{Role: "user", Content: prompt}}
+	if prefill != "" {
+		msgs = append(msgs, message{Role: "assistant", Content: prefill})
+	}
 	body, err := json.Marshal(request{
-		Model:     c.model,
+		Model:     model,
 		MaxTokens: maxTokens,
-		Messages:  []message{{Role: "user", Content: prompt}},
+		Messages:  msgs,
 	})
 	if err != nil {
 		return "", err
@@ -123,6 +122,7 @@ func (c *Client) complete(ctx context.Context, prompt string, maxTokens int, tim
 		return "", apiErr
 	}
 	var text strings.Builder
+	text.WriteString(prefill)
 	for _, part := range out.Content {
 		if part.Type == "text" {
 			text.WriteString(part.Text)

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,31 +21,61 @@ type WordExistence interface {
 	HasWord(ctx context.Context, userID uuid.UUID, forms ...string) (bool, error)
 }
 
+// SearchCache stores AI results by normalized query (nil → no caching).
+type SearchCache interface {
+	Get(ctx context.Context, query string) (domain.WordInfo, bool, error)
+	Put(ctx context.Context, query string, w domain.WordInfo) error
+}
+
 const maxSearchQueryLen = 100
 
 type SearchService struct {
 	ai       WordLookup // nil → feature disabled (no API key)
 	words    WordExistence
 	contexts *ContextService
+	cache    SearchCache
 }
 
-func NewSearchService(ai WordLookup, words WordExistence, contexts *ContextService) *SearchService {
-	return &SearchService{ai: ai, words: words, contexts: contexts}
+func NewSearchService(ai WordLookup, words WordExistence, contexts *ContextService, cache SearchCache) *SearchService {
+	return &SearchService{ai: ai, words: words, contexts: contexts, cache: cache}
 }
 
-// Search returns the AI dictionary entry plus whether the word is already in the user's collection.
+// NormalizeQuery is the cache key: case-insensitive, outer spaces ignored.
+func NormalizeQuery(q string) string { return strings.ToLower(strings.TrimSpace(q)) }
+
+// Search returns the dictionary entry (from cache, else from AI) plus whether the word
+// is already in the user's collection.
 func (s *SearchService) Search(ctx context.Context, userID uuid.UUID, query string) (*domain.WordInfo, error) {
 	query = strings.TrimSpace(query)
 	if query == "" || len([]rune(query)) > maxSearchQueryLen {
 		return nil, fmt.Errorf("%w: query must be 1-%d characters", domain.ErrValidation, maxSearchQueryLen)
 	}
-	if s.ai == nil {
-		return nil, domain.ErrUnavailable
+	key := NormalizeQuery(query)
+
+	info, hit := domain.WordInfo{}, false
+	if s.cache != nil {
+		var err error
+		if info, hit, err = s.cache.Get(ctx, key); err != nil {
+			slog.WarnContext(ctx, "search cache get failed", "query", key, "err", err) // cache must not break search
+		}
 	}
-	info, err := s.ai.LookupWord(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
+	if !hit {
+		if s.ai == nil {
+			return nil, domain.ErrUnavailable
+		}
+		var err error
+		if info, err = s.ai.LookupWord(ctx, query); err != nil {
+			return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
+		}
+		if s.cache != nil {
+			if err := s.cache.Put(context.WithoutCancel(ctx), key, info); err != nil {
+				slog.WarnContext(ctx, "search cache put failed", "query", key, "err", err)
+			}
+		}
 	}
+	slog.InfoContext(ctx, "search-word", "query", key, "cache_hit", hit)
+
+	var err error
 	if info.AlreadyAdded, err = s.words.HasWord(ctx, userID, info.FullWord(), info.Word); err != nil {
 		return nil, err
 	}

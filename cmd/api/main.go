@@ -129,7 +129,7 @@ func run() error {
 		Collection:  handler.NewCollectionHandler(cardRepo),
 		WordEdit:    handler.NewWordEditHandler(cardRepo),
 		Folders:     handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
-		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc)),
+		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
 		UserStatus:  adminRepo,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
