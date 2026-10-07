@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Same as the header logo: lime-300 → emerald-500 rounded square with a dark "W". -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#bef264"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- "W" drawn as a path (no font needed, renders identically everywhere). -->
+  <path d="M118 150 L186 362 L256 214 L326 362 L394 150"
+        fill="none" stroke="#022c22" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

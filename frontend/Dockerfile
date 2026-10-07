@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .
+# favicon.ico + PNG sizes are generated from public/favicon.svg (the header "W" logo).
+RUN node scripts/gen-favicons.mjs
 # vite build only (no tsc -b) so type-only warnings don't block a deploy.
 RUN npx vite build
 

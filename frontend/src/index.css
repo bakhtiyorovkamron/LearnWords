@@ -30,6 +30,24 @@
   .field {
     @apply w-full rounded-2xl border border-emerald-400/20 bg-emerald-950/60 px-4 py-3 text-emerald-50 placeholder:text-emerald-300/40 outline-none transition focus:border-lime-400 focus:ring-4 focus:ring-lime-400/20;
   }
+  /* Native select arrows sit at the very edge and poke out of the rounded-2xl border.
+     Replace with our own arrow at a fixed 1rem inset; text never runs under it. */
+  select.field {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2.75rem !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23bef264' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 0.75rem 0.5rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  select.field option {
+    background-color: #022c22;
+    color: #ecfdf5;
+  }
   .display {
     font-family: var(--font-display);
   }

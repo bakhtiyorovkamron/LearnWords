@@ -103,9 +103,12 @@ function WordResult({ info }: { info: WordInfo }) {
   return (
     <article className="glass animate-rise space-y-6 p-6 md:p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="w-full min-w-0">
           <div className="text-xs uppercase tracking-widest text-lime-300/70">{t(`search.type.${info.word_type}`)}</div>
-          <h2 className="display break-words text-4xl font-extrabold text-white md:text-5xl">
+          {/* Adaptive size + wrapping: long compound words must not overflow the card. */}
+          <h2 className="display font-extrabold leading-tight text-white"
+            style={{ fontSize: 'clamp(1.75rem, 5vw, 3rem)', overflowWrap: 'anywhere', wordBreak: 'break-word', hyphens: 'auto' }}
+            lang="de">
             {info.word_type === 'noun' && info.article && <span className="text-lime-300">{info.article} </span>}
             {info.word}
           </h2>
@@ -187,7 +190,7 @@ function WordResult({ info }: { info: WordInfo }) {
         {!added && (
           <div className="flex min-w-0 items-center gap-2 text-sm text-emerald-100/60">
             <span className="shrink-0">📁</span>
-            <FolderSelect value={folder} onChange={setFolder} className="max-w-[14rem]" />
+            <FolderSelect value={folder} onChange={setFolder} className="w-56 max-w-full" />
           </div>
         )}
         <button type="button" onClick={() => add.mutate()} disabled={added || add.isPending}

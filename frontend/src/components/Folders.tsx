@@ -47,7 +47,7 @@ export function FolderSelect({ value, onChange, includeAll = false, className = 
       aria-label={t('folders.label')}
       // min-w-0/max-w-full: may shrink inside flex parents and never overflow the card;
       // nowrap + ellipsis: long text is cut instead of wrapping; leading-normal + items-center keeps 📁, text and ▼ on one line.
-      className={`field block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap py-2 pr-9 text-sm leading-normal ${className}`}
+      className={`field block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap py-2 text-sm leading-normal ${className}`}
     >
       {includeAll ? (
         <>
