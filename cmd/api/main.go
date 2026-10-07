@@ -76,14 +76,17 @@ func run() error {
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
 	}
-	// AI: example sentences + daily stories, enabled only when the key is provided via environment.
+	// AI: example sentences + daily stories + word search, enabled only when the key is provided via environment.
 	var storyGen service.StoryGenerator
+	var wordLookup service.WordLookup
+
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 		ai := anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
 		providers.Examples = ai
 		storyGen = ai
+		wordLookup = ai
 	} else {
-		slog.Warn("ANTHROPIC_API_KEY is not set: example and story generation are disabled")
+		slog.Warn("ANTHROPIC_API_KEY is not set: example, story and word search generation are disabled")
 	}
 
 	// Services
@@ -126,6 +129,7 @@ func run() error {
 		Collection:  handler.NewCollectionHandler(cardRepo),
 		WordEdit:    handler.NewWordEditHandler(cardRepo),
 		Folders:     handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
+		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc)),
 		UserStatus:  adminRepo,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)

@@ -46,6 +46,7 @@ export function Layout() {
           <NavLink to="/contexts" className="mr-4"><Logo /></NavLink>
           <NavLink to="/contexts" end className={link}>📚 {t('nav.contexts')}</NavLink>
           <NavLink to="/contexts/new" className={link}>✨ {t('nav.add')}</NavLink>
+          <NavLink to="/search" className={link}>🔍 {t('nav.search')}</NavLink>
           <NavLink to="/cards" className={link}>🃏 {t('nav.cards')}</NavLink>
           <NavLink to="/stats" className={link}>📈 {t('nav.stats')}</NavLink>
           <NavLink to="/story" className={link}>📖 {t('nav.dailyStory')}</NavLink>

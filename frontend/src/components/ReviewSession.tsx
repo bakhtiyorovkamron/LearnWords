@@ -57,9 +57,10 @@ export function ReviewSession() {
     localStorage.setItem('review-folder', v)
   }
   const folderPicker = (
-    <div className="mt-5 flex flex-col items-center gap-2">
+    <div className="mx-auto mt-5 flex w-full max-w-xs flex-col items-center gap-2">
       <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('folders.trainOn')}</span>
-      <FolderSelect value={folder} onChange={chooseFolder} includeAll />
+      {/* Fixed width (up to 20rem, full width on narrow screens) so the select doesn't jump with the folder name. */}
+      <FolderSelect value={folder} onChange={chooseFolder} includeAll className="w-full" />
     </div>
   )
 
@@ -68,7 +69,7 @@ export function ReviewSession() {
     const count = due.data?.length ?? 0
     if (!count) {
       return (
-        <div className="glass p-10 text-center">
+        <div className="glass p-6 text-center sm:p-10">
           <div className="text-5xl">🎉</div>
           <p className="mt-3 text-lg font-semibold">{t('review.nothingToday')}</p>
           <p className="mt-1 text-sm text-emerald-100/70">{t('review.comeBack')}</p>
@@ -77,7 +78,7 @@ export function ReviewSession() {
       )
     }
     return (
-      <div className="glass p-10 text-center">
+      <div className="glass p-6 text-center sm:p-10">
         <div className="text-5xl">🃏</div>
         <p className="mt-3 text-lg font-semibold">{t('review.dueCount', { count })}</p>
         {folderPicker}

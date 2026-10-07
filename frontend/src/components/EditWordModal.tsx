@@ -32,6 +32,17 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
   })
   const [localError, setLocalError] = useState<string | null>(null)
 
+  // Same endpoint/flow as on the "Add" page, but uses the CURRENT values of the form fields.
+  const generate = useMutation({
+    mutationFn: () => wordsApi.generateExample(form.word.trim(), form.translation.trim()),
+    onSuccess: (r) => setForm((f) => ({
+      ...f,
+      example_sentence: r.example_sentence,
+      example_translation: r.example_translation,
+    })),
+  })
+  const canGenerate = !!form.word.trim() && !!form.translation.trim()
+
   const save = useMutation({
     mutationFn: (u: WordUpdate) => wordsApi.update(card.id, u),
     onSuccess: (updated) => {
@@ -90,9 +101,31 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
           <input id="ew-pr" className="field font-mono" value={form.transcription} onChange={set('transcription')} maxLength={200} />
         </div>
         <div>
-          <label className={label} htmlFor="ew-ex">{t('editWord.example')}</label>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className={`${label} mb-0`} htmlFor="ew-ex">{t('editWord.example')}</label>
+            <button type="button" onClick={() => generate.mutate()}
+              disabled={generate.isPending || !canGenerate}
+              title={canGenerate ? undefined : t('newContext.hintNeedTranslation')}
+              className="btn-ghost shrink-0 !px-3 !py-1 text-xs disabled:opacity-50">
+              {generate.isPending ? (
+                <>
+                  <span className="mr-1.5 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />
+                  {t('newContext.generating')}
+                </>
+              ) : (
+                t('newContext.generate')
+              )}
+            </button>
+          </div>
           <textarea id="ew-ex" rows={2} className="field" value={form.example_sentence} onChange={set('example_sentence')}
             placeholder={t('editWord.examplePlaceholder')} maxLength={500} />
+          {generate.error && (
+            <p className="mt-1 text-xs text-red-300">
+              {(generate.error as { response?: { status?: number } }).response?.status === 503
+                ? t('newContext.generateNotConfigured')
+                : t('newContext.generateFailed')}
+            </p>
+          )}
         </div>
         <div>
           <label className={label} htmlFor="ew-ext">{t('editWord.exampleTranslation')}</label>
@@ -107,7 +140,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
         )}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-ghost">{t('editWord.cancel')}</button>
-          <button type="submit" disabled={save.isPending} className="btn-primary">
+          <button type="submit" disabled={save.isPending || generate.isPending} className="btn-primary">
             {save.isPending ? t('editWord.saving') : t('editWord.save')}
           </button>
         </div>

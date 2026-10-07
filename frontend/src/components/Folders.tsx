@@ -21,7 +21,15 @@ export function useFolders() {
   return useQuery({ queryKey: ['folders'], queryFn: foldersApi.list, staleTime: 60_000 })
 }
 
-/** Native select: "all words" (optional) / "without folder" / each folder. */
+const MAX_FOLDER_LABEL = 24
+
+/** Folder names are user input of any length: cut to N chars + "…" (full name stays in the title). */
+export function shortFolderName(name: string, max = MAX_FOLDER_LABEL): string {
+  const chars = Array.from(name.trim()) // emoji-safe
+  return chars.length > max ? chars.slice(0, max - 1).join('') + '…' : chars.join('')
+}
+
+/** Native select: "all words" (optional) / "without folder" / each folder. Fixed width, never stretches its container. */
 export function FolderSelect({ value, onChange, includeAll = false, className = '' }: {
   value: FolderSelection
   onChange: (v: FolderSelection) => void
@@ -30,9 +38,17 @@ export function FolderSelect({ value, onChange, includeAll = false, className = 
 }) {
   const { t } = useTranslation()
   const folders = useFolders()
+  const selected = folders.data?.find((f) => f.id === value)
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={`field w-auto py-2 text-sm ${className}`}
-      aria-label={t('folders.label')}>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      title={selected?.name}
+      aria-label={t('folders.label')}
+      // min-w-0/max-w-full: may shrink inside flex parents and never overflow the card;
+      // nowrap + ellipsis: long text is cut instead of wrapping; leading-normal + items-center keeps 📁, text and ▼ on one line.
+      className={`field block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap py-2 pr-9 text-sm leading-normal ${className}`}
+    >
       {includeAll ? (
         <>
           <option value="">{t('folders.all')}</option>
@@ -41,7 +57,9 @@ export function FolderSelect({ value, onChange, includeAll = false, className = 
       ) : (
         <option value="">{t('folders.none')}</option>
       )}
-      {folders.data?.map((f) => <option key={f.id} value={f.id}>📁 {f.name}</option>)}
+      {folders.data?.map((f) => (
+        <option key={f.id} value={f.id} title={f.name}>📁 {shortFolderName(f.name)}</option>
+      ))}
     </select>
   )
 }
@@ -76,8 +94,8 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className={chip(value === '')} onClick={() => onChange('')}>📚 {t('folders.all')}</button>
         {folders.data?.map((f) => (
-          <button key={f.id} type="button" className={chip(value === f.id)} onClick={() => onChange(f.id)}>
-            <FolderDot color={f.color} /> {f.name}
+          <button key={f.id} type="button" className={chip(value === f.id)} onClick={() => onChange(f.id)} title={f.name}>
+            <FolderDot color={f.color} /> <span className="max-w-[12rem] truncate">{shortFolderName(f.name)}</span>
             <span className="text-xs opacity-60">{f.words_count}</span>
           </button>
         ))}

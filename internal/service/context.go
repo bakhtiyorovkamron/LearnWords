@@ -57,6 +57,8 @@ type CreateContextInput struct {
 	Language           string
 	// Optional folder for all created cards (ignored if it isn't the user's folder).
 	FolderID *uuid.UUID
+	// SingleWord: save Text as exactly one card (e.g. "der Hund", "sich freuen") without tokenizing.
+	SingleWord bool
 }
 
 func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in CreateContextInput) (*domain.ContextWithCards, error) {
@@ -90,7 +92,9 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	// The card keeps both variants; translation/pronunciation come from the user (or the first variant).
 	var variants []string
 	var words []string
-	if variants = SplitVariants(text); variants != nil {
+	if in.SingleWord {
+		words = []string{strings.Join(strings.Fields(text), " ")}
+	} else if variants = SplitVariants(text); variants != nil {
 		words = []string{strings.Join(variants, " / ")}
 	} else {
 		words = Tokenize(text, in.Language)

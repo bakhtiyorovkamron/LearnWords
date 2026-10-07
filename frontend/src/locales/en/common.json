@@ -5,6 +5,7 @@
   "nav": {
     "contexts": "Contexts",
     "add": "Add",
+    "search": "Search",
     "cards": "Cards",
     "stats": "Statistics",
     "dailyStory": "Daily Story",
@@ -146,6 +147,28 @@
     "prev": "Back",
     "next": "Next",
     "loadMore": "Show more ({{shown}} of {{total}})"
+  },
+  "search": {
+    "titleA": "Word ",
+    "titleB": "search",
+    "subtitle": "Translation, pronunciation, forms and an example — by German word or Russian translation.",
+    "placeholder": "Enter a word in German or Russian",
+    "find": "Find",
+    "searching": "Searching…",
+    "failed": "Could not find the word: {{error}}",
+    "notConfigured": "Search is not configured on the server (no ANTHROPIC_API_KEY)",
+    "type": { "noun": "noun", "verb": "verb", "adjective": "adjective", "adverb": "adverb", "other": "word" },
+    "plural": "Plural",
+    "strong": "strong verb",
+    "weak": "weak verb",
+    "present": "Präsens (present tense)",
+    "degrees": "Degrees of comparison",
+    "example": "Example",
+    "add": "Add to my collection",
+    "adding": "Adding…",
+    "added": "Word added to the collection",
+    "alreadyAdded": "Already added",
+    "addFailed": "Could not add: {{error}}"
   },
   "folders": {
     "label": "Folder",

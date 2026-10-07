@@ -9,6 +9,7 @@ import { CardsPage } from './pages/CardsPage'
 import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
 import { AdminPage } from './pages/AdminPage'
+import { SearchPage } from './pages/SearchPage'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/cards" element={<CardsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Route>

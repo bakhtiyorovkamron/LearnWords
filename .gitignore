@@ -1,0 +1,5 @@
+# Secrets (API keys, JWT secret) — never commit.
+.env
+.idea/
+frontend/node_modules/
+frontend/dist/

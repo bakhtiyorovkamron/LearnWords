@@ -25,6 +25,7 @@ type RouterDeps struct {
 	Collection  *CollectionHandler
 	WordEdit    *WordEditHandler
 	Folders     *FolderHandler
+	Search      *SearchHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 }
@@ -82,6 +83,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/folders", d.Folders.Create)
 		protected.PATCH("/folders/:id", d.Folders.Update)
 		protected.DELETE("/folders/:id", d.Folders.Delete)
+		protected.POST("/search-word", d.Search.Search)
+		protected.POST("/search-word/add", d.Search.Add)
 		protected.POST("/words/generate-example", d.Contexts.GenerateExample)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)

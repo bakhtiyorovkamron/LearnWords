@@ -78,6 +78,34 @@ export const foldersApi = {
   remove: (id: string) => api.delete(`/folders/${id}`),
 }
 
+export interface WordInfo {
+  word: string
+  word_type: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other'
+  article: string | null
+  plural: string | null
+  translation: string
+  pronunciation: string
+  verb_type: 'weak' | 'strong' | string | null
+  conjugation_present: Record<string, string> | null
+  perfekt: string | null
+  praeteritum: string | null
+  comparative: string | null
+  superlative: string | null
+  example_sentence: string
+  example_translation: string
+  already_added: boolean
+}
+
+export const searchApi = {
+  // AI call with retries on the backend → generous timeout.
+  search: (query: string) =>
+    api.post<WordInfo>('/search-word', { query }, { timeout: 120_000 }).then((r) => r.data),
+  add: (w: {
+    word: string; translation: string; pronunciation: string
+    example_sentence: string; example_translation: string; folder_id?: string
+  }) => api.post<ContextWithCards>('/search-word/add', w).then((r) => r.data),
+}
+
 export interface StoryWord { word: string; translation: string }
 export interface DailyStory {
   id: string; date: string; genre: string; title: string
