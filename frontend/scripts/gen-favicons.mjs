@@ -15,29 +15,32 @@ const files = {
   'android-chrome-192x192.png': 192,
   'android-chrome-512x512.png': 512,
 }
+
+for (const [name, size] of Object.entries(files)) {
+  await writeFile(new URL(name, dir), await png(size))
 }
-console.log('favicons generated:', [...Object.keys(files), 'favicon.ico'].join(', '))
+
+// favicon.ico with 16/32/48 PNG images (PNG-in-ICO, supported by all current browsers).
+const sizes = [16, 32, 48]
+const images = await Promise.all(sizes.map(png))
+const header = Buffer.alloc(6 + 16 * sizes.length)
+header.writeUInt16LE(0, 0) // reserved
+header.writeUInt16LE(1, 2) // type: icon
+header.writeUInt16LE(sizes.length, 4)
+
+let offset = header.length
+sizes.forEach((size, i) => {
+  const e = 6 + 16 * i
+  header.writeUInt8(size, e) // width
+  header.writeUInt8(size, e + 1) // height
+  header.writeUInt8(0, e + 2) // palette
+  header.writeUInt8(0, e + 3) // reserved
+  header.writeUInt16LE(1, e + 4) // color planes
+  header.writeUInt16LE(32, e + 6) // bits per pixel
+  header.writeUInt32LE(images[i].length, e + 8)
+  header.writeUInt32LE(offset, e + 12)
+  offset += images[i].length
+})
 
 await writeFile(new URL('favicon.ico', dir), Buffer.concat([header, ...images]))
-})
-  offset += images[i].length
-  header.writeUInt32LE(offset, e + 12)
-  header.writeUInt32LE(images[i].length, e + 8)
-  header.writeUInt16LE(32, e + 6) // bits per pixel
-  header.writeUInt16LE(1, e + 4) // color planes
-  header.writeUInt8(0, e + 3) // reserved
-  header.writeUInt8(0, e + 2) // palette
-  header.writeUInt8(size, e + 1) // height
-  header.writeUInt8(size, e) // width
-  const e = 6 + 16 * i
-sizes.forEach((size, i) => {
-let offset = header.length
-header.writeUInt16LE(sizes.length, 4)
-header.writeUInt16LE(1, 2) // type: icon
-header.writeUInt16LE(0, 0) // reserved
-const header = Buffer.alloc(6 + 16 * sizes.length)
-const images = await Promise.all(sizes.map(png))
-const sizes = [16, 32, 48]
-// favicon.ico with 16/32/48 PNG images (PNG-in-ICO, supported by all current browsers).
-  await writeFile(new URL(name, dir), await png(size))
-for (const [name, size] of Object.entries(files)) {
+console.log('favicons generated:', [...Object.keys(files), 'favicon.ico'].join(', '))
