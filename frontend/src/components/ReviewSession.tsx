@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cardsApi, reviewApi } from '../api/endpoints'
-import { errorMessage } from '../api/client'
+import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { buildQueue, type Direction, type QuizItem } from '../lib/quiz'
 import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
@@ -104,7 +104,11 @@ export function ReviewSession() {
       position={index + 1}
       total={deck.length}
       saving={answer.isPending}
-      error={answer.error ? errorMessage(answer.error) : null}
+      error={answer.error
+        ? isRateLimited(answer.error)
+          ? rateLimitMessage(answer.error)
+          : t('quiz.saveFailed', { error: errorMessage(answer.error) })
+        : null}
       onAnswer={(ok) => {
         if (ok) setCorrect((c) => c + 1)
         answer.mutate({ id: item.card.id, ok }) // saved immediately, not at the end

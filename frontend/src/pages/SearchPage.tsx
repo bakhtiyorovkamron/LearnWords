@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { searchApi, type WordInfo } from '../api/endpoints'
-import { errorMessage } from '../api/client'
+import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { FolderSelect } from '../components/Folders'
 import { toast } from '../components/Toaster'
 
@@ -58,7 +58,11 @@ export function SearchPage() {
 
       {err && (
         <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {status(err) === 503 ? t('search.notConfigured') : t('search.failed', { error: errorMessage(err) })}
+          {status(err) === 503
+            ? t('search.notConfigured')
+            : isRateLimited(err)
+              ? rateLimitMessage(err)
+              : t('search.failed', { error: errorMessage(err) })}
         </p>
       )}
       {search.isPending && <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />}
@@ -199,7 +203,7 @@ function WordResult({ info }: { info: WordInfo }) {
         </button>
       </footer>
       {add.error && status(add.error) !== 409 && (
-        <p className="text-sm text-red-300">{t('search.addFailed', { error: errorMessage(add.error) })}</p>
+        <p className="text-sm text-red-300">{isRateLimited(add.error) ? rateLimitMessage(add.error) : t('search.addFailed', { error: errorMessage(add.error) })}</p>
       )}
     </article>
   )

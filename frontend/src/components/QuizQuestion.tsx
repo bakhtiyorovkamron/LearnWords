@@ -142,7 +142,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       {lacking && (
         <p className="text-center text-xs text-amber-200/80">{t('quiz.lacking')}</p>
       )}
-      {error && <p className="text-center text-sm text-red-300">{t('quiz.saveFailed', { error })}</p>}
+      {error && <p className="text-center text-sm text-red-300">{error}</p>}
 
       {answered && (
         <button type="button" onClick={onNext} disabled={saving} className="btn-primary w-full text-lg">

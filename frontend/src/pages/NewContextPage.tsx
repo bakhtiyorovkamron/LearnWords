@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { contextsApi, wordsApi } from '../api/endpoints'
-import { errorMessage } from '../api/client'
+import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { resizeImage } from '../lib/image'
 import { FolderSelect } from '../components/Folders'
 
@@ -173,9 +173,11 @@ export function NewContextPage() {
           />
           {generate.error && (
             <p className="text-sm text-red-300">
-              {(generate.error as { response?: { status?: number } }).response?.status === 503
-                ? t('newContext.generateNotConfigured')
-                : t('newContext.generateFailed')}
+              {isRateLimited(generate.error)
+                ? rateLimitMessage(generate.error)
+                : (generate.error as { response?: { status?: number } }).response?.status === 503
+                  ? t('newContext.generateNotConfigured')
+                  : t('newContext.generateFailed')}
             </p>
           )}
           {!exampleSentence && (

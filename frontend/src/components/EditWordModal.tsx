@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { wordsApi, type WordUpdate } from '../api/endpoints'
-import { errorMessage } from '../api/client'
+import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import type { CollectionCard, WordCard } from '../api/types'
 import { toast } from './Toaster'
 
@@ -121,9 +121,11 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
             placeholder={t('editWord.examplePlaceholder')} maxLength={500} />
           {generate.error && (
             <p className="mt-1 text-xs text-red-300">
-              {(generate.error as { response?: { status?: number } }).response?.status === 503
-                ? t('newContext.generateNotConfigured')
-                : t('newContext.generateFailed')}
+              {isRateLimited(generate.error)
+                ? rateLimitMessage(generate.error)
+                : (generate.error as { response?: { status?: number } }).response?.status === 503
+                  ? t('newContext.generateNotConfigured')
+                  : t('newContext.generateFailed')}
             </p>
           )}
         </div>

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -28,11 +29,35 @@ type RouterDeps struct {
 	Search      *SearchHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
+	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
+	Ctx context.Context
 }
+
+// Rate limits (per minute). In-memory, per backend process.
+const (
+	authPerIPPerMin      = 10  // login/register, by IP
+	aiPerUserPerMin      = 20  // search-word, generate-example
+	storyPerUserPerMin   = 5   // daily story generation
+	generalPerUserPerMin = 100 // everything else under /api
+)
 
 func NewRouter(d RouterDeps) *gin.Engine {
 	r := gin.New()
 	r.MaxMultipartMemory = 12 << 20
+	// Only Caddy (docker network / localhost) may set X-Forwarded-For; otherwise clients
+	// could spoof their IP and bypass the per-IP limit.
+	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
+
+	ctx := d.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	authLimit := RateLimitByIP(NewRateLimiter(ctx, "auth", authPerIPPerMin, time.Minute))
+	searchLimit := RateLimitByUser(NewRateLimiter(ctx, "search", aiPerUserPerMin, time.Minute))
+	exampleLimit := RateLimitByUser(NewRateLimiter(ctx, "example", aiPerUserPerMin, time.Minute))
+	storyLimit := RateLimitByUser(NewRateLimiter(ctx, "story", storyPerUserPerMin, time.Minute))
+	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
+		"/api/search-word", "/api/words/generate-example", "/api/stories/generate")
 
 	r.Use(
 		Recovery(),
@@ -60,14 +85,14 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	api := r.Group("/api")
 	{
 		a := api.Group("/auth")
-		a.POST("/register", d.Auth.Register)
-		a.POST("/login", d.Auth.Login)
+		a.POST("/register", authLimit, d.Auth.Register)
+		a.POST("/login", authLimit, d.Auth.Login)
 		a.POST("/refresh", d.Auth.Refresh)
 		a.POST("/logout", d.Auth.Logout)
 	}
 
 	// ActiveUser re-checks ban/role in the DB on every authenticated request.
-	protected := api.Group("", AuthRequired(d.Tokens), ActiveUser(d.UserStatus))
+	protected := api.Group("", AuthRequired(d.Tokens), ActiveUser(d.UserStatus), generalLimit)
 	{
 		protected.POST("/contexts", d.Contexts.Create)
 		protected.GET("/contexts", d.Contexts.List)
@@ -83,15 +108,15 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/folders", d.Folders.Create)
 		protected.PATCH("/folders/:id", d.Folders.Update)
 		protected.DELETE("/folders/:id", d.Folders.Delete)
-		protected.POST("/search-word", d.Search.Search)
+		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
-		protected.POST("/words/generate-example", d.Contexts.GenerateExample)
+		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
 		protected.GET("/stats", d.Stats.Get)
 		protected.GET("/stories", d.Stories.List)
 		protected.GET("/stories/today", d.Stories.Today)
-		protected.POST("/stories/generate", d.Stories.Generate)
+		protected.POST("/stories/generate", storyLimit, d.Stories.Generate)
 		protected.GET("/stories/:date", d.Stories.ByDate)
 		protected.GET("/me/settings", d.Settings.Get)
 		protected.PUT("/me/settings", d.Settings.Update)

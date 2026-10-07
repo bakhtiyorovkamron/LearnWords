@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { storiesApi, type DailyStory } from '../api/endpoints'
-import { errorMessage } from '../api/client'
+import { errorMessage, isRateLimited, rateLimitMessage } from "../api/client";
 import { dateLocale } from '../i18n'
 
 // story.date is YYYY-MM-DD; parse as a local date so it doesn't shift by timezone.
@@ -73,6 +73,7 @@ export function StoryPage() {
     const status = (err as { response?: { status?: number } }).response?.status
     if (status === 503) return t('story.notConfigured')
     if (status === 422) return t('story.noWordsError')
+    if (isRateLimited(err)) return rateLimitMessage(err)
     return t('story.generateFailed', { error: errorMessage(err) })
   }
 

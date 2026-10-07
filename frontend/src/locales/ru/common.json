@@ -1,5 +1,5 @@
 {
-  "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…" },
+  "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…", "rateLimited": "Слишком много запросов. Попробуйте через {{seconds}} сек." },
   "direction": { "label": "Направление", "de_ru": "DE → RU", "ru_de": "RU → DE", "mixed": "Смешанно" },
   "lang": { "label": "Язык интерфейса", "ru": "Русский", "en": "English" },
   "nav": {

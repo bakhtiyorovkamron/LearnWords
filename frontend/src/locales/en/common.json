@@ -1,5 +1,5 @@
 {
-  "common": { "unknownError": "Unknown error", "loading": "Loading…" },
+  "common": { "unknownError": "Unknown error", "loading": "Loading…", "rateLimited": "Too many requests. Please try again in {{seconds}} s." },
   "direction": { "label": "Direction", "de_ru": "DE → RU", "ru_de": "RU → DE", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English" },
   "nav": {
