@@ -17,8 +17,6 @@ import (
 	"learnwords/internal/config"
 	"learnwords/internal/handler"
 	"learnwords/internal/provider/anthropic"
-	"learnwords/internal/provider/google"
-	"learnwords/internal/provider/localstore"
 	"learnwords/internal/provider/mock"
 	"learnwords/internal/repository/postgres"
 	"learnwords/internal/service"
@@ -77,18 +75,6 @@ func run() error {
 		Transcriber: mock.Transcriber{},
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
-	}
-	// Real pronunciation: Google Cloud TTS (Neural2), audio saved to MEDIA_DIR and served at /api/media.
-	if cfg.GoogleTTSKey != "" {
-		store, err := localstore.New(cfg.MediaDir)
-		if err != nil {
-			return err
-		}
-		providers.TTS = google.NewTTS(cfg.GoogleTTSKey)
-		providers.Storage = store
-		slog.Info("google tts enabled")
-	} else {
-		slog.Warn("GOOGLE_TTS_API_KEY is not set: audio falls back to browser speech synthesis")
 	}
 	// AI: example sentences + daily stories + word search, enabled only when the key is provided via environment.
 	var storyGen service.StoryGenerator

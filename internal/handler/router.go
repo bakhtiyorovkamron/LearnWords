@@ -29,8 +29,6 @@ type RouterDeps struct {
 	Search      *SearchHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
-	// MediaDir is served read-only at /api/media (generated TTS audio).
-	MediaDir string
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
 	Ctx context.Context
 }
