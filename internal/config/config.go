@@ -44,9 +44,6 @@ func Load() (*Config, error) {
 		TargetLang:   env("TRANSLATION_TARGET_LANG", "ru"),
 		AutoMigrate:  env("AUTO_MIGRATE", "true") == "true",
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
-
-		GoogleTTSKey: os.Getenv("GOOGLE_TTS_API_KEY"),
-		MediaDir:     env("MEDIA_DIR", "./data/media"),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")

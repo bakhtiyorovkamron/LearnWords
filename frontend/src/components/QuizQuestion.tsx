@@ -7,10 +7,11 @@ import {
 } from '../lib/quiz'
 
 function speak(card: WordCard) {
-  if (!('speechSynthesis' in window)) return
+  // Pronunciation is available only for German.
+  if (card.language !== 'de' || !('speechSynthesis' in window)) return
   // "der Samstag / der Sonnabend" → pronounce only the first variant.
   const u = new SpeechSynthesisUtterance(firstVariant(card.word))
-  u.lang = card.language === 'de' ? 'de-DE' : card.language
+  u.lang = 'de-DE'
   window.speechSynthesis.speak(u)
 }
 

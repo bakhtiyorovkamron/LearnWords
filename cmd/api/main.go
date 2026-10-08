@@ -145,7 +145,6 @@ func run() error {
 		Folders:     handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
 		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
 		UserStatus:  adminRepo,
-		MediaDir:    cfg.MediaDir,
 		Ctx:         ctx,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)

@@ -170,6 +170,9 @@ func (s *ContextService) buildCard(ctx context.Context, c domain.Context, word, 
 	} else {
 		card.Transcription = strings.TrimSpace(ts)
 	}
+	if !audioSupported(c.Language) {
+		return card // pronunciation is available only for German
+	}
 	if url, err := s.synthesize(ctx, c.UserID, card.ID, lookup, c.Language); err != nil {
 		slog.WarnContext(ctx, "audio synthesis failed", "word", lookup, "err", err)
 	} else {
@@ -177,6 +180,9 @@ func (s *ContextService) buildCard(ctx context.Context, c domain.Context, word, 
 	}
 	return card
 }
+
+// audioSupported: pronunciation (TTS) is offered only for German; new languages have no audio.
+func audioSupported(lang string) bool { return strings.EqualFold(lang, "de") }
 
 func (s *ContextService) synthesize(ctx context.Context, userID, cardID uuid.UUID, word, lang string) (string, error) {
 	audio, mime, err := s.p.TTS.Synthesize(ctx, word, lang)
@@ -209,6 +215,9 @@ func (s *ContextService) RegenerateAudio(ctx context.Context, userID, cardID uui
 	card, err := s.cards.GetByID(ctx, userID, cardID)
 	if err != nil {
 		return nil, err
+	}
+	if !audioSupported(card.Language) {
+		return nil, fmt.Errorf("%w: audio is available only for German", domain.ErrValidation)
 	}
 	url, err := s.synthesize(ctx, userID, card.ID, firstVariant(card.Word), card.Language)
 	if err != nil {

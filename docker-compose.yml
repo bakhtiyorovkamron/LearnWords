@@ -91,7 +91,6 @@ services:
     depends_on: [backend]
 
 volumes:
-  media:
   pgdata:
   frontend_node_modules:
   caddy_data:

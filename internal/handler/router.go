@@ -85,10 +85,6 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	})
 
 	api := r.Group("/api")
-	if d.MediaDir != "" {
-		// Public: <audio> can't send a bearer token; file names are random UUIDs.
-		api.Static("/media", d.MediaDir)
-	}
 	{
 		a := api.Group("/auth")
 		a.POST("/register", authLimit, d.Auth.Register)

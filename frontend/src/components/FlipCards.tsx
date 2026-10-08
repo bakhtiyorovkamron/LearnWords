@@ -5,9 +5,10 @@ import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
 import { EditWordModal } from './EditWordModal'
 
 function speak(card: CollectionCard) {
-  if (!('speechSynthesis' in window)) return
+  // Pronunciation is available only for German.
+  if (card.language !== 'de' || !('speechSynthesis' in window)) return
   const u = new SpeechSynthesisUtterance(card.word.split('/')[0].trim())
-  u.lang = card.language === 'de' ? 'de-DE' : card.language
+  u.lang = 'de-DE'
   window.speechSynthesis.speak(u)
 }
 
