@@ -5,18 +5,30 @@ import { searchApi, type WordInfo } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { FolderSelect } from '../components/Folders'
 import { toast } from '../components/Toaster'
+import { useLearningLang } from '../lib/learningLang'
 
-const PERSONS: [string, string][] = [
-  ['ich', 'ich'], ['du', 'du'], ['er_sie_es', 'er/sie/es'],
-  ['wir', 'wir'], ['ihr', 'ihr'], ['sie_Sie', 'sie/Sie'],
-]
+// Pronoun labels per learning language (keys are positions returned by the backend).
+const PERSONS_BY_LANG: Record<string, [string, string][]> = {
+  de: [['ich', 'ich'], ['du', 'du'], ['er_sie_es', 'er/sie/es'], ['wir', 'wir'], ['ihr', 'ihr'], ['sie_Sie', 'sie/Sie']],
+  en: [['ich', 'I'], ['du', 'you'], ['er_sie_es', 'he/she/it'], ['wir', 'we'], ['ihr', 'you (pl.)'], ['sie_Sie', 'they']],
+  fr: [['ich', 'je'], ['du', 'tu'], ['er_sie_es', 'il/elle'], ['wir', 'nous'], ['ihr', 'vous'], ['sie_Sie', 'ils/elles']],
+  ko: [],
+}
+// Labels of the two extra verb forms (backend reuses the "perfekt"/"praeteritum" fields).
+const VERB_FORMS: Record<string, [string, string]> = {
+  de: ['Perfekt', 'Präteritum (er/sie/es)'],
+  en: ['Past Participle', 'Past Simple'],
+  fr: ['Passé composé', 'Imparfait (il/elle)'],
+  ko: ['과거 (-았어요/-었어요)', '현재 (-아요/-어요)'],
+}
 
 function status(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status
 }
 
-function speak(text: string) {
-  if (!('speechSynthesis' in window)) return
+function speak(text: string, lang: string) {
+  // Audio is available only for German.
+  if (lang !== 'de' || !('speechSynthesis' in window)) return
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'de-DE'
   window.speechSynthesis.speak(u)
@@ -74,6 +86,9 @@ export function SearchPage() {
 function WordResult({ info }: { info: WordInfo }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const learning = useLearningLang()
+  const persons = PERSONS_BY_LANG[learning.code] ?? PERSONS_BY_LANG.de
+  const [perfektLabel, praetLabel] = VERB_FORMS[learning.code] ?? VERB_FORMS.de
   const [added, setAdded] = useState(info.already_added)
   const [folder, setFolder] = useState('')
   const full = info.word_type === 'noun' && info.article ? `${info.article} ${info.word}` : info.word
@@ -112,13 +127,15 @@ function WordResult({ info }: { info: WordInfo }) {
           {/* Adaptive size + wrapping: long compound words must not overflow the card. */}
           <h2 className="display font-extrabold leading-tight text-white"
             style={{ fontSize: 'clamp(1.75rem, 5vw, 3rem)', overflowWrap: 'anywhere', wordBreak: 'break-word', hyphens: 'auto' }}
-            lang="de">
+            lang={learning.code}>
             {info.word_type === 'noun' && info.article && <span className="text-lime-300">{info.article} </span>}
             {info.word}
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             {info.pronunciation && <span className="font-mono text-lime-300/90">[{info.pronunciation}]</span>}
-            <button type="button" onClick={() => speak(full)} className="btn-ghost !px-3 !py-1 text-sm" title={t('quiz.listenTitle')}>▶</button>
+            {learning.code === 'de' && (
+              <button type="button" onClick={() => speak(full, learning.code)} className="btn-ghost !px-3 !py-1 text-sm" title={t('quiz.listenTitle')}>▶</button>
+            )}
           </div>
           <p className="mt-3 text-xl text-emerald-100">{info.translation}</p>
         </div>
@@ -127,11 +144,11 @@ function WordResult({ info }: { info: WordInfo }) {
       {info.word_type === 'noun' && info.plural && (
         <section>
           <h3 className="mb-1 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.plural')}</h3>
-          <p className="text-lg text-white">die {info.plural.replace(/^die\s+/i, '')}</p>
+          <p className="text-lg text-white">{learning.code === 'de' ? `die ${info.plural.replace(/^die\s+/i, '')}` : info.plural}</p>
         </section>
       )}
 
-      {info.word_type === 'verb' && (
+      {(info.word_type === 'verb' || (learning.code === 'ko' && info.word_type === 'adjective')) && (
         <section className="space-y-4">
           {info.verb_type && (
             <span className="inline-block rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
@@ -143,7 +160,7 @@ function WordResult({ info }: { info: WordInfo }) {
               <h3 className="mb-2 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.present')}</h3>
               <table className="w-full overflow-hidden rounded-2xl text-left">
                 <tbody>
-                  {PERSONS.map(([key, label]) => {
+                  {persons.map(([key, label]) => {
                     const form = info.conjugation_present?.[key]
                     return form && (
                       <tr key={key} className="odd:bg-emerald-900/30">
@@ -159,13 +176,13 @@ function WordResult({ info }: { info: WordInfo }) {
           <div className="grid gap-3 sm:grid-cols-2">
             {info.perfekt && (
               <div className="rounded-2xl bg-emerald-900/30 p-4">
-                <div className="text-xs uppercase tracking-widest text-emerald-100/50">Perfekt</div>
+                <div className="text-xs uppercase tracking-widest text-emerald-100/50">{perfektLabel}</div>
                 <div className="mt-1 text-lg font-semibold text-white">{info.perfekt}</div>
               </div>
             )}
             {info.praeteritum && (
               <div className="rounded-2xl bg-emerald-900/30 p-4">
-                <div className="text-xs uppercase tracking-widest text-emerald-100/50">Präteritum (er/sie/es)</div>
+                <div className="text-xs uppercase tracking-widest text-emerald-100/50">{praetLabel}</div>
                 <div className="mt-1 text-lg font-semibold text-white">{info.praeteritum}</div>
               </div>
             )}

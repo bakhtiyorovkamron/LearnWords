@@ -47,6 +47,16 @@ func (r *StoryRepository) UsersWithWordsOn(ctx context.Context, day string) ([]u
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
+// LearningLanguage returns the user's learning language (used by the daily story cron).
+func (r *StoryRepository) LearningLanguage(ctx context.Context, userID uuid.UUID) (string, error) {
+	var lang string
+	err := r.pool.QueryRow(ctx, `SELECT learning_language FROM users WHERE id = $1`, userID).Scan(&lang)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrNotFound
+	}
+	return lang, err
+}
+
 const storyCols = `id, user_id, date, genre, title, story_de, story_ru, words_used, created_at`
 
 func scanStory(row pgx.Row) (domain.DailyStory, error) {

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { authApi } from '../api/endpoints'
+import { authApi, LEARNING_LANGS, type LearningLang } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { Logo } from '../components/Layout'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
@@ -25,10 +25,13 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [learningLang, setLearningLang] = useState<LearningLang>('de')
   const [localError, setLocalError] = useState<string | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => (isLogin ? authApi.login : authApi.register)({ email, password }),
+    mutationFn: () => isLogin
+      ? authApi.login({ email, password })
+      : authApi.register({ email, password, learning_language: learningLang }),
     onSuccess: () => navigate(from, { replace: true }),
   })
 
@@ -84,6 +87,25 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           {!isLogin && (
             <input className="field" type="password" placeholder={t('auth.confirmPassword')} required
               autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          )}
+          {!isLogin && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm text-emerald-100/70">{t('auth.learningLanguage')}</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {LEARNING_LANGS.map((l) => (
+                  <button key={l.code} type="button" onClick={() => setLearningLang(l.code)}
+                    aria-pressed={learningLang === l.code}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                      learningLang === l.code
+                        ? 'border-lime-300 bg-lime-400/15 text-lime-200'
+                        : 'border-emerald-400/20 text-emerald-100/80 hover:border-lime-400/50'}`}>
+                    <span className="text-lg">{l.flag}</span>
+                    <span className="font-semibold">{l.name}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-emerald-100/50">{t('auth.learningLanguageHint')}</p>
+            </fieldset>
           )}
           {error && (
             <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">{error}</p>

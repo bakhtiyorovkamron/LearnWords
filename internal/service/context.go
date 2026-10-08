@@ -65,9 +65,8 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	ctx, span := tracer.Start(ctx, "ContextService.Create")
 	defer span.End()
 
-	if in.Language == "" {
-		in.Language = "de"
-	}
+	// The learning language belongs to the account (chosen at registration), not to the request.
+	in.Language = domain.LangFrom(ctx)
 	c := domain.Context{ID: uuid.New(), UserID: userID, Language: in.Language, CreatedAt: time.Now().UTC()}
 	text := strings.TrimSpace(in.Text)
 	meaning := strings.TrimSpace(in.Meaning)

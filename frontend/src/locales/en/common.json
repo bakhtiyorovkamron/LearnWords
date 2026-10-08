@@ -33,6 +33,8 @@
     "email": "Email",
     "password": "Password",
     "confirmPassword": "Repeat password",
+    "learningLanguage": "Which language are you learning?",
+    "learningLanguageHint": "Chosen once — all words, stories and search will be in this language. Audio is available for German only.",
     "passwordTooShort": "Password must be at least 8 characters",
     "passwordsMismatch": "Passwords do not match",
     "wait": "One moment…",

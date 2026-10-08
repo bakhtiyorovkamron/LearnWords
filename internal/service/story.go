@@ -13,7 +13,7 @@ import (
 	"learnwords/internal/domain"
 )
 
-// StoryGenerator produces a German story from a list of words (implemented by the Anthropic client).
+// StoryGenerator produces a story in the user's learning language (domain.LangFrom(ctx)) from a list of words.
 type StoryGenerator interface {
 	GenerateStory(ctx context.Context, words []domain.StoryWord, genre string) (domain.GeneratedStory, error)
 }
@@ -21,6 +21,8 @@ type StoryGenerator interface {
 type StoryRepository interface {
 	WordsAddedOn(ctx context.Context, userID uuid.UUID, day string) ([]domain.StoryWord, error)
 	UsersWithWordsOn(ctx context.Context, day string) ([]uuid.UUID, error)
+	// LearningLanguage is used by the cron job (no HTTP request → no language in ctx).
+	LearningLanguage(ctx context.Context, userID uuid.UUID) (string, error)
 	Upsert(ctx context.Context, s domain.DailyStory) (domain.DailyStory, error)
 	ByDate(ctx context.Context, userID uuid.UUID, day string) (domain.DailyStory, error)
 	List(ctx context.Context, userID uuid.UUID, limit int) ([]domain.DailyStory, error)
@@ -141,6 +143,12 @@ func (s *StoryService) generateForAll(ctx context.Context, day string) {
 	for _, uid := range users {
 		// Up to 3 attempts per story inside the generator.
 		c, cancel := context.WithTimeout(ctx, 7*time.Minute)
+		lang, err := s.repo.LearningLanguage(c, uid)
+		if err != nil {
+			slog.Warn("daily story cron: learning language", "user", uid, "err", err)
+			lang = domain.DefaultLearningLang
+		}
+		c = domain.WithLang(c, lang)
 		if _, err := s.generateFor(c, uid, day, ""); err != nil {
 			slog.Warn("daily story cron: generation failed", "user", uid, "err", err)
 		}

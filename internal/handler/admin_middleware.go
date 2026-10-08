@@ -12,16 +12,17 @@ import (
 
 const roleKey = "userRole"
 
-// UserStatusStore reads the live role/ban state of a user from the database.
+// UserStatusStore reads the live role/ban state and learning language of a user from the database.
 type UserStatusStore interface {
-	UserStatus(ctx context.Context, id uuid.UUID) (role string, banned bool, err error)
+	UserStatus(ctx context.Context, id uuid.UUID) (role, learningLang string, banned bool, err error)
 }
 
 // ActiveUser runs after AuthRequired on every protected route. It re-reads the user from
 // the DB so that bans and role changes take effect immediately (not only after the JWT expires).
+// It also stores the user's learning language in the request context (domain.LangFrom).
 func ActiveUser(store UserStatusStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, banned, err := store.UserStatus(c.Request.Context(), userID(c))
+		role, lang, banned, err := store.UserStatus(c.Request.Context(), userID(c))
 		if err != nil {
 			if err == domain.ErrNotFound { // user deleted
 				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: "unauthorized"})
@@ -35,6 +36,7 @@ func ActiveUser(store UserStatusStore) gin.HandlerFunc {
 			return
 		}
 		c.Set(roleKey, role)
+		c.Request = c.Request.WithContext(domain.WithLang(c.Request.Context(), lang))
 		c.Next()
 	}
 }

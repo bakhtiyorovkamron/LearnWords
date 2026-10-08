@@ -37,7 +37,7 @@ func (h *AdminHandler) Me(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role})
+	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role, "learning_language": u.LearningLanguage})
 }
 
 // Users handles GET /api/admin/users.

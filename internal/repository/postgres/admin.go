@@ -17,17 +17,17 @@ type AdminRepository struct{ pool *pgxpool.Pool }
 
 func NewAdminRepository(pool *pgxpool.Pool) *AdminRepository { return &AdminRepository{pool: pool} }
 
-// UserStatus returns the current role and ban flag (checked on every authenticated request).
-func (r *AdminRepository) UserStatus(ctx context.Context, id uuid.UUID) (string, bool, error) {
+// UserStatus returns the current role, learning language and ban flag (checked on every authenticated request).
+func (r *AdminRepository) UserStatus(ctx context.Context, id uuid.UUID) (string, string, bool, error) {
 	var (
-		role   string
-		banned bool
+		role, lang string
+		banned     bool
 	)
-	err := r.pool.QueryRow(ctx, `SELECT role, is_banned FROM users WHERE id = $1`, id).Scan(&role, &banned)
+	err := r.pool.QueryRow(ctx, `SELECT role, learning_language, is_banned FROM users WHERE id = $1`, id).Scan(&role, &lang, &banned)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false, domain.ErrNotFound
+		return "", "", false, domain.ErrNotFound
 	}
-	return role, banned, err
+	return role, lang, banned, err
 }
 
 // ListUsers returns all users with word counts and last activity (latest review, word or story).

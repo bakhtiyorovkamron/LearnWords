@@ -50,7 +50,12 @@ func (s *SearchService) Search(ctx context.Context, userID uuid.UUID, query stri
 	if query == "" || len([]rune(query)) > maxSearchQueryLen {
 		return nil, fmt.Errorf("%w: query must be 1-%d characters", domain.ErrValidation, maxSearchQueryLen)
 	}
+	// Same spelling can mean different words in different languages → language is part of the key.
+	// German keeps the old un-prefixed keys so the existing cache stays valid.
 	key := NormalizeQuery(query)
+	if lang := domain.LangFrom(ctx); lang != domain.DefaultLearningLang {
+		key = lang + ":" + key
+	}
 
 	info, hit := domain.WordInfo{}, false
 	if s.cache != nil {
@@ -121,7 +126,7 @@ func (s *SearchService) Add(ctx context.Context, userID uuid.UUID, in AddInput) 
 		Pronunciation:      in.Pronunciation,
 		ExampleSentence:    example,
 		ExampleTranslation: in.ExampleTranslation,
-		Language:           "de",
+		Language:           domain.LangFrom(ctx),
 		FolderID:           in.FolderID,
 		SingleWord:         true,
 	})
@@ -129,7 +134,9 @@ func (s *SearchService) Add(ctx context.Context, userID uuid.UUID, in AddInput) 
 
 func isArticle(s string) bool {
 	switch strings.ToLower(s) {
-	case "der", "die", "das":
+	case "der", "die", "das", // de
+		"le", "la", "les", // fr
+		"a", "an", "the", "to": // en ("to go")
 		return true
 	}
 	return false

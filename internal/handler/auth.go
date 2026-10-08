@@ -53,12 +53,16 @@ func (h *AuthHandler) clearRefreshCookie(c *gin.Context) {
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
-	var req credentialsRequest
+	var req struct {
+		credentialsRequest
+		// "de" | "en" | "fr" | "ko"; empty = German.
+		LearningLanguage string `json:"learning_language"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		badRequest(c, "email must be valid and password 8-72 characters")
 		return
 	}
-	user, tokens, err := h.svc.Register(c.Request.Context(), req.Email, req.Password)
+	user, tokens, err := h.svc.Register(c.Request.Context(), req.Email, req.Password, req.LearningLanguage)
 	if err != nil {
 		writeError(c, err)
 		return

@@ -27,7 +27,7 @@ func NewAuthService(users UserRepository, tokens TokenManager) *AuthService {
 	return &AuthService{users: users, tokens: tokens, dummyHash: h}
 }
 
-func (s *AuthService) Register(ctx context.Context, email, password string) (*domain.User, domain.TokenPair, error) {
+func (s *AuthService) Register(ctx context.Context, email, password, learningLang string) (*domain.User, domain.TokenPair, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if _, err := mail.ParseAddress(email); err != nil {
 		return nil, domain.TokenPair{}, fmt.Errorf("%w: invalid email", domain.ErrValidation)
@@ -35,12 +35,20 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*do
 	if len(password) < 8 || len(password) > 72 {
 		return nil, domain.TokenPair{}, fmt.Errorf("%w: password must be 8-72 characters", domain.ErrValidation)
 	}
+	learningLang = strings.ToLower(strings.TrimSpace(learningLang))
+	if learningLang == "" {
+		learningLang = domain.DefaultLearningLang
+	}
+	if !domain.IsLearningLang(learningLang) {
+		return nil, domain.TokenPair{}, fmt.Errorf("%w: learning_language must be one of: de, en, fr, ko", domain.ErrValidation)
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, domain.TokenPair{}, err
 	}
 	now := time.Now().UTC()
-	u := &domain.User{ID: uuid.New(), Email: email, PasswordHash: string(hash), Role: domain.RoleUser, CreatedAt: now, UpdatedAt: now}
+	u := &domain.User{ID: uuid.New(), Email: email, PasswordHash: string(hash), Role: domain.RoleUser,
+		LearningLanguage: learningLang, CreatedAt: now, UpdatedAt: now}
 	if err := s.users.Create(ctx, u); err != nil {
 		return nil, domain.TokenPair{}, err
 	}

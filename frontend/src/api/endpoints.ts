@@ -9,13 +9,22 @@ export interface Credentials {
   password: string
 }
 
+// Language the user learns — chosen once at registration.
+export type LearningLang = 'de' | 'en' | 'fr' | 'ko'
+export const LEARNING_LANGS: { code: LearningLang; flag: string; name: string; locale: string }[] = [
+  { code: 'de', flag: '🇩🇪', name: 'Deutsch', locale: 'de-DE' },
+  { code: 'en', flag: '🇬🇧', name: 'English', locale: 'en-US' },
+  { code: 'fr', flag: '🇫🇷', name: 'Français', locale: 'fr-FR' },
+  { code: 'ko', flag: '🇰🇷', name: '한국어', locale: 'ko-KR' },
+]
+
 export const authApi = {
   async login(c: Credentials) {
     const { data } = await api.post<AuthResponse>('/auth/login', c)
     tokenStore.set(data.access_token)
     return data
   },
-  async register(c: Credentials) {
+  async register(c: Credentials & { learning_language?: LearningLang }) {
     const { data } = await api.post<AuthResponse>('/auth/register', c)
     tokenStore.set(data.access_token)
     return data
@@ -126,7 +135,7 @@ export const settingsApi = {
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
 }
 
-export interface Me { id: string; email: string; role: 'user' | 'admin' }
+export interface Me { id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang }
 
 export const meApi = {
   get: () => api.get<Me>('/me').then((r) => r.data),

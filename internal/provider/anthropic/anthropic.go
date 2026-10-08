@@ -35,7 +35,7 @@ func New(apiKey, model string) *Client {
 	return &Client{apiKey: apiKey, model: model, http: &http.Client{Timeout: 30 * time.Second}}
 }
 
-const promptTemplate = `Создай одно простое предложение на немецком языке (уровень A1-A2) с использованием слова "{{word}}" (перевод: "{{translation}}").
+const promptTemplate = `Создай одно простое предложение на {{lang}} языке (уровень A1-A2) с использованием слова "{{word}}" (перевод: "{{translation}}").
 В предложении замени само слово "{{word}}" на три подчёркивания: ___
 Дай также перевод полного предложения на русский язык.
 Ответь ТОЛЬКО в формате JSON, без markdown и пояснений:
@@ -45,14 +45,28 @@ const promptTemplate = `Создай одно простое предложен�
   "translation": "..."
 }`
 
+// langPrepositional: "немецком", "английском"... for "на {{lang}} языке".
+func langPrepositional(code string) string {
+	switch domain.Lang(code).Code {
+	case "en":
+		return "английском"
+	case "fr":
+		return "французском"
+	case "ko":
+		return "корейском (хангыль)"
+	}
+	return "немецком"
+}
+
 // clean strips characters that could break out of the quoted prompt placeholders.
 func clean(s string) string {
 	s = strings.NewReplacer("\"", "", "\n", " ", "\r", " ").Replace(s)
 	return strings.TrimSpace(s)
 }
 
-func buildPrompt(word, translation string) string {
-	return strings.NewReplacer("{{word}}", clean(word), "{{translation}}", clean(translation)).Replace(promptTemplate)
+func buildPrompt(lang, word, translation string) string {
+	return strings.NewReplacer("{{word}}", clean(word), "{{translation}}", clean(translation),
+		"{{lang}}", langPrepositional(lang)).Replace(promptTemplate)
 }
 
 type request struct {
@@ -83,7 +97,7 @@ func (c *Client) Generate(ctx context.Context, word, translation string) (domain
 	body, err := json.Marshal(request{
 		Model:     c.model,
 		MaxTokens: 400,
-		Messages:  []message{{Role: "user", Content: buildPrompt(word, translation)}},
+		Messages:  []message{{Role: "user", Content: buildPrompt(domain.LangFrom(ctx), word, translation)}},
 	})
 	if err != nil {
 		return domain.Example{}, err

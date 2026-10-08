@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
+import { useLearningLang } from '../lib/learningLang'
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -32,6 +33,7 @@ export function Layout() {
   // Only decides whether to show the link; the backend checks the role on every /api/admin request.
   const me = useQuery({ queryKey: ['me'], queryFn: meApi.get, staleTime: 5 * 60_000 })
   const isAdmin = me.data?.role === 'admin'
+  const learning = useLearningLang()
 
   async function logout() {
     await authApi.logout()
@@ -52,6 +54,9 @@ export function Layout() {
           <NavLink to="/story" className={link}>📖 {t('nav.dailyStory')}</NavLink>
           {isAdmin && <NavLink to="/admin" className={link}>🛡 {t('nav.admin')}</NavLink>}
           <div className="ml-auto flex items-center gap-2">
+            <span title={learning.name} className="rounded-xl border border-emerald-400/20 px-3 py-2 text-sm">
+              {learning.flag} {learning.name}
+            </span>
             <LanguageSwitcher />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
           </div>
@@ -61,7 +66,7 @@ export function Layout() {
         <Outlet />
       </main>
       <footer className="py-8 text-center text-xs text-emerald-300/40">
-        Deutsch lernen — Wort für Wort 🌿
+        {learning.flag} {learning.name} — Wort für Wort 🌿
       </footer>
       <Toaster />
     </div>

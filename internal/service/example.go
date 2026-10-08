@@ -53,7 +53,7 @@ func (s *ContextService) generateExampleAsync(userID uuid.UUID, card domain.Word
 		return
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), bgExampleTimeout)
+		ctx, cancel := context.WithTimeout(domain.WithLang(context.Background(), card.Language), bgExampleTimeout)
 		defer cancel()
 		time.Sleep(time.Second) // let the create request finish first
 		ex, err := s.p.Examples.Generate(ctx, card.Word, card.Translation)

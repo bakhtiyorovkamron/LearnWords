@@ -15,24 +15,24 @@ import (
 	"learnwords/internal/domain"
 )
 
-const storyPromptTemplate = `Ты — автор коротких рассказов для изучающих немецкий язык (уровень A1-B1).
-Напиши связный, интересный рассказ на немецком языке в жанре "{{genre}}", обязательно используя ВСЕ следующие слова (можно в нужной грамматической форме):
+const storyPromptTemplate = `Ты — автор коротких рассказов для изучающих {{langGen}} язык (уровень A1-B1).
+Напиши связный, интересный рассказ на {{langPrep}} языке в жанре "{{genre}}", обязательно используя ВСЕ следующие слова (можно в нужной грамматической форме):
 {{words}}
 
 Требования:
 - Длина рассказа примерно {{length}} предложений (чем больше слов, тем длиннее и насыщеннее сюжет).
 - Простая грамматика, короткие предложения, понятный сюжет с началом, развитием и концовкой.
-- Каждое использованное слово из списка выдели в немецком тексте жирным: **слово**.
+- Каждое использованное слово из списка выдели в тексте рассказа жирным: **слово**.
 - Дай полный перевод рассказа на русский язык.
-- Придумай короткий заголовок на немецком.
+- Придумай короткий заголовок на {{langPrep}} языке.
 
 ФОРМАТ ОТВЕТА — СТРОГО ВАЖНО:
 - Ответь СТРОГО одним валидным JSON-объектом, без каких-либо пояснений до или после объекта и без markdown-разметки (никаких ` + "```" + `).
 - Весь текст внутри полей должен быть корректно экранирован для JSON.
-- НЕ используй прямые двойные кавычки " внутри текста. Для прямой речи и цитат используй только кавычки „…“ (в немецком) и «…» (в русском).
+- НЕ используй прямые двойные кавычки " внутри текста. Для прямой речи и цитат используй только кавычки „…“ или «…».
 - Абзацы разделяй последовательностью \n (экранированный перенос строки), а не настоящим переносом строки.
 
-Структура ответа:
+Структура ответа (story_de — рассказ на изучаемом языке):
 {"title": "...", "story_de": "...", "story_ru": "..."}`
 
 // StoryLength scales the story with the number of words.
@@ -47,12 +47,14 @@ func StoryLength(n int) string {
 	}
 }
 
-func buildStoryPrompt(words []domain.StoryWord, genre string) string {
+func buildStoryPrompt(lang string, words []domain.StoryWord, genre string) string {
 	var b strings.Builder
 	for _, w := range words {
 		fmt.Fprintf(&b, "- %s (%s)\n", clean(w.Word), clean(w.Translation))
 	}
 	return strings.NewReplacer(
+		"{{langGen}}", domain.Lang(lang).NameRU,
+		"{{langPrep}}", langPrepositional(lang),
 		"{{genre}}", clean(genre),
 		"{{words}}", strings.TrimRight(b.String(), "\n"),
 		"{{length}}", StoryLength(len(words)),
@@ -76,11 +78,11 @@ type retryableError struct{ err error }
 func (e retryableError) Error() string { return e.err.Error() }
 func (e retryableError) Unwrap() error { return e.err }
 
-// GenerateStory asks the model for a short German story that uses all given words.
+// GenerateStory asks the model for a short story in the user's learning language that uses all given words.
 // Invalid or truncated JSON is retried (up to storyAttempts in total), with a bigger
 // token budget after a truncation.
 func (c *Client) GenerateStory(ctx context.Context, words []domain.StoryWord, genre string) (domain.GeneratedStory, error) {
-	prompt := buildStoryPrompt(words, genre)
+	prompt := buildStoryPrompt(domain.LangFrom(ctx), words, genre)
 	maxTokens := storyMaxTokens(len(words))
 	var lastErr error
 	for attempt := 1; attempt <= storyAttempts; attempt++ {

@@ -17,9 +17,12 @@ type UserRepository struct{ pool *pgxpool.Pool }
 func NewUserRepository(pool *pgxpool.Pool) *UserRepository { return &UserRepository{pool: pool} }
 
 func (r *UserRepository) Create(ctx context.Context, u *domain.User) error {
+	if u.LearningLanguage == "" {
+		u.LearningLanguage = domain.DefaultLearningLang
+	}
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)`,
-		u.ID, u.Email, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
+		`INSERT INTO users (id, email, password_hash, learning_language, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+		u.ID, u.Email, u.PasswordHash, u.LearningLanguage, u.CreatedAt, u.UpdatedAt)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return domain.ErrAlreadyExists
@@ -27,7 +30,7 @@ func (r *UserRepository) Create(ctx context.Context, u *domain.User) error {
 	return err
 }
 
-const userCols = `id, email, password_hash, role, is_banned, created_at, updated_at`
+const userCols = `id, email, password_hash, role, is_banned, learning_language, created_at, updated_at`
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	return r.getOne(ctx, `SELECT `+userCols+` FROM users WHERE email = $1`, email)
@@ -39,7 +42,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 
 func (r *UserRepository) getOne(ctx context.Context, q string, arg any) (*domain.User, error) {
 	var u domain.User
-	err := r.pool.QueryRow(ctx, q, arg).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsBanned, &u.CreatedAt, &u.UpdatedAt)
+	err := r.pool.QueryRow(ctx, q, arg).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsBanned, &u.LearningLanguage, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
