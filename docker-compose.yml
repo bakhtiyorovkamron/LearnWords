@@ -35,12 +35,25 @@ services:
       # Site is served over HTTPS → refresh cookie must be Secure.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_TTS_API_KEY: ${GOOGLE_TTS_API_KEY:-}
+      MEDIA_DIR: /data/media
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GIN_MODE: ${GIN_MODE:-release}
     ports: ["127.0.0.1:${BACKEND_PORT:-18080}:8080"]
+    volumes: [media:/data/media]
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Free self-hosted TTS: Piper (de, en, fr) + MeloTTS (ko). Internal only, not exposed to the internet.
+  tts:
+    build: ./tts
+    restart: unless-stopped
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:5000/healthz"]
+      interval: 15s
+      retries: 10
 
   # Production web server: https://yodla.fun (auto HTTPS), static frontend + /api proxy.
   caddy:
@@ -78,6 +91,7 @@ services:
     depends_on: [backend]
 
 volumes:
+  media:
   pgdata:
   frontend_node_modules:
   caddy_data:

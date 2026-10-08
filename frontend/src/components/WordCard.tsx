@@ -8,9 +8,9 @@ import { EditWordModal } from './EditWordModal'
 import { FolderSelect } from './Folders'
 import { toast } from './Toaster'
 
-// Mock storage returns mock:// URLs which browsers can't play — fall back to Web Speech API.
+// Google TTS audio is served at /api/media/...; mock:// URLs can't be played — fall back to Web Speech API.
 function play(card: WordCard) {
-  if (card.audio_url && /^https?:/.test(card.audio_url)) {
+  if (card.audio_url && /^(https?:|\/api\/media\/)/.test(card.audio_url)) {
     new Audio(card.audio_url).play().catch(() => speak(card))
   } else {
     speak(card)
@@ -21,7 +21,8 @@ function speak(card: WordCard) {
   if (!('speechSynthesis' in window)) return
   // "der Samstag / der Sonnabend" → pronounce only the first variant.
   const u = new SpeechSynthesisUtterance(card.word.split('/')[0].trim())
-  u.lang = card.language === 'de' ? 'de-DE' : card.language
+  const locales: Record<string, string> = { de: 'de-DE', en: 'en-US', fr: 'fr-FR', ko: 'ko-KR' }
+  u.lang = locales[card.language] ?? card.language
   window.speechSynthesis.speak(u)
 }
 

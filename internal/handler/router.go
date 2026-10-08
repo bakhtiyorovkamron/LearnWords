@@ -29,6 +29,8 @@ type RouterDeps struct {
 	Search      *SearchHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
+	// MediaDir is served read-only at /api/media (generated TTS audio).
+	MediaDir string
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
 	Ctx context.Context
 }
@@ -83,6 +85,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	})
 
 	api := r.Group("/api")
+	if d.MediaDir != "" {
+		// Public: <audio> can't send a bearer token; file names are random UUIDs.
+		api.Static("/media", d.MediaDir)
+	}
 	{
 		a := api.Group("/auth")
 		a.POST("/register", authLimit, d.Auth.Register)

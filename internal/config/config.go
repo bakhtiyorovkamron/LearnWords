@@ -21,6 +21,12 @@ type Config struct {
 	TargetLang   string // language to translate into
 	AutoMigrate  bool
 	CookieSecure bool // set true behind HTTPS
+
+	// TTS: self-hosted Piper/MeloTTS (TTSURL, e.g. http://tts:5000) takes priority over Google.
+	// Both empty = browser Web Speech fallback.
+	TTSURL       string
+	GoogleTTSKey string
+	MediaDir     string // generated audio on disk
 }
 
 func Load() (*Config, error) {
@@ -38,6 +44,9 @@ func Load() (*Config, error) {
 		TargetLang:   env("TRANSLATION_TARGET_LANG", "ru"),
 		AutoMigrate:  env("AUTO_MIGRATE", "true") == "true",
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
+
+		GoogleTTSKey: os.Getenv("GOOGLE_TTS_API_KEY"),
+		MediaDir:     env("MEDIA_DIR", "./data/media"),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")
