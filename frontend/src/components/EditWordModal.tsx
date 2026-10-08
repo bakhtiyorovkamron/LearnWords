@@ -6,6 +6,7 @@ import { wordsApi, type WordUpdate } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import type { CollectionCard, WordCard } from '../api/types'
 import { toast } from './Toaster'
+import { useLearningLang } from '../lib/learningLang'
 
 type CollectionPage = { items: CollectionCard[]; total: number }
 
@@ -22,6 +23,7 @@ function patchCaches(qc: ReturnType<typeof useQueryClient>, updated: WordCard) {
 
 export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () => void }) {
   const { t } = useTranslation()
+  const learning = useLearningLang()
   const qc = useQueryClient()
   const [form, setForm] = useState({
     word: card.word,
@@ -61,7 +63,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
   function submit(e: FormEvent) {
     e.preventDefault()
     setLocalError(null)
-    if (!form.word.trim()) return setLocalError(t('editWord.errWord'))
+    if (!form.word.trim()) return setLocalError(t('editWord.errWord', learning.vars))
     if (!form.translation.trim()) return setLocalError(t('editWord.errTranslation'))
     // Send only changed fields.
     const original: Record<keyof typeof form, string> = {
@@ -89,7 +91,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
         <h2 id="edit-word-title" className="display text-2xl font-extrabold">✏️ {t('editWord.title')}</h2>
 
         <div>
-          <label className={label} htmlFor="ew-word">{t('editWord.word')} *</label>
+          <label className={label} htmlFor="ew-word">{t('editWord.word', learning.vars)} *</label>
           <input id="ew-word" autoFocus className="field" value={form.word} onChange={set('word')} maxLength={100} />
         </div>
         <div>
@@ -118,7 +120,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
             </button>
           </div>
           <textarea id="ew-ex" rows={2} className="field" value={form.example_sentence} onChange={set('example_sentence')}
-            placeholder={t('editWord.examplePlaceholder')} maxLength={500} />
+            placeholder={learning.gapPlaceholder} maxLength={500} />
           {generate.error && (
             <p className="mt-1 text-xs text-red-300">
               {isRateLimited(generate.error)

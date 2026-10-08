@@ -9,9 +9,11 @@ import { PhotoPicker } from '../components/PhotoPicker'
 import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
 import { dateLocale } from '../i18n'
+import { useLearningLang } from '../lib/learningLang'
 
 export function ContextDetailPage() {
   const { t } = useTranslation()
+  const learning = useLearningLang()
   const { id = '' } = useParams()
   // No GET /contexts/:id yet — take the context from the cached list.
   const contexts = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
@@ -19,7 +21,7 @@ export function ContextDetailPage() {
   const ctx = contexts.data?.find((c) => c.id === id)
   const [picking, setPicking] = useState(false)
   // Clock-time phrases ("halb neun") get a generated time image instead of a photo.
-  const time = ctx ? parseGermanTime(ctx.source_text) : null
+  const time = ctx && ctx.language === 'de' ? parseGermanTime(ctx.source_text) : null
 
   if (words.error) return <p className="text-red-300">{errorMessage(words.error)}</p>
 
@@ -56,7 +58,7 @@ export function ContextDetailPage() {
               )
             )}
 
-            <p className="text-xs uppercase tracking-widest text-lime-300/80">{t('detail.original')}</p>
+            <p className="text-xs uppercase tracking-widest text-lime-300/80">{t('detail.original', { langNative: learning.name })}</p>
             <blockquote className="display relative mt-4 text-2xl font-semibold leading-snug text-white">
               „{ctx?.source_text ?? '…'}“
             </blockquote>

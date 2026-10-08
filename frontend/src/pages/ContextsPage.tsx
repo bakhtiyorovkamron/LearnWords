@@ -7,9 +7,11 @@ import type { Context } from '../api/types'
 import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
 import { dateLocale } from '../i18n'
+import { useLearningLang } from '../lib/learningLang'
 
 export function ContextsPage() {
   const { t } = useTranslation()
+  const learning = useLearningLang()
   const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
   const cards = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
@@ -36,7 +38,7 @@ export function ContextsPage() {
   const stats = [
     { label: t('stats.wordsAdded'), value: cards.data?.length ?? 0, icon: '📝' },
     { label: t('stats.streak'), value: streak, icon: '🔥' },
-    { label: t('stats.language'), value: 'DE', icon: '🇩🇪' },
+    { label: t('stats.language'), value: learning.vars.langCode, icon: learning.flag },
   ]
 
   return (
@@ -46,7 +48,7 @@ export function ContextsPage() {
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="display text-3xl font-extrabold md:text-4xl">
-              {t('home.greeting')} <span className="text-lime-300">{t('home.greetingAccent')}</span>
+              {learning.greeting} <span className="text-lime-300">{learning.greetingAccent}</span>
             </h1>
             <p className="mt-2 text-emerald-100/70">{t('home.subtitle')}</p>
           </div>
@@ -71,13 +73,13 @@ export function ContextsPage() {
         {data && !data.length && (
           <div className="glass p-10 text-center">
             <div className="text-5xl">🌿</div>
-            <p className="mt-3 text-emerald-100/70">{t('home.empty')}</p>
+            <p className="mt-3 text-emerald-100/70">{t('home.empty', learning.vars)}</p>
             <Link to="/contexts/new" className="btn-primary mt-6">{t('home.start')}</Link>
           </div>
         )}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {data?.map((c, i) => {
-            const time = parseGermanTime(c.source_text)
+            const time = c.language === 'de' ? parseGermanTime(c.source_text) : null
             return (
             <Link key={c.id} to={`/contexts/${c.id}`}
               style={{ animationDelay: `${Math.min(i, 12) * 50}ms` }}

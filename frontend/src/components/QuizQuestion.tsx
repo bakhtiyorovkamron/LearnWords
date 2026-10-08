@@ -5,6 +5,7 @@ import {
   buildOptions, checkTyped, countsAsCorrect, firstVariant,
   type QuizItem, type Verdict,
 } from '../lib/quiz'
+import { useLearningLang } from '../lib/learningLang'
 
 function speak(card: WordCard) {
   // Pronunciation is available only for German.
@@ -30,6 +31,7 @@ interface Props {
 // option buttons; ru_de_type uses a text field. Progress is updated the same way for all.
 export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext }: Props) {
   const { t } = useTranslation()
+  const learning = useLearningLang()
   const { card, format } = item
   const isChoice = format !== 'ru_de_type'
   const { options, lacking } = useMemo(
@@ -93,7 +95,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       </div>
 
       <div className="glass p-8 text-center">
-        <p className="text-xs uppercase tracking-widest text-lime-300/80">{t(`quiz.prompt.${format}`)}</p>
+        <p className="text-xs uppercase tracking-widest text-lime-300/80">{t(`quiz.prompt.${format}`, learning.vars)}</p>
         <div className={`display mt-3 font-extrabold text-white ${format === 'gap' ? 'text-2xl leading-snug' : 'text-4xl'}`}>
           {prompt}
         </div>
@@ -101,7 +103,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
           <div className="mt-2 text-sm text-emerald-100/60">{card.example_translation}</div>
         )}
         {/* Listening would give the answer away in the reverse formats — only after answering there. */}
-        {(format === 'de_ru' || answered) && (
+        {card.language === 'de' && (format === 'de_ru' || answered) && (
           <button type="button" onClick={() => speak(card)} className="btn-ghost mt-2" title={t('quiz.listenTitle')}>{t('quiz.listen')}</button>
         )}
 
@@ -130,9 +132,10 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
             value={typed}
             disabled={answered}
             onChange={(e) => setTyped(e.target.value)}
-            placeholder={t('quiz.typePlaceholder')}
+            placeholder={t('quiz.typePlaceholder', learning.vars)}
             autoComplete="off" autoCapitalize="off" spellCheck={false}
             className={`field flex-1 text-lg ${typedStyle}`}
+            lang={learning.code}
           />
           {!answered && (
             <button type="submit" disabled={!typed.trim()} className="btn-primary shrink-0">{t('quiz.check')}</button>

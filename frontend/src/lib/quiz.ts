@@ -14,7 +14,8 @@ export interface QuizItem {
 
 export type Verdict = 'correct' | 'almost_article' | 'almost_typo' | 'wrong'
 
-const ARTICLES = ['der', 'die', 'das']
+// Articles of all learning languages (de, fr, en); Korean has none.
+const ARTICLES = ['der', 'die', 'das', 'le', 'la', 'les', 'the', 'a', 'an']
 
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]

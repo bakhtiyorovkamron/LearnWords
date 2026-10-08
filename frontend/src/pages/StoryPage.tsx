@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { storiesApi, type DailyStory } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from "../api/client";
 import { dateLocale } from '../i18n'
+import { useLearningLang } from '../lib/learningLang'
 
 // story.date is YYYY-MM-DD; parse as a local date so it doesn't shift by timezone.
 function formatDate(iso: string) {
@@ -34,7 +35,7 @@ function StoryView({ story }: { story: DailyStory }) {
   return (
     <article className="glass space-y-4 p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="display text-2xl font-bold">{story.title || 'Geschichte des Tages'}</h2>
+        <h2 className="display text-2xl font-bold">{story.title || `${t('story.titleA')}${t('story.titleB')}`}</h2>
         <span className="text-xs text-emerald-100/60">
           {formatDate(story.date)} · {t(`story.genres.${story.genre}`, { defaultValue: story.genre })}
         </span>
@@ -57,6 +58,7 @@ function StoryView({ story }: { story: DailyStory }) {
 
 export function StoryPage() {
   const { t } = useTranslation()
+  const learning = useLearningLang()
   const qc = useQueryClient()
   const today = useQuery({ queryKey: ['stories', 'today'], queryFn: storiesApi.today })
   const archive = useQuery({ queryKey: ['stories', 'list'], queryFn: storiesApi.list })
@@ -93,7 +95,7 @@ export function StoryPage() {
         <h1 className="display text-3xl font-extrabold md:text-4xl">
           {t('story.titleA')}<span className="text-lime-300">{t('story.titleB')}</span> 📖
         </h1>
-        <p className="mt-2 text-emerald-100/70">{t('story.subtitle')}</p>
+        <p className="mt-2 text-emerald-100/70">{t('story.subtitle', learning.vars)}</p>
       </div>
 
       <section className="glass space-y-4 p-6">

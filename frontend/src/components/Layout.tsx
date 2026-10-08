@@ -66,7 +66,7 @@ export function Layout() {
         <Outlet />
       </main>
       <footer className="py-8 text-center text-xs text-emerald-300/40">
-        {learning.flag} {learning.name} — Wort für Wort 🌿
+        {learning.flag} {learning.name} 🌿
       </footer>
       <Toaster />
     </div>

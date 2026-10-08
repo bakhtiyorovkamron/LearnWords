@@ -125,7 +125,7 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
           ← {t('collection.prev')}
         </button>
         {/* In RU → DE, listening before flipping would give the answer away. */}
-        {(!ruFirst || flipped) ? (
+        {card.language === 'de' && (!ruFirst || flipped) ? (
           <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')}>▶</button>
         ) : <span />}
         <button type="button" onClick={() => go(1)} disabled={index >= cards.length - 1} className="btn-ghost disabled:opacity-30">

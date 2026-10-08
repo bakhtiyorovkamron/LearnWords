@@ -13,7 +13,7 @@
     "logout": "Log out"
   },
   "auth": {
-    "heroTitle1": "German ",
+    "heroTitle1": "Languages ",
     "heroTitleAccent": "through context",
     "heroTitle2": ", not rote learning",
     "heroText": "Paste a phrase from a series, a song or a chat — we'll break it into words with translation, transcription and pronunciation.",
@@ -52,7 +52,7 @@
     "subtitle": "Each phrase is a set of new words in a living context.",
     "newPhrase": "✨ New phrase",
     "myContexts": "My contexts",
-    "empty": "Nothing here yet. Add your first German phrase!",
+    "empty": "Nothing here yet. Add your first {{langName}} phrase!",
     "start": "Start",
     "open": "Open →",
     "deleteConfirm": "Delete this context?",
@@ -106,7 +106,7 @@
     "tryExample": "Or try an example",
     "analyzing": "Analyzing words…",
     "submit": "Analyze phrase →",
-    "errTextRequired": "Enter a German word or phrase",
+    "errTextRequired": "Enter a {{langName}} word or phrase",
     "errTranslationRequired": "Enter a translation",
     "errPronunciationRequired": "Enter the pronunciation",
     "errPhoto": "Could not upload the photo"
@@ -115,7 +115,7 @@
     "back": "← All contexts",
     "replacePhoto": "🔄 Replace photo",
     "uploadPhoto": "Upload photo",
-    "original": "Original · Deutsch",
+    "original": "Original · {{langNative}}",
     "meaning": "Meaning",
     "added": "Added {{date}}",
     "words": "Words"
@@ -153,8 +153,8 @@
   "search": {
     "titleA": "Word ",
     "titleB": "search",
-    "subtitle": "Translation, pronunciation, forms and an example — by German word or Russian translation.",
-    "placeholder": "Enter a word in German or Russian",
+    "subtitle": "Translation, pronunciation, forms and an example — by {{langName}} word or Russian translation.",
+    "placeholder": "Enter a word in {{langName}} or Russian",
     "find": "Find",
     "searching": "Searching…",
     "failed": "Could not find the word: {{error}}",
@@ -163,7 +163,7 @@
     "plural": "Plural",
     "strong": "strong verb",
     "weak": "weak verb",
-    "present": "Präsens (present tense)",
+    "present": "Present tense",
     "degrees": "Degrees of comparison",
     "example": "Example",
     "add": "Add to my collection",
@@ -192,7 +192,7 @@
   },
   "editWord": {
     "title": "Edit",
-    "word": "German word",
+    "word": "{{langName}} word",
     "translation": "Translation",
     "pronunciation": "Pronunciation",
     "example": "Example sentence (with a ___ gap)",
@@ -204,7 +204,7 @@
     "cancel": "Cancel",
     "saved": "Word updated",
     "saveFailed": "Could not save: {{error}}",
-    "errWord": "Enter the German word",
+    "errWord": "Enter the {{langName}} word",
     "errTranslation": "Enter a translation"
   },
   "wordCard": {
@@ -224,11 +224,11 @@
     "choose": "Choose the translation",
     "prompt": {
       "de_ru": "Choose the translation",
-      "ru_de": "Choose the German word",
-      "ru_de_type": "Type it in German",
+      "ru_de": "Choose the {{langName}} word",
+      "ru_de_type": "Type it in {{langName}}",
       "gap": "Fill in the missing word"
     },
-    "typePlaceholder": "German word (with article)",
+    "typePlaceholder": "{{langName}} word (with article, if any)",
     "check": "Check",
     "almostArticle": "≈ Almost! With the right article: {{answer}}",
     "almostTypo": "≈ Accepted — check the typo: {{answer}}",
@@ -258,7 +258,7 @@
   "story": {
     "titleA": "Daily ",
     "titleB": "Story",
-    "subtitle": "A short German story built from the words you added today.",
+    "subtitle": "A short {{langName}} story built from the words you added today.",
     "noWords": "You haven't added any words today. Add at least one to generate a story ✍️",
     "wordsToday": "Words today:",
     "randomGenre": "🎲 Random genre",

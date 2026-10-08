@@ -6,19 +6,14 @@ import { contextsApi, wordsApi } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { resizeImage } from '../lib/image'
 import { FolderSelect } from '../components/Folders'
+import { useLearningLang } from '../lib/learningLang'
 
 const MAX_LEN = 2000
 
-// German sample phrases are learning content — not translated.
-const examples = [
-  'Guten Morgen! Wie geht es dir heute?',
-  'Ich hätte gern einen Kaffee mit Milch, bitte.',
-  'Das Wetter ist heute wunderschön, lass uns spazieren gehen.',
-  'Kannst du mir bitte helfen? Ich habe mich verlaufen.',
-]
-
 export function NewContextPage() {
   const { t } = useTranslation()
+  const learning = useLearningLang()
+  const examples = learning.examples
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [text, setText] = useState('')
@@ -65,7 +60,7 @@ export function NewContextPage() {
   const mutation = useMutation({
     mutationFn: () =>
       contextsApi.create({
-        text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), photo, language: 'de',
+        text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), photo, language: learning.code,
         exampleSentence: exampleSentence.trim(), exampleTranslation: exampleTranslation.trim(),
         folderId: folderId || undefined,
       }),
@@ -83,7 +78,7 @@ export function NewContextPage() {
   function submit(e: FormEvent) {
     e.preventDefault()
     setLocalError(null)
-    if (!text.trim()) return setLocalError(t('newContext.errTextRequired'))
+    if (!text.trim()) return setLocalError(t('newContext.errTextRequired', learning.vars))
     if (!meaning.trim()) return setLocalError(t('newContext.errTranslationRequired'))
     // Pronunciation is optional.
     mutation.mutate()
@@ -108,7 +103,8 @@ export function NewContextPage() {
             onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))}
             rows={7}
             autoFocus
-            placeholder="z. B. „Ich freue mich schon auf das Wochenende!“"
+            placeholder={learning.phrasePlaceholder}
+            lang={learning.code}
             className="field resize-none text-lg leading-relaxed"
           />
           <span className="absolute bottom-3 right-4 text-xs text-emerald-300/50">
@@ -132,7 +128,7 @@ export function NewContextPage() {
           <input
             value={pronunciation}
             onChange={(e) => setPronunciation(e.target.value.slice(0, 200))}
-            placeholder={t('newContext.pronunciationPlaceholder')}
+            placeholder={learning.pronunciationPlaceholder}
             className="field"
           />
         </div>
@@ -162,7 +158,7 @@ export function NewContextPage() {
           <input
             value={exampleSentence}
             onChange={(e) => setExampleSentence(e.target.value.slice(0, 500))}
-            placeholder="Ich esse eine ___."
+            placeholder={learning.gapPlaceholder}
             className="field"
           />
           <input

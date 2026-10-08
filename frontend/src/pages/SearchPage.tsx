@@ -36,6 +36,7 @@ function speak(text: string, lang: string) {
 
 export function SearchPage() {
   const { t } = useTranslation()
+  const learning = useLearningLang()
   const [query, setQuery] = useState('')
   const search = useMutation({ mutationFn: (q: string) => searchApi.search(q) })
 
@@ -52,12 +53,12 @@ export function SearchPage() {
         <h1 className="display text-3xl font-extrabold md:text-4xl">
           {t('search.titleA')}<span className="text-lime-300">{t('search.titleB')}</span> 🔍
         </h1>
-        <p className="mt-2 text-emerald-100/70">{t('search.subtitle')}</p>
+        <p className="mt-2 text-emerald-100/70">{t('search.subtitle', learning.vars)}</p>
       </div>
 
       <form onSubmit={submit} className="glass flex flex-col gap-3 p-4 sm:flex-row">
         <input value={query} onChange={(e) => setQuery(e.target.value.slice(0, 100))} autoFocus
-          placeholder={t('search.placeholder')} className="field flex-1 text-lg" aria-label={t('search.placeholder')} />
+          placeholder={t('search.placeholder', learning.vars)} className="field flex-1 text-lg" aria-label={t('search.placeholder', learning.vars)} />
         <button type="submit" disabled={!query.trim() || search.isPending} className="btn-primary shrink-0">
           {search.isPending ? (
             <>
