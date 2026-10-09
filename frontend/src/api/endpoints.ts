@@ -112,9 +112,9 @@ export interface WordInfo {
 
 export const searchApi = {
   // AI call with retries on the backend → generous timeout.
-  // translation_language = UI language (ru/en/uz): translations come back in it.
-  search: (query: string, translationLanguage: string) =>
-    api.post<WordInfo>('/search-word', { query, translation_language: translationLanguage }, { timeout: 120_000 })
+  // native_language = UI language (ru/en/uz): the query is most likely in it; translations come back in it.
+  search: (query: string, nativeLanguage: string) =>
+    api.post<WordInfo>('/search-word', { query, native_language: nativeLanguage }, { timeout: 120_000 })
       .then((r) => r.data),
   add: (w: {
     word: string; translation: string; pronunciation: string

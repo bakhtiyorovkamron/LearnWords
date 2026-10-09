@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"learnwords/internal/domain"
 	"learnwords/internal/service"
 )
 
@@ -12,16 +13,26 @@ type SearchHandler struct{ svc *service.SearchService }
 
 func NewSearchHandler(svc *service.SearchService) *SearchHandler { return &SearchHandler{svc: svc} }
 
-// Search handles POST /api/search-word {"query": "..."}.
+// Search handles POST /api/search-word {"query": "...", "native_language": "uz"|"ru"|"en"}.
+// native_language = the user's UI/native language: the query is most likely written in it and
+// translations come back in it. The learning language comes from the account (ActiveUser).
+// "translation_language" is accepted as an alias for older frontends.
 func (h *SearchHandler) Search(c *gin.Context) {
 	var req struct {
-		Query string `json:"query"`
+		Query               string `json:"query"`
+		NativeLanguage      string `json:"native_language"`
+		TranslationLanguage string `json:"translation_language"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		badRequest(c, "query is required")
 		return
 	}
-	info, err := h.svc.Search(c.Request.Context(), userID(c), req.Query)
+	native := req.NativeLanguage
+	if native == "" {
+		native = req.TranslationLanguage
+	}
+	ctx := domain.WithTranslationLang(c.Request.Context(), native)
+	info, err := h.svc.Search(ctx, userID(c), req.Query)
 	if err != nil {
 		writeError(c, err)
 		return

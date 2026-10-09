@@ -16,17 +16,34 @@ import (
 )
 
 // One compact prompt for all learning languages (same JSON shape → shared cache, parser and UI).
-// The query may be written in the learning language OR in Russian/Uzbek/English (or another
-// language): the model detects it and always returns the word in the learning language.
+// The user has a NATIVE language (the UI language: uz/ru/en) and a LEARNING language (de/en/fr/ko).
+// The query is most likely written in the native language, so the model must translate it by MEANING
+// first and must not pick learning-language words that merely look similar ("men" ≠ "Mensch").
 // conjugation_present keys are positions: ich=1 sg, du=2 sg, er_sie_es=3 sg, wir=1 pl, ihr=2 pl, sie_Sie=3 pl.
-const searchPrompt = `Dictionary lookup. Query: "{{query}}".
-The query is either a {{target}} word, or a word in Russian, Uzbek, English or another language.
-1) Detect the query language (ISO code: de, ru, uz, en, fr, ko, ...). A Latin-script query that is a real Uzbek or English word but not a common {{target}} word is Uzbek/English (e.g. "daftar" is Uzbek "notebook", not German).
-2) If the query is not {{target}}, find the main {{target}} equivalent. Put other good {{target}} equivalents into "alternatives" (max 3, nouns with article), else [].
-3) "translation" and "example_translation" MUST be in {{trlang}}. "pronunciation" of the {{target}} word written in {{pronscript}}.
+const searchPrompt = `Bilingual dictionary lookup.
+native_language: {{native}} (the user's native language)
+learning_language: {{target}} (the language the user learns)
+Query: "{{query}}"
+
+Rules:
+1) The query is most likely written in the native language ({{native}}). First check whether it is a word of {{native}}. If it is, find its exact {{target}} equivalent BY MEANING.
+2) NEVER choose a {{target}} word because it is spelled similarly to the query or starts with the same letters.
+3) Treat the query as a {{target}} word only if it is an exact {{target}} word AND it is not a word of {{native}}. Russian or English queries are handled the same way (translate by meaning).
+4) If the query is ambiguous (a word in both {{native}} and {{target}}), return the {{native}} meaning as the main result and put the {{target}} spelling match into "alternatives". Also put other good {{target}} equivalents into "alternatives" (max 3, nouns with article). Otherwise [].
+5) "query_language": ISO code of the language you decided the query is in (e.g. {{nativecode}}, {{targetcode}}, ru, en).
+6) "translation" and "example_translation" MUST be in {{native}}. "pronunciation" of the {{target}} word written in {{pronscript}}.
+Examples for {{native}} → {{target}}: {{examples}}
 {{grammar}}
 Return ONLY this JSON (null if not applicable; "word" without article):
 {"word":"","word_type":"noun|verb|adjective|adverb|other","article":null,"plural":null,"translation":"","pronunciation":"","verb_type":null,"conjugation_present":null,"perfekt":null,"praeteritum":null,"comparative":null,"superlative":null,"example_sentence":"simple A1-A2 sentence in {{target}}","example_translation":"","alternatives":[],"query_language":""}`
+
+// Short few-shot hints (native → German) that pin down the "translate by meaning" behaviour.
+// For other learning languages the rules alone are used.
+var searchExamples = map[string]string{
+	"uz": `"men" → ich (not der Mensch); "daftar" → das Heft; "ich" (German) → ich, translation "men".`,
+	"ru": `"тетрадь" → das Heft; "я" → ich; "ich" (German) → ich, translation "я".`,
+	"en": `"notebook" → das Heft; "I" → ich; "ich" (German) → ich, translation "I".`,
+}
 
 // Per-language grammar notes; field names stay the same for every language.
 var searchGrammar = map[string]string{
@@ -55,22 +72,32 @@ const (
 	searchPrefill  = "{"
 )
 
-func buildSearchPrompt(lang, trLang, query string) string {
-	grammar, ok := searchGrammar[lang]
+// buildSearchPrompt: lang = learning language (de/en/fr/ko), native = UI/native language (uz/ru/en).
+func buildSearchPrompt(lang, native, query string) string {
+	learning := domain.Lang(lang)
+	native = domain.NormTranslationLang(native)
+	grammar, ok := searchGrammar[learning.Code]
 	if !ok {
 		grammar = searchGrammar["de"]
 	}
+	examples := "none"
+	if learning.Code == "de" {
+		examples = searchExamples[native]
+	}
 	return strings.NewReplacer(
 		"{{query}}", clean(query),
-		"{{target}}", domain.Lang(lang).NameEN,
-		"{{trlang}}", domain.TranslationLangName(trLang),
-		"{{pronscript}}", pronScript(trLang),
+		"{{target}}", learning.NameEN,
+		"{{targetcode}}", learning.Code,
+		"{{native}}", domain.TranslationLangName(native),
+		"{{nativecode}}", native,
+		"{{pronscript}}", pronScript(native),
+		"{{examples}}", examples,
 		"{{grammar}}", grammar,
 	).Replace(searchPrompt)
 }
 
 // LookupWord returns a dictionary entry for a word in the user's learning language (domain.LangFrom(ctx)).
-// The query may be in any language; translations are in domain.TranslationLangFrom(ctx).
+// The query is most likely in the native language (domain.TranslationLangFrom(ctx)); translations are in it.
 // JSON is cut out of the answer and repaired if needed; transient failures are retried once.
 func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo, error) {
 	trLang := domain.TranslationLangFrom(ctx)

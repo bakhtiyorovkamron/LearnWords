@@ -228,8 +228,8 @@
     "choose": "Tarjimani tanlang",
     "prompt": {
       "de_ru": "Tarjimani tanlang",
-      "ru_de": "{{langUz}} tilidagi so‘zni tanlang",
-      "ru_de_type": "{{langUz}}cha yozing",
+      "ru_de": "So‘zni {{langUz}} tilida tanlang",
+      "ru_de_type": "Javobni {{langUz}}cha yozing",
       "gap": "Tushib qolgan so‘zni qo‘ying"
     },
     "typePlaceholder": "So‘z {{langUz}}cha (artikli bo‘lsa, artikl bilan)",

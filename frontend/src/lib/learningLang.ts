@@ -7,8 +7,9 @@ const CONTENT: Record<LearningLang, {
   greeting: string; greetingAccent: string
   phrasePlaceholder: string; gapPlaceholder: string; pronunciationPlaceholder: string
   examples: string[]
-  // Words for i18n interpolation: ru — "немецкое слово", "на немецком", "по-немецки"; en — "German".
-  vars: { langAdj: string; langPrep: string; langAdv: string; langName: string; langCode: string }
+  // Every language must define ALL vars, otherwise i18next leaves raw "{{name}}" in the UI.
+  // ru: langAdj/langPrep/langAdv · en: langName · uz: langUz ("nemis" → "nemis tilida") · all: langCode
+  vars: { langAdj: string; langPrep: string; langAdv: string; langName: string; langCode: string; langUz: string }
 }> = {
   de: {
     greeting: 'Hallo!', greetingAccent: 'Was lernen wir heute?',
@@ -21,7 +22,7 @@ const CONTENT: Record<LearningLang, {
       'Das Wetter ist heute wunderschön, lass uns spazieren gehen.',
       'Kannst du mir bitte helfen? Ich habe mich verlaufen.',
     ],
-    vars: { langAdj: 'немецкое', langPrep: 'немецком', langAdv: 'по-немецки', langName: 'German', langCode: 'DE' },
+    vars: { langAdj: 'немецкое', langPrep: 'немецком', langAdv: 'по-немецки', langName: 'German', langCode: 'DE', langUz: 'nemis' },
   },
   en: {
     greeting: 'Hello!', greetingAccent: 'What are we learning today?',
@@ -34,7 +35,7 @@ const CONTENT: Record<LearningLang, {
       'The weather is beautiful today, let’s go for a walk.',
       'Can you help me, please? I got lost.',
     ],
-    vars: { langAdj: 'английское', langPrep: 'английском', langAdv: 'по-английски', langName: 'English', langCode: 'EN' },
+    vars: { langAdj: 'английское', langPrep: 'английском', langAdv: 'по-английски', langName: 'English', langCode: 'EN', langUz: 'ingliz' },
   },
   fr: {
     greeting: 'Bonjour !', greetingAccent: 'Qu’est-ce qu’on apprend aujourd’hui ?',

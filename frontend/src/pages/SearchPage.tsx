@@ -86,7 +86,7 @@ export function SearchPage() {
 }
 
 function WordResult({ info }: { info: WordInfo }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const learning = useLearningLang()
   const persons = PERSONS_BY_LANG[learning.code] ?? PERSONS_BY_LANG.de
@@ -125,7 +125,11 @@ function WordResult({ info }: { info: WordInfo }) {
     <article className="glass animate-rise space-y-6 p-6 md:p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="w-full min-w-0">
-          <div className="text-xs uppercase tracking-widest text-lime-300/70">{t(`search.type.${info.word_type}`)}</div>
+          {/* Label comes from the UI locale (never from the AI); no CSS uppercase — Uzbek Latin
+              "ot" turned into "OT" looked like Cyrillic "ОТ". */}
+          <div className="text-xs font-semibold tracking-wide text-lime-300/70" lang={i18n.language}>
+            {t(`search.type.${info.word_type}`, { defaultValue: t('search.type.other') })}
+          </div>
           {/* Adaptive size + wrapping: long compound words must not overflow the card. */}
           <h2 className="display font-extrabold leading-tight text-white"
             style={{ fontSize: 'clamp(1.75rem, 5vw, 3rem)', overflowWrap: 'anywhere', wordBreak: 'break-word', hyphens: 'auto' }}

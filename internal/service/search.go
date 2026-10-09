@@ -43,6 +43,15 @@ func NewSearchService(ai WordLookup, words WordExistence, contexts *ContextServi
 // NormalizeQuery is the cache key: case-insensitive, outer spaces ignored.
 func NormalizeQuery(q string) string { return strings.ToLower(strings.TrimSpace(q)) }
 
+// searchCacheVersion is bumped whenever the prompt logic changes; migrations delete older keys.
+const searchCacheVersion = "v3"
+
+// SearchCacheKey: "v3:<learning>:<native>:<normalized query>", e.g. "v3:de:uz:men".
+func SearchCacheKey(learningLang, nativeLang, query string) string {
+	return searchCacheVersion + ":" + domain.Lang(learningLang).Code + ":" +
+		domain.NormTranslationLang(nativeLang) + ":" + NormalizeQuery(query)
+}
+
 // Search returns the dictionary entry (from cache, else from AI) plus whether the word
 // is already in the user's collection.
 func (s *SearchService) Search(ctx context.Context, userID uuid.UUID, query string) (*domain.WordInfo, error) {
@@ -50,12 +59,9 @@ func (s *SearchService) Search(ctx context.Context, userID uuid.UUID, query stri
 	if query == "" || len([]rune(query)) > maxSearchQueryLen {
 		return nil, fmt.Errorf("%w: query must be 1-%d characters", domain.ErrValidation, maxSearchQueryLen)
 	}
-	// Same spelling can mean different words in different languages → language is part of the key.
-	// German keeps the old un-prefixed keys so the existing cache stays valid.
-	key := NormalizeQuery(query)
-	if lang := domain.LangFrom(ctx); lang != domain.DefaultLearningLang {
-		key = lang + ":" + key
-	}
+	// The same spelling means different words in different languages ("men" is Uzbek "I"),
+	// and the translation is written in the native language → both languages are part of the key.
+	key := SearchCacheKey(domain.LangFrom(ctx), domain.TranslationLangFrom(ctx), query)
 
 	info, hit := domain.WordInfo{}, false
 	if s.cache != nil {
