@@ -192,7 +192,16 @@
     "moveTo": "Papka:",
     "moved": "So‘z ko‘chirildi",
     "moveFailed": "Ko‘chirib bo‘lmadi",
-    "trainOn": "Qaysi so‘zlarni mashq qilish"
+    "trainOn": "Qaysi so‘zlarni mashq qilish",
+    "myFolders": "Mening papkalarim",
+    "open": "Ochish",
+    "train": "Mashq qilish",
+    "learnedOf": "{{total}} tadan {{learned}} tasi o‘rganildi",
+    "dueToday": "Bugun takrorlash: {{count}}",
+    "createHint": "Mavzu bo‘yicha o‘rganish uchun papka yarating, masalan «Ish» yoki «8-dars»",
+    "menu": "Papka menyusi",
+    "wordsCount_one": "{{count}} ta so‘z",
+    "wordsCount_other": "{{count}} ta so‘z"
   },
   "editWord": {
     "title": "Tahrirlash",

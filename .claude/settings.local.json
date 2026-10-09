@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go test *)",
+      "Bash(python3 *)",
+      "Bash(git checkout *)",
+      "Bash(node -e ' *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npm run *)",
+      "Bash(open -a Docker)",
+      "Bash(docker exec *)",
+      "Bash(go build *)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15432/learnwords?sslmode=disable\")",
+      "Bash(export JWT_SECRET=\"local-verification-secret-32-chars-minimum-ok\")",
+      "Bash(export HTTP_ADDR=\":8090\")",
+      "Bash(export AUTO_MIGRATE=\"true\")",
+      "Bash(export CORS_ORIGINS=\"http://localhost:5173\")",
+      "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/email.txt)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"scratchpad/learnwords-api\")",
+      "Bash(sleep 1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/healthz)"
+    ]
+  }
+}

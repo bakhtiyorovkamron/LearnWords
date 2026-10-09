@@ -192,7 +192,16 @@
     "moveTo": "Folder:",
     "moved": "Word moved",
     "moveFailed": "Could not move",
-    "trainOn": "Train words from"
+    "trainOn": "Train words from",
+    "myFolders": "My folders",
+    "open": "Open",
+    "train": "Train",
+    "learnedOf": "{{learned}} of {{total}} learned",
+    "dueToday": "Review today: {{count}}",
+    "createHint": "Create a folder, e.g. \u201cWork\u201d or \u201cLesson 8\u201d, to study words by topic",
+    "menu": "Folder menu",
+    "wordsCount_one": "{{count}} word",
+    "wordsCount_other": "{{count}} words"
   },
   "editWord": {
     "title": "Edit",

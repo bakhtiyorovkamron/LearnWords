@@ -1,7 +1,7 @@
 import { api, tokenStore } from './client'
 import type {
   AuthResponse, CollectionCard, CollectionPeriod, CollectionSort, CollectionStatus,
-  Context, ContextWithCards, DueCard, Folder, FolderSelection, Page, Progress, Stats, WordCard,
+  Context, ContextWithCards, DueCard, Folder, FolderList, FolderSelection, Page, Progress, Stats, WordCard,
 } from './types'
 
 export interface Credentials {
@@ -83,7 +83,7 @@ export interface WordUpdate {
 
 // Folders are optional grouping only; progress/stories/stats don't depend on them.
 export const foldersApi = {
-  list: () => api.get<{ folders: Folder[] }>('/folders').then((r) => r.data.folders),
+  list: () => api.get<FolderList>('/folders').then((r) => r.data),
   create: (name: string, color: string) => api.post<Folder>('/folders', { name, color }).then((r) => r.data),
   update: (id: string, u: { name?: string; color?: string }) => api.patch<Folder>(`/folders/${id}`, u).then((r) => r.data),
   remove: (id: string) => api.delete(`/folders/${id}`),

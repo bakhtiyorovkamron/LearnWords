@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { collectionApi } from '../api/endpoints'
@@ -16,7 +17,10 @@ const FLIP_DIRECTIONS = ['de_ru', 'ru_de'] as const
 
 export function CardsPage() {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<'review' | 'all'>('review')
+  // Deep link from a folder card on the Contexts page: ?tab=all&folder=<id|none|''>.
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState<'review' | 'all'>(params.get('tab') === 'all' ? 'all' : 'review')
+  const initialFolder = params.get('folder') ?? ''
   const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
   return (
     <div className="space-y-8">
@@ -26,7 +30,7 @@ export function CardsPage() {
             className={tab === k ? 'btn-primary' : 'btn-ghost'}>{label}</button>
         ))}
       </div>
-      {tab === 'review' ? <ReviewSession /> : <Collection />}
+      {tab === 'review' ? <ReviewSession /> : <Collection initialFolder={initialFolder} />}
     </div>
   )
 }
@@ -58,13 +62,13 @@ function Segmented<T extends string>({ value, onChange, options }: {
   )
 }
 
-function Collection() {
+function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   const { t } = useTranslation()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<CollectionStatus>('all')
   const [period, setPeriod] = useState<CollectionPeriod>('all')
   const [sort, setSort] = useState<CollectionSort>('date')
-  const [folder, setFolder] = useState('') // '' = all words (default, as before)
+  const [folder, setFolder] = useState(initialFolder) // '' = all words (default, as before)
   const [view, setView] = useState<'list' | 'flip'>(() =>
     localStorage.getItem(VIEW_KEY) === 'flip' ? 'flip' : 'list')
   const search = useDebounced(q.trim(), 300)

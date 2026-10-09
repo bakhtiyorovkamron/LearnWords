@@ -36,12 +36,26 @@ export interface WordCard {
   folder_id?: string | null // optional folder; null = no folder
 }
 
-export interface Folder {
+export interface FolderStats {
+  total: number
+  new_count: number
+  learning_count: number
+  learned_count: number
+  due_today: number
+}
+
+export interface Folder extends FolderStats {
   id: string
   name: string
   color: string
   created_at: string
-  words_count: number
+}
+
+// GET /api/folders response: the user's folders plus the "all words" / "no folder" aggregates.
+export interface FolderList {
+  all: FolderStats
+  none: FolderStats
+  folders: Folder[]
 }
 
 /** '' = all words, 'none' = words without a folder, otherwise a folder id. */

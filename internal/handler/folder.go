@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -13,7 +14,7 @@ import (
 )
 
 type FolderStore interface {
-	List(ctx context.Context, userID uuid.UUID) ([]domain.Folder, error)
+	List(ctx context.Context, userID uuid.UUID) (*domain.FolderList, error)
 	Create(ctx context.Context, userID uuid.UUID, name, color string) (*domain.Folder, error)
 	Update(ctx context.Context, userID, id uuid.UUID, name, color *string) (*domain.Folder, error)
 	Delete(ctx context.Context, userID, id uuid.UUID) error
@@ -23,7 +24,10 @@ type FolderHandler struct{ store FolderStore }
 
 func NewFolderHandler(store FolderStore) *FolderHandler { return &FolderHandler{store: store} }
 
-const maxFolders = 100
+const (
+	maxFolders       = 100
+	maxFolderNameLen = 40
+)
 
 // Colour is a short token (e.g. "amber") or a #hex value — never arbitrary CSS.
 var folderColorRe = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|[a-z]{1,15})?$`)
@@ -37,8 +41,8 @@ func (r *folderReq) validate(requireName bool) string {
 	if r.Name != nil {
 		n := strings.TrimSpace(*r.Name)
 		r.Name = &n
-		if n == "" || len([]rune(n)) > 50 {
-			return "name must be 1-50 characters"
+		if n == "" || len([]rune(n)) > maxFolderNameLen {
+			return fmt.Sprintf("name must be 1-%d characters", maxFolderNameLen)
 		}
 	} else if requireName {
 		return "name is required"
@@ -53,14 +57,26 @@ func (r *folderReq) validate(requireName bool) string {
 	return ""
 }
 
-// List handles GET /api/folders.
+// nameTaken reports whether name (case-insensitive) is already used by another of the user's
+// folders — folder names must be unique per user. excludeID is skipped (renaming to the same name).
+func nameTaken(folders []domain.Folder, name string, excludeID uuid.UUID) bool {
+	for _, f := range folders {
+		if f.ID != excludeID && strings.EqualFold(f.Name, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// List handles GET /api/folders: the user's folders (with word-progress breakdown) plus the
+// "all words" / "no folder" aggregates.
 func (h *FolderHandler) List(c *gin.Context) {
-	items, err := h.store.List(c.Request.Context(), userID(c))
+	list, err := h.store.List(c.Request.Context(), userID(c))
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"folders": items})
+	c.JSON(http.StatusOK, list)
 }
 
 // Create handles POST /api/folders {"name","color"}.
@@ -74,13 +90,17 @@ func (h *FolderHandler) Create(c *gin.Context) {
 		badRequest(c, msg)
 		return
 	}
-	existing, err := h.store.List(c.Request.Context(), userID(c))
+	list, err := h.store.List(c.Request.Context(), userID(c))
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	if len(existing) >= maxFolders {
+	if len(list.Folders) >= maxFolders {
 		badRequest(c, "too many folders")
+		return
+	}
+	if nameTaken(list.Folders, *req.Name, uuid.Nil) {
+		writeError(c, fmt.Errorf("%w: a folder with this name already exists", domain.ErrAlreadyExists))
 		return
 	}
 	color := ""
@@ -113,6 +133,17 @@ func (h *FolderHandler) Update(c *gin.Context) {
 	if req.Name == nil && req.Color == nil {
 		badRequest(c, "nothing to update")
 		return
+	}
+	if req.Name != nil {
+		list, err := h.store.List(c.Request.Context(), userID(c))
+		if err != nil {
+			writeError(c, err)
+			return
+		}
+		if nameTaken(list.Folders, *req.Name, id) {
+			writeError(c, fmt.Errorf("%w: a folder with this name already exists", domain.ErrAlreadyExists))
+			return
+		}
 	}
 	f, err := h.store.Update(c.Request.Context(), userID(c), id, req.Name, req.Color)
 	if err != nil {

@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { foldersApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import type { Folder, FolderSelection } from '../api/types'
+import type { Folder, FolderSelection, FolderStats } from '../api/types'
+import { useLearningLang } from '../lib/learningLang'
+import { STATUS_STYLE } from './ProgressDots'
 import { toast } from './Toaster'
 
 export const FOLDER_COLORS = ['lime', 'amber', 'sky', 'rose', 'violet', 'slate'] as const
@@ -17,8 +21,14 @@ export function FolderDot({ color }: { color: string }) {
   return <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${DOT[color] ?? 'bg-emerald-300'}`} />
 }
 
-export function useFolders() {
+export function useFolderList() {
   return useQuery({ queryKey: ['folders'], queryFn: foldersApi.list, staleTime: 60_000 })
+}
+
+/** Just the user's folders (no all/none aggregates) — for the dropdown/chips pickers. */
+export function useFolders() {
+  const q = useFolderList()
+  return { ...q, data: q.data?.folders }
 }
 
 const MAX_FOLDER_LABEL = 24
@@ -96,7 +106,7 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
         {folders.data?.map((f) => (
           <button key={f.id} type="button" className={chip(value === f.id)} onClick={() => onChange(f.id)} title={f.name}>
             <FolderDot color={f.color} /> <span className="max-w-[12rem] truncate">{shortFolderName(f.name)}</span>
-            <span className="text-xs opacity-60">{f.words_count}</span>
+            <span className="text-xs opacity-60">{f.total}</span>
           </button>
         ))}
         <button type="button" className={chip(value === 'none')} onClick={() => onChange('none')}>{t('folders.none')}</button>
@@ -146,7 +156,7 @@ function FolderForm({ folder, onClose, onCreated }: {
   return (
     <form className="glass flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
       onSubmit={(e) => { e.preventDefault(); if (name.trim()) save.mutate() }}>
-      <input autoFocus value={name} maxLength={50} onChange={(e) => setName(e.target.value)}
+      <input autoFocus value={name} maxLength={40} onChange={(e) => setName(e.target.value)}
         placeholder={t('folders.namePlaceholder')} className="field flex-1 py-2" />
       <div className="flex gap-1.5">
         {FOLDER_COLORS.map((c) => (
@@ -162,5 +172,186 @@ function FolderForm({ folder, onClose, onCreated }: {
       </div>
       {save.error && <p className="text-xs text-red-300">{errorMessage(save.error)}</p>}
     </form>
+  )
+}
+
+/** "+ New folder" / rename+recolour, as a small centered modal (Contexts page folder grid). */
+function FolderModal({ folder, onClose, onCreated }: {
+  folder: Folder | null; onClose: () => void; onCreated?: (f: Folder) => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return createPortal(
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-lg" role="dialog" aria-modal="true">
+        <FolderForm folder={folder} onClose={onClose} onCreated={onCreated ?? (() => {})} />
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+/** Three-segment progress bar (new/learning/learned), same colours as the Collection filter. */
+function FolderProgressBar({ stats }: { stats: FolderStats }) {
+  const { t } = useTranslation()
+  const pct = (n: number) => (stats.total ? (n / stats.total) * 100 : 0)
+  return (
+    <div>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <span className={STATUS_STYLE.new.bar} style={{ width: `${pct(stats.new_count)}%` }} />
+        <span className={STATUS_STYLE.learning.bar} style={{ width: `${pct(stats.learning_count)}%` }} />
+        <span className={STATUS_STYLE.learned.bar} style={{ width: `${pct(stats.learned_count)}%` }} />
+      </div>
+      <p className="mt-1.5 text-xs text-emerald-100/60">
+        {t('folders.learnedOf', { learned: stats.learned_count, total: stats.total })}
+      </p>
+    </div>
+  )
+}
+
+interface FolderCardData {
+  linkId: string // '' = all words, 'none' = no folder, otherwise the folder id
+  name: string
+  color?: string // real folders only; All/No-folder use `icon` instead
+  icon?: string
+  stats: FolderStats
+  locked?: boolean // All/No-folder: no rename/delete menu
+}
+
+function FolderCard({ data, onEdit, onDelete, deleting }: {
+  data: FolderCardData; onEdit?: () => void; onDelete?: () => void; deleting?: boolean
+}) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  function train() {
+    localStorage.setItem('review-folder', data.linkId)
+    navigate('/cards')
+  }
+
+  return (
+    <div className="animate-rise group relative overflow-hidden rounded-3xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/50 via-emerald-900/40 to-teal-900/40 p-5 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/10">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {data.color ? <FolderDot color={data.color} /> : <span className="text-lg leading-none">{data.icon}</span>}
+          <h3 className="truncate text-lg font-bold text-white" title={data.name}>{shortFolderName(data.name)}</h3>
+        </div>
+        {!data.locked && (
+          <div className="relative shrink-0">
+            <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label={t('folders.menu')}
+              className="grid h-8 w-8 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300">
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-9 z-20 w-40 overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-950 shadow-xl"
+                onMouseLeave={() => setMenuOpen(false)}>
+                <button type="button" onClick={() => { setMenuOpen(false); onEdit?.() }}
+                  className="block w-full px-4 py-2 text-left text-sm text-emerald-100/80 hover:bg-emerald-400/10 hover:text-white">
+                  ✏️ {t('folders.rename')}
+                </button>
+                <button type="button" disabled={deleting} onClick={() => { setMenuOpen(false); onDelete?.() }}
+                  className="block w-full px-4 py-2 text-left text-sm text-red-300/80 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-50">
+                  🗑 {t('folders.delete')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <p className="mt-1 text-xs text-emerald-100/60">{t('folders.wordsCount', { count: data.stats.total })}</p>
+
+      <div className="mt-4"><FolderProgressBar stats={data.stats} /></div>
+
+      {data.stats.due_today > 0 && (
+        <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-lime-400/15 px-3 py-1 text-xs font-semibold text-lime-300">
+          🔔 {t('folders.dueToday', { count: data.stats.due_today })}
+        </p>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        <Link to={`/cards?tab=all&folder=${encodeURIComponent(data.linkId)}`}
+          className="btn-ghost flex-1 py-2 text-center text-sm">
+          {t('folders.open')}
+        </Link>
+        <button type="button" onClick={train} className="btn-primary flex-1 py-2 text-sm">
+          {t('folders.train')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** "My folders" grid for the Contexts page: All words / No folder / user folders / + New folder. */
+export function FolderGrid() {
+  const { t } = useTranslation()
+  const learning = useLearningLang()
+  const qc = useQueryClient()
+  const list = useFolderList()
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Folder | null>(null)
+
+  const remove = useMutation({
+    mutationFn: (id: string) => foldersApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['folders'] })
+      toast(t('folders.deleted'))
+    },
+  })
+
+  if (list.isLoading) {
+    return (
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-52 animate-pulse rounded-3xl bg-emerald-800/30" />
+        ))}
+      </div>
+    )
+  }
+  if (list.error) return <p className="text-red-300">{errorMessage(list.error)}</p>
+  if (!list.data) return null
+
+  const { all, none, folders } = list.data
+
+  if (all.total === 0) {
+    return (
+      <div className="glass p-10 text-center">
+        <div className="text-5xl">🌿</div>
+        <p className="mt-3 text-emerald-100/70">{t('home.empty', learning.vars)}</p>
+        <Link to="/contexts/new" className="btn-primary mt-6">{t('home.start')}</Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <FolderCard data={{ linkId: '', name: t('folders.all'), icon: '📚', stats: all, locked: true }} />
+        <FolderCard data={{ linkId: 'none', name: t('folders.none'), icon: '📂', stats: none, locked: true }} />
+        {folders.map((f) => (
+          <FolderCard key={f.id} data={{ linkId: f.id, name: f.name, color: f.color, stats: f }}
+            onEdit={() => setEditing(f)}
+            onDelete={() => { if (window.confirm(t('folders.deleteConfirm', { name: f.name }))) remove.mutate(f.id) }}
+            deleting={remove.isPending && remove.variables === f.id} />
+        ))}
+        <button type="button" onClick={() => setCreating(true)}
+          className="flex min-h-[13rem] flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-lime-400/30 text-lime-300/80 transition hover:border-lime-400/60 hover:text-lime-300">
+          <span className="text-3xl">+</span>
+          <span className="text-sm font-semibold">{t('folders.new')}</span>
+        </button>
+      </div>
+
+      {folders.length === 0 && <p className="text-center text-sm text-emerald-100/50">{t('folders.createHint')}</p>}
+      {remove.error && <p className="text-center text-xs text-red-300">{errorMessage(remove.error)}</p>}
+
+      {(creating || editing) && (
+        <FolderModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }} />
+      )}
+    </div>
   )
 }

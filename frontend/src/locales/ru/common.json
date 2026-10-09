@@ -196,7 +196,18 @@
     "moveTo": "Папка:",
     "moved": "Слово перемещено",
     "moveFailed": "Не удалось переместить",
-    "trainOn": "Тренировать слова из"
+    "trainOn": "Тренировать слова из",
+    "myFolders": "Мои папки",
+    "open": "Открыть",
+    "train": "Тренировать",
+    "learnedOf": "{{learned}} из {{total}} выучено",
+    "dueToday": "Сегодня повторить: {{count}}",
+    "createHint": "Создайте папку, например «Работа» или «Урок 8», чтобы учить слова по темам",
+    "menu": "Меню папки",
+    "wordsCount_one": "{{count}} слово",
+    "wordsCount_few": "{{count}} слова",
+    "wordsCount_many": "{{count}} слов",
+    "wordsCount_other": "{{count}} слова"
   },
   "editWord": {
     "title": "Редактировать",
