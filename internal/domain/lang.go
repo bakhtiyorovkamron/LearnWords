@@ -52,3 +52,36 @@ func LangFrom(ctx context.Context) string {
 	}
 	return DefaultLearningLang
 }
+
+// Translation (= interface) languages: translations and example translations from AI are written
+// in the user's UI language. Russian is the default (and what all existing cards use).
+const DefaultTranslationLang = "ru"
+
+var translationLangNames = map[string]string{"ru": "Russian", "en": "English", "uz": "Uzbek (Latin script)"}
+
+// NormTranslationLang returns a supported translation language code, falling back to "ru".
+func NormTranslationLang(code string) string {
+	code = strings.ToLower(strings.TrimSpace(code))
+	if _, ok := translationLangNames[code]; ok {
+		return code
+	}
+	return DefaultTranslationLang
+}
+
+// TranslationLangName is the English name used in AI prompts.
+func TranslationLangName(code string) string { return translationLangNames[NormTranslationLang(code)] }
+
+type trLangKey struct{}
+
+// WithTranslationLang stores the language for AI translations in ctx.
+func WithTranslationLang(ctx context.Context, code string) context.Context {
+	return context.WithValue(ctx, trLangKey{}, NormTranslationLang(code))
+}
+
+// TranslationLangFrom returns the translation language from ctx ("ru" if not set).
+func TranslationLangFrom(ctx context.Context) string {
+	if v, ok := ctx.Value(trLangKey{}).(string); ok && v != "" {
+		return v
+	}
+	return DefaultTranslationLang
+}

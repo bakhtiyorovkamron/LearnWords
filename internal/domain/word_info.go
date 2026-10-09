@@ -16,6 +16,12 @@ type WordInfo struct {
 	Superlative        *string            `json:"superlative"`
 	ExampleSentence    string             `json:"example_sentence"`
 	ExampleTranslation string             `json:"example_translation"`
+	// Other words in the learning language that also match an ambiguous query (with article for nouns).
+	Alternatives []string `json:"alternatives"`
+	// Language the query was written in as detected by AI: de | ru | uz | en | ...
+	QueryLanguage string `json:"query_language"`
+	// Language of translation/example_translation (ru | en | uz), set by the backend.
+	TranslationLanguage string `json:"translation_language"`
 
 	// Filled by the backend: the word (with article for nouns) is already in the user's collection.
 	AlreadyAdded bool `json:"already_added"`

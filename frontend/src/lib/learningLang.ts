@@ -47,7 +47,7 @@ const CONTENT: Record<LearningLang, {
       'Il fait très beau aujourd’hui, allons nous promener.',
       'Pouvez-vous m’aider, s’il vous plaît ? Je me suis perdu.',
     ],
-    vars: { langAdj: 'французское', langPrep: 'французском', langAdv: 'по-французски', langName: 'French', langCode: 'FR' },
+    vars: { langAdj: 'французское', langPrep: 'французском', langAdv: 'по-французски', langName: 'French', langCode: 'FR', langUz: 'fransuz' },
   },
   ko: {
     greeting: '안녕하세요!', greetingAccent: '오늘은 무엇을 배울까요?',

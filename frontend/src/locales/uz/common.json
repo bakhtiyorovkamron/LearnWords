@@ -153,8 +153,9 @@
   "search": {
     "titleA": "So‘zlarni ",
     "titleB": "qidirish",
-    "subtitle": "Tarjima, talaffuz, shakllar va misol — {{langUz}} tilidagi so‘z yoki ruscha tarjima bo‘yicha.",
-    "placeholder": "{{langUz}} yoki rus tilida so‘z kiriting",
+    "subtitle": "Tarjima, talaffuz, shakllar va misol — {{langUz}} tilidagi so‘z yoki uning o‘zbek, rus yoki ingliz tilidagi tarjimasi bo‘yicha.",
+    "placeholder": "So‘zni {{langUz}}, o‘zbek, rus yoki ingliz tilida kiriting",
+    "alternatives": "Boshqa variantlar:",
     "find": "Topish",
     "searching": "Qidirilmoqda…",
     "failed": "So‘zni topib bo‘lmadi: {{error}}",

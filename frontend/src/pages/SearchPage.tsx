@@ -35,10 +35,11 @@ function speak(text: string, lang: string) {
 }
 
 export function SearchPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const [query, setQuery] = useState('')
-  const search = useMutation({ mutationFn: (q: string) => searchApi.search(q) })
+  // Translation comes back in the current UI language (ru/en/uz).
+  const search = useMutation({ mutationFn: (q: string) => searchApi.search(q, i18n.language) })
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -139,6 +140,12 @@ function WordResult({ info }: { info: WordInfo }) {
             )}
           </div>
           <p className="mt-3 text-xl text-emerald-100">{info.translation}</p>
+          {!!info.alternatives?.length && (
+            <p className="mt-2 text-sm text-emerald-100/60">
+              {t('search.alternatives')}{' '}
+              <span className="text-emerald-50" lang={learning.code}>{info.alternatives.join(', ')}</span>
+            </p>
+          )}
         </div>
       </header>
 

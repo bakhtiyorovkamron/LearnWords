@@ -104,13 +104,18 @@ export interface WordInfo {
   superlative: string | null
   example_sentence: string
   example_translation: string
+  alternatives?: string[]
+  query_language?: string
+  translation_language?: string
   already_added: boolean
 }
 
 export const searchApi = {
   // AI call with retries on the backend → generous timeout.
-  search: (query: string) =>
-    api.post<WordInfo>('/search-word', { query }, { timeout: 120_000 }).then((r) => r.data),
+  // translation_language = UI language (ru/en/uz): translations come back in it.
+  search: (query: string, translationLanguage: string) =>
+    api.post<WordInfo>('/search-word', { query, translation_language: translationLanguage }, { timeout: 120_000 })
+      .then((r) => r.data),
   add: (w: {
     word: string; translation: string; pronunciation: string
     example_sentence: string; example_translation: string; folder_id?: string

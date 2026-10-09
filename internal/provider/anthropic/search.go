@@ -15,35 +15,33 @@ import (
 	"learnwords/internal/domain"
 )
 
-// Compact prompt: only the JSON schema + rules. Shorter input and output = faster answer.
-const searchPromptTemplate = `Немецкое слово или русский перевод: "{{query}}". Найди немецкое слово и верни JSON строго по схеме (null — если неприменимо; word без артикля):
-{"word":"","word_type":"noun|verb|adjective|adverb|other","article":"der|die|das|null","plural":null,"translation":"перевод на русский","pronunciation":"русскими буквами","verb_type":"weak|strong|null","conjugation_present":{"ich":"","du":"","er_sie_es":"","wir":"","ihr":"","sie_Sie":""},"perfekt":"hat/ist + Partizip II","praeteritum":"3 л. ед.ч.","comparative":null,"superlative":null,"example_sentence":"","example_translation":""}
-conjugation_present/perfekt/praeteritum/verb_type — только для глаголов, comparative/superlative — для прилагательных, article/plural — для существительных. Только JSON.`
-
-// Same JSON shape for other languages, so the cache, parser and UI stay shared.
+// One compact prompt for all learning languages (same JSON shape → shared cache, parser and UI).
+// The query may be written in the learning language OR in Russian/Uzbek/English (or another
+// language): the model detects it and always returns the word in the learning language.
 // conjugation_present keys are positions: ich=1 sg, du=2 sg, er_sie_es=3 sg, wir=1 pl, ihr=2 pl, sie_Sie=3 pl.
-const searchPromptEN = `Английское слово или русский перевод: "{{query}}". Найди английское слово и верни JSON строго по схеме (null — если неприменимо; word без артикля и без "to"):
-{"word":"","word_type":"noun|verb|adjective|adverb|other","article":null,"plural":"форма мн.ч. или null","translation":"перевод на русский","pronunciation":"русскими буквами","verb_type":"regular|irregular|null","conjugation_present":{"ich":"I ...","du":"you ...","er_sie_es":"he/she/it ...","wir":"we ...","ihr":"you ...","sie_Sie":"they ..."},"perfekt":"Past Participle","praeteritum":"Past Simple","comparative":null,"superlative":null,"example_sentence":"","example_translation":""}
-conjugation_present/perfekt/praeteritum/verb_type — только для глаголов, comparative/superlative — для прилагательных, plural — для существительных. Только JSON.`
+const searchPrompt = `Dictionary lookup. Query: "{{query}}".
+The query is either a {{target}} word, or a word in Russian, Uzbek, English or another language.
+1) Detect the query language (ISO code: de, ru, uz, en, fr, ko, ...). A Latin-script query that is a real Uzbek or English word but not a common {{target}} word is Uzbek/English (e.g. "daftar" is Uzbek "notebook", not German).
+2) If the query is not {{target}}, find the main {{target}} equivalent. Put other good {{target}} equivalents into "alternatives" (max 3, nouns with article), else [].
+3) "translation" and "example_translation" MUST be in {{trlang}}. "pronunciation" of the {{target}} word written in {{pronscript}}.
+{{grammar}}
+Return ONLY this JSON (null if not applicable; "word" without article):
+{"word":"","word_type":"noun|verb|adjective|adverb|other","article":null,"plural":null,"translation":"","pronunciation":"","verb_type":null,"conjugation_present":null,"perfekt":null,"praeteritum":null,"comparative":null,"superlative":null,"example_sentence":"simple A1-A2 sentence in {{target}}","example_translation":"","alternatives":[],"query_language":""}`
 
-const searchPromptFR = `Французское слово или русский перевод: "{{query}}". Найди французское слово и верни JSON строго по схеме (null — если неприменимо; word без артикля):
-{"word":"","word_type":"noun|verb|adjective|adverb|other","article":"le|la|null","plural":"форма мн.ч. или null","translation":"перевод на русский","pronunciation":"русскими буквами","verb_type":"1|2|3 (группа) или null","conjugation_present":{"ich":"je ...","du":"tu ...","er_sie_es":"il/elle ...","wir":"nous ...","ihr":"vous ...","sie_Sie":"ils/elles ..."},"perfekt":"passé composé (j'ai/je suis + participe)","praeteritum":"imparfait (il/elle)","comparative":null,"superlative":null,"example_sentence":"","example_translation":""}
-article — le или la по роду существительного (даже если перед гласной l'). conjugation_present/perfekt/praeteritum/verb_type — только для глаголов, comparative/superlative — для прилагательных. Только JSON.`
+// Per-language grammar notes; field names stay the same for every language.
+var searchGrammar = map[string]string{
+	"de": `Nouns: article der|die|das, plural (without article). Verbs: verb_type weak|strong, conjugation_present {"ich","du","er_sie_es","wir","ihr","sie_Sie"}, perfekt "hat/ist + Partizip II", praeteritum (3rd sg). Adjectives: comparative, superlative.`,
+	"en": `No article. Nouns: plural. Verbs (word without "to"): verb_type regular|irregular, conjugation_present {"ich":"I ...","du":"you ...","er_sie_es":"he/she/it ...","wir":"we ...","ihr":"you ...","sie_Sie":"they ..."}, perfekt = Past Participle, praeteritum = Past Simple. Adjectives: comparative, superlative.`,
+	"fr": `Nouns: article le|la by gender (even before a vowel), plural. Verbs: verb_type 1|2|3 (group), conjugation_present {"ich":"je ...","du":"tu ...","er_sie_es":"il/elle ...","wir":"nous ...","ihr":"vous ...","sie_Sie":"ils/elles ..."}, perfekt = passé composé, praeteritum = imparfait (il/elle). Adjectives: comparative, superlative.`,
+	"ko": `Word in Hangul (verbs/adjectives in dictionary form ending in 다). No article, plural, conjugation_present. Verbs and adjectives: perfekt = polite past (-았어요/-었어요), praeteritum = polite present (-아요/-어요).`,
+}
 
-const searchPromptKO = `Корейское слово или русский перевод: "{{query}}". Найди корейское слово (хангыль) и верни JSON строго по схеме (null — если неприменимо):
-{"word":"слово хангылем (глаголы и прилагательные — в словарной форме на 다)","word_type":"noun|verb|adjective|adverb|other","article":null,"plural":null,"translation":"перевод на русский","pronunciation":"русскими буквами по системе Концевича","verb_type":null,"conjugation_present":null,"perfekt":"прошедшее время, вежливый стиль (-았어요/-었어요)","praeteritum":"настоящее время, вежливый стиль (-아요/-어요)","comparative":null,"superlative":null,"example_sentence":"простое предложение хангылем","example_translation":""}
-perfekt/praeteritum — только для глаголов и прилагательных. Только JSON.`
-
-func searchTemplate(lang string) string {
-	switch lang {
-	case "en":
-		return searchPromptEN
-	case "fr":
-		return searchPromptFR
-	case "ko":
-		return searchPromptKO
+// Script for the pronunciation hint: readers of a Russian UI read Cyrillic, others read Latin.
+func pronScript(trLang string) string {
+	if trLang == "ru" {
+		return "Russian Cyrillic letters"
 	}
-	return searchPromptTemplate
+	return "simple Latin letters (as an Uzbek/English speaker would read it)"
 }
 
 const (
@@ -57,15 +55,26 @@ const (
 	searchPrefill  = "{"
 )
 
-func buildSearchPrompt(lang, query string) string {
-	return strings.ReplaceAll(searchTemplate(lang), "{{query}}", clean(query))
+func buildSearchPrompt(lang, trLang, query string) string {
+	grammar, ok := searchGrammar[lang]
+	if !ok {
+		grammar = searchGrammar["de"]
+	}
+	return strings.NewReplacer(
+		"{{query}}", clean(query),
+		"{{target}}", domain.Lang(lang).NameEN,
+		"{{trlang}}", domain.TranslationLangName(trLang),
+		"{{pronscript}}", pronScript(trLang),
+		"{{grammar}}", grammar,
+	).Replace(searchPrompt)
 }
 
-// LookupWord returns a dictionary entry for a word in the user's learning language (domain.LangFrom(ctx))
-// or for its Russian translation.
+// LookupWord returns a dictionary entry for a word in the user's learning language (domain.LangFrom(ctx)).
+// The query may be in any language; translations are in domain.TranslationLangFrom(ctx).
 // JSON is cut out of the answer and repaired if needed; transient failures are retried once.
 func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo, error) {
-	prompt := buildSearchPrompt(domain.LangFrom(ctx), query)
+	trLang := domain.TranslationLangFrom(ctx)
+	prompt := buildSearchPrompt(domain.LangFrom(ctx), trLang, query)
 	var lastErr error
 	for attempt := 1; attempt <= searchAttempts; attempt++ {
 		start := time.Now()
@@ -74,6 +83,7 @@ func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo,
 		if err == nil {
 			info, perr := ParseWordInfo(text)
 			if perr == nil {
+				info.TranslationLanguage = trLang
 				return info, nil
 			}
 			slog.ErrorContext(ctx, "search-word: invalid model output", "err", perr, "raw", text)
@@ -209,6 +219,18 @@ func ParseWordInfo(s string) (domain.WordInfo, error) {
 	if w.ConjugationPresent != nil && len(*w.ConjugationPresent) == 0 {
 		w.ConjugationPresent = nil
 	}
+	w.QueryLanguage = strings.ToLower(strings.TrimSpace(w.QueryLanguage))
+	alts := make([]string, 0, len(w.Alternatives))
+	seen := map[string]bool{strings.ToLower(w.FullWord()): true, strings.ToLower(w.Word): true}
+	for _, a := range w.Alternatives {
+		a = strings.Join(strings.Fields(a), " ")
+		if a == "" || seen[strings.ToLower(a)] || len(alts) == 3 {
+			continue
+		}
+		seen[strings.ToLower(a)] = true
+		alts = append(alts, a)
+	}
+	w.Alternatives = alts
 	if w.Word == "" || w.Translation == "" {
 		return domain.WordInfo{}, errors.New("word or translation is empty")
 	}

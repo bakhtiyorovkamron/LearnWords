@@ -153,8 +153,9 @@
   "search": {
     "titleA": "Word ",
     "titleB": "search",
-    "subtitle": "Translation, pronunciation, forms and an example — by {{langName}} word or Russian translation.",
-    "placeholder": "Enter a word in {{langName}} or Russian",
+    "subtitle": "Translation, pronunciation, forms and an example — by {{langName}} word or by its translation in English, Russian or Uzbek.",
+    "placeholder": "A word in {{langName}}, English, Russian or Uzbek",
+    "alternatives": "Other options:",
     "find": "Find",
     "searching": "Searching…",
     "failed": "Could not find the word: {{error}}",

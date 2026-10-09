@@ -78,7 +78,11 @@ func (s *SearchService) Search(ctx context.Context, userID uuid.UUID, query stri
 			}
 		}
 	}
-	slog.InfoContext(ctx, "search-word", "query", key, "cache_hit", hit)
+	slog.InfoContext(ctx, "search-word", "query", key, "cache_hit", hit, "query_language", info.QueryLanguage)
+	info.TranslationLanguage = domain.TranslationLangFrom(ctx)
+	if info.Alternatives == nil {
+		info.Alternatives = []string{}
+	}
 
 	var err error
 	if info.AlreadyAdded, err = s.words.HasWord(ctx, userID, info.FullWord(), info.Word); err != nil {
