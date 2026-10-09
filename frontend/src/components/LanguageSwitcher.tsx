@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { settingsApi } from '../api/endpoints'
 import { isLanguage, LANGUAGES, type Language } from '../i18n'
 
-const FLAGS: Record<Language, string> = { ru: '🇷🇺', en: '🇬🇧' }
+const FLAGS: Record<Language, string> = { ru: '🇷🇺', en: '🇬🇧', uz: '🇺🇿' }
 
 // Header language switcher. The choice is stored in localStorage (see i18n.ts)
 // and, when logged in, in the user's profile so it follows the user across devices.

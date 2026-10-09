@@ -1,7 +1,7 @@
 {
   "common": { "unknownError": "Unknown error", "loading": "Loading…", "rateLimited": "Too many requests. Please try again in {{seconds}} s." },
   "direction": { "label": "Direction", "de_ru": "{{lang}} → RU", "ru_de": "RU → {{lang}}", "mixed": "Mixed" },
-  "lang": { "label": "Interface language", "ru": "Русский", "en": "English" },
+  "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "nav": {
     "contexts": "Contexts",
     "add": "Add",

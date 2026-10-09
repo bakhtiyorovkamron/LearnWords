@@ -36,7 +36,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		InterfaceLanguage string `json:"interface_language"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || !supportedLanguages[req.InterfaceLanguage] {
-		badRequest(c, "interface_language must be one of: ru, en")
+		badRequest(c, "interface_language must be one of: ru, en, uz")
 		return
 	}
 	if err := h.store.SetInterfaceLanguage(c.Request.Context(), userID(c), req.InterfaceLanguage); err != nil {

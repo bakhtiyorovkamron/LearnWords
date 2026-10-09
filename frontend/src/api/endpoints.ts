@@ -33,6 +33,7 @@ export const authApi = {
   async logout() {
     await api.post('/auth/logout').catch(() => undefined)
     tokenStore.set(null)
+    localStorage.removeItem('learning_language')
   },
 }
 

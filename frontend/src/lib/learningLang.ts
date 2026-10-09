@@ -60,7 +60,7 @@ const CONTENT: Record<LearningLang, {
       '오늘 날씨가 정말 좋아요. 산책하러 가요.',
       '좀 도와주시겠어요? 길을 잃었어요.',
     ],
-    vars: { langAdj: 'корейское', langPrep: 'корейском', langAdv: 'по-корейски', langName: 'Korean', langCode: 'KO' },
+    vars: { langAdj: 'корейское', langPrep: 'корейском', langAdv: 'по-корейски', langName: 'Korean', langCode: 'KO', langUz: 'koreys' },
   },
 }
 
