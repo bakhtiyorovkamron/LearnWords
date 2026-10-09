@@ -27,6 +27,7 @@ export const authApi = {
   async register(c: Credentials & { learning_language?: LearningLang }) {
     const { data } = await api.post<AuthResponse>('/auth/register', c)
     tokenStore.set(data.access_token)
+    if (c.learning_language) localStorage.setItem('learning_language', c.learning_language)
     return data
   },
   async logout() {
@@ -54,7 +55,7 @@ export const contextsApi = {
     fd.append('pronunciation', input.pronunciation ?? '')
     fd.append('example_sentence', input.exampleSentence ?? '')
     fd.append('example_translation', input.exampleTranslation ?? '')
-    fd.append('language', input.language ?? 'de')
+    if (input.language) fd.append('language', input.language) // backend uses the account language
     if (input.folderId) fd.append('folder_id', input.folderId)
     return api.post<ContextWithCards>('/contexts', fd).then((r) => r.data)
   },

@@ -64,11 +64,18 @@ const CONTENT: Record<LearningLang, {
   },
 }
 
-// The language the current user learns (from /api/me, chosen at registration). Defaults to German.
+const LS_KEY = 'learning_language'
+const isLang = (v: string | null): v is LearningLang => !!v && v in CONTENT
+
+// The language the current user learns (from /api/me, chosen at registration).
+// The last known value is cached in localStorage so the UI never flashes "DE" while /api/me loads.
 // `vars` must be passed to t() for strings that mention the language: t('key', learning.vars).
 export function useLearningLang() {
   const me = useQuery({ queryKey: ['me'], queryFn: meApi.get, staleTime: 5 * 60_000 })
-  const code: LearningLang = me.data?.learning_language ?? 'de'
+  const fromServer = me.data?.learning_language
+  if (fromServer && localStorage.getItem(LS_KEY) !== fromServer) localStorage.setItem(LS_KEY, fromServer)
+  const cached = localStorage.getItem(LS_KEY)
+  const code: LearningLang = fromServer ?? (isLang(cached) ? cached : 'de')
   const info = LEARNING_LANGS.find((l) => l.code === code) ?? LEARNING_LANGS[0]
   return { ...info, ...CONTENT[code], code, ready: !me.isLoading }
 }

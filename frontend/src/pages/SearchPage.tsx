@@ -194,9 +194,9 @@ function WordResult({ info }: { info: WordInfo }) {
       {info.word_type === 'adjective' && (info.comparative || info.superlative) && (
         <section>
           <h3 className="mb-1 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.degrees')}</h3>
-          {row('Positiv', info.word)}
-          {row('Komparativ', info.comparative)}
-          {row('Superlativ', info.superlative)}
+          {row(t('search.positive'), info.word)}
+          {row(t('search.comparative'), info.comparative)}
+          {row(t('search.superlative'), info.superlative)}
         </section>
       )}
 

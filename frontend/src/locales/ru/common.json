@@ -1,6 +1,6 @@
 {
   "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…", "rateLimited": "Слишком много запросов. Попробуйте через {{seconds}} сек." },
-  "direction": { "label": "Направление", "de_ru": "DE → RU", "ru_de": "RU → DE", "mixed": "Смешанно" },
+  "direction": { "label": "Направление", "de_ru": "{{lang}} → RU", "ru_de": "RU → {{lang}}", "mixed": "Смешанно" },
   "lang": { "label": "Язык интерфейса", "ru": "Русский", "en": "English" },
   "nav": {
     "contexts": "Контексты",
@@ -169,6 +169,9 @@
     "weak": "слабый глагол",
     "present": "Настоящее время",
     "degrees": "Степени сравнения",
+    "positive": "Положительная",
+    "comparative": "Сравнительная",
+    "superlative": "Превосходная",
     "example": "Пример",
     "add": "Добавить в свою коллекцию",
     "adding": "Добавляем…",
