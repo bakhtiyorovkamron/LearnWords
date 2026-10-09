@@ -7,6 +7,9 @@ type WordInfo struct {
 	Article            *string            `json:"article"`
 	Plural             *string            `json:"plural"`
 	Translation        string             `json:"translation"`
+	// Note is an optional grammatical/usage remark in the native language (e.g. "imperative
+	// mood", "informal"). Explanations like this must never be appended to Translation itself.
+	Note               *string            `json:"note"`
 	Pronunciation      string             `json:"pronunciation"`
 	VerbType           *string            `json:"verb_type"` // weak | strong
 	ConjugationPresent *map[string]string `json:"conjugation_present"`

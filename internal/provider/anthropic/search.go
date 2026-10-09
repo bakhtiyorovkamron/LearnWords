@@ -61,16 +61,19 @@ var resolveHints = map[string]string{
 // cardPrompt asks for the rest of the dictionary card once the target-language word is already known.
 const cardPrompt = `Dictionary card for the {{target}} word "{{word}}"{{articleNote}}, for a learner whose native language is {{native}}.
 Fill in the fields below for exactly this word and meaning (the original query was in: {{querylang}}). Do not translate a different word and do not change "word".
-"translation" and "example_translation" MUST be written in {{native}}. "pronunciation" of the {{target}} word, written in {{pronscript}}.
+"translation" MUST contain ONLY the short {{native}} equivalent (1-4 words) — NO parentheses, NO grammatical comments ("imperative", "informal", ...), NO language names, nothing but the bare translation. Any such remark goes into the separate "note" field instead (in {{native}}; null if there is nothing to add).
+"example_translation" is the plain {{native}} translation of the example sentence, with the same rule: no parentheses or comments mixed in.
+"pronunciation" of the {{target}} word, written in {{pronscript}}.
 "example_sentence" MUST be a simple A1-A2 sentence written ENTIRELY in {{target}} — no {{native}} or English words mixed in, no parentheses or notes — and it must contain the word.
 {{grammar}}
 Return ONLY this JSON ("word" unchanged, null if not applicable):
-{"word":"{{word}}","word_type":"noun|verb|adjective|adverb|other","plural":null,"verb_type":null,"conjugation_present":null,"perfekt":null,"praeteritum":null,"comparative":null,"superlative":null,"translation":"","pronunciation":"","example_sentence":"","example_translation":""}`
+{"word":"{{word}}","word_type":"noun|verb|adjective|adverb|other","plural":null,"verb_type":null,"conjugation_present":null,"perfekt":null,"praeteritum":null,"comparative":null,"superlative":null,"translation":"","note":null,"pronunciation":"","example_sentence":"","example_translation":""}`
 
-// reinforceCard is appended on the retry after the example sentence failed validation
-// (it mixed in native-language/English text or contained a parenthetical note).
+// reinforceCard is appended on the retry after the card failed validation: either the example
+// sentence mixed in another language/a parenthetical note, or an explanation leaked into
+// "translation"/"example_translation" instead of going into the separate "note" field.
 const reinforceCard = `
-IMPORTANT: your previous "example_sentence" was not clean {{target}}-only text (it mixed in another language or contained a parenthetical note). Write a new A1-A2 sentence using only {{target}} words this time.`
+IMPORTANT: your previous answer put an explanation in "translation" or "example_sentence"/"example_translation" (parentheses, a grammar comment, a language name). "translation" must be ONLY the bare {{target}}→{{native}} equivalent; move any remark to "note". Write a new, clean answer this time.`
 
 // Per-language grammar notes; field names stay the same for every language.
 var searchGrammar = map[string]string{
@@ -168,9 +171,18 @@ func validateResolution(w domain.WordInfo, targetCode, query string) error {
 	return nil
 }
 
-// validateCard rejects an example sentence that isn't clean target-language text: a parenthetical
-// note, or a sentence that is actually still written in the original (native) query language.
+// validateCard rejects a card whose text fields are not clean: an explanation leaked into
+// "translation"/"example_translation" (the production bug — e.g. "sen (odam bilan rasmiy
+// bo'lmagan o'zbek tili)" or "будь здоров (повелительное наклонение)" instead of a bare
+// translation), a parenthetical note in the example sentence, or an example sentence that is
+// actually still written in the original (native) query language.
 func validateCard(card domain.WordInfo, targetCode, query string, resolved domain.WordInfo) error {
+	if strings.ContainsAny(card.Translation, "()") {
+		return fmt.Errorf("translation contains an explanation: %q", card.Translation)
+	}
+	if strings.ContainsAny(card.ExampleTranslation, "()") {
+		return fmt.Errorf("example_translation contains an explanation: %q", card.ExampleTranslation)
+	}
 	if strings.ContainsAny(card.ExampleSentence, "()") {
 		return fmt.Errorf("example_sentence contains a parenthetical note: %q", card.ExampleSentence)
 	}
@@ -407,6 +419,7 @@ func normalizeWordInfo(w domain.WordInfo) domain.WordInfo {
 			w.Article = &a
 		}
 	}
+	w.Note = normNull(w.Note)
 	w.Plural = normNull(w.Plural)
 	w.VerbType = normNull(w.VerbType)
 	w.Perfekt = normNull(w.Perfekt)

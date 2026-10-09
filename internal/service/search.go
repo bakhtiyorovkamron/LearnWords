@@ -46,9 +46,11 @@ func NormalizeQuery(q string) string { return strings.ToLower(strings.TrimSpace(
 // searchCacheVersion is bumped whenever the prompt logic changes; migrations delete older keys.
 // v4: two-step lookup (Sonnet resolves the word, Haiku assembles the card) + server-side
 // validation, fixing native-language words (e.g. Uzbek "sen") leaking into "word" unresolved.
-const searchCacheVersion = "v4"
+// v5: "translation"/"example_translation" validated against parenthetical explanations
+// (e.g. "sen (odam bilan rasmiy bo'lmagan o'zbek tili)"); such remarks now go into "note".
+const searchCacheVersion = "v5"
 
-// SearchCacheKey: "v4:<learning>:<native>:<normalized query>", e.g. "v4:de:uz:men".
+// SearchCacheKey: "v5:<learning>:<native>:<normalized query>", e.g. "v5:de:uz:men".
 func SearchCacheKey(learningLang, nativeLang, query string) string {
 	return searchCacheVersion + ":" + domain.Lang(learningLang).Code + ":" +
 		domain.NormTranslationLang(nativeLang) + ":" + NormalizeQuery(query)

@@ -36,8 +36,14 @@ func TestBuildResolvePrompt_NativeFirst(t *testing.T) {
 	}
 
 	card := buildCardPrompt("de", "ru", domain.WordInfo{Word: "Heft", Article: strPtr("das")}, false)
-	if !strings.Contains(card, `"translation" and "example_translation" MUST be written in Russian`) {
-		t.Errorf("card prompt missing native-language translation rule:\n%s", card)
+	for _, want := range []string{
+		`"translation" MUST contain ONLY the short Russian equivalent`,
+		"NO parentheses, NO grammatical comments",
+		"goes into the separate \"note\" field",
+	} {
+		if !strings.Contains(card, want) {
+			t.Errorf("card prompt missing %q:\n%s", want, card)
+		}
 	}
 	if !strings.Contains(card, "Russian Cyrillic letters") {
 		t.Error("ru native should ask for Cyrillic pronunciation")
@@ -114,6 +120,30 @@ func TestValidateCard(t *testing.T) {
 	}
 }
 
+// Offline: the production bug — an explanation leaks into "translation"/"example_translation"
+// instead of a bare equivalent — must be rejected, with "note" left as the place for it.
+func TestValidateCard_RejectsExplanationInTranslation(t *testing.T) {
+	resolved := domain.WordInfo{Word: "du", QueryLanguage: "uz"}
+	bug := domain.WordInfo{Translation: "sen (odam bilan rasmiy bo'lmagan o'zbek tili)", ExampleSentence: "Du bist nett."}
+	if err := validateCard(bug, "de", "sen", resolved); err == nil {
+		t.Error("expected error: translation contains an explanation")
+	}
+	deResolved := domain.WordInfo{Word: "sei gesund", QueryLanguage: "de"}
+	bugRu := domain.WordInfo{Translation: "будь здоров (повелительное наклонение)", ExampleSentence: "Sei gesund."}
+	if err := validateCard(bugRu, "de", "sei gesund", deResolved); err == nil {
+		t.Error("expected error: translation contains an explanation")
+	}
+	bugExampleTr := domain.WordInfo{Translation: "sen", ExampleSentence: "Du bist nett.", ExampleTranslation: "sen juda yaxshisan (do'stona)"}
+	if err := validateCard(bugExampleTr, "de", "sen", resolved); err == nil {
+		t.Error("expected error: example_translation contains an explanation")
+	}
+	note := "imperative mood"
+	clean := domain.WordInfo{Translation: "будь здоров", Note: &note, ExampleSentence: "Sei gesund."}
+	if err := validateCard(clean, "de", "sei gesund", deResolved); err != nil {
+		t.Errorf("clean translation with a separate note was rejected: %v", err)
+	}
+}
+
 // Live (calls the real API): run with
 //
 //	ANTHROPIC_API_KEY=... go test ./internal/provider/anthropic -run Live -v
@@ -176,9 +206,46 @@ func TestLookupWord_Live_UzToDe(t *testing.T) {
 				t.Errorf("translation_language = %q", w.TranslationLanguage)
 			}
 			for _, ch := range []string{"(", ")"} {
-				if strings.Contains(w.ExampleSentence, ch) || strings.ContainsAny(strings.Join(w.Alternatives, ""), ch) {
-					t.Errorf("example_sentence/alternatives contain an explanation: %q, %v", w.ExampleSentence, w.Alternatives)
+				if strings.Contains(w.ExampleSentence, ch) || strings.ContainsAny(strings.Join(w.Alternatives, ""), ch) ||
+					strings.Contains(w.Translation, ch) || strings.Contains(w.ExampleTranslation, ch) {
+					t.Errorf("a text field contains an explanation: translation=%q example_translation=%q example_sentence=%q alts=%v",
+						w.Translation, w.ExampleTranslation, w.ExampleSentence, w.Alternatives)
 				}
+			}
+		})
+	}
+}
+
+// Live: "translation" must be a bare word, with no parenthetical explanation, for the same
+// query across every native language — the exact shape of the production bug report.
+func TestLookupWord_Live_TranslationNoExplanation(t *testing.T) {
+	key := os.Getenv("ANTHROPIC_API_KEY")
+	if key == "" {
+		t.Skip("ANTHROPIC_API_KEY not set")
+	}
+	c := New(key, "")
+	cases := []struct {
+		native, query, wantTranslation string
+	}{
+		{"uz", "du", "sen"},
+		{"ru", "du", "ты"},
+		{"en", "du", "you"},
+		{"uz", "ich", "men"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.native+"/"+tc.query, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			ctx = domain.WithTranslationLang(domain.WithLang(ctx, "de"), tc.native)
+			w, err := c.LookupWord(ctx, tc.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.ContainsAny(w.Translation, "()") {
+				t.Errorf("translation = %q, contains an explanation", w.Translation)
+			}
+			if !strings.EqualFold(strings.TrimSpace(w.Translation), tc.wantTranslation) {
+				t.Errorf("translation = %q, want %q", w.Translation, tc.wantTranslation)
 			}
 		})
 	}
