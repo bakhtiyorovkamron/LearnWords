@@ -13,22 +13,23 @@ import (
 )
 
 type RouterDeps struct {
-	ServiceName string
-	CORSOrigins []string
-	Tokens      service.TokenManager
-	Auth        *AuthHandler
-	Contexts    *ContextHandler
-	Review      *ReviewHandler
-	Stats       *StatsHandler
-	Stories     *StoryHandler
-	Settings    *SettingsHandler
-	Admin       *AdminHandler
-	Collection  *CollectionHandler
-	WordEdit    *WordEditHandler
-	Folders     *FolderHandler
-	Search      *SearchHandler
-	UserStatus  UserStatusStore
-	HealthCheck func() error
+	ServiceName  string
+	CORSOrigins  []string
+	Tokens       service.TokenManager
+	Auth         *AuthHandler
+	Contexts     *ContextHandler
+	Review       *ReviewHandler
+	Stats        *StatsHandler
+	Stories      *StoryHandler
+	Settings     *SettingsHandler
+	Admin        *AdminHandler
+	Collection   *CollectionHandler
+	WordEdit     *WordEditHandler
+	Folders      *FolderHandler
+	Search       *SearchHandler
+	Translations *TranslationHandler
+	UserStatus   UserStatusStore
+	HealthCheck  func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
 	Ctx context.Context
 }
@@ -56,8 +57,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	searchLimit := RateLimitByUser(NewRateLimiter(ctx, "search", aiPerUserPerMin, time.Minute))
 	exampleLimit := RateLimitByUser(NewRateLimiter(ctx, "example", aiPerUserPerMin, time.Minute))
 	storyLimit := RateLimitByUser(NewRateLimiter(ctx, "story", storyPerUserPerMin, time.Minute))
+	translateLimit := RateLimitByUser(NewRateLimiter(ctx, "translate", aiPerUserPerMin, time.Minute))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
-		"/api/search-word", "/api/words/generate-example", "/api/stories/generate")
+		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations")
 
 	r.Use(
 		Recovery(),
@@ -111,6 +113,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
 		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)
+		protected.POST("/translations", translateLimit, d.Translations.Batch)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
 		protected.GET("/stats", d.Stats.Get)

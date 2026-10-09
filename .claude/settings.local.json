@@ -22,7 +22,25 @@
       "Bash(pkill -f \"scratchpad/learnwords-api\")",
       "Bash(sleep 1)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/healthz)",
-      "Bash(echo \"tsc EXIT=$?\")"
+      "Bash(echo \"tsc EXIT=$?\")",
+      "Bash(gofmt -l ./internal/...)",
+      "Bash(gofmt -w ./internal/handler/router.go ./internal/handler/translation.go ./internal/service/translation.go ./internal/repository/postgres/word_translation.go ./internal/provider/anthropic/translate.go)",
+      "Bash(gofmt -l ./internal/)",
+      "Bash(gofmt -w ./internal/handler/router.go)",
+      "Bash(cd *)",
+      "Bash(gofmt -w ./internal/domain/word_info.go ./internal/provider/anthropic/search_lang_test.go)",
+      "Bash(gofmt -w ./cmd/api/main.go)",
+      "Bash(node /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/i18n-diff.mjs)",
+      "Bash(go vet *)",
+      "Bash(docker run *)",
+      "Bash(echo BUILD_OK)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15433/learnwords?sslmode=disable\")",
+      "Bash(export HTTP_ADDR=\":8091\")",
+      "Bash(export GIN_MODE=\"release\")",
+      "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api)",
+      "Bash(docker stop *)",
+      "Bash(docker rm *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8091/healthz)"
     ]
   }
 }

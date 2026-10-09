@@ -2,10 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { LEARNING_LANGS, meApi, type LearningLang } from '../api/endpoints'
 
 // Per-language learning content shown in the UI (sample phrases, placeholders, greetings).
-// This is learning content in the target language, so it is not part of i18n.
+// This is learning content in the target language, so it is not part of i18n — it is the SAME
+// for every interface language (a Russian-, English- and Uzbek-interface user learning German
+// all see "Hallo! Was lernen wir heute?" and the "Deutsch lernen — Wort für Wort 🌿" footer).
 const CONTENT: Record<LearningLang, {
   greeting: string; greetingAccent: string
   phrasePlaceholder: string; gapPlaceholder: string; pronunciationPlaceholder: string
+  tagline: string // footer, e.g. "Deutsch lernen — Wort für Wort 🌿"
   examples: string[]
   // Every language must define ALL vars, otherwise i18next leaves raw "{{name}}" in the UI.
   // ru: langAdj/langPrep/langAdv · en: langName · uz: langUz ("nemis" → "nemis tilida") · all: langCode
@@ -16,6 +19,7 @@ const CONTENT: Record<LearningLang, {
     phrasePlaceholder: 'z. B. „Ich freue mich schon auf das Wochenende!“',
     gapPlaceholder: 'Ich esse eine ___.',
     pronunciationPlaceholder: '[ихь]',
+    tagline: 'Deutsch lernen — Wort für Wort 🌿',
     examples: [
       'Guten Morgen! Wie geht es dir heute?',
       'Ich hätte gern einen Kaffee mit Milch, bitte.',
@@ -29,6 +33,7 @@ const CONTENT: Record<LearningLang, {
     phrasePlaceholder: 'e.g. “I’m really looking forward to the weekend!”',
     gapPlaceholder: 'I eat an ___ every day.',
     pronunciationPlaceholder: '[хэ́лоу]',
+    tagline: 'Learning English — word by word 🌿',
     examples: [
       'Good morning! How are you today?',
       'I would like a coffee with milk, please.',
@@ -42,6 +47,7 @@ const CONTENT: Record<LearningLang, {
     phrasePlaceholder: 'p. ex. « J’ai hâte d’être au week-end ! »',
     gapPlaceholder: 'Je mange une ___.',
     pronunciationPlaceholder: '[бонжу́р]',
+    tagline: 'Apprendre le français — mot par mot 🌿',
     examples: [
       'Bonjour ! Comment ça va aujourd’hui ?',
       'Je voudrais un café au lait, s’il vous plaît.',
@@ -55,6 +61,7 @@ const CONTENT: Record<LearningLang, {
     phrasePlaceholder: '예: “주말이 정말 기다려져요!”',
     gapPlaceholder: '저는 매일 ___을 먹어요.',
     pronunciationPlaceholder: '[аннёнхасэё]',
+    tagline: '한국어 배우기 — 한 단어씩 🌿',
     examples: [
       '좋은 아침이에요! 오늘 어떻게 지내요?',
       '우유 넣은 커피 한 잔 주세요.',

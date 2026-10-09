@@ -72,24 +72,47 @@ export function buildQueue(cards: DueCard[], direction: Direction = 'mixed'): Qu
   return items
 }
 
-/** Correct answer + 2 random distinct wrong ones taken from the user's other cards. */
-export function buildOptions(item: QuizItem, pool: WordCard[]) {
+/**
+ * Up to 2 other cards to use as wrong answers, picked for being distinct from the right one.
+ * Selection itself uses whatever text is already loaded locally (the learning-language word for
+ * 'ru_de'/'ru_de_type', the card's own already-stored translation for 'de_ru' — good enough for
+ * picking diverse-looking distractors). What is actually SHOWN still goes through buildOptions,
+ * which — for 'de_ru' — looks up each card's translation in the user's current native language
+ * instead of reusing that stored value (it may be in a different language entirely).
+ */
+export function pickDistractors(item: QuizItem, pool: WordCard[]): { cards: WordCard[]; lacking: boolean } {
   const pick = (c: WordCard) => (item.format === 'de_ru' ? c.translation : firstVariant(c.word)).trim()
   const right = pick(item.card)
   const seen = new Set([right.toLowerCase()])
-  const wrong: string[] = []
+  const cards: WordCard[] = []
   for (const c of shuffle(pool)) {
     const v = pick(c)
     if (!v || c.id === item.card.id || seen.has(v.toLowerCase())) continue
     seen.add(v.toLowerCase())
-    wrong.push(v)
-    if (wrong.length === 2) break
+    cards.push(c)
+    if (cards.length === 2) break
   }
-  const lacking = wrong.length < 2
-  while (wrong.length < 2) wrong.push('—')
+  return { cards, lacking: cards.length < 2 }
+}
+
+/**
+ * Builds the final answer options for 'de_ru'/'ru_de'/'gap'. `translated` maps a word id to its
+ * translation in the user's current native language — required for 'de_ru' (the options ARE
+ * translations); ignored for the other formats (the options are learning-language words/the
+ * sentence's own gap-filler, unaffected by the interface language).
+ */
+export function buildOptions(item: QuizItem, distractors: WordCard[], translated: Record<string, string> = {}) {
+  const text = (c: WordCard) => (item.format === 'de_ru' ? (translated[c.id] ?? '').trim() : firstVariant(c.word).trim())
+  const right = text(item.card)
+  const wrong = distractors.map(text)
+  const lacking = distractors.length < 2 || wrong.some((w) => !w) || !right
+  while (wrong.length < 2) wrong.push('')
   return {
     lacking,
-    options: shuffle([{ text: right, correct: true }, ...wrong.map((text) => ({ text, correct: false }))]),
+    options: shuffle([
+      { text: right || '—', correct: true },
+      ...wrong.map((t) => ({ text: t || '—', correct: false })),
+    ]),
   }
 }
 

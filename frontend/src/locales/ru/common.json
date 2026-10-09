@@ -1,6 +1,6 @@
 {
   "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…", "rateLimited": "Слишком много запросов. Попробуйте через {{seconds}} сек." },
-  "direction": { "label": "Направление", "de_ru": "{{lang}} → RU", "ru_de": "RU → {{lang}}", "mixed": "Смешанно" },
+  "direction": { "label": "Направление", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Смешанно" },
   "lang": { "label": "Язык интерфейса", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "nav": {
     "contexts": "Контексты",

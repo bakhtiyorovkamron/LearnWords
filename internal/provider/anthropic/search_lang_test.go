@@ -158,7 +158,7 @@ func TestLookupWord_Live_UzToDe(t *testing.T) {
 	c := New(key, "")
 	cases := []struct {
 		native, query, want string
-		wantTranslation      string // substring, lower-case; "" = don't check
+		wantTranslation     string // substring, lower-case; "" = don't check
 	}{
 		{"uz", "sen", "du", "sen"},
 		{"uz", "men", "ich", "men"},

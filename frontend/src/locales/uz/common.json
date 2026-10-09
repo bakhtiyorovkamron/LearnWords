@@ -1,6 +1,6 @@
 {
   "common": { "unknownError": "Noma’lum xato", "loading": "Yuklanmoqda…", "rateLimited": "So‘rovlar juda ko‘p. {{seconds}} soniyadan keyin urinib ko‘ring." },
-  "direction": { "label": "Yo‘nalish", "de_ru": "{{lang}} → RU", "ru_de": "RU → {{lang}}", "mixed": "Aralash" },
+  "direction": { "label": "Yo‘nalish", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Aralash" },
   "lang": { "label": "Interfeys tili", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "nav": {
     "contexts": "Kontekstlar",

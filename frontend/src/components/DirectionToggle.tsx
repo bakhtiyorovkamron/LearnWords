@@ -12,15 +12,18 @@ export function useStoredChoice<T extends string>(key: string, allowed: readonly
   return [value, setValue] as const
 }
 
-/** Segmented "KO → RU / RU → KO [/ Смешанно]" toggle; the code is the user's learning language.
- *  Internal keys stay de_ru / ru_de and mean "learning language → RU" / "RU → learning language". */
+/** Segmented "DE → UZ / UZ → DE [/ Aralash]" toggle; the learning-language code comes from the
+ *  account, the native-language code from the current UI language — neither is baked into the
+ *  locale strings (direction.de_ru/ru_de are just "{{lang}} → {{native}}" templates).
+ *  Internal keys stay de_ru / ru_de and mean "learning language → native" / "native → learning". */
 export function DirectionToggle<T extends string>({ value, onChange, options }: {
   value: T
   onChange: (v: T) => void
   options: readonly T[]
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const lang = useLearningLang().vars.langCode
+  const native = i18n.language.toUpperCase()
   return (
     <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-1"
       role="radiogroup" aria-label={t('direction.label')}>
@@ -29,7 +32,7 @@ export function DirectionToggle<T extends string>({ value, onChange, options }: 
           className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
             value === k ? 'bg-lime-400 text-emerald-950 shadow' : 'text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white'
           }`}>
-          {t(`direction.${k}`, { lang })}
+          {t(`direction.${k}`, { lang, native })}
         </button>
       ))}
     </div>

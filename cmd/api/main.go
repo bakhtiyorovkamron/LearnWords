@@ -76,17 +76,20 @@ func run() error {
 		TTS:         mock.TTS{},
 		Storage:     mock.NewStorage(),
 	}
-	// AI: example sentences + daily stories + word search, enabled only when the key is provided via environment.
+	// AI: example sentences + daily stories + word search + on-demand translation, enabled only
+	// when the key is provided via environment.
 	var storyGen service.StoryGenerator
 	var wordLookup service.WordLookup
+	var wordTranslator service.WordTranslator
 
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 		ai := anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
 		providers.Examples = ai
 		storyGen = ai
 		wordLookup = ai
+		wordTranslator = ai
 	} else {
-		slog.Warn("ANTHROPIC_API_KEY is not set: example, story and word search generation are disabled")
+		slog.Warn("ANTHROPIC_API_KEY is not set: example, story, word search and translation generation are disabled")
 	}
 
 	// Services
@@ -116,22 +119,23 @@ func run() error {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := handler.NewRouter(handler.RouterDeps{
-		ServiceName: cfg.ServiceName,
-		CORSOrigins: cfg.CORSOrigins,
-		Tokens:      tokens,
-		Auth:        handler.NewAuthHandler(authSvc, cfg.CookieSecure),
-		Contexts:    handler.NewContextHandler(contextSvc),
-		Review:      handler.NewReviewHandler(service.NewReviewService(postgres.NewReviewRepository(pool))),
-		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
-		Stories:     handler.NewStoryHandler(storySvc),
-		Settings:    handler.NewSettingsHandler(userRepo),
-		Admin:       handler.NewAdminHandler(adminRepo, userRepo),
-		Collection:  handler.NewCollectionHandler(cardRepo),
-		WordEdit:    handler.NewWordEditHandler(cardRepo),
-		Folders:     handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
-		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
-		UserStatus:  adminRepo,
-		Ctx:         ctx,
+		ServiceName:  cfg.ServiceName,
+		CORSOrigins:  cfg.CORSOrigins,
+		Tokens:       tokens,
+		Auth:         handler.NewAuthHandler(authSvc, cfg.CookieSecure),
+		Contexts:     handler.NewContextHandler(contextSvc),
+		Review:       handler.NewReviewHandler(service.NewReviewService(postgres.NewReviewRepository(pool))),
+		Stats:        handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
+		Stories:      handler.NewStoryHandler(storySvc),
+		Settings:     handler.NewSettingsHandler(userRepo),
+		Admin:        handler.NewAdminHandler(adminRepo, userRepo),
+		Collection:   handler.NewCollectionHandler(cardRepo),
+		WordEdit:     handler.NewWordEditHandler(cardRepo),
+		Folders:      handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
+		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
+		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
+		UserStatus:   adminRepo,
+		Ctx:          ctx,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

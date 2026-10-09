@@ -2,11 +2,11 @@ package domain
 
 // WordInfo is the AI "dictionary entry" for a searched word (not stored as such).
 type WordInfo struct {
-	Word               string             `json:"word"`
-	WordType           string             `json:"word_type"` // noun | verb | adjective | adverb | other
-	Article            *string            `json:"article"`
-	Plural             *string            `json:"plural"`
-	Translation        string             `json:"translation"`
+	Word        string  `json:"word"`
+	WordType    string  `json:"word_type"` // noun | verb | adjective | adverb | other
+	Article     *string `json:"article"`
+	Plural      *string `json:"plural"`
+	Translation string  `json:"translation"`
 	// Note is an optional grammatical/usage remark in the native language (e.g. "imperative
 	// mood", "informal"). Explanations like this must never be appended to Translation itself.
 	Note               *string            `json:"note"`
