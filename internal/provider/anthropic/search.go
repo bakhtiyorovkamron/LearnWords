@@ -9,41 +9,68 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"learnwords/internal/domain"
 )
 
-// One compact prompt for all learning languages (same JSON shape → shared cache, parser and UI).
+// Word lookup is split into two model calls:
+//  1. resolveWord (Sonnet) decides what language the query is in and what the exact
+//     learning-language word is. This is the hard, error-prone part — Haiku was found to
+//     mis-translate short native-language function words (pronouns like Uzbek "sen"/"u"),
+//     returning them unchanged instead of the German equivalent.
+//  2. assembleCard (Haiku) fills in the rest of the dictionary card (grammar, translation,
+//     pronunciation, example sentence) for the word already resolved by step 1. This is cheap
+//     formatting work that Haiku handles reliably once it isn't also asked to disambiguate languages.
+//
 // The user has a NATIVE language (the UI language: uz/ru/en) and a LEARNING language (de/en/fr/ko).
-// The query is most likely written in the native language, so the model must translate it by MEANING
-// first and must not pick learning-language words that merely look similar ("men" ≠ "Mensch").
 // conjugation_present keys are positions: ich=1 sg, du=2 sg, er_sie_es=3 sg, wir=1 pl, ihr=2 pl, sie_Sie=3 pl.
-const searchPrompt = `Bilingual dictionary lookup.
+const resolvePrompt = `Translate a dictionary query between two languages.
 native_language: {{native}} (the user's native language)
-learning_language: {{target}} (the language the user learns)
+learning_language: {{target}} (the language the user is learning)
 Query: "{{query}}"
 
+Decide what the query means and return its {{target}} equivalent.
 Rules:
-1) The query is most likely written in the native language ({{native}}). First check whether it is a word of {{native}}. If it is, find its exact {{target}} equivalent BY MEANING.
-2) NEVER choose a {{target}} word because it is spelled similarly to the query or starts with the same letters.
-3) Treat the query as a {{target}} word only if it is an exact {{target}} word AND it is not a word of {{native}}. Russian or English queries are handled the same way (translate by meaning).
-4) If the query is ambiguous (a word in both {{native}} and {{target}}), return the {{native}} meaning as the main result and put the {{target}} spelling match into "alternatives". Also put other good {{target}} equivalents into "alternatives" (max 3, nouns with article). Otherwise [].
-5) "query_language": ISO code of the language you decided the query is in (e.g. {{nativecode}}, {{targetcode}}, ru, en).
-6) "translation" and "example_translation" MUST be in {{native}}. "pronunciation" of the {{target}} word written in {{pronscript}}.
-Examples for {{native}} → {{target}}: {{examples}}
-{{grammar}}
-Return ONLY this JSON (null if not applicable; "word" without article):
-{"word":"","word_type":"noun|verb|adjective|adverb|other","article":null,"plural":null,"translation":"","pronunciation":"","verb_type":null,"conjugation_present":null,"perfekt":null,"praeteritum":null,"comparative":null,"superlative":null,"example_sentence":"simple A1-A2 sentence in {{target}}","example_translation":"","alternatives":[],"query_language":""}`
+1) The query is most likely a {{native}} word. Check this first. If it is, translate it BY MEANING to {{target}} — this includes personal pronouns, question words and other short function words, which must be translated too, never copied as-is.
+2) Only treat the query as a {{target}} word if it is an exact, correctly spelled {{target}} word AND it is not also a {{native}} word. Never pick a {{target}} word merely because it starts with the same letters or looks similar to the query.
+3) "word" is ALWAYS written in {{target}}. It may equal the raw query text only when rule 2 applies. If the query is {{native}} (query_language different from {{targetcode}}), "word" must be different from the query text — returning the {{native}} query unchanged is always wrong, even for short words like pronouns.
+4) If the query spelling matches a word in both {{native}} and {{target}} (truly ambiguous), set "word"/"article" to the {{native}} meaning and put the {{target}} spelling match — plus up to 2 other good {{target}} equivalents, nouns with article — into "alternatives". Otherwise alternatives = [].
+5) "alternatives" entries are bare {{target}} words or short phrases only: no parentheses, no explanations, no words from any other language.
+6) "query_language": ISO code of the language you decided the query is written in (e.g. {{nativecode}}, {{targetcode}}, ru, en).
+{{hints}}
+Return ONLY this JSON ("word" without article, null if not applicable):
+{"word":"","article":null,"alternatives":[],"query_language":""}`
 
-// Short few-shot hints (native → German) that pin down the "translate by meaning" behaviour.
+// reinforceResolve is appended to the prompt on the retry after a validation failure
+// (the model returned the native query unchanged as "word").
+const reinforceResolve = `
+IMPORTANT: your previous answer returned the {{native}} query text unchanged as "word" — that is wrong. Return the actual {{target}} translation (a different word) instead.`
+
+// Short few-shot hints (native → German), including the personal pronouns that are most
+// often mistranslated, to pin down the "translate by meaning, even for short words" behaviour.
 // For other learning languages the rules alone are used.
-var searchExamples = map[string]string{
-	"uz": `"men" → ich (not der Mensch); "daftar" → das Heft; "ich" (German) → ich, translation "men".`,
-	"ru": `"тетрадь" → das Heft; "я" → ich; "ich" (German) → ich, translation "я".`,
-	"en": `"notebook" → das Heft; "I" → ich; "ich" (German) → ich, translation "I".`,
+var resolveHints = map[string]string{
+	"uz": `Examples: "men"→"ich" (not "der Mensch"); "sen"→"du"; "u"→"er" (also "sie"/"es" depending on context); "biz"→"wir"; "siz"→"ihr" (or "Sie" for polite); "ular"→"sie"; "daftar"→"das Heft"; "kitob"→"das Buch"; "olma"→"der Apfel"; "uy"→"das Haus". Reverse: German "ich" (query_language "de") → word "ich".`,
+	"ru": `Examples: "тетрадь"→"das Heft"; "я"→"ich"; "ты"→"du"; "он"/"она"→"er"/"sie". Reverse: German "ich" (query_language "de") → word "ich".`,
+	"en": `Examples: "notebook"→"das Heft"; "I"→"ich"; "you"→"du". Reverse: German "ich" (query_language "de") → word "ich".`,
 }
+
+// cardPrompt asks for the rest of the dictionary card once the target-language word is already known.
+const cardPrompt = `Dictionary card for the {{target}} word "{{word}}"{{articleNote}}, for a learner whose native language is {{native}}.
+Fill in the fields below for exactly this word and meaning (the original query was in: {{querylang}}). Do not translate a different word and do not change "word".
+"translation" and "example_translation" MUST be written in {{native}}. "pronunciation" of the {{target}} word, written in {{pronscript}}.
+"example_sentence" MUST be a simple A1-A2 sentence written ENTIRELY in {{target}} — no {{native}} or English words mixed in, no parentheses or notes — and it must contain the word.
+{{grammar}}
+Return ONLY this JSON ("word" unchanged, null if not applicable):
+{"word":"{{word}}","word_type":"noun|verb|adjective|adverb|other","plural":null,"verb_type":null,"conjugation_present":null,"perfekt":null,"praeteritum":null,"comparative":null,"superlative":null,"translation":"","pronunciation":"","example_sentence":"","example_translation":""}`
+
+// reinforceCard is appended on the retry after the example sentence failed validation
+// (it mixed in native-language/English text or contained a parenthetical note).
+const reinforceCard = `
+IMPORTANT: your previous "example_sentence" was not clean {{target}}-only text (it mixed in another language or contained a parenthetical note). Write a new A1-A2 sentence using only {{target}} words this time.`
 
 // Per-language grammar notes; field names stay the same for every language.
 var searchGrammar = map[string]string{
@@ -62,7 +89,11 @@ func pronScript(trLang string) string {
 }
 
 const (
-	// Haiku: dictionary data doesn't need Sonnet, and it answers 2-4x faster.
+	// Resolving the target-language word is the hard, disambiguation-heavy part (language
+	// detection + translation of short function words) — Haiku was found unreliable at it.
+	searchResolveModel     = DefaultModel // "claude-sonnet-4-6"
+	searchResolveMaxTokens = 300
+	// Haiku: once the word is already resolved, the rest is cheap formatting/dictionary lookup.
 	searchModel     = "claude-haiku-4-5"
 	searchMaxTokens = 1000
 	// Prefill "{" makes invalid JSON rare, so 2 quick attempts are enough.
@@ -72,45 +103,175 @@ const (
 	searchPrefill  = "{"
 )
 
-// buildSearchPrompt: lang = learning language (de/en/fr/ko), native = UI/native language (uz/ru/en).
-func buildSearchPrompt(lang, native, query string) string {
-	learning := domain.Lang(lang)
+func buildResolvePrompt(targetCode, native, query string, reinforce bool) string {
+	learning := domain.Lang(targetCode)
 	native = domain.NormTranslationLang(native)
-	grammar, ok := searchGrammar[learning.Code]
-	if !ok {
-		grammar = searchGrammar["de"]
-	}
-	examples := "none"
+	hints := "none"
 	if learning.Code == "de" {
-		examples = searchExamples[native]
+		hints = resolveHints[native]
 	}
-	return strings.NewReplacer(
+	p := strings.NewReplacer(
 		"{{query}}", clean(query),
 		"{{target}}", learning.NameEN,
 		"{{targetcode}}", learning.Code,
 		"{{native}}", domain.TranslationLangName(native),
 		"{{nativecode}}", native,
+		"{{hints}}", hints,
+	).Replace(resolvePrompt)
+	if reinforce {
+		p += strings.NewReplacer(
+			"{{native}}", domain.TranslationLangName(native),
+			"{{target}}", learning.NameEN,
+		).Replace(reinforceResolve)
+	}
+	return p
+}
+
+func buildCardPrompt(targetCode, native string, resolved domain.WordInfo, reinforce bool) string {
+	learning := domain.Lang(targetCode)
+	native = domain.NormTranslationLang(native)
+	grammar, ok := searchGrammar[learning.Code]
+	if !ok {
+		grammar = searchGrammar["de"]
+	}
+	articleNote := ""
+	if resolved.Article != nil && *resolved.Article != "" {
+		articleNote = fmt.Sprintf(" (article: %s)", *resolved.Article)
+	}
+	p := strings.NewReplacer(
+		"{{word}}", clean(resolved.Word),
+		"{{articleNote}}", articleNote,
+		"{{target}}", learning.NameEN,
+		"{{native}}", domain.TranslationLangName(native),
+		"{{querylang}}", resolved.QueryLanguage,
 		"{{pronscript}}", pronScript(native),
-		"{{examples}}", examples,
 		"{{grammar}}", grammar,
-	).Replace(searchPrompt)
+	).Replace(cardPrompt)
+	if reinforce {
+		p += strings.NewReplacer("{{target}}", learning.NameEN).Replace(reinforceCard)
+	}
+	return p
+}
+
+// validateResolution catches the model returning the native query untranslated as the target
+// word (the production bug: Uzbek "sen" → word "sen" instead of "du"), and explanation text
+// leaking into "alternatives" (e.g. "du (sen - 2nd person singular informal pronoun in German)").
+func validateResolution(w domain.WordInfo, targetCode, query string) error {
+	if w.QueryLanguage != targetCode && strings.EqualFold(strings.TrimSpace(w.Word), strings.TrimSpace(query)) {
+		return fmt.Errorf("word %q equals the %s query verbatim, expected a %s translation", w.Word, w.QueryLanguage, targetCode)
+	}
+	for _, a := range w.Alternatives {
+		if strings.ContainsAny(a, "()") {
+			return fmt.Errorf("alternative %q contains an explanation", a)
+		}
+	}
+	return nil
+}
+
+// validateCard rejects an example sentence that isn't clean target-language text: a parenthetical
+// note, or a sentence that is actually still written in the original (native) query language.
+func validateCard(card domain.WordInfo, targetCode, query string, resolved domain.WordInfo) error {
+	if strings.ContainsAny(card.ExampleSentence, "()") {
+		return fmt.Errorf("example_sentence contains a parenthetical note: %q", card.ExampleSentence)
+	}
+	if resolved.QueryLanguage != targetCode && containsWord(card.ExampleSentence, query) {
+		return fmt.Errorf("example_sentence looks like it is in %s, not %s: %q", resolved.QueryLanguage, targetCode, card.ExampleSentence)
+	}
+	return nil
+}
+
+// containsWord reports whether sentence contains word as a standalone token (case-insensitive).
+func containsWord(sentence, word string) bool {
+	word = strings.TrimSpace(word)
+	if word == "" {
+		return false
+	}
+	re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(word) + `\b`)
+	return re.MatchString(sentence)
 }
 
 // LookupWord returns a dictionary entry for a word in the user's learning language (domain.LangFrom(ctx)).
 // The query is most likely in the native language (domain.TranslationLangFrom(ctx)); translations are in it.
-// JSON is cut out of the answer and repaired if needed; transient failures are retried once.
+// See the comment above resolvePrompt for why this is two model calls instead of one.
 func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo, error) {
 	trLang := domain.TranslationLangFrom(ctx)
-	prompt := buildSearchPrompt(domain.LangFrom(ctx), trLang, query)
+	targetCode := domain.Lang(domain.LangFrom(ctx)).Code
+
+	resolved, err := c.resolveWord(ctx, targetCode, trLang, query)
+	if err != nil {
+		return domain.WordInfo{}, err
+	}
+	card, err := c.assembleCard(ctx, targetCode, trLang, query, resolved)
+	if err != nil {
+		return domain.WordInfo{}, err
+	}
+	card.Word, card.Article, card.Alternatives, card.QueryLanguage = resolved.Word, resolved.Article, resolved.Alternatives, resolved.QueryLanguage
+	card.TranslationLanguage = trLang
+	return card, nil
+}
+
+// resolveWord decides the target-language word and the query's language. A validation failure
+// (not just a transient API error) is retried once with a reinforced prompt before giving up —
+// an invalid result is never returned (and so never reaches the cache or the client).
+func (c *Client) resolveWord(ctx context.Context, targetCode, native, query string) (domain.WordInfo, error) {
+	prompts := []string{
+		buildResolvePrompt(targetCode, native, query, false),
+		buildResolvePrompt(targetCode, native, query, true),
+	}
+	var lastErr error
+	for i, prompt := range prompts {
+		info, err := c.callAndParse(ctx, searchResolveModel, prompt, searchResolveMaxTokens, parseResolution)
+		if err != nil {
+			lastErr = err
+			slog.WarnContext(ctx, "search-word resolve attempt failed", "attempt", i+1, "err", err)
+			continue
+		}
+		if verr := validateResolution(info, targetCode, query); verr != nil {
+			lastErr = verr
+			slog.WarnContext(ctx, "search-word resolve validation failed", "attempt", i+1, "err", verr)
+			continue
+		}
+		return info, nil
+	}
+	return domain.WordInfo{}, fmt.Errorf("could not resolve a %s word for %q: %w", targetCode, query, lastErr)
+}
+
+// assembleCard fills in the rest of the dictionary card for the already-resolved word.
+func (c *Client) assembleCard(ctx context.Context, targetCode, native, query string, resolved domain.WordInfo) (domain.WordInfo, error) {
+	prompts := []string{
+		buildCardPrompt(targetCode, native, resolved, false),
+		buildCardPrompt(targetCode, native, resolved, true),
+	}
+	var lastErr error
+	for i, prompt := range prompts {
+		card, err := c.callAndParse(ctx, searchModel, prompt, searchMaxTokens, ParseWordInfo)
+		if err != nil {
+			lastErr = err
+			slog.WarnContext(ctx, "search-word card attempt failed", "attempt", i+1, "err", err)
+			continue
+		}
+		if verr := validateCard(card, targetCode, query, resolved); verr != nil {
+			lastErr = verr
+			slog.WarnContext(ctx, "search-word card validation failed", "attempt", i+1, "err", verr)
+			continue
+		}
+		return card, nil
+	}
+	return domain.WordInfo{}, fmt.Errorf("could not build a clean %s dictionary card for %q: %w", targetCode, resolved.Word, lastErr)
+}
+
+// callAndParse performs one model call — retrying transient failures (network, 429, 5xx,
+// truncated output) with backoff — and parses the JSON answer with parse.
+func (c *Client) callAndParse(ctx context.Context, model, prompt string, maxTokens int,
+	parse func(string) (domain.WordInfo, error)) (domain.WordInfo, error) {
 	var lastErr error
 	for attempt := 1; attempt <= searchAttempts; attempt++ {
 		start := time.Now()
-		text, err := c.completeWith(ctx, searchModel, prompt, searchPrefill, searchMaxTokens, searchTimeout)
-		slog.InfoContext(ctx, "search-word ai call", "attempt", attempt, "took_ms", time.Since(start).Milliseconds(), "ok", err == nil)
+		text, err := c.completeWith(ctx, model, prompt, searchPrefill, maxTokens, searchTimeout)
+		slog.InfoContext(ctx, "search-word ai call", "model", model, "attempt", attempt, "took_ms", time.Since(start).Milliseconds(), "ok", err == nil)
 		if err == nil {
-			info, perr := ParseWordInfo(text)
+			info, perr := parse(text)
 			if perr == nil {
-				info.TranslationLanguage = trLang
 				return info, nil
 			}
 			slog.ErrorContext(ctx, "search-word: invalid model output", "err", perr, "raw", text)
@@ -121,7 +282,6 @@ func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo,
 		if !errors.As(err, &re) || ctx.Err() != nil {
 			return domain.WordInfo{}, err
 		}
-		slog.WarnContext(ctx, "search-word attempt failed", "attempt", attempt, "err", err)
 		if attempt == searchAttempts {
 			break
 		}
@@ -131,7 +291,7 @@ func (c *Client) LookupWord(ctx context.Context, query string) (domain.WordInfo,
 		case <-time.After(searchBackoff):
 		}
 	}
-	return domain.WordInfo{}, fmt.Errorf("word lookup failed after %d attempts: %w", searchAttempts, lastErr)
+	return domain.WordInfo{}, lastErr
 }
 
 // complete performs one Messages API call with the client's default model.
@@ -200,8 +360,10 @@ func (c *Client) completeWith(ctx context.Context, model, prompt, prefill string
 
 var articles = map[string]bool{"der": true, "die": true, "das": true, "le": true, "la": true}
 
-// ParseWordInfo extracts and normalises the word JSON (fences/extra text tolerated, broken quotes repaired).
-func ParseWordInfo(s string) (domain.WordInfo, error) {
+// unmarshalWordJSON extracts and JSON-decodes a WordInfo-shaped answer (fences/extra text
+// tolerated, broken quotes repaired). It does not validate which fields are required —
+// callers do that, since the resolve and card steps require different fields.
+func unmarshalWordJSON(s string) (domain.WordInfo, error) {
 	s = extractJSONObject(s)
 	var w domain.WordInfo
 	if err := json.Unmarshal([]byte(s), &w); err != nil {
@@ -209,6 +371,12 @@ func ParseWordInfo(s string) (domain.WordInfo, error) {
 			return domain.WordInfo{}, fmt.Errorf("parse word json: %w", err)
 		}
 	}
+	return w, nil
+}
+
+// normalizeWordInfo trims fields and fixes common model mistakes (article leaked into "word",
+// duplicate/empty alternatives, stray null markers), shared by the resolve and card steps.
+func normalizeWordInfo(w domain.WordInfo) domain.WordInfo {
 	w.Word = strings.TrimSpace(w.Word)
 	w.Translation = strings.TrimSpace(w.Translation)
 	w.Pronunciation = strings.TrimSpace(w.Pronunciation)
@@ -258,8 +426,31 @@ func ParseWordInfo(s string) (domain.WordInfo, error) {
 		alts = append(alts, a)
 	}
 	w.Alternatives = alts
+	return w
+}
+
+// ParseWordInfo extracts and normalises a full dictionary-card answer (the assembleCard step).
+func ParseWordInfo(s string) (domain.WordInfo, error) {
+	w, err := unmarshalWordJSON(s)
+	if err != nil {
+		return domain.WordInfo{}, err
+	}
+	w = normalizeWordInfo(w)
 	if w.Word == "" || w.Translation == "" {
 		return domain.WordInfo{}, errors.New("word or translation is empty")
+	}
+	return w, nil
+}
+
+// parseResolution extracts and normalises the smaller resolveWord answer (no translation yet).
+func parseResolution(s string) (domain.WordInfo, error) {
+	w, err := unmarshalWordJSON(s)
+	if err != nil {
+		return domain.WordInfo{}, err
+	}
+	w = normalizeWordInfo(w)
+	if w.Word == "" || w.QueryLanguage == "" {
+		return domain.WordInfo{}, errors.New("word or query_language is empty")
 	}
 	return w, nil
 }

@@ -44,9 +44,11 @@ func NewSearchService(ai WordLookup, words WordExistence, contexts *ContextServi
 func NormalizeQuery(q string) string { return strings.ToLower(strings.TrimSpace(q)) }
 
 // searchCacheVersion is bumped whenever the prompt logic changes; migrations delete older keys.
-const searchCacheVersion = "v3"
+// v4: two-step lookup (Sonnet resolves the word, Haiku assembles the card) + server-side
+// validation, fixing native-language words (e.g. Uzbek "sen") leaking into "word" unresolved.
+const searchCacheVersion = "v4"
 
-// SearchCacheKey: "v3:<learning>:<native>:<normalized query>", e.g. "v3:de:uz:men".
+// SearchCacheKey: "v4:<learning>:<native>:<normalized query>", e.g. "v4:de:uz:men".
 func SearchCacheKey(learningLang, nativeLang, query string) string {
 	return searchCacheVersion + ":" + domain.Lang(learningLang).Code + ":" +
 		domain.NormTranslationLang(nativeLang) + ":" + NormalizeQuery(query)
