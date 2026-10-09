@@ -128,68 +128,112 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
       )}
       {remove.error && <p className="text-xs text-red-300">{errorMessage(remove.error)}</p>}
       {(creating || editing) && (
-        <FolderForm folder={editing} onClose={() => { setCreating(false); setEditing(null) }}
+        <FolderFormModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }}
           onCreated={(f) => onChange(f.id)} />
       )}
     </div>
   )
 }
 
-function FolderForm({ folder, onClose, onCreated }: {
-  folder: Folder | null; onClose: () => void; onCreated: (f: Folder) => void
+const FOLDER_NAME_MAX = 40
+
+/** Create / rename+recolour a folder, as a centered modal with a live preview. */
+export function FolderFormModal({ folder, onClose, onCreated }: {
+  folder: Folder | null; onClose: () => void; onCreated?: (f: Folder) => void
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const allFolders = useFolders()
   const [name, setName] = useState(folder?.name ?? '')
   const [color, setColor] = useState(folder?.color || 'lime')
-  const save = useMutation({
-    mutationFn: () => folder
-      ? foldersApi.update(folder.id, { name: name.trim(), color })
-      : foldersApi.create(name.trim(), color),
-    onSuccess: (f) => {
-      qc.invalidateQueries({ queryKey: ['folders'] })
-      if (!folder) onCreated(f)
-      toast(folder ? t('folders.saved') : t('folders.created'))
-      onClose()
-    },
-  })
-  return (
-    <form className="glass flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
-      onSubmit={(e) => { e.preventDefault(); if (name.trim()) save.mutate() }}>
-      <input autoFocus value={name} maxLength={40} onChange={(e) => setName(e.target.value)}
-        placeholder={t('folders.namePlaceholder')} className="field flex-1 py-2" />
-      <div className="flex gap-1.5">
-        {FOLDER_COLORS.map((c) => (
-          <button key={c} type="button" onClick={() => setColor(c)} aria-label={c}
-            className={`grid h-7 w-7 place-items-center rounded-full ${color === c ? 'ring-2 ring-white' : ''}`}>
-            <FolderDot color={c} />
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <button type="button" className="btn-ghost" onClick={onClose}>{t('editWord.cancel')}</button>
-        <button type="submit" className="btn-primary" disabled={save.isPending || !name.trim()}>{t('editWord.save')}</button>
-      </div>
-      {save.error && <p className="text-xs text-red-300">{errorMessage(save.error)}</p>}
-    </form>
-  )
-}
 
-/** "+ New folder" / rename+recolour, as a small centered modal (Contexts page folder grid). */
-function FolderModal({ folder, onClose, onCreated }: {
-  folder: Folder | null; onClose: () => void; onCreated?: (f: Folder) => void
-}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  const trimmed = name.trim()
+  // Unique per user, checked live against the already-loaded folder list (own folder excluded when renaming).
+  const isDuplicate = trimmed !== '' && (allFolders.data ?? [])
+    .some((f) => f.id !== folder?.id && f.name.toLowerCase() === trimmed.toLowerCase())
+  const isValid = trimmed !== '' && !isDuplicate
+
+  const save = useMutation({
+    mutationFn: () => folder
+      ? foldersApi.update(folder.id, { name: trimmed, color })
+      : foldersApi.create(trimmed, color),
+    onSuccess: (f) => {
+      qc.invalidateQueries({ queryKey: ['folders'] })
+      onCreated?.(f)
+      toast(folder ? t('folders.saved') : t('folders.created'))
+      onClose()
+    },
+  })
+
   return createPortal(
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="w-full max-w-lg" role="dialog" aria-modal="true">
-        <FolderForm folder={folder} onClose={onClose} onCreated={onCreated ?? (() => {})} />
-      </div>
+      <form
+        role="dialog" aria-modal="true" aria-labelledby="folder-form-title"
+        className="glass max-h-[90vh] w-full max-w-md space-y-5 overflow-y-auto p-6 text-left"
+        onSubmit={(e) => { e.preventDefault(); if (isValid) save.mutate() }}
+      >
+        <div className="flex items-center justify-between">
+          <h2 id="folder-form-title" className="display text-xl font-extrabold">
+            {folder ? t('folders.rename') : t('folders.new')}
+          </h2>
+          <button type="button" onClick={onClose} aria-label={t('folders.close')}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-emerald-100/60" htmlFor="folder-name">
+            {t('folders.nameLabel')}
+          </label>
+          <div className="relative">
+            <input id="folder-name" autoFocus value={name} maxLength={FOLDER_NAME_MAX}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('folders.namePlaceholder')} className="field w-full pr-14" />
+            <span className="pointer-events-none absolute bottom-2.5 right-4 text-xs text-emerald-100/40">
+              {name.length}/{FOLDER_NAME_MAX}
+            </span>
+          </div>
+          {isDuplicate && <p className="mt-1.5 text-xs text-red-300">{t('folders.nameTaken')}</p>}
+        </div>
+
+        <div>
+          <p className="mb-2 block text-xs font-semibold uppercase tracking-wide text-emerald-100/60">{t('folders.colorLabel')}</p>
+          <div className="flex flex-wrap gap-3">
+            {FOLDER_COLORS.map((c) => (
+              <button key={c} type="button" onClick={() => setColor(c)} aria-label={c} aria-pressed={color === c}
+                className={`relative grid h-8 w-8 place-items-center rounded-full ${DOT[c]} transition ${
+                  color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-emerald-900' : 'opacity-60 hover:opacity-100'
+                }`}>
+                {color === c && <span aria-hidden className="text-sm font-bold text-emerald-950">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-3">
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-lg text-emerald-950 ${DOT[color]}`}>📁</span>
+          <span className={`min-w-0 flex-1 truncate font-semibold ${trimmed ? 'text-white' : 'text-emerald-100/40'}`}>
+            {trimmed || t('folders.previewPlaceholder')}
+          </span>
+        </div>
+
+        {save.error && !isDuplicate && <p className="text-xs text-red-300">{errorMessage(save.error)}</p>}
+
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="btn-ghost h-11 flex-1">{t('editWord.cancel')}</button>
+          <button type="submit" disabled={!isValid || save.isPending} className="btn-primary h-11 flex-1">
+            {t('editWord.save')}
+          </button>
+        </div>
+      </form>
     </div>,
     document.body,
   )
@@ -235,13 +279,15 @@ function FolderCard({ data, onEdit, onDelete, deleting }: {
   }
 
   return (
-    <div className="animate-rise group relative overflow-hidden rounded-3xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/50 via-emerald-900/40 to-teal-900/40 p-5 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/10">
-      <div className="flex items-start justify-between gap-2">
+    <div className="animate-rise group relative flex h-full flex-col overflow-hidden rounded-3xl border border-emerald-400/15 bg-gradient-to-br from-emerald-800/50 via-emerald-900/40 to-teal-900/40 p-5 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/10">
+      {/* Fixed-height header: reserves the "⋯" button's slot even when it's not rendered,
+          so every card's title row — and everything below it — lines up. */}
+      <div className="flex h-8 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {data.color ? <FolderDot color={data.color} /> : <span className="text-lg leading-none">{data.icon}</span>}
           <h3 className="truncate text-lg font-bold text-white" title={data.name}>{shortFolderName(data.name)}</h3>
         </div>
-        {!data.locked && (
+        {!data.locked ? (
           <div className="relative shrink-0">
             <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label={t('folders.menu')}
               className="grid h-8 w-8 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300">
@@ -261,6 +307,8 @@ function FolderCard({ data, onEdit, onDelete, deleting }: {
               </div>
             )}
           </div>
+        ) : (
+          <div aria-hidden className="h-8 w-8 shrink-0" />
         )}
       </div>
 
@@ -268,13 +316,17 @@ function FolderCard({ data, onEdit, onDelete, deleting }: {
 
       <div className="mt-4"><FolderProgressBar stats={data.stats} /></div>
 
-      {data.stats.due_today > 0 && (
-        <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-lime-400/15 px-3 py-1 text-xs font-semibold text-lime-300">
-          🔔 {t('folders.dueToday', { count: data.stats.due_today })}
-        </p>
-      )}
+      {/* Reserved slot: present (empty) even with nothing due, so the buttons below never shift. */}
+      <div className="mt-3 min-h-[1.75rem]">
+        {data.stats.due_today > 0 && (
+          <p className="inline-flex items-center gap-1 rounded-full bg-lime-400/15 px-3 py-1 text-xs font-semibold text-lime-300">
+            🔔 {t('folders.dueToday', { count: data.stats.due_today })}
+          </p>
+        )}
+      </div>
 
-      <div className="mt-4 flex gap-2">
+      {/* mt-auto: pinned to the bottom of the (grid-stretched) card, flush with every sibling. */}
+      <div className="mt-auto flex gap-2">
         <Link to={`/cards?tab=all&folder=${encodeURIComponent(data.linkId)}`}
           className="btn-ghost flex-1 py-2 text-center text-sm">
           {t('folders.open')}
@@ -287,7 +339,7 @@ function FolderCard({ data, onEdit, onDelete, deleting }: {
   )
 }
 
-/** "My folders" grid for the Contexts page: All words / No folder / user folders / + New folder. */
+/** "My folders" grid for the Contexts page: All words / user folders / + New folder. */
 export function FolderGrid() {
   const { t } = useTranslation()
   const learning = useLearningLang()
@@ -316,7 +368,7 @@ export function FolderGrid() {
   if (list.error) return <p className="text-red-300">{errorMessage(list.error)}</p>
   if (!list.data) return null
 
-  const { all, none, folders } = list.data
+  const { all, folders } = list.data
 
   if (all.total === 0) {
     return (
@@ -332,7 +384,6 @@ export function FolderGrid() {
     <div className="space-y-4">
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <FolderCard data={{ linkId: '', name: t('folders.all'), icon: '📚', stats: all, locked: true }} />
-        <FolderCard data={{ linkId: 'none', name: t('folders.none'), icon: '📂', stats: none, locked: true }} />
         {folders.map((f) => (
           <FolderCard key={f.id} data={{ linkId: f.id, name: f.name, color: f.color, stats: f }}
             onEdit={() => setEditing(f)}
@@ -350,7 +401,7 @@ export function FolderGrid() {
       {remove.error && <p className="text-center text-xs text-red-300">{errorMessage(remove.error)}</p>}
 
       {(creating || editing) && (
-        <FolderModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }} />
+        <FolderFormModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }} />
       )}
     </div>
   )

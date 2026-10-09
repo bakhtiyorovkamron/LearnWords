@@ -21,7 +21,8 @@
       "Bash(kill %1)",
       "Bash(pkill -f \"scratchpad/learnwords-api\")",
       "Bash(sleep 1)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/healthz)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/healthz)",
+      "Bash(echo \"tsc EXIT=$?\")"
     ]
   }
 }

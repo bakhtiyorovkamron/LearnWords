@@ -28,11 +28,12 @@ type Folder struct {
 	FolderStats
 }
 
-// FolderList is the GET /api/folders response: the user's folders plus the "all words" and
-// "no folder" aggregates, computed alongside them (no N+1 — see FolderRepository.List).
+// FolderList is the GET /api/folders response: the user's folders plus the "all words"
+// aggregate, computed alongside them (no N+1 — see FolderRepository.List). Words without a
+// folder (folder_id IS NULL) are included in "all" and remain reachable via the "none" folder
+// filter on /collection and /review/due — there is just no separate "no folder" summary here.
 type FolderList struct {
 	All     FolderStats `json:"all"`
-	None    FolderStats `json:"none"`
 	Folders []Folder    `json:"folders"`
 }
 

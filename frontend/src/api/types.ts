@@ -51,10 +51,10 @@ export interface Folder extends FolderStats {
   created_at: string
 }
 
-// GET /api/folders response: the user's folders plus the "all words" / "no folder" aggregates.
+// GET /api/folders response: the user's folders plus the "all words" aggregate. Words without
+// a folder are included in "all" and stay reachable via the 'none' FolderSelection elsewhere.
 export interface FolderList {
   all: FolderStats
-  none: FolderStats
   folders: Folder[]
 }
 

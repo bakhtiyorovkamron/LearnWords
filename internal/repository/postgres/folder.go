@@ -17,7 +17,7 @@ type FolderRepository struct{ pool *pgxpool.Pool }
 func NewFolderRepository(pool *pgxpool.Pool) *FolderRepository { return &FolderRepository{pool: pool} }
 
 // List returns the user's folders — each with its word-progress breakdown (one GROUP BY query) —
-// plus the "all words" and "no folder" aggregates (one more query, not a loop over folders).
+// plus the "all words" aggregate (one more query, not a loop over folders).
 func (r *FolderRepository) List(ctx context.Context, userID uuid.UUID) (*domain.FolderList, error) {
 	today := time.Now().UTC()
 
@@ -53,17 +53,11 @@ func (r *FolderRepository) List(ctx context.Context, userID uuid.UUID) (*domain.
 		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) <= 2),
 		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) BETWEEN 3 AND 5),
 		       count(*) FILTER (WHERE COALESCE(p.is_learned, false)),
-		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.next_review_at, $2::date) <= $2::date),
-		       count(*) FILTER (WHERE w.folder_id IS NULL),
-		       count(*) FILTER (WHERE w.folder_id IS NULL AND NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) <= 2),
-		       count(*) FILTER (WHERE w.folder_id IS NULL AND NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) BETWEEN 3 AND 5),
-		       count(*) FILTER (WHERE w.folder_id IS NULL AND COALESCE(p.is_learned, false)),
-		       count(*) FILTER (WHERE w.folder_id IS NULL AND NOT COALESCE(p.is_learned, false) AND COALESCE(p.next_review_at, $2::date) <= $2::date)
+		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.next_review_at, $2::date) <= $2::date)
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		WHERE w.user_id = $1`, userID, today).Scan(
-		&list.All.Total, &list.All.NewCount, &list.All.LearningCount, &list.All.LearnedCount, &list.All.DueToday,
-		&list.None.Total, &list.None.NewCount, &list.None.LearningCount, &list.None.LearnedCount, &list.None.DueToday)
+		&list.All.Total, &list.All.NewCount, &list.All.LearningCount, &list.All.LearnedCount, &list.All.DueToday)
 	if err != nil {
 		return nil, err
 	}
