@@ -220,7 +220,9 @@ func (c *Client) resolveWord(ctx context.Context, targetCode, native, query stri
 	}
 	var lastErr error
 	for i, prompt := range prompts {
-		info, err := c.callAndParse(ctx, searchResolveModel, prompt, searchResolveMaxTokens, parseResolution)
+		// claude-sonnet-4-6 rejects an assistant-prefilled turn ("the conversation must end
+		// with a user message") — no prefill for the resolve step.
+		info, err := c.callAndParse(ctx, searchResolveModel, prompt, "", searchResolveMaxTokens, parseResolution)
 		if err != nil {
 			lastErr = err
 			slog.WarnContext(ctx, "search-word resolve attempt failed", "attempt", i+1, "err", err)
@@ -244,7 +246,7 @@ func (c *Client) assembleCard(ctx context.Context, targetCode, native, query str
 	}
 	var lastErr error
 	for i, prompt := range prompts {
-		card, err := c.callAndParse(ctx, searchModel, prompt, searchMaxTokens, ParseWordInfo)
+		card, err := c.callAndParse(ctx, searchModel, prompt, searchPrefill, searchMaxTokens, ParseWordInfo)
 		if err != nil {
 			lastErr = err
 			slog.WarnContext(ctx, "search-word card attempt failed", "attempt", i+1, "err", err)
@@ -262,12 +264,12 @@ func (c *Client) assembleCard(ctx context.Context, targetCode, native, query str
 
 // callAndParse performs one model call — retrying transient failures (network, 429, 5xx,
 // truncated output) with backoff — and parses the JSON answer with parse.
-func (c *Client) callAndParse(ctx context.Context, model, prompt string, maxTokens int,
+func (c *Client) callAndParse(ctx context.Context, model, prompt, prefill string, maxTokens int,
 	parse func(string) (domain.WordInfo, error)) (domain.WordInfo, error) {
 	var lastErr error
 	for attempt := 1; attempt <= searchAttempts; attempt++ {
 		start := time.Now()
-		text, err := c.completeWith(ctx, model, prompt, searchPrefill, maxTokens, searchTimeout)
+		text, err := c.completeWith(ctx, model, prompt, prefill, maxTokens, searchTimeout)
 		slog.InfoContext(ctx, "search-word ai call", "model", model, "attempt", attempt, "took_ms", time.Since(start).Milliseconds(), "ok", err == nil)
 		if err == nil {
 			info, perr := parse(text)
