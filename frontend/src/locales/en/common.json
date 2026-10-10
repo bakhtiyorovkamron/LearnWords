@@ -100,21 +100,15 @@
     "generateNotConfigured": "Auto-generation is not configured on the server (no ANTHROPIC_API_KEY)",
     "generateFailed": "Could not generate an example, please try again",
     "autoExampleHint": "If left empty, an example for a single word will be added automatically after saving.",
-    "photo": "Photo (optional)",
-    "removePhoto": "✕ Remove",
-    "uploadPhoto": "Upload photo",
     "tryExample": "Or try an example",
     "analyzing": "Analyzing words…",
     "submit": "Analyze phrase →",
     "errTextRequired": "Enter a {{langName}} word or phrase",
     "errTranslationRequired": "Enter a translation",
-    "errPronunciationRequired": "Enter the pronunciation",
-    "errPhoto": "Could not upload the photo"
+    "errPronunciationRequired": "Enter the pronunciation"
   },
   "detail": {
     "back": "← All contexts",
-    "replacePhoto": "🔄 Replace photo",
-    "uploadPhoto": "Upload photo",
     "original": "Original · {{langNative}}",
     "meaning": "Meaning",
     "added": "Added {{date}}",
@@ -266,12 +260,6 @@
     "total": "Total words: {{count}}",
     "restart": "Try again",
     "home": "Back to home"
-  },
-  "photo": {
-    "titleA": "Upload ",
-    "titleB": "photo",
-    "uploading": "Uploading…",
-    "choose": "Choose a file (PNG, JPEG, WebP)"
   },
   "story": {
     "titleA": "Daily ",

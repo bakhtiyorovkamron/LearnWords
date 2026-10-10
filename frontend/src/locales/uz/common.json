@@ -100,21 +100,15 @@
     "generateNotConfigured": "Avtomatik yaratish serverda sozlanmagan (ANTHROPIC_API_KEY yo‘q)",
     "generateFailed": "Misol yaratib bo‘lmadi, qaytadan urinib ko‘ring",
     "autoExampleHint": "Bo‘sh qoldirilsa, bitta so‘z uchun misol saqlangandan keyin avtomatik qo‘shiladi.",
-    "photo": "Rasm (ixtiyoriy)",
-    "removePhoto": "✕ Olib tashlash",
-    "uploadPhoto": "Rasm yuklash",
     "tryExample": "Yoki misolni sinab ko‘ring",
     "analyzing": "So‘zlar tahlil qilinmoqda…",
     "submit": "Iborani tahlil qilish →",
     "errTextRequired": "{{langUz}} tilida so‘z yoki ibora kiriting",
     "errTranslationRequired": "Tarjimani kiriting",
-    "errPronunciationRequired": "Talaffuzni kiriting",
-    "errPhoto": "Rasmni yuklab bo‘lmadi"
+    "errPronunciationRequired": "Talaffuzni kiriting"
   },
   "detail": {
     "back": "← Barcha kontekstlar",
-    "replacePhoto": "🔄 Rasmni almashtirish",
-    "uploadPhoto": "Rasm yuklash",
     "original": "Asl matn · {{langNative}}",
     "meaning": "Ma’nosi",
     "added": "Qo‘shilgan: {{date}}",
@@ -266,12 +260,6 @@
     "total": "Jami so‘zlar: {{count}}",
     "restart": "Yana bir bor",
     "home": "Bosh sahifaga qaytish"
-  },
-  "photo": {
-    "titleA": "Rasm ",
-    "titleB": "yuklash",
-    "uploading": "Yuklanmoqda…",
-    "choose": "Faylni tanlash (PNG, JPEG, WebP)"
   },
   "story": {
     "titleA": "Kun ",

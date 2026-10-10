@@ -1,11 +1,9 @@
-import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { contextsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { WordCardView } from '../components/WordCard'
-import { PhotoPicker } from '../components/PhotoPicker'
 import { TimeImage } from '../components/TimeImage'
 import { parseGermanTime } from '../lib/germanTime'
 import { dateLocale } from '../i18n'
@@ -19,7 +17,6 @@ export function ContextDetailPage() {
   const contexts = useQuery({ queryKey: ['contexts'], queryFn: contextsApi.list })
   const words = useQuery({ queryKey: ['context-words', id], queryFn: () => contextsApi.words(id) })
   const ctx = contexts.data?.find((c) => c.id === id)
-  const [picking, setPicking] = useState(false)
   // Clock-time phrases ("halb neun") get a generated time image instead of a photo.
   const time = ctx && ctx.language === 'de' ? parseGermanTime(ctx.source_text) : null
 
@@ -27,7 +24,6 @@ export function ContextDetailPage() {
 
   return (
     <div className="space-y-8">
-      {picking && <PhotoPicker contextId={id} onClose={() => setPicking(false)} />}
       <Link to="/contexts" className="btn-ghost">{t('detail.back')}</Link>
 
       <div className="grid gap-8 lg:grid-cols-5">
@@ -39,23 +35,11 @@ export function ContextDetailPage() {
               <div className="-mx-8 -mt-8 mb-6">
                 <TimeImage time={time} />
               </div>
-            ) : ctx?.image_url ? (
-              <figure className="group relative -mx-8 -mt-8 mb-6">
+            ) : ctx?.image_url && (
+              <figure className="relative -mx-8 -mt-8 mb-6">
                 <img src={ctx.image_url} alt="" className="aspect-[4/3] w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-transparent to-transparent" />
-                <button onClick={() => setPicking(true)}
-                  className="absolute right-3 top-3 rounded-full bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-lime-300 backdrop-blur transition hover:bg-emerald-950">
-                  {t('detail.replacePhoto')}
-                </button>
               </figure>
-            ) : (
-              ctx && (
-                <button onClick={() => setPicking(true)}
-                  className="relative mb-6 flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/30 text-emerald-200/70 transition hover:border-lime-400 hover:text-lime-300">
-                  <span className="text-4xl">📷</span>
-                  <span className="text-sm font-semibold">{t('detail.uploadPhoto')}</span>
-                </button>
-              )
             )}
 
             <p className="text-xs uppercase tracking-widest text-lime-300/80">{t('detail.original', { langNative: learning.name })}</p>

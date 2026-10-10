@@ -102,21 +102,15 @@
     "generateNotConfigured": "Автогенерация не настроена на сервере (нет ANTHROPIC_API_KEY)",
     "generateFailed": "Не удалось сгенерировать пример, попробуйте снова",
     "autoExampleHint": "Если оставить пустым, пример для одного слова добавится автоматически после сохранения.",
-    "photo": "Фото (необязательно)",
-    "removePhoto": "✕ Убрать",
-    "uploadPhoto": "Загрузить фото",
     "tryExample": "Или попробуйте пример",
     "analyzing": "Разбираем слова…",
     "submit": "Разобрать фразу →",
     "errTextRequired": "Введите слово или фразу на {{langPrep}}",
     "errTranslationRequired": "Введите перевод",
-    "errPronunciationRequired": "Введите произношение",
-    "errPhoto": "Не удалось загрузить фото"
+    "errPronunciationRequired": "Введите произношение"
   },
   "detail": {
     "back": "← Все контексты",
-    "replacePhoto": "🔄 Заменить фото",
-    "uploadPhoto": "Загрузить фото",
     "original": "Оригинал · {{langNative}}",
     "meaning": "Значение",
     "added": "Добавлено {{date}}",
@@ -272,12 +266,6 @@
     "total": "Всего слов: {{count}}",
     "restart": "Пройти ещё раз",
     "home": "Вернуться на главную"
-  },
-  "photo": {
-    "titleA": "Загрузить ",
-    "titleB": "фото",
-    "uploading": "Загружаем…",
-    "choose": "Выбрать файл (PNG, JPEG, WebP)"
   },
   "story": {
     "titleA": "История ",

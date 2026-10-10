@@ -40,7 +40,14 @@
       "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api)",
       "Bash(docker stop *)",
       "Bash(docker rm *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8091/healthz)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8091/healthz)",
+      "Bash(gofmt -l ./internal/ ./cmd/)",
+      "Bash(sleep 4)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15434/learnwords?sslmode=disable\")",
+      "Bash(export HTTP_ADDR=\":8092\")",
+      "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api2)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(pkill -f \"scratchpad/learnwords-api2\")"
     ]
   }
 }

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -40,24 +39,7 @@ func parseOptionalFolder(s string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
-// readPhoto reads an optional uploaded file from the given multipart field.
-func readPhoto(c *gin.Context, field string) ([]byte, error) {
-	fh, err := c.FormFile(field)
-	if err != nil {
-		return nil, nil // no file attached
-	}
-	if fh.Size > service.MaxImageSize {
-		return nil, fmt.Errorf("%w: image too large", domain.ErrValidation)
-	}
-	f, err := fh.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return io.ReadAll(io.LimitReader(f, service.MaxImageSize+1))
-}
-
-// Create accepts multipart/form-data (text, meaning, language, photo) or JSON {"text","meaning","language"}.
+// Create accepts multipart/form-data (text, meaning, language) or JSON {"text","meaning","language"}.
 func (h *ContextHandler) Create(c *gin.Context) {
 	var in service.CreateContextInput
 	var folder string
@@ -73,12 +55,6 @@ func (h *ContextHandler) Create(c *gin.Context) {
 			badRequest(c, "text is required (max 2000 chars)")
 			return
 		}
-		img, err := readPhoto(c, "photo")
-		if err != nil {
-			writeError(c, err)
-			return
-		}
-		in.Image = img
 	} else {
 		var req createContextJSON
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -135,28 +111,6 @@ func (h *ContextHandler) WordCards(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "limit": limit, "offset": offset})
-}
-
-// SetPhoto handles PUT /api/contexts/:id/photo (multipart, field "photo").
-func (h *ContextHandler) SetPhoto(c *gin.Context) {
-	id, ok := pathUUID(c, "id")
-	if !ok {
-		return
-	}
-	img, err := readPhoto(c, "photo")
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	if len(img) == 0 {
-		badRequest(c, "photo file is required")
-		return
-	}
-	if err := h.svc.UploadPhoto(c.Request.Context(), userID(c), id, img); err != nil {
-		writeError(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
 }
 
 func (h *ContextHandler) RegenerateAudio(c *gin.Context) {

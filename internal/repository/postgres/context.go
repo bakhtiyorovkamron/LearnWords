@@ -69,16 +69,3 @@ func (r *ContextRepository) GetByID(ctx context.Context, userID, id uuid.UUID) (
 	}
 	return &c, nil
 }
-
-func (r *ContextRepository) UpdatePhoto(ctx context.Context, userID, id uuid.UUID, url, credit string) error {
-	tag, err := r.pool.Exec(ctx,
-		`UPDATE contexts SET image_url = $1, photo_credit = $2 WHERE id = $3 AND user_id = $4`,
-		url, credit, id, userID)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrNotFound
-	}
-	return nil
-}

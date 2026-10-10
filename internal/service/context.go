@@ -19,12 +19,7 @@ import (
 
 var tracer = otel.Tracer("learnwords/service")
 
-const (
-	MaxImageSize   = 5 << 20
-	maxWordsPerCtx = 50
-)
-
-var allowedImageTypes = map[string]string{"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+const maxWordsPerCtx = 50
 
 type Providers struct {
 	OCR         provider.OCR
@@ -53,7 +48,6 @@ type CreateContextInput struct {
 	// Optional example sentence entered (or already generated) by the user.
 	ExampleSentence    string
 	ExampleTranslation string
-	Image              []byte
 	Language           string
 	// Optional folder for all created cards (ignored if it isn't the user's folder).
 	FolderID *uuid.UUID
@@ -75,13 +69,6 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	}
 	c.Meaning = meaning
 
-	if len(in.Image) > 0 {
-		url, err := imageDataURL(in.Image)
-		if err != nil {
-			return nil, err
-		}
-		c.ImageURL = &url
-	}
 	if text == "" {
 		return nil, fmt.Errorf("%w: text is required", domain.ErrValidation)
 	}

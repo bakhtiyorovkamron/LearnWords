@@ -21,7 +21,6 @@ type ContextRepository interface {
 	CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard) error
 	ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.Context, error)
 	GetByID(ctx context.Context, userID, id uuid.UUID) (*domain.Context, error)
-	UpdatePhoto(ctx context.Context, userID, id uuid.UUID, url, credit string) error
 	Delete(ctx context.Context, userID, id uuid.UUID) error
 }
 
