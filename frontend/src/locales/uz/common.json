@@ -230,7 +230,10 @@
     "nothingToday": "Bugun takrorlash uchun so‘z yo‘q 🎉",
     "comeBack": "Ertaga qayting yoki yangi so‘zlar qo‘shing.",
     "dueCount": "Bugun takrorlanadigan so‘zlar: {{count}}",
-    "start": "Mashqni boshlash"
+    "start": "Mashqni boshlash",
+    "sessionSize": "Mashq hajmi",
+    "sessionSizeAll": "Hammasi",
+    "sessionLine": "Shu mashqda: {{count}}"
   },
   "quiz": {
     "choose": "Tarjimani tanlang",
@@ -258,6 +261,7 @@
     "correct": "to‘g‘ri",
     "wrong": "noto‘g‘ri",
     "total": "Jami so‘zlar: {{count}}",
+    "more": "Yana {{count}}",
     "restart": "Yana bir bor",
     "home": "Bosh sahifaga qaytish"
   },

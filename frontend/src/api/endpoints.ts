@@ -149,9 +149,19 @@ export const storiesApi = {
       .then((r) => r.data),
 }
 
+// Training-session size: how many due words one "Review" round asks at once. Persisted on
+// the server (per user, follows across devices) with a localStorage fallback — see
+// lib/reviewSessionSize.ts.
+export const SESSION_SIZES = ['10', '20', '50', 'all'] as const
+export type SessionSize = (typeof SESSION_SIZES)[number]
+export const isSessionSize = (v: unknown): v is SessionSize =>
+  typeof v === 'string' && (SESSION_SIZES as readonly string[]).includes(v)
+
 export const settingsApi = {
-  get: () => api.get<{ interface_language: string }>('/me/settings').then((r) => r.data),
+  get: () =>
+    api.get<{ interface_language: string; review_session_size: string }>('/me/settings').then((r) => r.data),
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
+  setReviewSessionSize: (size: SessionSize) => api.put('/me/settings', { review_session_size: size }),
 }
 
 export interface Me { id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang }
@@ -185,8 +195,11 @@ export const statsApi = {
 }
 
 export const reviewApi = {
-  due: (folder: FolderSelection = '') =>
-    api.get<{ cards: DueCard[] }>('/review/due', { params: { folder_id: folder || undefined } }).then((r) => r.data.cards),
+  // total = the real number of due words today, uncapped; cards.length <= the requested limit.
+  due: (folder: FolderSelection = '', limit: SessionSize = '20') =>
+    api
+      .get<{ cards: DueCard[]; total: number }>('/review/due', { params: { folder_id: folder || undefined, limit } })
+      .then((r) => r.data),
   answer: (id: string, correct: boolean) =>
     api.post<Progress>(`/review/${id}/answer`, { correct }).then((r) => r.data),
 }

@@ -55,7 +55,14 @@
       "Bash(sleep 2)",
       "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api4.log)",
       "Bash(pkill -f \"scratchpad/learnwords-api3\")",
-      "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api5.log)"
+      "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api5.log)",
+      "Bash(gofmt -w ./internal/repository/postgres/review.go ./internal/handler/settings.go)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15436/learnwords?sslmode=disable\")",
+      "Bash(export HTTP_ADDR=\":8094\")",
+      "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api4)",
+      "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api6.log)",
+      "Bash(pkill -f \"scratchpad/learnwords-api4\")",
+      "Bash(rm -f /tmp/seed_wc.sql /tmp/ids.txt)"
     ]
   }
 }

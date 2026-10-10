@@ -230,7 +230,10 @@
     "nothingToday": "No words to review today 🎉",
     "comeBack": "Come back tomorrow or add new words.",
     "dueCount": "Words to review today: {{count}}",
-    "start": "Start training"
+    "start": "Start training",
+    "sessionSize": "Session size",
+    "sessionSizeAll": "All",
+    "sessionLine": "In this session: {{count}}"
   },
   "quiz": {
     "choose": "Choose the translation",
@@ -258,6 +261,7 @@
     "correct": "correct",
     "wrong": "wrong",
     "total": "Total words: {{count}}",
+    "more": "More {{count}}",
     "restart": "Try again",
     "home": "Back to home"
   },

@@ -17,19 +17,26 @@ type ReviewRepository struct{ pool *pgxpool.Pool }
 
 func NewReviewRepository(pool *pgxpool.Pool) *ReviewRepository { return &ReviewRepository{pool: pool} }
 
-// ListDue returns unlearned cards due today. Cards without a progress row are treated as box 1, due today.
+// folderWhere builds the two folder-filter params shared by ListDue and CountDue.
+func folderWhere(folder *domain.FolderFilter) (folderOnly *uuid.UUID, noFolder bool) {
+	if folder == nil {
+		return nil, false
+	}
+	if folder.None {
+		return nil, true
+	}
+	id := folder.ID
+	return &id, false
+}
+
+// ListDue returns unlearned cards due today, in priority order:
+//  1. overdue (next_review_at strictly before today) OR box 1 (new words / words just missed),
+//  2. everything else due exactly today (box 2-5),
+//
+// oldest-overdue first within each group. Cards without a progress row count as box 1, due today.
 // folder (optional) limits the queue to one folder or to folder-less words; nil = all words.
 func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error) {
-	var folderOnly *uuid.UUID
-	noFolder := false
-	if folder != nil {
-		if folder.None {
-			noFolder = true
-		} else {
-			id := folder.ID
-			folderOnly = &id
-		}
-	}
+	folderOnly, noFolder := folderWhere(folder)
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 		       w.language, w.created_at, COALESCE(p.box_level, 1),
@@ -41,7 +48,10 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
 		  AND ($4::uuid IS NULL OR w.folder_id = $4::uuid)
 		  AND (NOT $5::bool OR w.folder_id IS NULL)
-		ORDER BY COALESCE(p.next_review_at, $2::date), w.created_at
+		ORDER BY
+		  CASE WHEN COALESCE(p.next_review_at, $2::date) < $2::date OR COALESCE(p.box_level, 1) = 1 THEN 0 ELSE 1 END,
+		  COALESCE(p.next_review_at, $2::date),
+		  w.created_at
 		LIMIT $3`, userID, today, limit, folderOnly, noFolder)
 	if err != nil {
 		return nil, err
@@ -55,6 +65,24 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		d.HasExample = strings.Contains(d.ExampleSentence, "___")
 		return d, err
 	})
+}
+
+// CountDue is the real number of due cards, ignoring any session-size cap — used for the
+// "N words due today" line, independent of how many are actually shown in one session.
+func (r *ReviewRepository) CountDue(ctx context.Context, userID uuid.UUID, today time.Time, folder *domain.FolderFilter) (int, error) {
+	folderOnly, noFolder := folderWhere(folder)
+	var total int
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM word_cards w
+		LEFT JOIN word_progress p ON p.word_id = w.id
+		WHERE w.user_id = $1
+		  AND COALESCE(p.is_learned, false) = false
+		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
+		  AND ($3::uuid IS NULL OR w.folder_id = $3::uuid)
+		  AND (NOT $4::bool OR w.folder_id IS NULL)`,
+		userID, today, folderOnly, noFolder).Scan(&total)
+	return total, err
 }
 
 // Apply loads (creating if absent) the progress row under a row lock, transforms it and saves it atomically.

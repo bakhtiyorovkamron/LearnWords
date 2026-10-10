@@ -5,11 +5,16 @@ interface Props {
   correct: number
   total: number
   onRestart: () => void
+  // moreCount > 0 → there are still due words left: show "Ещё N" (same filters + direction).
+  moreCount?: number
+  onMore?: () => void
+  moreLoading?: boolean
 }
 
-export function ReviewResult({ correct, total, onRestart }: Props) {
+export function ReviewResult({ correct, total, onRestart, moreCount = 0, onMore, moreLoading }: Props) {
   const { t } = useTranslation()
   const wrong = total - correct
+  const hasMore = moreCount > 0
   return (
     <div className="glass mx-auto max-w-xl p-10 text-center">
       <div className="text-5xl">{wrong === 0 ? '🏆' : '🎉'}</div>
@@ -26,7 +31,12 @@ export function ReviewResult({ correct, total, onRestart }: Props) {
       </div>
       <p className="mt-4 text-sm text-emerald-100/70">{t('result.total', { count: total })}</p>
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <button type="button" onClick={onRestart} className="btn-primary">{t('result.restart')}</button>
+        {hasMore && (
+          <button type="button" onClick={onMore} disabled={moreLoading} className="btn-primary disabled:opacity-60">
+            {moreLoading ? t('common.loading') : t('result.more', { count: moreCount })}
+          </button>
+        )}
+        <button type="button" onClick={onRestart} className={hasMore ? 'btn-ghost' : 'btn-primary'}>{t('result.restart')}</button>
         <Link to="/contexts" className="btn-ghost">{t('result.home')}</Link>
       </div>
     </div>

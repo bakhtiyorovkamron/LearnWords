@@ -10,16 +10,38 @@ import (
 )
 
 const (
-	maxBox          = 5
-	learnedStreak   = 2
-	defaultDueLimit = 100
+	maxBox        = 5
+	learnedStreak = 2
+	// DefaultSessionSize is used whenever the requested session size is missing or invalid.
+	DefaultSessionSize = 20
+	// unlimitedSessionSize stands in for "all" as a SQL LIMIT — effectively no cap at all.
+	unlimitedSessionSize = 1 << 30
 )
 
 // boxIntervalDays: days until next review for each box level.
 var boxIntervalDays = map[int]int{1: 1, 2: 2, 3: 4, 4: 7, 5: 14}
 
+// NormalizeSessionSize validates the requested training-session size (10, 20, 50 or "all")
+// and returns the SQL LIMIT to use; anything else falls back to DefaultSessionSize.
+func NormalizeSessionSize(s string) int {
+	switch s {
+	case "10":
+		return 10
+	case "20":
+		return 20
+	case "50":
+		return 50
+	case "all":
+		return unlimitedSessionSize
+	default:
+		return DefaultSessionSize
+	}
+}
+
 type ReviewRepository interface {
 	ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error)
+	// CountDue is the real total, ignoring the session-size cap (for the "N words due today" line).
+	CountDue(ctx context.Context, userID uuid.UUID, today time.Time, folder *domain.FolderFilter) (int, error)
 	// Apply runs fn on the current progress inside a transaction, stores the result and logs the answer.
 	Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time, correct bool,
 		fn func(p domain.Progress) domain.Progress) (*domain.Progress, error)
@@ -39,10 +61,20 @@ func dateOf(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// Due returns words that should be reviewed today, optionally only from one folder.
-// The Leitner logic itself is per word and does not depend on folders.
-func (s *ReviewService) Due(ctx context.Context, userID uuid.UUID, folder *domain.FolderFilter) ([]domain.DueCard, error) {
-	return s.repo.ListDue(ctx, userID, dateOf(s.now()), defaultDueLimit, folder)
+// Due returns up to NormalizeSessionSize(sessionSize) words that should be reviewed today
+// (optionally only from one folder), in priority order — see ListDue — plus the real total due
+// count (uncapped), so the caller can show "N due today, M in this session".
+func (s *ReviewService) Due(ctx context.Context, userID uuid.UUID, folder *domain.FolderFilter, sessionSize string) ([]domain.DueCard, int, error) {
+	today := dateOf(s.now())
+	total, err := s.repo.CountDue(ctx, userID, today, folder)
+	if err != nil {
+		return nil, 0, err
+	}
+	cards, err := s.repo.ListDue(ctx, userID, today, NormalizeSessionSize(sessionSize), folder)
+	if err != nil {
+		return nil, 0, err
+	}
+	return cards, total, nil
 }
 
 // Answer applies the user's answer to the word's Leitner state.
