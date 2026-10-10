@@ -82,7 +82,9 @@
       "Bash(curl -s http://localhost:8095/api/hero?native_language=ru -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
       "Bash(seq 1 10)",
       "Bash(pkill -f \"scratchpad/learnwords-api5\")",
-      "Bash(rm -f /tmp/seed_hero.sql)"
+      "Bash(rm -f /tmp/seed_hero.sql)",
+      "Bash(git fetch *)",
+      "Bash(docker context *)"
     ]
   }
 }
