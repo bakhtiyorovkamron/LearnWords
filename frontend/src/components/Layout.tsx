@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
+import { HeroWidget } from './HeroWidget'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
 import { useLearningLang } from '../lib/learningLang'
@@ -69,6 +70,7 @@ export function Layout() {
         {learning.tagline}
       </footer>
       <Toaster />
+      <HeroWidget />
     </div>
   )
 }

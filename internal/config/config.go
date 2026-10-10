@@ -21,6 +21,9 @@ type Config struct {
 	TargetLang   string // language to translate into
 	AutoMigrate  bool
 	CookieSecure bool // set true behind HTTPS
+	// HeroEmails: FEATURE_HERO_EMAILS, comma-separated, case-insensitive. Empty = feature off
+	// for everyone. Never hardcode an email here or anywhere else — this is the only switch.
+	HeroEmails []string
 }
 
 func Load() (*Config, error) {
@@ -38,6 +41,7 @@ func Load() (*Config, error) {
 		TargetLang:   env("TRANSLATION_TARGET_LANG", "ru"),
 		AutoMigrate:  env("AUTO_MIGRATE", "true") == "true",
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
+		HeroEmails:   strings.Split(env("FEATURE_HERO_EMAILS", ""), ","),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")

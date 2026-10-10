@@ -62,7 +62,27 @@
       "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api4)",
       "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api6.log)",
       "Bash(pkill -f \"scratchpad/learnwords-api4\")",
-      "Bash(rm -f /tmp/seed_wc.sql /tmp/ids.txt)"
+      "Bash(rm -f /tmp/seed_wc.sql /tmp/ids.txt)",
+      "Bash(gofmt -w ./internal/domain/hero.go)",
+      "Bash(gofmt -w ./internal/service/hero_phrases.go)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15437/learnwords?sslmode=disable\")",
+      "Bash(export HTTP_ADDR=\":8095\")",
+      "Bash(export FEATURE_HERO_EMAILS=\"bahtiyorovkamron8@gmail.com, hero-test2@example.com\")",
+      "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api5)",
+      "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api7.log)",
+      "Bash(echo \"--- 1\\) not-whitelisted German user -> 404 ---\")",
+      "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/token_c.txt)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' http://localhost:8095/api/hero -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(echo \"--- 2\\) whitelisted but learning English -> 404 \\(German-only for now\\) ---\")",
+      "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/token_b.txt)",
+      "Bash(echo \"--- stage_name in en/uz ---\")",
+      "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/token_a.txt)",
+      "Bash(curl -s http://localhost:8095/api/hero?native_language=en -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(echo \"--- 60 learned words -> stage 2 \\(50-199\\), stage_changed=true \\(first growth from 1\\) ---\")",
+      "Bash(curl -s http://localhost:8095/api/hero?native_language=ru -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(seq 1 10)",
+      "Bash(pkill -f \"scratchpad/learnwords-api5\")",
+      "Bash(rm -f /tmp/seed_hero.sql)"
     ]
   }
 }

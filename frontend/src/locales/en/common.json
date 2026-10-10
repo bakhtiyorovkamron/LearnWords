@@ -2,7 +2,8 @@
   "common": { "unknownError": "Unknown error", "loading": "Loading…", "rateLimited": "Too many requests. Please try again in {{seconds}} s." },
   "direction": { "label": "Direction", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
-  "nav": {
+    "hero": { "title": "Your German hero", "wordsLearned": "Words learned", "toNextStage": "To the next stage", "show": "Show hero", "expand": "Expand", "collapse": "Collapse", "hide": "Hide hero", "sleepyBubble": "Zzz..." },
+"nav": {
     "contexts": "Contexts",
     "add": "Add",
     "search": "Search",

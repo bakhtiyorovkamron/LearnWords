@@ -100,6 +100,7 @@ func run() error {
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator)
 	adminRepo := postgres.NewAdminRepository(pool)
+	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEmails)
 
 	// Daily story cron: STORY_CRON_HOUR (default 23) in STORY_CRON_TZ (default Europe/Berlin).
 	cronHour := 23
@@ -136,6 +137,7 @@ func run() error {
 		Folders:      handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
 		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
+		Hero:         handler.NewHeroHandler(heroSvc),
 		UserStatus:   adminRepo,
 		Ctx:          ctx,
 		HealthCheck: func() error {

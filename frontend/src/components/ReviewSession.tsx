@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cardsApi, reviewApi, SESSION_SIZES, type SessionSize } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
+import { emitHeroEvent } from '../lib/heroBus'
 import { buildQueue, type Direction, type QuizItem } from '../lib/quiz'
 import { useReviewSessionSize } from '../lib/reviewSessionSize'
 import { QuizQuestion } from './QuizQuestion'
@@ -48,21 +49,37 @@ export function ReviewSession() {
   const [deck, setDeck] = useState<QuizItem[] | null>(null) // null = not started
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
+  const [streak, setStreak] = useState(0) // consecutive correct answers; resets on a wrong one
   const [moreLoading, setMoreLoading] = useState(false)
   // Only changes how words are asked; progress (box_level) is shared by all directions.
   const [direction, setDirection] = useStoredChoice<Direction>('review-direction', DIRECTIONS, 'mixed')
 
+  // The hero widget only ever hears about training through these events — it has no other
+  // hook into this component, and this component has no idea the hero exists.
   const answer = useMutation({
-    mutationFn: ({ id, ok }: { id: string; ok: boolean }) => reviewApi.answer(id, ok),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stats'] }),
+    mutationFn: ({ id, ok }: { id: string; ok: boolean; wasLearned: boolean }) => reviewApi.answer(id, ok),
+    onSuccess: (progress, variables) => {
+      qc.invalidateQueries({ queryKey: ['stats'] })
+      if (progress.box_level >= 4 && !variables.wasLearned) emitHeroEvent({ type: 'word_learned' })
+    },
   })
+
+  // Reports exactly once when the deck is exhausted, not on every re-render of the result screen.
+  useEffect(() => {
+    if (deck && index >= deck.length) {
+      emitHeroEvent({ type: 'session_finished', correctCount: correct, total: deck.length })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck, index])
 
   function start() {
     // Random suitable format per word (gap only with an example, typing only for box 3+).
     setDeck(buildQueue(due.data?.cards ?? [], direction))
     setIndex(0)
     setCorrect(0)
+    setStreak(0)
     answer.reset()
+    emitHeroEvent({ type: 'session_started' })
   }
 
   function restart() {
@@ -79,7 +96,9 @@ export function ReviewSession() {
       setDeck(buildQueue(result.data?.cards ?? [], direction))
       setIndex(0)
       setCorrect(0)
+      setStreak(0)
       answer.reset()
+      emitHeroEvent({ type: 'session_started' })
     } finally {
       setMoreLoading(false)
     }
@@ -158,7 +177,10 @@ export function ReviewSession() {
         : null}
       onAnswer={(ok) => {
         if (ok) setCorrect((c) => c + 1)
-        answer.mutate({ id: item.card.id, ok }) // saved immediately, not at the end
+        const newStreak = ok ? streak + 1 : 0
+        setStreak(newStreak)
+        emitHeroEvent({ type: 'answer', correct: ok, streak: newStreak })
+        answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4 }) // saved immediately, not at the end
       }}
       onNext={() => {
         answer.reset()

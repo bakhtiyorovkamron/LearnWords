@@ -28,6 +28,7 @@ type RouterDeps struct {
 	Folders      *FolderHandler
 	Search       *SearchHandler
 	Translations *TranslationHandler
+	Hero         *HeroHandler
 	UserStatus   UserStatusStore
 	HealthCheck  func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -123,6 +124,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/settings", d.Settings.Get)
 		protected.PUT("/me/settings", d.Settings.Update)
 		protected.GET("/me", d.Admin.Me)
+		protected.GET("/hero", d.Hero.Get)
 	}
 
 	// Every /api/admin/* route goes through AuthRequired + ActiveUser + RequireAdmin (role from the DB).

@@ -170,6 +170,25 @@ export const meApi = {
   get: () => api.get<Me>('/me').then((r) => r.data),
 }
 
+export interface Hero {
+  stage: number
+  stage_name: string
+  learned_count: number
+  words_to_next_stage: number
+  born_at: string
+  age_days: number
+  birthday_today: boolean
+  phrase: string
+  stage_changed: boolean
+}
+
+// Gated server-side (FEATURE_HERO_EMAILS) — not everyone has this endpoint at all. A 404 means
+// "not available to you", not an error: callers should treat it as "no hero", nothing to show.
+export const heroApi = {
+  get: (nativeLanguage: string) =>
+    api.get<Hero>('/hero', { params: { native_language: nativeLanguage } }).then((r) => r.data),
+}
+
 export interface AdminUser {
   id: string; email: string; role: 'user' | 'admin'; is_banned: boolean
   created_at: string; words_count: number; last_activity_at: string | null
