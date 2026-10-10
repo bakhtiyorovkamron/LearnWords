@@ -11,29 +11,36 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 
 	"learnwords/internal/domain"
 )
 
-const storyPromptTemplate = `Ты — автор коротких рассказов для изучающих {{langGen}} язык (уровень A1-B1).
-Напиши связный, интересный рассказ на {{langPrep}} языке в жанре "{{genre}}", обязательно используя ВСЕ следующие слова (можно в нужной грамматической форме):
+// Story generation is two separate model calls:
+//  1. generateStoryOnce builds the story in the learning language ONLY — the word list passed
+//     in has no translations attached, so there is nothing non-German (etc.) for the model to
+//     echo into the text. A Cyrillic-character check catches it anyway if the model slips.
+//  2. TranslateStory translates the already-generated text (+ a gloss per word) into whichever
+//     native language a viewer actually requested — lazily, once per (story, language), cached.
+const storyPromptTemplate = `You are a short-story author for {{target}} learners (level A1-B1).
+Write a connected, engaging story in the genre "{{genre}}", using ALL of the following {{target}} words (any grammatical form is fine):
 {{words}}
 
-Требования:
-- Длина рассказа примерно {{length}} предложений (чем больше слов, тем длиннее и насыщеннее сюжет).
-- Простая грамматика, короткие предложения, понятный сюжет с началом, развитием и концовкой.
-- Каждое использованное слово из списка выдели в тексте рассказа жирным: **слово**.
-- Дай полный перевод рассказа на русский язык.
-- Придумай короткий заголовок на {{langPrep}} языке.
+Requirements:
+- The ENTIRE story and its title must be written 100% in {{target}} — not a single word, phrase or name from any other language or script may appear anywhere in them.
+- About {{length}} sentences (more words → a longer, richer plot).
+- Simple grammar, short sentences, a clear beginning, middle and end.
+- Bold every used word from the list in the text: **word**.
 
-ФОРМАТ ОТВЕТА — СТРОГО ВАЖНО:
-- Ответь СТРОГО одним валидным JSON-объектом, без каких-либо пояснений до или после объекта и без markdown-разметки (никаких ` + "```" + `).
-- Весь текст внутри полей должен быть корректно экранирован для JSON.
-- НЕ используй прямые двойные кавычки " внутри текста. Для прямой речи и цитат используй только кавычки „…“ или «…».
-- Абзацы разделяй последовательностью \n (экранированный перенос строки), а не настоящим переносом строки.
+ANSWER FORMAT — STRICT:
+- Respond with ONLY one valid JSON object, no text before or after it, no markdown fences.
+- Escape all text correctly for JSON. Do not use straight double quotes " inside the text — use „…“ or «…» for dialogue/quotes.
+- Separate paragraphs with \n (escaped), not a real newline.
 
-Структура ответа (story_de — рассказ на изучаемом языке):
-{"title": "...", "story_de": "...", "story_ru": "..."}`
+{"title": "...", "story_de": "..."}`
+
+const reinforceStory = `
+IMPORTANT: your previous answer mixed in text from another language — every word of "title" and "story_de" must be {{target}} only. Write it again, entirely in {{target}}.`
 
 // StoryLength scales the story with the number of words.
 func StoryLength(n int) string {
@@ -47,25 +54,42 @@ func StoryLength(n int) string {
 	}
 }
 
-func buildStoryPrompt(lang string, words []domain.StoryWord, genre string) string {
+// buildStoryPrompt never receives translations — only the learning-language spellings — so the
+// model has no foreign-language text available to leak into the story.
+func buildStoryPrompt(learningLang string, words []domain.StoryWord, genre string, reinforce bool) string {
+	target := domain.Lang(learningLang).NameEN
 	var b strings.Builder
 	for _, w := range words {
-		fmt.Fprintf(&b, "- %s (%s)\n", clean(w.Word), clean(w.Translation))
+		fmt.Fprintf(&b, "- %s\n", clean(w.Word))
 	}
-	return strings.NewReplacer(
-		"{{langGen}}", domain.Lang(lang).NameRU,
-		"{{langPrep}}", langPrepositional(lang),
+	p := strings.NewReplacer(
+		"{{target}}", target,
 		"{{genre}}", clean(genre),
 		"{{words}}", strings.TrimRight(b.String(), "\n"),
 		"{{length}}", StoryLength(len(words)),
 	).Replace(storyPromptTemplate)
+	if reinforce {
+		p += strings.NewReplacer("{{target}}", target).Replace(reinforceStory)
+	}
+	return p
 }
 
-// storyMaxTokens: German + Russian text, Cyrillic is token-heavy → generous budget per word.
+// containsCyrillic reports whether s has any Cyrillic character — a sign the model slipped
+// into Russian instead of writing purely in the learning language.
+func containsCyrillic(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Cyrillic, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// storyMaxTokens: learning-language text only now (translation is a separate, later call).
 func storyMaxTokens(words int) int {
-	n := 2000 + 200*words
-	if n > 6000 {
-		n = 6000
+	n := 1200 + 100*words
+	if n > 3000 {
+		n = 3000
 	}
 	return n
 }
@@ -78,17 +102,23 @@ type retryableError struct{ err error }
 func (e retryableError) Error() string { return e.err.Error() }
 func (e retryableError) Unwrap() error { return e.err }
 
-// GenerateStory asks the model for a short story in the user's learning language that uses all given words.
-// Invalid or truncated JSON is retried (up to storyAttempts in total), with a bigger
-// token budget after a truncation.
+// GenerateStory asks the model for a short story in the user's learning language that uses all
+// given words. Invalid/truncated JSON AND Cyrillic leaking into the text are both retried (up
+// to storyAttempts in total — i.e. at most 2 regenerations after the first attempt), each retry
+// reinforcing that the whole answer must be in the learning language.
 func (c *Client) GenerateStory(ctx context.Context, words []domain.StoryWord, genre string) (domain.GeneratedStory, error) {
-	prompt := buildStoryPrompt(domain.LangFrom(ctx), words, genre)
+	learningLang := domain.LangFrom(ctx)
 	maxTokens := storyMaxTokens(len(words))
 	var lastErr error
 	for attempt := 1; attempt <= storyAttempts; attempt++ {
+		prompt := buildStoryPrompt(learningLang, words, genre, attempt > 1)
 		st, truncated, err := c.storyOnce(ctx, prompt, maxTokens)
 		if err == nil {
-			return st, nil
+			if containsCyrillic(st.Title) || containsCyrillic(st.StoryDE) {
+				err = retryableError{errors.New("story text contains Cyrillic characters")}
+			} else {
+				return st, nil
+			}
 		}
 		lastErr = err
 		var re retryableError
@@ -97,8 +127,11 @@ func (c *Client) GenerateStory(ctx context.Context, words []domain.StoryWord, ge
 		}
 		slog.WarnContext(ctx, "story generation attempt failed",
 			"attempt", attempt, "max_tokens", maxTokens, "truncated", truncated, "err", err)
-		if truncated && maxTokens < 8000 {
-			maxTokens = min(maxTokens*3/2, 8000)
+		if truncated && maxTokens < 6000 {
+			maxTokens = min(maxTokens*3/2, 6000)
+		}
+		if attempt == storyAttempts {
+			break
 		}
 		select {
 		case <-ctx.Done():
@@ -184,8 +217,7 @@ func ParseStory(s string) (domain.GeneratedStory, error) {
 	}
 	st.Title = strings.TrimSpace(st.Title)
 	st.StoryDE = strings.TrimSpace(st.StoryDE)
-	st.StoryRU = strings.TrimSpace(st.StoryRU)
-	if st.StoryDE == "" || st.StoryRU == "" {
+	if st.StoryDE == "" {
 		return domain.GeneratedStory{}, errors.New("story is incomplete")
 	}
 	return st, nil

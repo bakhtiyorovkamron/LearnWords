@@ -28,10 +28,11 @@ function Highlighted({ text }: { text: string }) {
   )
 }
 
-// The story itself (DE text + RU translation) is learning content and is shown as is.
+// The story itself (learning-language text + its translation) is shown as is. The translation
+// is resolved server-side for the current interface language — never assumed to be Russian.
 function StoryView({ story }: { story: DailyStory }) {
   const { t } = useTranslation()
-  const [showRu, setShowRu] = useState(false)
+  const [showTranslation, setShowTranslation] = useState(false)
   return (
     <article className="glass space-y-4 p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -41,14 +42,18 @@ function StoryView({ story }: { story: DailyStory }) {
         </span>
       </div>
       <p className="whitespace-pre-line leading-relaxed"><Highlighted text={story.story_de} /></p>
-      <button className="btn-ghost" onClick={() => setShowRu((v) => !v)}>
-        {showRu ? t('story.hideTranslation') : t('story.showTranslation')}
-      </button>
-      {showRu && <p className="whitespace-pre-line text-emerald-100/80"><Highlighted text={story.story_ru} /></p>}
+      {story.story_translation && (
+        <button className="btn-ghost" onClick={() => setShowTranslation((v) => !v)}>
+          {showTranslation ? t('story.hideTranslation') : t('story.showTranslation')}
+        </button>
+      )}
+      {showTranslation && story.story_translation && (
+        <p className="whitespace-pre-line text-emerald-100/80"><Highlighted text={story.story_translation} /></p>
+      )}
       <div className="flex flex-wrap gap-2 pt-2">
         {story.words_used.map((w) => (
           <span key={w.word} className="rounded-full bg-white/5 px-3 py-1 text-sm">
-            {w.word} <span className="text-emerald-100/60">— {w.translation}</span>
+            {w.word}{w.translation && <span className="text-emerald-100/60"> — {w.translation}</span>}
           </span>
         ))}
       </div>
@@ -57,16 +62,19 @@ function StoryView({ story }: { story: DailyStory }) {
 }
 
 export function StoryPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const qc = useQueryClient()
-  const today = useQuery({ queryKey: ['stories', 'today'], queryFn: storiesApi.today })
+  const today = useQuery({
+    queryKey: ['stories', 'today', i18n.language],
+    queryFn: () => storiesApi.today(i18n.language),
+  })
   const archive = useQuery({ queryKey: ['stories', 'list'], queryFn: storiesApi.list })
   const [genre, setGenre] = useState('')
   const [selected, setSelected] = useState<string>('')
 
   const gen = useMutation({
-    mutationFn: () => storiesApi.generate(genre),
+    mutationFn: () => storiesApi.generate(genre, i18n.language),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stories'] }),
   })
 
@@ -84,7 +92,14 @@ export function StoryPage() {
   useEffect(() => {
     if (!selected && past.length) setSelected(past[0].date)
   }, [past, selected])
-  const selectedStory = past.find((s) => s.date === selected)
+  // The archive list has no translation (see storiesApi.list) — fetch the selected date's story
+  // on its own, resolved for the current interface language, same as today's story.
+  const selectedQuery = useQuery({
+    queryKey: ['stories', 'by-date', selected, i18n.language],
+    queryFn: () => storiesApi.byDate(selected, i18n.language),
+    enabled: !!selected,
+  })
+  const selectedStory = selectedQuery.data
 
   const words = today.data?.words_today ?? []
   const story = today.data?.story
@@ -150,7 +165,13 @@ export function StoryPage() {
                 </button>
               ))}
             </div>
-            {selectedStory ? <StoryView story={selectedStory} /> : <p className="text-emerald-100/60">{t('story.noStoryForDate')}</p>}
+            {selectedQuery.isLoading ? (
+              <p>{t('common.loading')}</p>
+            ) : selectedStory ? (
+              <StoryView story={selectedStory} />
+            ) : (
+              <p className="text-emerald-100/60">{t('story.noStoryForDate')}</p>
+            )}
           </>
         )}
       </section>

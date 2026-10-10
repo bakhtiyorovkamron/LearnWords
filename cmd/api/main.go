@@ -79,6 +79,7 @@ func run() error {
 	// AI: example sentences + daily stories + word search + on-demand translation, enabled only
 	// when the key is provided via environment.
 	var storyGen service.StoryGenerator
+	var storyTranslator service.StoryTranslator
 	var wordLookup service.WordLookup
 	var wordTranslator service.WordTranslator
 
@@ -86,6 +87,7 @@ func run() error {
 		ai := anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
 		providers.Examples = ai
 		storyGen = ai
+		storyTranslator = ai
 		wordLookup = ai
 		wordTranslator = ai
 	} else {
@@ -96,7 +98,7 @@ func run() error {
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
-	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen)
+	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator)
 	adminRepo := postgres.NewAdminRepository(pool)
 
 	// Daily story cron: STORY_CRON_HOUR (default 23) in STORY_CRON_TZ (default Europe/Berlin).

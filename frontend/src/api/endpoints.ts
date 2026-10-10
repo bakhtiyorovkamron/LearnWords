@@ -120,16 +120,33 @@ export const searchApi = {
 export interface StoryWord { word: string; translation: string }
 export interface DailyStory {
   id: string; date: string; genre: string; title: string
-  story_de: string; story_ru: string; words_used: StoryWord[]; created_at: string
+  story_de: string
+  // Translation of story_de and each word's gloss, in `language` — resolved (generated + cached
+  // on first view) for whichever native_language was requested. Empty if translation generation
+  // is unavailable or failed — never a guess in the wrong language.
+  story_translation: string; language: string
+  words_used: StoryWord[]; created_at: string
 }
 
+// native_language = the UI language (ru/en/uz): the story's translation and word glosses come
+// back in it, generated once and cached server-side.
 export const storiesApi = {
-  today: () =>
-    api.get<{ story: DailyStory | null; words_today: StoryWord[]; genres: string[] }>('/stories/today').then((r) => r.data),
+  today: (nativeLanguage: string) =>
+    api
+      .get<{ story: DailyStory | null; words_today: StoryWord[]; genres: string[] }>('/stories/today', {
+        params: { native_language: nativeLanguage },
+      })
+      .then((r) => r.data),
+  // Archive list: metadata + learning-language text only (no translation — resolving it for
+  // the whole archive up front could mean hundreds of AI calls). Open a date via byDate().
   list: () => api.get<{ stories: DailyStory[] }>('/stories').then((r) => r.data.stories),
+  byDate: (date: string, nativeLanguage: string) =>
+    api.get<DailyStory>(`/stories/${date}`, { params: { native_language: nativeLanguage } }).then((r) => r.data),
   // The backend retries the AI call up to 3 times, so allow several minutes.
-  generate: (genre?: string) =>
-    api.post<DailyStory>('/stories/generate', { genre: genre ?? '' }, { timeout: 420_000 }).then((r) => r.data),
+  generate: (genre: string, nativeLanguage: string) =>
+    api
+      .post<DailyStory>('/stories/generate', { genre, native_language: nativeLanguage }, { timeout: 420_000 })
+      .then((r) => r.data),
 }
 
 export const settingsApi = {

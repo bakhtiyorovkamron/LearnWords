@@ -57,7 +57,7 @@ func (r *StoryRepository) LearningLanguage(ctx context.Context, userID uuid.UUID
 	return lang, err
 }
 
-const storyCols = `id, user_id, date, genre, title, story_de, story_ru, words_used, created_at`
+const storyCols = `id, user_id, date, genre, title, story_de, words_used, created_at`
 
 func scanStory(row pgx.Row) (domain.DailyStory, error) {
 	var (
@@ -65,7 +65,7 @@ func scanStory(row pgx.Row) (domain.DailyStory, error) {
 		day   time.Time
 		words []byte
 	)
-	if err := row.Scan(&s.ID, &s.UserID, &day, &s.Genre, &s.Title, &s.StoryDE, &s.StoryRU, &words, &s.CreatedAt); err != nil {
+	if err := row.Scan(&s.ID, &s.UserID, &day, &s.Genre, &s.Title, &s.StoryDE, &words, &s.CreatedAt); err != nil {
 		return s, err
 	}
 	s.Date = day.Format("2006-01-02")
@@ -83,13 +83,44 @@ func (r *StoryRepository) Upsert(ctx context.Context, s domain.DailyStory) (doma
 		return s, err
 	}
 	return scanStory(r.pool.QueryRow(ctx, `
-		INSERT INTO daily_stories (user_id, date, genre, title, story_de, story_ru, words_used)
-		VALUES ($1, $2::date, $3, $4, $5, $6, $7::jsonb)
+		INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used)
+		VALUES ($1, $2::date, $3, $4, $5, $6::jsonb)
 		ON CONFLICT (user_id, date) DO UPDATE
 		SET genre = EXCLUDED.genre, title = EXCLUDED.title, story_de = EXCLUDED.story_de,
-		    story_ru = EXCLUDED.story_ru, words_used = EXCLUDED.words_used, created_at = now()
+		    words_used = EXCLUDED.words_used, created_at = now()
 		RETURNING `+storyCols,
-		s.UserID, s.Date, s.Genre, s.Title, s.StoryDE, s.StoryRU, string(words)))
+		s.UserID, s.Date, s.Genre, s.Title, s.StoryDE, string(words)))
+}
+
+// GetTranslation returns a cached story translation; ok=false on a miss.
+func (r *StoryRepository) GetTranslation(ctx context.Context, storyID uuid.UUID, lang string) (translation string, wordGlosses map[string]string, ok bool, err error) {
+	var raw []byte
+	err = r.pool.QueryRow(ctx,
+		`SELECT translation_text, word_glosses FROM story_translations WHERE story_id = $1 AND lang = $2`,
+		storyID, lang).Scan(&translation, &raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, false, nil
+	}
+	if err != nil {
+		return "", nil, false, err
+	}
+	_ = json.Unmarshal(raw, &wordGlosses)
+	return translation, wordGlosses, true, nil
+}
+
+// PutTranslation stores (or refreshes) a story's translation for one native language.
+func (r *StoryRepository) PutTranslation(ctx context.Context, storyID uuid.UUID, lang, translation string, wordGlosses map[string]string) error {
+	raw, err := json.Marshal(wordGlosses)
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO story_translations (story_id, lang, translation_text, word_glosses)
+		VALUES ($1, $2, $3, $4::jsonb)
+		ON CONFLICT (story_id, lang) DO UPDATE
+		SET translation_text = EXCLUDED.translation_text, word_glosses = EXCLUDED.word_glosses`,
+		storyID, lang, translation, string(raw))
+	return err
 }
 
 // ByDate returns the user's story for a date or domain.ErrNotFound.
