@@ -36,6 +36,20 @@ func NormalizeSessionSize(s string) int {
 	}
 }
 
+// DefaultPracticeMode is used whenever the requested practice mode is missing or invalid.
+const DefaultPracticeMode = "hard"
+
+var practiceModes = map[string]bool{"hard": true, "random": true, "recent": true}
+
+// NormalizePracticeMode validates the requested practice word-selection mode
+// ("hard" | "random" | "recent"); anything else falls back to DefaultPracticeMode.
+func NormalizePracticeMode(m string) string {
+	if practiceModes[m] {
+		return m
+	}
+	return DefaultPracticeMode
+}
+
 type ReviewRepository interface {
 	ListDue(ctx context.Context, userID uuid.UUID, today time.Time, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error)
 	// CountDue is the real total, ignoring the session-size cap (for the "N words due today" line).
@@ -43,6 +57,12 @@ type ReviewRepository interface {
 	// Apply runs fn on the current progress inside a transaction, stores the result and logs the answer.
 	Apply(ctx context.Context, userID, wordID uuid.UUID, today time.Time, correct bool,
 		fn func(p domain.Progress) domain.Progress) (*domain.Progress, error)
+	// PracticeWords draws a pool for extra practice from the WHOLE collection (not just due
+	// words) — practice exists precisely so there's something to do when nothing is due.
+	PracticeWords(ctx context.Context, userID uuid.UUID, mode string, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error)
+	// LogPractice records a practice answer for streak/activity purposes only. It must never
+	// update word_progress — see postgres.ReviewRepository.LogPractice's implementation.
+	LogPractice(ctx context.Context, userID, wordID uuid.UUID, correct bool) error
 }
 
 type ReviewService struct {
@@ -82,6 +102,21 @@ func (s *ReviewService) Answer(ctx context.Context, userID, wordID uuid.UUID, co
 	return s.repo.Apply(ctx, userID, wordID, today, correct, func(p domain.Progress) domain.Progress {
 		return ApplyAnswer(p, correct, now)
 	})
+}
+
+// Practice returns up to NormalizeSessionSize(sessionSize) words for EXTRA practice — drawn
+// from the whole collection, not limited to what's due today — ordered per
+// NormalizePracticeMode(mode) (hardest first / random / most recently added).
+func (s *ReviewService) Practice(ctx context.Context, userID uuid.UUID, mode, sessionSize string, folder *domain.FolderFilter) ([]domain.DueCard, error) {
+	return s.repo.PracticeWords(ctx, userID, NormalizePracticeMode(mode), NormalizeSessionSize(sessionSize), folder)
+}
+
+// AnswerPractice logs a practice answer for the daily-activity streak only. It deliberately
+// does NOT call Apply/ApplyAnswer — practice must never change a word's box, next review date,
+// or learned status. This is enforced here structurally (there is no Leitner-mutating code in
+// this method at all), not by trusting a client-sent flag.
+func (s *ReviewService) AnswerPractice(ctx context.Context, userID, wordID uuid.UUID, correct bool) error {
+	return s.repo.LogPractice(ctx, userID, wordID, correct)
 }
 
 // ApplyAnswer is the pure Leitner transition.

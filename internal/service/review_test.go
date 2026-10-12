@@ -1,8 +1,11 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
 )
@@ -60,6 +63,69 @@ func TestIsWordLearned_NeverTrueBelowLearnedMinBox(t *testing.T) {
 	for box := 1; box < domain.LearnedMinBox; box++ {
 		if domain.IsWordLearned(box, 999) {
 			t.Errorf("box %d must never count as learned, no matter the streak", box)
+		}
+	}
+}
+
+// --- practice: structural safety -----------------------------------------
+
+type fakeReviewRepoForPractice struct {
+	applyCalls int // must stay 0 for every practice answer — Apply is the ONLY thing that
+	// ever mutates word_progress (box_level, next_review_at, is_learned).
+	logPracticeCalls int
+	lastLogCorrect   bool
+	practiceWords    []domain.DueCard
+}
+
+func (f *fakeReviewRepoForPractice) ListDue(context.Context, uuid.UUID, time.Time, int, *domain.FolderFilter) ([]domain.DueCard, error) {
+	return nil, nil
+}
+func (f *fakeReviewRepoForPractice) CountDue(context.Context, uuid.UUID, time.Time, *domain.FolderFilter) (int, error) {
+	return 0, nil
+}
+func (f *fakeReviewRepoForPractice) Apply(context.Context, uuid.UUID, uuid.UUID, time.Time, bool,
+	func(domain.Progress) domain.Progress) (*domain.Progress, error) {
+	f.applyCalls++
+	return &domain.Progress{}, nil
+}
+func (f *fakeReviewRepoForPractice) PracticeWords(context.Context, uuid.UUID, string, int, *domain.FolderFilter) ([]domain.DueCard, error) {
+	return f.practiceWords, nil
+}
+func (f *fakeReviewRepoForPractice) LogPractice(_ context.Context, _, _ uuid.UUID, correct bool) error {
+	f.logPracticeCalls++
+	f.lastLogCorrect = correct
+	return nil
+}
+
+// AnswerPractice must call ONLY LogPractice — never Apply — regardless of the answer's
+// correctness. This is the "frontend not trusted" guarantee from a different angle: even a
+// service-level caller has no way to reach the Leitner-mutating code path through this method.
+func TestAnswerPractice_NeverCallsApply(t *testing.T) {
+	for _, correct := range []bool{true, false} {
+		repo := &fakeReviewRepoForPractice{}
+		s := NewReviewService(repo)
+		if err := s.AnswerPractice(context.Background(), uuid.New(), uuid.New(), correct); err != nil {
+			t.Fatal(err)
+		}
+		if repo.applyCalls != 0 {
+			t.Errorf("correct=%v: Apply was called %d times, want 0", correct, repo.applyCalls)
+		}
+		if repo.logPracticeCalls != 1 || repo.lastLogCorrect != correct {
+			t.Errorf("correct=%v: LogPractice calls=%d, lastCorrect=%v", correct, repo.logPracticeCalls, repo.lastLogCorrect)
+		}
+	}
+}
+
+func TestNormalizePracticeMode(t *testing.T) {
+	cases := map[string]string{
+		"hard": "hard", "random": "random", "recent": "recent",
+		"":        DefaultPracticeMode,
+		"HARD":    DefaultPracticeMode, // case-sensitive: only the exact lowercase values are valid
+		"easiest": DefaultPracticeMode,
+	}
+	for in, want := range cases {
+		if got := NormalizePracticeMode(in); got != want {
+			t.Errorf("NormalizePracticeMode(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

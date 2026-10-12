@@ -16,6 +16,9 @@ type StatsRepository struct{ pool *pgxpool.Pool }
 func NewStatsRepository(pool *pgxpool.Pool) *StatsRepository { return &StatsRepository{pool: pool} }
 
 // Daily returns one row per day in [from, to] (UTC dates), including days without activity.
+// Only session_type='review' answers count toward "reviewed"/"correct" (accuracy, the chart) —
+// practice never touched the Leitner schedule, so mixing it in would misrepresent real review
+// performance. See ActiveDays for the (deliberately unfiltered) streak.
 func (r *StatsRepository) Daily(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]domain.DayStat, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT d::date,
@@ -26,7 +29,7 @@ func (r *StatsRepository) Daily(ctx context.Context, userID uuid.UUID, from, to 
 			       count(*) AS reviewed,
 			       count(*) FILTER (WHERE is_correct) AS correct
 			FROM review_logs
-			WHERE user_id = $1 AND reviewed_at >= ($2::date::timestamp AT TIME ZONE 'UTC')
+			WHERE user_id = $1 AND reviewed_at >= ($2::date::timestamp AT TIME ZONE 'UTC') AND session_type = 'review'
 			GROUP BY 1) l ON l.day = d::date
 		LEFT JOIN (
 			SELECT (created_at AT TIME ZONE 'UTC')::date AS day, count(*) AS new_words
@@ -59,6 +62,8 @@ func (r *StatsRepository) LearnedCount(ctx context.Context, userID uuid.UUID) (i
 }
 
 // ActiveDays returns every distinct UTC day with at least one answer, newest first.
+// Deliberately includes practice answers (session_type='practice') — practice still counts as
+// a day's training activity for the streak, even though it doesn't touch the Leitner schedule.
 func (r *StatsRepository) ActiveDays(ctx context.Context, userID uuid.UUID) ([]time.Time, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT DISTINCT (reviewed_at AT TIME ZONE 'UTC')::date AS day

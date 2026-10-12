@@ -99,7 +99,19 @@
       "Bash(echo \"--- hero ---\")",
       "Bash(curl -s http://localhost:8096/api/hero?native_language=ru -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
       "Bash(pkill -f \"scratchpad/learnwords-api6\")",
-      "Bash(rm -f /tmp/seed_learned.sql)"
+      "Bash(rm -f /tmp/seed_learned.sql)",
+      "Bash(gofmt -w ./internal/service/review.go)",
+      "Bash(gofmt -w ./internal/repository/postgres/review.go)",
+      "Bash(gofmt -w ./internal/repository/postgres/stats.go)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15439/learnwords?sslmode=disable\")",
+      "Bash(export HTTP_ADDR=\":8097\")",
+      "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api7)",
+      "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api9.log)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8097/healthz)",
+      "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/token_p.txt)",
+      "Bash(echo \"--- confirm nothing due today ---\")",
+      "Bash(curl -s http://localhost:8097/api/review/due?limit=20 -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Read(//tmp/**)"
     ]
   }
 }

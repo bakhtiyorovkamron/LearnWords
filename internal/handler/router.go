@@ -29,6 +29,7 @@ type RouterDeps struct {
 	Search       *SearchHandler
 	Translations *TranslationHandler
 	Hero         *HeroHandler
+	Practice     *PracticeHandler
 	UserStatus   UserStatusStore
 	HealthCheck  func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -116,6 +117,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/translations", translateLimit, d.Translations.Batch)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
+		protected.GET("/practice/words", d.Practice.Words)
+		protected.POST("/practice/:id/answer", d.Practice.Answer)
 		protected.GET("/stats", d.Stats.Get)
 		protected.GET("/stories", d.Stories.List)
 		protected.GET("/stories/today", d.Stories.Today)

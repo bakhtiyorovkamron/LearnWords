@@ -3,7 +3,8 @@
   "direction": { "label": "Yo‘nalish", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Aralash" },
   "lang": { "label": "Interfeys tili", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
     "hero": { "almost": "Yaqinda yodlanadi: {{n}}", "title": "Nemischa qahramoningiz", "wordsLearned": "Oʻrganilgan soʻzlar", "toNextStage": "Keyingi bosqichgacha", "show": "Qahramonni koʻrsatish", "expand": "Yoyish", "collapse": "Yigʻish", "hide": "Qahramonni yashirish", "sleepyBubble": "Zzz..." },
-"nav": {
+"practice": { "start": "Yana mashq qilish", "again": "Yana bir bor oʻtish", "pick": "Qaysi soʻzlarni mashq qilamiz?", "hard": "Qiyin soʻzlar", "random": "Tasodifiy", "recent": "Yaqinda qoʻshilganlar", "note": "Bu mashq takrorlash jadvalini oʻzgartirmaydi" },
+  "nav": {
     "contexts": "Kontekstlar",
     "add": "Qo‘shish",
     "search": "Qidiruv",

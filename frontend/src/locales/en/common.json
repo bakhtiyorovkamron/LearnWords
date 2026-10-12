@@ -3,7 +3,8 @@
   "direction": { "label": "Direction", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
     "hero": { "almost": "Almost learned: {{n}}", "title": "Your German hero", "wordsLearned": "Words learned", "toNextStage": "To the next stage", "show": "Show hero", "expand": "Expand", "collapse": "Collapse", "hide": "Hide hero", "sleepyBubble": "Zzz..." },
-"nav": {
+"practice": { "start": "Practice more", "again": "Practice again", "pick": "Which words to practice?", "hard": "Hardest", "random": "Random", "recent": "Recently added", "note": "This practice does not change your review schedule" },
+  "nav": {
     "contexts": "Contexts",
     "add": "Add",
     "search": "Search",

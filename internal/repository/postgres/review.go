@@ -132,8 +132,11 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 		return nil, err
 	}
 	// Log the answer for statistics (same transaction: progress and log stay consistent).
+	// session_type is explicit here (not just relying on the column default) — this is the
+	// ONLY code path that may ever write 'review'; LogPractice is the only other writer and it
+	// always writes 'practice', never touching word_progress at all.
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO review_logs (user_id, word_id, is_correct) VALUES ($1, $2, $3)`,
+		`INSERT INTO review_logs (user_id, word_id, is_correct, session_type) VALUES ($1, $2, $3, 'review')`,
 		userID, wordID, correct); err != nil {
 		return nil, err
 	}
@@ -141,4 +144,68 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 		return nil, err
 	}
 	return &p, nil
+}
+
+// PracticeWords returns a pool for extra practice — drawn from the user's WHOLE collection
+// (not filtered by due date or is_learned; that's the point — something to do when nothing is
+// due), ordered per mode:
+//   - "hard": lowest Leitner box first, then most past wrong answers first (both signals of
+//     difficulty); mode is always one of NormalizePracticeMode's fixed values, never raw user
+//     input, so it is safe to splice into the ORDER BY.
+//   - "random": random order.
+//   - "recent": most recently added first.
+func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, mode string, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error) {
+	folderOnly, noFolder := folderWhere(folder)
+	order := "random()"
+	switch mode {
+	case "recent":
+		order = "w.created_at DESC"
+	case "hard":
+		order = "COALESCE(p.box_level, 1) ASC, COALESCE(wr.wrong_count, 0) DESC, w.created_at ASC"
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
+		       w.language, w.created_at, COALESCE(p.box_level, 1),
+		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), w.folder_id
+		FROM word_cards w
+		LEFT JOIN word_progress p ON p.word_id = w.id
+		LEFT JOIN (
+			SELECT word_id, count(*) AS wrong_count FROM review_logs
+			WHERE user_id = $1 AND NOT is_correct GROUP BY word_id
+		) wr ON wr.word_id = w.id
+		WHERE w.user_id = $1
+		  AND ($3::uuid IS NULL OR w.folder_id = $3::uuid)
+		  AND (NOT $4::bool OR w.folder_id IS NULL)
+		ORDER BY `+order+`
+		LIMIT $2`, userID, limit, folderOnly, noFolder)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.DueCard, error) {
+		var d domain.DueCard
+		err := row.Scan(&d.ID, &d.ContextID, &d.UserID, &d.Word, &d.Translation, &d.Transcription,
+			&d.AudioURL, &d.Language, &d.CreatedAt, &d.BoxLevel,
+			&d.ExampleSentence, &d.ExampleTranslation, &d.FolderID)
+		d.HasExample = strings.Contains(d.ExampleSentence, "___")
+		return d, err
+	})
+}
+
+// LogPractice records a practice answer for the daily-activity streak only. There is — by
+// construction — no UPDATE to word_progress anywhere in this method: a practice answer can
+// never change a word's box, next review date or learned status, regardless of what the client
+// sends.
+func (r *ReviewRepository) LogPractice(ctx context.Context, userID, wordID uuid.UUID, correct bool) error {
+	var exists bool
+	if err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM word_cards WHERE id = $1 AND user_id = $2)`, wordID, userID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return domain.ErrNotFound
+	}
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO review_logs (user_id, word_id, is_correct, session_type) VALUES ($1, $2, $3, 'practice')`,
+		userID, wordID, correct)
+	return err
 }

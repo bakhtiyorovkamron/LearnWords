@@ -224,6 +224,20 @@ export const reviewApi = {
     api.post<Progress>(`/review/${id}/answer`, { correct }).then((r) => r.data),
 }
 
+// Extra practice: for when there's nothing left due, or just to drill more. Answers here never
+// touch the Leitner schedule — enforced on the backend (separate endpoint, separate code path),
+// not by anything the client sends.
+export const PRACTICE_MODES = ['hard', 'random', 'recent'] as const
+export type PracticeMode = (typeof PRACTICE_MODES)[number]
+
+export const practiceApi = {
+  words: (mode: PracticeMode, limit: SessionSize, folder: FolderSelection = '') =>
+    api
+      .get<{ cards: DueCard[] }>('/practice/words', { params: { mode, limit, folder_id: folder || undefined } })
+      .then((r) => r.data.cards),
+  answer: (id: string, correct: boolean) => api.post(`/practice/${id}/answer`, { correct }),
+}
+
 export interface CardTranslation { translation: string; example_translation: string }
 
 // Per-word translation cache: shows the quiz in the user's actual interface language instead of

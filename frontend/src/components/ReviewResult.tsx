@@ -5,13 +5,16 @@ interface Props {
   correct: number
   total: number
   onRestart: () => void
+  // Lets callers repurpose the restart button — e.g. "Пройти ещё раз" (practice.again) leads
+  // into the practice setup screen rather than literally restarting the same session.
+  restartLabel?: string
   // moreCount > 0 → there are still due words left: show "Ещё N" (same filters + direction).
   moreCount?: number
   onMore?: () => void
   moreLoading?: boolean
 }
 
-export function ReviewResult({ correct, total, onRestart, moreCount = 0, onMore, moreLoading }: Props) {
+export function ReviewResult({ correct, total, onRestart, restartLabel, moreCount = 0, onMore, moreLoading }: Props) {
   const { t } = useTranslation()
   const wrong = total - correct
   const hasMore = moreCount > 0
@@ -36,7 +39,7 @@ export function ReviewResult({ correct, total, onRestart, moreCount = 0, onMore,
             {moreLoading ? t('common.loading') : t('result.more', { count: moreCount })}
           </button>
         )}
-        <button type="button" onClick={onRestart} className={hasMore ? 'btn-ghost' : 'btn-primary'}>{t('result.restart')}</button>
+        <button type="button" onClick={onRestart} className={hasMore ? 'btn-ghost' : 'btn-primary'}>{restartLabel ?? t('result.restart')}</button>
         <Link to="/contexts" className="btn-ghost">{t('result.home')}</Link>
       </div>
     </div>
