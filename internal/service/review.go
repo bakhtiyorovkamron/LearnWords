@@ -10,8 +10,6 @@ import (
 )
 
 const (
-	maxBox        = 5
-	learnedStreak = 2
 	// DefaultSessionSize is used whenever the requested session size is missing or invalid.
 	DefaultSessionSize = 20
 	// unlimitedSessionSize stands in for "all" as a SQL LIMIT — effectively no cap at all.
@@ -90,11 +88,11 @@ func (s *ReviewService) Answer(ctx context.Context, userID, wordID uuid.UUID, co
 func ApplyAnswer(p domain.Progress, correct bool, now time.Time) domain.Progress {
 	today := dateOf(now)
 	if correct {
-		if p.BoxLevel < maxBox {
+		if p.BoxLevel < domain.LearnedMinBox {
 			p.BoxLevel++
 		} else {
 			p.CorrectStreakAtMax++
-			if p.CorrectStreakAtMax >= learnedStreak {
+			if p.CorrectStreakAtMax >= domain.LearnedStreak {
 				p.IsLearned = true
 			}
 		}

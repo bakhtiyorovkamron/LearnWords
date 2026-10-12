@@ -84,7 +84,22 @@
       "Bash(pkill -f \"scratchpad/learnwords-api5\")",
       "Bash(rm -f /tmp/seed_hero.sql)",
       "Bash(git fetch *)",
-      "Bash(docker context *)"
+      "Bash(docker context *)",
+      "Bash(gofmt -w ./internal/domain/learned.go)",
+      "Bash(gofmt -w ./internal/repository/postgres/hero.go)",
+      "Bash(gofmt -w ./internal/service/hero.go)",
+      "Bash(gofmt -w ./internal/service/hero_test.go)",
+      "Bash(gofmt -w ./internal/service/review_test.go)",
+      "Bash(export DATABASE_URL=\"postgres://learnwords:learnwords@localhost:15438/learnwords?sslmode=disable\")",
+      "Bash(export HTTP_ADDR=\":8096\")",
+      "Bash(export FEATURE_HERO_EMAILS=\"learned-test@example.com\")",
+      "Bash(nohup /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/learnwords-api6)",
+      "Bash(tail -5 /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/api8.log)",
+      "Bash(cat /private/tmp/claude-502/-Users-kamronbahtiyorov-go-src-learnwords/0989cc13-1312-4e40-b5fb-f64c69cf8a80/scratchpad/token_learned.txt)",
+      "Bash(echo \"--- hero ---\")",
+      "Bash(curl -s http://localhost:8096/api/hero?native_language=ru -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(pkill -f \"scratchpad/learnwords-api6\")",
+      "Bash(rm -f /tmp/seed_learned.sql)"
     ]
   }
 }

@@ -60,6 +60,9 @@ export function HeroCard() {
       <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-900/60">
         <div className="h-full bg-lime-400 transition-all" style={{ width: `${progress}%` }} />
       </div>
+      {hero.almost_count > 0 && (
+        <p className="mt-1.5 text-xs text-emerald-100/50">{t('hero.almost', { n: hero.almost_count })}</p>
+      )}
 
       {hero.phrase && (
         <div className="mt-4 inline-block max-w-full rounded-2xl rounded-bl-none bg-white/10 px-4 py-2 text-sm italic text-white">

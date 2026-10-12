@@ -2,7 +2,7 @@
   "common": { "unknownError": "Unknown error", "loading": "Loading…", "rateLimited": "Too many requests. Please try again in {{seconds}} s." },
   "direction": { "label": "Direction", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
-    "hero": { "title": "Your German hero", "wordsLearned": "Words learned", "toNextStage": "To the next stage", "show": "Show hero", "expand": "Expand", "collapse": "Collapse", "hide": "Hide hero", "sleepyBubble": "Zzz..." },
+    "hero": { "almost": "Almost learned: {{n}}", "title": "Your German hero", "wordsLearned": "Words learned", "toNextStage": "To the next stage", "show": "Show hero", "expand": "Expand", "collapse": "Collapse", "hide": "Hide hero", "sleepyBubble": "Zzz..." },
 "nav": {
     "contexts": "Contexts",
     "add": "Add",
@@ -127,7 +127,7 @@
     "nothingFound": "Nothing found",
     "empty": "The collection is empty"
   },
-  "collection": {
+  "collection": { "found": "Found: {{count}}",
     "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned" },
     "period": { "today": "Today", "week": "This week", "all": "All time" },
     "sortLabel": "Sort",

@@ -27,15 +27,19 @@ func (f *fakeUserRepoForHero) GetByID(context.Context, uuid.UUID) (*domain.User,
 
 type fakeHeroRepo struct {
 	learnedCount int
+	almostCount  int
 	learnedWords []string
 	stage        int
 	hasStage     bool
 }
 
-func (f *fakeHeroRepo) CountLearned(context.Context, uuid.UUID, int) (int, error) {
+func (f *fakeHeroRepo) CountLearned(context.Context, uuid.UUID) (int, error) {
 	return f.learnedCount, nil
 }
-func (f *fakeHeroRepo) LearnedWords(context.Context, uuid.UUID, int) ([]string, error) {
+func (f *fakeHeroRepo) CountAlmostLearned(context.Context, uuid.UUID, int) (int, error) {
+	return f.almostCount, nil
+}
+func (f *fakeHeroRepo) LearnedWords(context.Context, uuid.UUID) ([]string, error) {
 	return f.learnedWords, nil
 }
 func (f *fakeHeroRepo) HeroStage(context.Context, uuid.UUID) (int, bool, error) {

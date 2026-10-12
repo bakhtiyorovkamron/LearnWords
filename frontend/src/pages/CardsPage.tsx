@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { collectionApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -90,8 +90,18 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   })
 
   const cards = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data])
-  const total = query.data?.pages[0]?.total
+  const filteredTotal = query.data?.pages[0]?.total
   const filtersActive = status !== 'all' || period !== 'all' || !!search || !!folder
+
+  // The heading always shows the TRUE total word count, independent of any filter — a separate
+  // line shows how many match the current filter (see cards.count / collection.found below).
+  // No filters → the same number as filteredTotal, so the list just fetches it once itself.
+  const grandTotal = useQuery({
+    queryKey: ['collection', 'grand-total'],
+    queryFn: () =>
+      collectionApi.list({ status: 'all', period: 'all', sort: 'date', q: '', limit: 1, offset: 0 }).then((r) => r.total),
+    staleTime: 30_000,
+  })
 
   return (
     <div className="space-y-6">
@@ -101,8 +111,11 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
             {t('cards.titleA')}<span className="text-lime-300">{t('cards.titleB')}</span> 🃏
           </h1>
           <p className="mt-2 text-emerald-100/70">
-            {total !== undefined ? t('cards.count', { count: total }) : t('cards.allInOnePlace')}
+            {grandTotal.data !== undefined ? t('cards.count', { count: grandTotal.data }) : t('cards.allInOnePlace')}
           </p>
+          {filtersActive && (
+            <p className="text-sm text-lime-300/80">{t('collection.found', { count: filteredTotal ?? 0 })}</p>
+          )}
         </div>
         <div className="relative w-full md:w-80">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-emerald-300/60">🔍</span>
@@ -177,7 +190,7 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
             className="btn-ghost">
             {query.isFetchingNextPage
               ? t('common.loading')
-              : t('collection.loadMore', { shown: cards.length, total })}
+              : t('collection.loadMore', { shown: cards.length, total: filteredTotal })}
           </button>
         </div>
       )}

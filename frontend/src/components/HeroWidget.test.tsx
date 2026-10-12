@@ -15,6 +15,7 @@ const baseHero: Hero = {
   stage: 2,
   stage_name: 'Малыш',
   learned_count: 60,
+  almost_count: 5,
   words_to_next_stage: 140,
   born_at: '2024-01-01T00:00:00Z',
   age_days: 400,

@@ -11,10 +11,6 @@ import (
 	"learnwords/internal/domain"
 )
 
-// HeroMinBox: a word counts as "learned" for the hero feature once it reaches this Leitner
-// box (4 or 5) — kept as a named constant so the threshold is easy to change later.
-const HeroMinBox = 4
-
 // heroStageMinCount[i] is the learned-word count at which stage i+1 begins (stage 1 starts at 0).
 // Stage 6 ("от 2400") has no upper bound.
 var heroStageMinCount = [6]int{0, 50, 200, 500, 1300, 2400}
@@ -62,9 +58,12 @@ func isHeroBirthday(bornAt, now time.Time) (isToday bool, years int) {
 }
 
 // HeroRepository is the storage side of the hero feature — see postgres.HeroRepository.
+// CountLearned/LearnedWords use the SAME definition of "learned" as the stats page and the
+// Collection filter (domain.LearnedMinBox / word_progress.is_learned) — see domain/learned.go.
 type HeroRepository interface {
-	CountLearned(ctx context.Context, userID uuid.UUID, minBox int) (int, error)
-	LearnedWords(ctx context.Context, userID uuid.UUID, minBox int) ([]string, error)
+	CountLearned(ctx context.Context, userID uuid.UUID) (int, error)
+	CountAlmostLearned(ctx context.Context, userID uuid.UUID, box int) (int, error)
+	LearnedWords(ctx context.Context, userID uuid.UUID) ([]string, error)
 	HeroStage(ctx context.Context, userID uuid.UUID) (stage int, ok bool, err error)
 	SetHeroStage(ctx context.Context, userID uuid.UUID, stage int) error
 }
@@ -103,7 +102,13 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		return nil, domain.ErrNotFound
 	}
 
-	learnedCount, err := s.repo.CountLearned(ctx, userID, HeroMinBox)
+	learnedCount, err := s.repo.CountLearned(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	// "Almost learned" is a display-only number — it must never feed into the stage, which is
+	// computed from learnedCount alone.
+	almostCount, err := s.repo.CountAlmostLearned(ctx, userID, domain.LearnedMinBox-1)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +132,7 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		}
 	}
 
-	words, err := s.repo.LearnedWords(ctx, userID, HeroMinBox)
+	words, err := s.repo.LearnedWords(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +151,7 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		Stage:            stage,
 		StageName:        heroStageName(stage, interfaceLang),
 		LearnedCount:     learnedCount,
+		AlmostCount:      almostCount,
 		WordsToNextStage: heroWordsToNextStage(learnedCount, stage),
 		BornAt:           user.CreatedAt,
 		AgeDays:          int(now.Sub(user.CreatedAt).Hours() / 24),

@@ -174,6 +174,7 @@ export interface Hero {
   stage: number
   stage_name: string
   learned_count: number
+  almost_count: number // words one Leitner box below "learned"
   words_to_next_stage: number
   born_at: string
   age_days: number

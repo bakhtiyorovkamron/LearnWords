@@ -15,28 +15,43 @@ type HeroRepository struct{ pool *pgxpool.Pool }
 
 func NewHeroRepository(pool *pgxpool.Pool) *HeroRepository { return &HeroRepository{pool: pool} }
 
-// CountLearned returns how many German words are at box_level >= minBox.
-func (r *HeroRepository) CountLearned(ctx context.Context, userID uuid.UUID, minBox int) (int, error) {
+// CountLearned returns how many German words are learned — the SAME is_learned flag the
+// stats page and the Collection "Выучено" filter use (see domain.LearnedMinBox).
+func (r *HeroRepository) CountLearned(ctx context.Context, userID uuid.UUID) (int, error) {
 	var n int
 	err := r.pool.QueryRow(ctx, `
 		SELECT count(*)
 		FROM word_progress p
 		JOIN word_cards w ON w.id = p.word_id
-		WHERE p.user_id = $1 AND p.box_level >= $2 AND w.language = 'de'`,
-		userID, minBox).Scan(&n)
+		WHERE p.user_id = $1 AND p.is_learned AND w.language = 'de'`,
+		userID).Scan(&n)
 	return n, err
 }
 
-// LearnedWords returns the spelling of every learned German word (box_level >= minBox) —
-// small enough (a few thousand short strings at most) to fetch whole and pick/filter in Go,
-// which avoids any sampling bias from picking a random subset in SQL first.
-func (r *HeroRepository) LearnedWords(ctx context.Context, userID uuid.UUID, minBox int) ([]string, error) {
+// CountAlmostLearned returns how many German words sit exactly at box domain.LearnedMinBox-1 —
+// "almost learned", shown as a second line on the hero card. Does not affect the hero's
+// stage, which is computed from CountLearned only.
+func (r *HeroRepository) CountAlmostLearned(ctx context.Context, userID uuid.UUID, box int) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM word_progress p
+		JOIN word_cards w ON w.id = p.word_id
+		WHERE p.user_id = $1 AND p.box_level = $2 AND NOT p.is_learned AND w.language = 'de'`,
+		userID, box).Scan(&n)
+	return n, err
+}
+
+// LearnedWords returns the spelling of every learned German word — small enough (a few
+// thousand short strings at most) to fetch whole and pick/filter in Go, which avoids any
+// sampling bias from picking a random subset in SQL first.
+func (r *HeroRepository) LearnedWords(ctx context.Context, userID uuid.UUID) ([]string, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.word
 		FROM word_progress p
 		JOIN word_cards w ON w.id = p.word_id
-		WHERE p.user_id = $1 AND p.box_level >= $2 AND w.language = 'de'`,
-		userID, minBox)
+		WHERE p.user_id = $1 AND p.is_learned AND w.language = 'de'`,
+		userID)
 	if err != nil {
 		return nil, err
 	}

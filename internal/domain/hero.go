@@ -8,6 +8,7 @@ type Hero struct {
 	Stage            int       `json:"stage"`      // 1-6
 	StageName        string    `json:"stage_name"` // in the requested interface language
 	LearnedCount     int       `json:"learned_count"`
+	AlmostCount      int       `json:"almost_count"`        // words at box LearnedMinBox-1 ("almost learned")
 	WordsToNextStage int       `json:"words_to_next_stage"` // 0 at the max stage
 	BornAt           time.Time `json:"born_at"`             // account creation date
 	AgeDays          int       `json:"age_days"`
