@@ -52,6 +52,10 @@ services:
     dns: [1.1.1.1, 8.8.8.8]
     environment:
       ACME_EMAIL: ${ACME_EMAIL:-admin@yodla.fun}
+      # Basic auth in front of https://monitor.yodla.fun (see README «Мониторинг»). Passed through
+      # only when set in .env: without them the Caddyfile default keeps the panel locked.
+      BESZEL_BASIC_USER:
+      BESZEL_BASIC_HASH:
     ports:
       - "80:80"
       - "443:443"
@@ -63,6 +67,36 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [backend]
+
+  # Server monitoring (https://beszel.dev): hub = web panel, agent = collects this server's metrics.
+  # Pinned versions — upgrade both together (https://github.com/henrygd/beszel/releases).
+  beszel:
+    image: henrygd/beszel:0.21.0
+    container_name: beszel
+    restart: unless-stopped
+    environment:
+      APP_URL: https://monitor.yodla.fun
+    # Localhost only: the agent (host network) connects here; Caddy reaches the hub as beszel:8090.
+    ports: ["127.0.0.1:8090:8090"]
+    volumes:
+      - ./beszel_data:/beszel_data
+      - ./beszel_socket:/beszel_socket
+
+  beszel-agent:
+    image: henrygd/beszel-agent:0.21.0
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./beszel_agent_data:/var/lib/beszel-agent
+      - ./beszel_socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LISTEN: /beszel_socket/beszel.sock
+      HUB_URL: http://localhost:8090
+      # From the panel's "Add system" dialog, stored in .env (README «Мониторинг»).
+      KEY: ${BESZEL_KEY:-}
+      TOKEN: ${BESZEL_TOKEN:-}
 
   # Dev server with hot reload (http://IP:15173). Start only when needed:
   #   docker compose --profile dev up -d frontend
