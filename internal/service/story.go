@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 
@@ -25,12 +27,19 @@ type StoryTranslator interface {
 	TranslateStory(ctx context.Context, learningLang, nativeLang, storyDE string, words []string) (translation string, wordGlosses map[string]string, err error)
 }
 
+// StoryProofreader is the second AI pass over a generated story: fixes grammar (articles, cases,
+// agreement) without changing the plot. One call per invocation — the retry is done here.
+type StoryProofreader interface {
+	ProofreadStory(ctx context.Context, title, story string, words []domain.StoryWord) (domain.ProofreadStory, error)
+}
+
 type StoryRepository interface {
 	WordsAddedOn(ctx context.Context, userID uuid.UUID, day string) ([]domain.StoryWord, error)
 	UsersWithWordsOn(ctx context.Context, day string) ([]uuid.UUID, error)
 	// LearningLanguage is used by the cron job (no HTTP request → no language in ctx).
 	LearningLanguage(ctx context.Context, userID uuid.UUID) (string, error)
 	Upsert(ctx context.Context, s domain.DailyStory) (domain.DailyStory, error)
+	SaveCorrections(ctx context.Context, storyID, userID uuid.UUID, cs []domain.StoryCorrection) error
 	ByDate(ctx context.Context, userID uuid.UUID, day string) (domain.DailyStory, error)
 	List(ctx context.Context, userID uuid.UUID, limit int) ([]domain.DailyStory, error)
 	GetTranslation(ctx context.Context, storyID uuid.UUID, lang string) (translation string, wordGlosses map[string]string, ok bool, err error)
@@ -45,13 +54,14 @@ const maxStoryWords = 12
 
 type StoryService struct {
 	repo       StoryRepository
-	gen        StoryGenerator  // nil when ANTHROPIC_API_KEY is not set
-	translator StoryTranslator // nil when ANTHROPIC_API_KEY is not set
+	gen        StoryGenerator   // nil when ANTHROPIC_API_KEY is not set
+	translator StoryTranslator  // nil when ANTHROPIC_API_KEY is not set
+	proof      StoryProofreader // nil when ANTHROPIC_API_KEY is not set
 	now        func() time.Time
 }
 
-func NewStoryService(repo StoryRepository, gen StoryGenerator, translator StoryTranslator) *StoryService {
-	return &StoryService{repo: repo, gen: gen, translator: translator, now: time.Now}
+func NewStoryService(repo StoryRepository, gen StoryGenerator, translator StoryTranslator, proof StoryProofreader) *StoryService {
+	return &StoryService{repo: repo, gen: gen, translator: translator, proof: proof, now: time.Now}
 }
 
 func (s *StoryService) today() string { return s.now().UTC().Format("2006-01-02") }
@@ -102,14 +112,115 @@ func (s *StoryService) generateFor(ctx context.Context, userID uuid.UUID, day, g
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
-	saved, err := s.repo.Upsert(ctx, domain.DailyStory{
-		UserID: userID, Date: day, Genre: genre, Title: g.Title,
-		StoryDE: g.StoryDE, WordsUsed: words,
-	})
+	// Proofread BEFORE saving: what is stored (and later translated) is the corrected text.
+	st := domain.DailyStory{UserID: userID, Date: day, Genre: genre, Title: g.Title, StoryDE: g.StoryDE, WordsUsed: words}
+	corrections := s.proofread(ctx, &st)
+	saved, err := s.repo.Upsert(ctx, st)
 	if err != nil {
 		return nil, fmt.Errorf("save story: %w", err)
 	}
+	if err := s.repo.SaveCorrections(ctx, saved.ID, userID, corrections); err != nil {
+		slog.WarnContext(ctx, "save story corrections failed", "story", saved.ID, "err", err)
+	}
 	return &saved, nil
+}
+
+const proofreadTries = 2 // first call + one retry
+
+// proofread replaces st's title/text with the proofread version and records the forms each word
+// has in the text. If both attempts fail (timeout, invalid JSON, a suspicious answer), the
+// original text is kept and the failure is logged — the story is still shown.
+func (s *StoryService) proofread(ctx context.Context, st *domain.DailyStory) []domain.StoryCorrection {
+	if s.proof == nil {
+		st.ProofreadStatus = domain.ProofreadNone
+		return nil
+	}
+	var lastErr error
+	for try := 1; try <= proofreadTries; try++ {
+		p, err := s.proof.ProofreadStory(ctx, st.Title, st.StoryDE, st.WordsUsed)
+		if err == nil {
+			err = validateProofread(st.StoryDE, p)
+		}
+		if err == nil {
+			if p.Title != "" {
+				st.Title = p.Title
+			}
+			st.StoryDE = p.Text
+			st.ProofreadStatus = domain.ProofreadChecked
+			applyWordForms(st.WordsUsed, p.WordForms, p.Text)
+			slog.InfoContext(ctx, "story proofread", "corrections", len(p.Corrections), "try", try)
+			return p.Corrections
+		}
+		lastErr = err
+		slog.WarnContext(ctx, "story proofread attempt failed", "try", try, "err", err)
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	slog.ErrorContext(ctx, "story proofread failed, showing the original text", "err", lastErr)
+	st.ProofreadStatus = domain.ProofreadFailed
+	return nil
+}
+
+// validateProofread rejects answers that are clearly not "the same story, corrected": empty,
+// in another script, much shorter/longer, or with highlighted words dropped.
+func validateProofread(original string, p domain.ProofreadStory) error {
+	if p.Text == "" {
+		return errors.New("proofread text is empty")
+	}
+	if hasCyrillic(p.Text) || hasCyrillic(p.Title) {
+		return errors.New("proofread text contains Cyrillic characters")
+	}
+	if n, o := len([]rune(p.Text)), len([]rune(original)); n*10 < o*7 || n*10 > o*13 {
+		return fmt.Errorf("proofread text length changed too much (%d → %d)", o, n)
+	}
+	if strings.Count(p.Text, "**")/2 < strings.Count(original, "**")/2 {
+		return errors.New("proofread text lost highlighted words")
+	}
+	return nil
+}
+
+func hasCyrillic(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Cyrillic, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// applyWordForms stores, per word, the spellings it has in the text (only ones that really occur).
+// Keys are matched against how the word was given to the model (article + lemma), the lemma and the saved text.
+func applyWordForms(words []domain.StoryWord, forms map[string][]string, text string) {
+	if len(forms) == 0 {
+		return
+	}
+	lower := make(map[string][]string, len(forms))
+	for k, v := range forms {
+		lower[strings.ToLower(strings.TrimSpace(k))] = v
+	}
+	plain := strings.ToLower(strings.ReplaceAll(text, "**", ""))
+	for i := range words {
+		w := &words[i]
+		var found []string
+		for _, key := range []string{w.PromptForm(), w.Lemma, w.Word} {
+			if f, ok := lower[strings.ToLower(strings.TrimSpace(key))]; ok && key != "" {
+				found = f
+				break
+			}
+		}
+		w.Forms = nil
+		seen := map[string]bool{}
+		for _, f := range found {
+			f = strings.TrimSpace(strings.Trim(f, "*"))
+			lf := strings.ToLower(f)
+			if f == "" || seen[lf] || !strings.Contains(plain, lf) || len(w.Forms) >= 6 {
+				continue
+			}
+			seen[lf] = true
+			w.Forms = append(w.Forms, f)
+		}
+	}
 }
 
 // ByDate returns a story for a given date (YYYY-MM-DD; empty means today), resolved for

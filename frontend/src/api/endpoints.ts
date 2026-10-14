@@ -37,6 +37,53 @@ export const authApi = {
   },
 }
 
+export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'phrase' | 'other'
+
+// Grammar the user agreed to (word check "ok", or "corrected" → "Use this"). Saved next to the text.
+export interface WordGrammar {
+  lemma: string; article: string | null; plural: string | null; part_of_speech: PartOfSpeech
+}
+
+export interface WordCheck {
+  status: 'ok' | 'corrected' | 'unknown'
+  input: string
+  lemma: string
+  article: 'der' | 'die' | 'das' | null
+  plural: string | null
+  part_of_speech: PartOfSpeech
+  translation: string
+  reason: string
+}
+
+function appendGrammar(fd: FormData, g?: WordGrammar | null) {
+  if (!g) return
+  fd.append('lemma', g.lemma)
+  fd.append('article', g.article ?? '')
+  fd.append('plural', g.plural ?? '')
+  fd.append('part_of_speech', g.part_of_speech)
+}
+
+export const wordCheckApi = {
+  // German only. 503 = AI not configured → callers just save without a check.
+  check: (text: string, nativeLanguage: string, signal?: AbortSignal) =>
+    api.post<WordCheck>('/words/check', { text, native_language: nativeLanguage }, { signal, timeout: 45_000 })
+      .then((r) => r.data),
+}
+
+// Suggestions from the admin job "check existing words"; nothing changes until accepted.
+export interface WordFix {
+  id: string; word_id: string
+  original_word: string; suggested_word: string
+  lemma: string; article: string | null; plural: string | null; part_of_speech: PartOfSpeech
+  reason: string; translation: string; created_at: string
+}
+
+export const wordFixesApi = {
+  list: () => api.get<{ items: WordFix[] }>('/word-fixes').then((r) => r.data.items),
+  accept: (id: string) => api.post(`/word-fixes/${id}/accept`),
+  reject: (id: string) => api.post(`/word-fixes/${id}/reject`),
+}
+
 export const contextsApi = {
   list: () => api.get<Page<Context>>('/contexts').then((r) => r.data.items),
   words: (id: string) => api.get<Page<WordCard>>(`/contexts/${id}/words`).then((r) => r.data.items),
@@ -44,6 +91,7 @@ export const contextsApi = {
   create(input: {
     text: string; meaning?: string; pronunciation?: string; language?: string
     exampleSentence?: string; exampleTranslation?: string; folderId?: string
+    grammar?: WordGrammar | null
   }) {
     const fd = new FormData()
     fd.append('text', input.text)
@@ -53,6 +101,7 @@ export const contextsApi = {
     fd.append('example_translation', input.exampleTranslation ?? '')
     if (input.language) fd.append('language', input.language) // backend uses the account language
     if (input.folderId) fd.append('folder_id', input.folderId)
+    appendGrammar(fd, input.grammar)
     return api.post<ContextWithCards>('/contexts', fd).then((r) => r.data)
   },
 }
@@ -114,10 +163,15 @@ export const searchApi = {
   add: (w: {
     word: string; translation: string; pronunciation: string
     example_sentence: string; example_translation: string; folder_id?: string
-  }) => api.post<ContextWithCards>('/search-word/add', w).then((r) => r.data),
+  } & Partial<WordGrammar>) => api.post<ContextWithCards>('/search-word/add', w).then((r) => r.data),
 }
 
-export interface StoryWord { word: string; translation: string }
+export interface StoryWord {
+  word: string; translation: string
+  // From the word check (may be absent for older words) — used to find the word in the text.
+  lemma?: string; article?: string; part_of_speech?: string
+  forms?: string[] // spellings the word has in the story ("kommt" for "kommen"), from proofreading
+}
 export interface DailyStory {
   id: string; date: string; genre: string; title: string
   story_de: string
@@ -207,6 +261,17 @@ export const adminApi = {
   stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
   remove: (id: string) => api.delete(`/admin/users/${id}`),
   setBanned: (id: string, banned: boolean) => api.patch(`/admin/users/${id}/ban`, { banned }),
+  wordCheckStatus: () => api.get<WordCheckJob>('/admin/word-check').then((r) => r.data),
+  // 202 started, 409 already running — both return the current status.
+  startWordCheck: () =>
+    api.post<WordCheckJob>('/admin/word-check', null, { validateStatus: (s) => s === 202 || s === 409 })
+      .then((r) => r.data),
+}
+
+export interface WordCheckJob {
+  running: boolean; total: number; processed: number
+  suggestions: number; confirmed: number; unknown: number; failed: number
+  started_at: string | null; finished_at: string | null; error?: string
 }
 
 export const statsApi = {

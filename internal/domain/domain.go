@@ -73,6 +73,22 @@ type WordCard struct {
 	ExampleTranslation string `json:"example_translation"` // Russian translation of the full sentence
 
 	FolderID *uuid.UUID `json:"folder_id"` // optional grouping; nil = no folder
+
+	// Grammar from the word check, stored next to (never instead of) the text the user typed.
+	// nil = not checked (older words, other learning languages, "keep as is").
+	Lemma        *string `json:"lemma"`
+	Article      *string `json:"article"`
+	Plural       *string `json:"plural"`
+	PartOfSpeech *string `json:"part_of_speech"`
+}
+
+// SetGrammar copies checked grammar onto the card (nil leaves the fields empty).
+func (w *WordCard) SetGrammar(g *WordGrammar) {
+	if g == nil {
+		return
+	}
+	lemma, pos := g.Lemma, g.PartOfSpeech
+	w.Lemma, w.Article, w.Plural, w.PartOfSpeech = &lemma, g.Article, g.Plural, &pos
 }
 
 // Example is an AI-generated example sentence for a word.

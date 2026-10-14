@@ -103,6 +103,13 @@ function WordResult({ info }: { info: WordInfo }) {
       example_sentence: info.example_sentence,
       example_translation: info.example_translation,
       folder_id: folder || undefined,
+      // The search result is already a checked dictionary form (German only: der/die/das).
+      ...(learning.code === 'de' && {
+        lemma: info.word,
+        article: info.word_type === 'noun' ? info.article : null,
+        plural: info.word_type === 'noun' ? info.plural : null,
+        part_of_speech: info.word_type,
+      }),
     }),
     onSuccess: () => {
       setAdded(true)

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { storiesApi, type DailyStory } from '../api/endpoints'
+import { storiesApi, type DailyStory, type StoryWord } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from "../api/client";
 import { dateLocale } from '../i18n'
 import { useLearningLang } from '../lib/learningLang'
+import { highlightStory } from '../lib/storyHighlight'
 
 // story.date is YYYY-MM-DD; parse as a local date so it doesn't shift by timezone.
 function formatDate(iso: string) {
@@ -12,16 +13,17 @@ function formatDate(iso: string) {
   return new Date(y, m - 1, d).toLocaleDateString(dateLocale())
 }
 
-// Renders **word** as highlighted text.
-function Highlighted({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+// Highlights the day's words: **bold** from the AI plus every form of each word found by its
+// lemma ("kommt" for "kommen") — see lib/storyHighlight.ts. Without `words` only **bold** counts.
+function Highlighted({ text, words = [] }: { text: string; words?: StoryWord[] }) {
+  const segments = useMemo(() => highlightStory(text, words), [text, words])
   return (
     <>
-      {parts.map((p, i) =>
-        p.startsWith('**') && p.endsWith('**') ? (
-          <mark key={i} className="rounded bg-lime-300/20 px-1 font-semibold text-lime-300">{p.slice(2, -2)}</mark>
+      {segments.map((s, i) =>
+        s.hl ? (
+          <mark key={i} className="rounded bg-lime-300/20 px-1 font-semibold text-lime-300">{s.text}</mark>
         ) : (
-          <span key={i}>{p}</span>
+          <span key={i}>{s.text}</span>
         ),
       )}
     </>
@@ -41,7 +43,7 @@ function StoryView({ story }: { story: DailyStory }) {
           {formatDate(story.date)} · {t(`story.genres.${story.genre}`, { defaultValue: story.genre })}
         </span>
       </div>
-      <p className="whitespace-pre-line leading-relaxed"><Highlighted text={story.story_de} /></p>
+      <p className="whitespace-pre-line leading-relaxed"><Highlighted text={story.story_de} words={story.words_used} /></p>
       {story.story_translation && (
         <button className="btn-ghost" onClick={() => setShowTranslation((v) => !v)}>
           {showTranslation ? t('story.hideTranslation') : t('story.showTranslation')}

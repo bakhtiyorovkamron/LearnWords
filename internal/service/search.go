@@ -109,6 +109,8 @@ type AddInput struct {
 	ExampleSentence    string
 	ExampleTranslation string
 	FolderID           *uuid.UUID
+	// The search result is already a checked dictionary form — its grammar is stored as is.
+	Grammar *domain.WordGrammar
 }
 
 // Add saves the word through the normal creation flow (same as the "Add" page: context + card +
@@ -143,6 +145,7 @@ func (s *SearchService) Add(ctx context.Context, userID uuid.UUID, in AddInput) 
 		Language:           domain.LangFrom(ctx),
 		FolderID:           in.FolderID,
 		SingleWord:         true,
+		Grammar:            in.Grammar,
 	})
 }
 

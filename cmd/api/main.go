@@ -80,6 +80,8 @@ func run() error {
 	// when the key is provided via environment.
 	var storyGen service.StoryGenerator
 	var storyTranslator service.StoryTranslator
+	var storyProofreader service.StoryProofreader
+	var wordChecker service.WordChecker
 	var wordLookup service.WordLookup
 	var wordTranslator service.WordTranslator
 
@@ -88,6 +90,8 @@ func run() error {
 		providers.Examples = ai
 		storyGen = ai
 		storyTranslator = ai
+		storyProofreader = ai
+		wordChecker = ai
 		wordLookup = ai
 		wordTranslator = ai
 	} else {
@@ -98,10 +102,12 @@ func run() error {
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
-	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator)
+	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEmails)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
+	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool))
+	wordFixSvc := service.NewWordFixService(postgres.NewWordFixRepository(pool), wordCheckSvc)
 
 	// Daily story cron: STORY_CRON_HOUR (default 23) in STORY_CRON_TZ (default Europe/Berlin).
 	cronHour := 23
@@ -130,6 +136,7 @@ func run() error {
 		Contexts:     handler.NewContextHandler(contextSvc),
 		Review:       handler.NewReviewHandler(reviewSvc),
 		Practice:     handler.NewPracticeHandler(reviewSvc),
+		WordCheck:    handler.NewWordCheckHandler(wordCheckSvc, wordFixSvc),
 		Stats:        handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		Stories:      handler.NewStoryHandler(storySvc),
 		Settings:     handler.NewSettingsHandler(userRepo),

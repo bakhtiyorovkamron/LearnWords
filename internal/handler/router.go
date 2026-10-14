@@ -30,6 +30,7 @@ type RouterDeps struct {
 	Translations *TranslationHandler
 	Hero         *HeroHandler
 	Practice     *PracticeHandler
+	WordCheck    *WordCheckHandler
 	UserStatus   UserStatusStore
 	HealthCheck  func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -41,6 +42,7 @@ const (
 	authPerIPPerMin      = 10  // login/register, by IP
 	aiPerUserPerMin      = 20  // search-word, generate-example
 	storyPerUserPerMin   = 5   // daily story generation
+	checkPerUserPerMin   = 40  // word check while typing (debounced; repeats come from the cache)
 	generalPerUserPerMin = 100 // everything else under /api
 )
 
@@ -60,8 +62,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	exampleLimit := RateLimitByUser(NewRateLimiter(ctx, "example", aiPerUserPerMin, time.Minute))
 	storyLimit := RateLimitByUser(NewRateLimiter(ctx, "story", storyPerUserPerMin, time.Minute))
 	translateLimit := RateLimitByUser(NewRateLimiter(ctx, "translate", aiPerUserPerMin, time.Minute))
+	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
-		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations")
+		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations", "/api/words/check")
 
 	r.Use(
 		Recovery(),
@@ -114,6 +117,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
 		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)
+		protected.POST("/words/check", checkLimit, d.WordCheck.Check)
+		protected.GET("/word-fixes", d.WordCheck.ListFixes)
+		protected.POST("/word-fixes/:id/accept", d.WordCheck.AcceptFix)
+		protected.POST("/word-fixes/:id/reject", d.WordCheck.RejectFix)
 		protected.POST("/translations", translateLimit, d.Translations.Batch)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
@@ -137,6 +144,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/stats", d.Admin.Stats)
 		admin.DELETE("/users/:id", d.Admin.DeleteUser)
 		admin.PATCH("/users/:id/ban", d.Admin.Ban)
+		admin.POST("/word-check", d.WordCheck.StartJob)
+		admin.GET("/word-check", d.WordCheck.JobStatus)
 	}
 	return r
 }

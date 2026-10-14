@@ -24,6 +24,31 @@ type createContextJSON struct {
 	ExampleTranslation string `json:"example_translation" binding:"max=500"`
 	Language           string `json:"language"`
 	FolderID           string `json:"folder_id"`
+	grammarJSON
+}
+
+// grammarJSON: optional result of POST /api/words/check that the user accepted.
+type grammarJSON struct {
+	Lemma        string `json:"lemma"`
+	Article      string `json:"article"`
+	Plural       string `json:"plural"`
+	PartOfSpeech string `json:"part_of_speech"`
+}
+
+// grammar returns nil when no lemma was sent (word not checked / "keep as is").
+func (g grammarJSON) grammar() *domain.WordGrammar {
+	if strings.TrimSpace(g.Lemma) == "" {
+		return nil
+	}
+	return &domain.WordGrammar{Lemma: g.Lemma, Article: optional(g.Article), Plural: optional(g.Plural),
+		PartOfSpeech: strings.TrimSpace(g.PartOfSpeech)}
+}
+
+func optional(s string) *string {
+	if s = strings.TrimSpace(s); s == "" {
+		return nil
+	}
+	return &s
 }
 
 // parseOptionalFolder: "" → nil (no folder), otherwise a UUID.
@@ -51,6 +76,8 @@ func (h *ContextHandler) Create(c *gin.Context) {
 		in.ExampleTranslation = c.PostForm("example_translation")
 		in.Language = c.PostForm("language")
 		folder = c.PostForm("folder_id")
+		in.Grammar = grammarJSON{Lemma: c.PostForm("lemma"), Article: c.PostForm("article"),
+			Plural: c.PostForm("plural"), PartOfSpeech: c.PostForm("part_of_speech")}.grammar()
 		if strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 2000 {
 			badRequest(c, "text is required (max 2000 chars)")
 			return
@@ -62,7 +89,8 @@ func (h *ContextHandler) Create(c *gin.Context) {
 			return
 		}
 		in = service.CreateContextInput{Text: req.Text, Meaning: req.Meaning, Pronunciation: req.Pronunciation,
-			ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, Language: req.Language}
+			ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, Language: req.Language,
+			Grammar: req.grammar()}
 		folder = req.FolderID
 	}
 	folderID, err := parseOptionalFolder(folder)

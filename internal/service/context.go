@@ -53,6 +53,9 @@ type CreateContextInput struct {
 	FolderID *uuid.UUID
 	// SingleWord: save Text as exactly one card (e.g. "der Hund", "sich freuen") without tokenizing.
 	SingleWord bool
+	// Grammar from the word check (lemma, article, plural, part of speech) the user agreed to.
+	// Stored only when the text becomes exactly one card.
+	Grammar *domain.WordGrammar
 }
 
 func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in CreateContextInput) (*domain.ContextWithCards, error) {
@@ -68,6 +71,9 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 		return nil, fmt.Errorf("%w: meaning too long", domain.ErrValidation)
 	}
 	c.Meaning = meaning
+	if err := in.Grammar.Validate(); err != nil {
+		return nil, err
+	}
 
 	if text == "" {
 		return nil, fmt.Errorf("%w: text is required", domain.ErrValidation)
@@ -115,6 +121,7 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 			if p := strings.TrimSpace(in.Pronunciation); p != "" {
 				card.Transcription = p
 			}
+			card.SetGrammar(in.Grammar)
 			card.ExampleSentence = strings.TrimSpace(in.ExampleSentence)
 			card.ExampleTranslation = strings.TrimSpace(in.ExampleTranslation)
 			if len([]rune(card.ExampleSentence)) > 500 || len([]rune(card.ExampleTranslation)) > 500 {

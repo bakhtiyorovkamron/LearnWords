@@ -20,7 +20,8 @@ func NewStoryRepository(pool *pgxpool.Pool) *StoryRepository { return &StoryRepo
 // WordsAddedOn returns the distinct words a user added on the given UTC date (YYYY-MM-DD).
 func (r *StoryRepository) WordsAddedOn(ctx context.Context, userID uuid.UUID, day string) ([]domain.StoryWord, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT DISTINCT ON (lower(word)) word, translation
+		SELECT DISTINCT ON (lower(word)) word, translation,
+		       COALESCE(lemma, ''), COALESCE(article, ''), COALESCE(part_of_speech, '')
 		FROM word_cards
 		WHERE user_id = $1 AND (created_at AT TIME ZONE 'UTC')::date = $2::date
 		ORDER BY lower(word), created_at`, userID, day)
@@ -29,7 +30,7 @@ func (r *StoryRepository) WordsAddedOn(ctx context.Context, userID uuid.UUID, da
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.StoryWord, error) {
 		var w domain.StoryWord
-		err := row.Scan(&w.Word, &w.Translation)
+		err := row.Scan(&w.Word, &w.Translation, &w.Lemma, &w.Article, &w.PartOfSpeech)
 		return w, err
 	})
 }
@@ -57,7 +58,7 @@ func (r *StoryRepository) LearningLanguage(ctx context.Context, userID uuid.UUID
 	return lang, err
 }
 
-const storyCols = `id, user_id, date, genre, title, story_de, words_used, created_at`
+const storyCols = `id, user_id, date, genre, title, story_de, words_used, created_at, proofread_status`
 
 func scanStory(row pgx.Row) (domain.DailyStory, error) {
 	var (
@@ -65,7 +66,7 @@ func scanStory(row pgx.Row) (domain.DailyStory, error) {
 		day   time.Time
 		words []byte
 	)
-	if err := row.Scan(&s.ID, &s.UserID, &day, &s.Genre, &s.Title, &s.StoryDE, &words, &s.CreatedAt); err != nil {
+	if err := row.Scan(&s.ID, &s.UserID, &day, &s.Genre, &s.Title, &s.StoryDE, &words, &s.CreatedAt, &s.ProofreadStatus); err != nil {
 		return s, err
 	}
 	s.Date = day.Format("2006-01-02")
@@ -76,20 +77,48 @@ func scanStory(row pgx.Row) (domain.DailyStory, error) {
 	return s, nil
 }
 
-// Upsert saves the story for (user, date), replacing a previous one on regeneration.
+// Upsert saves the story for (user, date), replacing a previous one on regeneration. The
+// story keeps its id, so cached translations of the previous text are deleted — they are
+// regenerated from the new (proofread) text on the next view.
 func (r *StoryRepository) Upsert(ctx context.Context, s domain.DailyStory) (domain.DailyStory, error) {
 	words, err := json.Marshal(s.WordsUsed)
 	if err != nil {
 		return s, err
 	}
-	return scanStory(r.pool.QueryRow(ctx, `
-		INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used)
-		VALUES ($1, $2::date, $3, $4, $5, $6::jsonb)
-		ON CONFLICT (user_id, date) DO UPDATE
-		SET genre = EXCLUDED.genre, title = EXCLUDED.title, story_de = EXCLUDED.story_de,
-		    words_used = EXCLUDED.words_used, created_at = now()
-		RETURNING `+storyCols,
-		s.UserID, s.Date, s.Genre, s.Title, s.StoryDE, string(words)))
+	if s.ProofreadStatus == "" {
+		s.ProofreadStatus = domain.ProofreadNone
+	}
+	var saved domain.DailyStory
+	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var err error
+		saved, err = scanStory(tx.QueryRow(ctx, `
+			INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used, proofread_status)
+			VALUES ($1, $2::date, $3, $4, $5, $6::jsonb, $7)
+			ON CONFLICT (user_id, date) DO UPDATE
+			SET genre = EXCLUDED.genre, title = EXCLUDED.title, story_de = EXCLUDED.story_de,
+			    words_used = EXCLUDED.words_used, proofread_status = EXCLUDED.proofread_status, created_at = now()
+			RETURNING `+storyCols,
+			s.UserID, s.Date, s.Genre, s.Title, s.StoryDE, string(words), s.ProofreadStatus))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM story_translations WHERE story_id = $1`, saved.ID)
+		return err
+	})
+	return saved, err
+}
+
+// SaveCorrections stores what the proofreading step fixed in a story (statistics).
+func (r *StoryRepository) SaveCorrections(ctx context.Context, storyID, userID uuid.UUID, cs []domain.StoryCorrection) error {
+	if len(cs) == 0 {
+		return nil
+	}
+	batch := &pgx.Batch{}
+	for _, c := range cs {
+		batch.Queue(`INSERT INTO story_corrections (story_id, user_id, from_text, to_text, why) VALUES ($1, $2, $3, $4, $5)`,
+			storyID, userID, c.From, c.To, c.Why)
+	}
+	return r.pool.SendBatch(ctx, batch).Close()
 }
 
 // GetTranslation returns a cached story translation; ok=false on a miss.

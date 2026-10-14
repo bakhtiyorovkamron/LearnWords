@@ -50,6 +50,7 @@ func (h *SearchHandler) Add(c *gin.Context) {
 		ExampleSentence    string `json:"example_sentence" binding:"max=500"`
 		ExampleTranslation string `json:"example_translation" binding:"max=500"`
 		FolderID           string `json:"folder_id"`
+		grammarJSON
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		badRequest(c, "invalid body")
@@ -63,6 +64,7 @@ func (h *SearchHandler) Add(c *gin.Context) {
 	res, err := h.svc.Add(c.Request.Context(), userID(c), service.AddInput{
 		Word: req.Word, Translation: req.Translation, Pronunciation: req.Pronunciation,
 		ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, FolderID: folder,
+		Grammar: req.grammar(),
 	})
 	if err != nil {
 		writeError(c, err)

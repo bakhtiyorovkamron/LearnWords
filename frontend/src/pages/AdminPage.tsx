@@ -27,8 +27,45 @@ export function AdminPage() {
         <p className="mt-2 text-emerald-100/70">{t('admin.subtitle')}</p>
       </div>
       <StatsBlock />
+      <WordCheckJobPanel />
       <UsersTable myId={me.data!.id} />
     </div>
+  )
+}
+
+// "Check existing words": runs the word check over every saved German word in the background
+// and stores suggestions — users accept or reject them themselves; nothing is fixed automatically.
+function WordCheckJobPanel() {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const status = useQuery({
+    queryKey: ['admin', 'word-check'],
+    queryFn: adminApi.wordCheckStatus,
+    refetchInterval: (q) => (q.state.data?.running ? 2000 : false),
+  })
+  const start = useMutation({
+    mutationFn: adminApi.startWordCheck,
+    onSuccess: (data) => qc.setQueryData(['admin', 'word-check'], data),
+  })
+  const s = status.data
+  return (
+    <section className="glass flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+      <div className="space-y-1">
+        <h2 className="font-semibold">🔎 {t('admin.wordCheck.title')}</h2>
+        <p className="text-sm text-emerald-100/60">{t('admin.wordCheck.hint')}</p>
+        {s && (s.running || s.finished_at) && (
+          <p className="text-sm text-lime-200/90">
+            {t('admin.wordCheck.progress', { processed: s.processed, total: s.total })}
+            {' · '}{t('admin.wordCheck.result', { suggestions: s.suggestions, confirmed: s.confirmed, unknown: s.unknown, failed: s.failed })}
+          </p>
+        )}
+        {s?.error && <p className="text-sm text-red-300">{s.error}</p>}
+        {(start.error || status.error) && <p className="text-sm text-red-300">{errorMessage(start.error ?? status.error)}</p>}
+      </div>
+      <button type="button" className="btn-primary shrink-0" disabled={s?.running || start.isPending} onClick={() => start.mutate()}>
+        {s?.running ? t('admin.wordCheck.running') : t('admin.wordCheck.run')}
+      </button>
+    </section>
   )
 }
 

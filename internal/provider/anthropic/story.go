@@ -23,14 +23,17 @@ import (
 //  2. TranslateStory translates the already-generated text (+ a gloss per word) into whichever
 //     native language a viewer actually requested — lazily, once per (story, language), cached.
 const storyPromptTemplate = `You are a short-story author for {{target}} learners (level A1-B1).
-Write a connected, engaging story in the genre "{{genre}}", using ALL of the following {{target}} words (any grammatical form is fine):
+Write a connected, engaging story in the genre "{{genre}}", using ALL of the following {{target}} words:
 {{words}}
+
+The words are given in their base form (nouns with their article, verbs in the infinitive). Do NOT paste them in as listed: put each one into the grammatical form the sentence needs — conjugate verbs ("kommen" → "Sie kommt"), decline nouns and adjectives, and use the article that matches the noun's gender, case and number ("der Stift" → "mit dem Stift", "Der magische Stift").
 
 Requirements:
 - The ENTIRE story and its title must be written 100% in {{target}} — not a single word, phrase or name from any other language or script may appear anywhere in them.
 - About {{length}} sentences (more words → a longer, richer plot).
 - Simple grammar, short sentences, a clear beginning, middle and end.
-- Bold every used word from the list in the text: **word**.
+- Bold every used word from the list in the text, in the form it has there: **kommt**.
+- Check grammar carefully: articles, cases, adjective endings and subject-verb agreement.
 
 ANSWER FORMAT — STRICT:
 - Respond with ONLY one valid JSON object, no text before or after it, no markdown fences.
@@ -60,7 +63,7 @@ func buildStoryPrompt(learningLang string, words []domain.StoryWord, genre strin
 	target := domain.Lang(learningLang).NameEN
 	var b strings.Builder
 	for _, w := range words {
-		fmt.Fprintf(&b, "- %s\n", clean(w.Word))
+		fmt.Fprintf(&b, "- %s\n", clean(w.PromptForm()))
 	}
 	p := strings.NewReplacer(
 		"{{target}}", target,

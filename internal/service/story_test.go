@@ -14,6 +14,10 @@ import (
 // everything else is unused by resolveTranslation and just needs to satisfy the interface.
 type fakeStoryRepo struct {
 	cache map[string]domain.StoryTranslation // key: storyID.String()+":"+lang
+
+	words       []domain.StoryWord // WordsAddedOn
+	saved       []domain.DailyStory
+	corrections []domain.StoryCorrection
 }
 
 func newFakeStoryRepo() *fakeStoryRepo {
@@ -38,7 +42,7 @@ func (r *fakeStoryRepo) PutTranslation(_ context.Context, storyID uuid.UUID, lan
 }
 
 func (r *fakeStoryRepo) WordsAddedOn(context.Context, uuid.UUID, string) ([]domain.StoryWord, error) {
-	return nil, nil
+	return r.words, nil
 }
 func (r *fakeStoryRepo) UsersWithWordsOn(context.Context, string) ([]uuid.UUID, error) {
 	return nil, nil
@@ -47,7 +51,13 @@ func (r *fakeStoryRepo) LearningLanguage(context.Context, uuid.UUID) (string, er
 	return "de", nil
 }
 func (r *fakeStoryRepo) Upsert(_ context.Context, s domain.DailyStory) (domain.DailyStory, error) {
+	s.ID = uuid.New()
+	r.saved = append(r.saved, s)
 	return s, nil
+}
+func (r *fakeStoryRepo) SaveCorrections(_ context.Context, _, _ uuid.UUID, cs []domain.StoryCorrection) error {
+	r.corrections = append(r.corrections, cs...)
+	return nil
 }
 func (r *fakeStoryRepo) ByDate(context.Context, uuid.UUID, string) (domain.DailyStory, error) {
 	return domain.DailyStory{}, nil

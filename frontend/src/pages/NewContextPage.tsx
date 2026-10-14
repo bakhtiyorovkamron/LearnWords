@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { contextsApi, wordsApi } from '../api/endpoints'
+import { contextsApi, wordsApi, type WordCheck, type WordGrammar } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { FolderSelect } from '../components/Folders'
+import { WordCheckHint } from '../components/WordCheckHint'
+import { collapseSpaces, grammarOf, suggestionOf, useWordCheck } from '../lib/wordCheck'
 import { useLearningLang } from '../lib/learningLang'
 
 const MAX_LEN = 2000
@@ -22,6 +24,12 @@ export function NewContextPage() {
   const [exampleTranslation, setExampleTranslation] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
   const [folderId, setFolderId] = useState('') // optional; '' = no folder
+  // Word check (German only): texts the user chose to keep despite a suggestion.
+  const check = useWordCheck(text, learning.code === 'de')
+  const [kept, setKept] = useState<Set<string>>(() => new Set())
+  const [needDecision, setNeedDecision] = useState(false)
+  const [checkingOnSave, setCheckingOnSave] = useState(false)
+  const isKept = kept.has(collapseSpaces(text))
 
   // AI example generation works for a single word (the word is replaced by ___ in the sentence).
   const singleWord = text.trim() !== '' && !/\s/.test(text.trim())
@@ -35,11 +43,11 @@ export function NewContextPage() {
   })
 
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (grammar: WordGrammar | null) =>
       contextsApi.create({
         text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), language: learning.code,
         exampleSentence: exampleSentence.trim(), exampleTranslation: exampleTranslation.trim(),
-        folderId: folderId || undefined,
+        folderId: folderId || undefined, grammar,
       }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['contexts'] })
@@ -52,13 +60,33 @@ export function NewContextPage() {
     },
   })
 
-  function submit(e: FormEvent) {
+  // "Use this": the user explicitly takes the suggestion (article + base form). The new text is
+  // marked as checked, so it isn't sent to the check again.
+  function useSuggestion(r: WordCheck) {
+    const word = suggestionOf(r)
+    check.seed(word, { ...r, status: 'ok', input: word, reason: '' })
+    setText(word)
+    if (!meaning.trim() && r.translation) setMeaning(r.translation)
+    setNeedDecision(false)
+  }
+
+  function keepAsIs() {
+    setKept((k) => new Set(k).add(collapseSpaces(text)))
+    setNeedDecision(false)
+  }
+
+  async function submit(e: FormEvent) {
     e.preventDefault()
     setLocalError(null)
     if (!text.trim()) return setLocalError(t('newContext.errTextRequired', learning.vars))
     if (!meaning.trim()) return setLocalError(t('newContext.errTranslationRequired'))
     // Pronunciation is optional.
-    mutation.mutate()
+    // Word check: an open correction must be decided first ("Use this" / "Keep as is");
+    // "unknown" is only a warning; a failed check never blocks saving.
+    setCheckingOnSave(true)
+    const r = await check.ensure().finally(() => setCheckingOnSave(false))
+    if (r?.status === 'corrected' && !isKept) return setNeedDecision(true)
+    mutation.mutate(r?.status === 'ok' ? grammarOf(r) : null)
   }
 
   const error = localError ?? (mutation.error ? errorMessage(mutation.error) : null)
@@ -77,7 +105,10 @@ export function NewContextPage() {
         <div className="relative">
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))}
+            onChange={(e) => {
+              setText(e.target.value.slice(0, MAX_LEN))
+              setNeedDecision(false)
+            }}
             rows={7}
             autoFocus
             placeholder={learning.phrasePlaceholder}
@@ -88,6 +119,10 @@ export function NewContextPage() {
             {text.length}/{MAX_LEN}
           </span>
         </div>
+        {check.active && (
+          <WordCheckHint state={check.state} kept={isKept} highlight={needDecision}
+            onUse={useSuggestion} onKeep={keepAsIs} />
+        )}
 
         <div>
           <label className={labelCls}>{t('newContext.translation')}</label>
@@ -174,11 +209,11 @@ export function NewContextPage() {
           <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">{error}</p>
         )}
 
-        <button type="submit" disabled={mutation.isPending} className="btn-primary w-full text-lg">
-          {mutation.isPending ? (
+        <button type="submit" disabled={mutation.isPending || checkingOnSave} className="btn-primary w-full text-lg">
+          {mutation.isPending || checkingOnSave ? (
             <>
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-950 border-t-transparent" />
-              {t('newContext.analyzing')}
+              {checkingOnSave ? t('check.checking') : t('newContext.analyzing')}
             </>
           ) : (
             t('newContext.submit')

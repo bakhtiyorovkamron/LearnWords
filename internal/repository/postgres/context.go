@@ -38,11 +38,11 @@ func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Conte
 			// folder_id is taken only if that folder belongs to the same user (otherwise NULL).
 			batch.Queue(`INSERT INTO word_cards
 				(id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
-				 example_sentence, example_translation, folder_id)
+				 example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-				        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3))`,
+				        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3), $13, $14, $15, $16)`,
 				w.ID, w.ContextID, w.UserID, w.Word, w.Translation, w.Transcription, w.AudioURL, w.Language, w.CreatedAt,
-				w.ExampleSentence, w.ExampleTranslation, w.FolderID)
+				w.ExampleSentence, w.ExampleTranslation, w.FolderID, w.Lemma, w.Article, w.Plural, w.PartOfSpeech)
 		}
 		return tx.SendBatch(ctx, batch).Close()
 	})

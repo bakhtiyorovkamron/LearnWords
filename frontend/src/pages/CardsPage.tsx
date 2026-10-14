@@ -10,6 +10,7 @@ import { ReviewSession } from '../components/ReviewSession'
 import { FlipCards } from '../components/FlipCards'
 import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
 import { FolderBar } from '../components/Folders'
+import { WordFixes } from '../components/WordFixes'
 
 const PAGE = 48
 const VIEW_KEY = 'collection-view'
@@ -123,6 +124,8 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
             className="field pl-11" />
         </div>
       </div>
+
+      <WordFixes />
 
       <FolderBar value={folder} onChange={setFolder} />
 

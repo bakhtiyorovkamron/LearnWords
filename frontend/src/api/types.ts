@@ -34,6 +34,11 @@ export interface WordCard {
   example_sentence?: string
   example_translation?: string
   folder_id?: string | null // optional folder; null = no folder
+  // Grammar from the word check, stored next to the typed text; null = not checked.
+  lemma?: string | null
+  article?: string | null
+  plural?: string | null
+  part_of_speech?: string | null
 }
 
 export interface FolderStats {
