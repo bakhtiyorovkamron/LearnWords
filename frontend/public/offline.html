@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B2B1C" />
+    <title>Wortkontext</title>
+    <!-- Served by the service worker when there is no network: no external CSS/fonts/JS files. -->
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+        box-sizing: border-box; background: #0B2B1C; color: #ecfdf5; text-align: center;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      .logo {
+        display: inline-grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1.25rem;
+        background: linear-gradient(135deg, #bef264, #10b981); color: #022c22; font-size: 2rem; font-weight: 800;
+      }
+      p { max-width: 20rem; margin: 1.5rem auto; font-size: 1.05rem; line-height: 1.5; }
+      button {
+        border: 0; border-radius: 1rem; padding: 0.8rem 2rem; font: inherit; font-weight: 600; cursor: pointer;
+        background: linear-gradient(90deg, #a3e635, #34d399, #2dd4bf); color: #022c22;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="logo">W</div>
+      <p id="text">Нет интернета. Подключись и нажми «Повторить»</p>
+      <button id="retry" type="button">Повторить</button>
+    </main>
+    <script>
+      // Texts are kept in sync with pwa.offline / pwa.retry in src/locales/*/common.json.
+      var T = {
+        ru: ['Нет интернета. Подключись и нажми «Повторить»', 'Повторить'],
+        en: ['No internet connection. Reconnect and tap Retry', 'Retry'],
+        uz: ['Internet yoʻq. Ulanib, «Qayta urinish»ni bosing', 'Qayta urinish'],
+      }
+      var lng
+      try { lng = localStorage.getItem('ui-language') } catch (e) {}
+      if (!T[lng]) {
+        var nav = (navigator.language || '').toLowerCase()
+        lng = nav.indexOf('uz') === 0 ? 'uz' : nav.indexOf('ru') === 0 ? 'ru' : 'en'
+      }
+      document.documentElement.lang = lng
+      document.getElementById('text').textContent = T[lng][0]
+      document.getElementById('retry').textContent = T[lng][1]
+      document.getElementById('retry').addEventListener('click', function () { location.reload() })
+      window.addEventListener('online', function () { location.reload() })
+    </script>
+  </body>
+</html>

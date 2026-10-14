@@ -99,7 +99,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
   }
 
   function style(i: number) {
-    const base = 'w-full rounded-2xl border px-5 py-4 text-left text-lg font-semibold transition '
+    const base = 'w-full rounded-2xl border px-4 py-3 text-left text-base font-semibold transition sm:px-5 sm:py-4 sm:text-lg '
     if (!answered) return base + 'border-emerald-400/20 bg-emerald-900/40 text-white hover:border-lime-400/60 hover:bg-lime-400/10'
     if (options[i].correct) return base + 'border-lime-400 bg-lime-400/20 text-lime-100'
     if (i === picked) return base + 'border-red-400 bg-red-500/20 text-red-100'
@@ -134,7 +134,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-5">
+    <div className="mx-auto max-w-xl space-y-3 sm:space-y-5">
       <div className="flex items-center justify-between text-sm text-emerald-100/70">
         <span>{position} / {total}</span>
         <div className="mx-4 h-2 flex-1 overflow-hidden rounded-full bg-emerald-900/60">
@@ -142,9 +142,9 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
         </div>
       </div>
 
-      <div className="glass p-8 text-center">
+      <div className="glass p-5 text-center sm:p-8">
         <p className="text-xs uppercase tracking-widest text-lime-300/80">{t(`quiz.prompt.${format}`, learning.vars)}</p>
-        <div className={`display mt-3 font-extrabold text-white ${format === 'gap' ? 'text-2xl leading-snug' : 'text-4xl'}`}>
+        <div className={`display mt-3 font-extrabold text-white ${format === 'gap' ? 'text-xl leading-snug sm:text-2xl' : 'text-3xl sm:text-4xl'}`}>
           {prompt}
         </div>
         {format === 'gap' && translatedExample && (
@@ -156,7 +156,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
         )}
 
         {answered && (
-          <div className="mt-4 space-y-1">
+          <div className="mt-3 space-y-1 sm:mt-4">
             {format !== 'de_ru' && <div className="text-lg font-bold text-white">{card.word}</div>}
             <div className="font-mono text-sm text-lime-300/90">{card.transcription || '—'}</div>
             {format !== 'de_ru' && translatedSelf && <div className="text-sm text-emerald-100/70">{translatedSelf}</div>}
@@ -166,7 +166,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       </div>
 
       {isChoice ? (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {options.map((o, i) => (
             <button key={i} type="button" disabled={answered} onClick={() => choose(i)} className={style(i)}>
               {o.text}

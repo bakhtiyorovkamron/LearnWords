@@ -21,7 +21,7 @@ export function Toaster() {
     return () => window.removeEventListener(EVENT, onToast)
   }, [])
   return (
-    <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-[calc(var(--nav-h)+1.5rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
       {items.map((x) => (
         <div key={x.id} className="animate-rise rounded-2xl border border-lime-400/40 bg-emerald-900/95 px-5 py-3 text-sm font-semibold text-lime-100 shadow-xl">
           ✓ {x.text}

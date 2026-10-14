@@ -5,6 +5,15 @@
   --font-display: "Unbounded", "Inter", ui-sans-serif, sans-serif;
 }
 
+/* Height of the mobile bottom navigation (Layout.tsx), incl. the iPhone home-indicator area.
+   Fixed bottom elements (toasts, hero, install banner) sit above it. 0 from md (768px) up. */
+:root {
+  --nav-h: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 48rem) {
+  :root { --nav-h: 0px; }
+}
+
 @layer base {
   body {
     @apply bg-emerald-950 text-emerald-50 antialiased;

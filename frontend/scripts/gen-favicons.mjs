@@ -6,7 +6,16 @@ import sharp from 'sharp'
 const dir = new URL('../public/', import.meta.url)
 const svg = await readFile(new URL('favicon.svg', dir))
 
-const png = (size) => sharp(svg, { density: 384 }).resize(size, size).png().toBuffer()
+const png = (size, src = svg) => sharp(src, { density: 384 }).resize(size, size).png().toBuffer()
+
+// Maskable PWA icon: launchers crop it to a circle/squircle, so the gradient fills the whole
+// square (no rounded corners) and the "W" is shrunk into the central 80% safe zone.
+const maskableSvg = Buffer.from(
+  svg
+    .toString()
+    .replace(/<rect([^>]*?) rx="\d+"/, '<rect$1')
+    .replace(/<path /, '<path transform="translate(256 256) scale(0.8) translate(-256 -256)" '),
+)
 
 const files = {
   'favicon-16x16.png': 16,
@@ -19,10 +28,11 @@ const files = {
 for (const [name, size] of Object.entries(files)) {
   await writeFile(new URL(name, dir), await png(size))
 }
+await writeFile(new URL('maskable-512x512.png', dir), await png(512, maskableSvg))
 
 // favicon.ico with 16/32/48 PNG images (PNG-in-ICO, supported by all current browsers).
 const sizes = [16, 32, 48]
-const images = await Promise.all(sizes.map(png))
+const images = await Promise.all(sizes.map((size) => png(size)))
 const header = Buffer.alloc(6 + 16 * sizes.length)
 header.writeUInt16LE(0, 0) // reserved
 header.writeUInt16LE(1, 2) // type: icon
@@ -43,4 +53,4 @@ sizes.forEach((size, i) => {
 })
 
 await writeFile(new URL('favicon.ico', dir), Buffer.concat([header, ...images]))
-console.log('favicons generated:', [...Object.keys(files), 'favicon.ico'].join(', '))
+console.log('favicons generated:', [...Object.keys(files), 'maskable-512x512.png', 'favicon.ico'].join(', '))

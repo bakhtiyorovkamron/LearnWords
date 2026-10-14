@@ -177,7 +177,7 @@ export function HeroWidget() {
         }}
         title={t('hero.show')}
         aria-label={t('hero.show')}
-        className="fixed bottom-2 left-2 z-30 grid h-7 w-7 place-items-center rounded-full bg-emerald-950/50 text-sm opacity-40 transition hover:opacity-90"
+        className="fixed bottom-[calc(var(--nav-h)+0.5rem)] left-2 z-30 grid h-7 w-7 place-items-center rounded-full bg-emerald-950/50 text-sm opacity-40 transition hover:opacity-90"
       >
         {asset.emoji}
       </button>
@@ -194,7 +194,7 @@ export function HeroWidget() {
         }}
         title={t('hero.expand')}
         aria-label={t('hero.expand')}
-        className={`fixed bottom-4 left-4 z-30 grid h-12 w-12 place-items-center rounded-full border border-emerald-400/20 bg-emerald-950/80 text-2xl shadow-lg shadow-emerald-500/20 sm:h-14 sm:w-14 ${asset.animationClass}`}
+        className={`fixed bottom-[calc(var(--nav-h)+1rem)] left-4 z-30 grid h-12 w-12 place-items-center rounded-full border border-emerald-400/20 bg-emerald-950/80 text-2xl shadow-lg shadow-emerald-500/20 sm:h-14 sm:w-14 ${asset.animationClass}`}
       >
         {asset.emoji}
       </button>
@@ -202,7 +202,7 @@ export function HeroWidget() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-3 left-3 z-30 flex flex-col items-start sm:bottom-4 sm:left-4">
+    <div className="pointer-events-none fixed bottom-[calc(var(--nav-h)+0.75rem)] left-3 z-30 flex flex-col items-start sm:bottom-[calc(var(--nav-h)+1rem)] sm:left-4">
       {(bubble || sleepyBubble) && (
         <button
           type="button"

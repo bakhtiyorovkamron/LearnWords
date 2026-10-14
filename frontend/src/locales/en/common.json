@@ -4,6 +4,7 @@
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
     "hero": { "almost": "Almost learned: {{n}}", "title": "Your German hero", "wordsLearned": "Words learned", "toNextStage": "To the next stage", "show": "Show hero", "expand": "Expand", "collapse": "Collapse", "hide": "Hide hero", "sleepyBubble": "Zzz..." },
 "practice": { "start": "Practice more", "again": "Practice again", "pick": "Which words to practice?", "hard": "Hardest", "random": "Random", "recent": "Recently added", "note": "This practice does not change your review schedule" },
+  "pwa": {"install": "Install app", "banner": "Add Wortkontext to your phone — it opens like an app", "iosHint": "Tap Share, then Add to Home Screen", "offline": "No internet connection. Reconnect and tap Retry", "retry": "Retry", "later": "Not now"},
   "nav": {
     "contexts": "Contexts",
     "add": "Add",
@@ -12,7 +13,8 @@
     "stats": "Statistics",
     "dailyStory": "Daily Story",
     "admin": "Admin",
-    "logout": "Log out"
+    "logout": "Log out",
+    "more": "More"
   },
   "auth": {
     "heroTitle1": "Languages ",

@@ -34,11 +34,13 @@ yodla.fun {
 		file_server
 	}
 
-	# Hashed assets can be cached forever; index.html must always be fresh.
+	# Hashed assets can be cached forever. Everything else must be revalidated on every request:
+	# index.html (also served for SPA paths like /cards), sw.js, the manifest, icons, offline.html —
+	# otherwise the browser may keep an old index.html/sw.js after a deploy.
 	@assets path /assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"
-	@html path / /index.html
-	header @html Cache-Control "no-cache"
+	@notAssets not path /assets/* /api/*
+	header @notAssets Cache-Control "no-cache"
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"

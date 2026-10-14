@@ -23,7 +23,7 @@ export function CardsPage() {
   const initialFolder = params.get('folder') ?? ''
   const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8">
       <div className="flex gap-2">
         {tabs.map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}

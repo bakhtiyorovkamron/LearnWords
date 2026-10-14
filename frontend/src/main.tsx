@@ -5,7 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './auth/AuthContext'
 import App from './App'
 import './i18n' // must run before the first render
+import { registerServiceWorker } from './lib/pwa'
 import './index.css'
+
+registerServiceWorker()
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
