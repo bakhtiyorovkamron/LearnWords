@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { translationsApi } from '../api/endpoints'
@@ -27,6 +27,7 @@ interface Props {
   error?: string | null
   onAnswer: (correct: boolean) => void // sent to the backend right after the answer
   onNext: () => void
+  corner?: ReactNode // e.g. the training hero, at the right end of the progress row
 }
 
 // One training question in one of 4 formats. Choice formats (de_ru, ru_de, gap) share the
@@ -38,7 +39,7 @@ interface Props {
 // it up via /api/translations, which returns a cached value or generates+caches one via AI. The
 // 'gap' format needs no blocking lookup — its prompt is the learning-language sentence itself;
 // the native-language hint underneath it just appears once (if) the lookup resolves.
-export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext }: Props) {
+export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner }: Props) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const { card, format } = item
@@ -140,6 +141,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
         <div className="mx-4 h-2 flex-1 overflow-hidden rounded-full bg-emerald-900/60">
           <div className="h-full bg-lime-400 transition-all" style={{ width: `${((position - (answered ? 0 : 1)) / total) * 100}%` }} />
         </div>
+        {corner}
       </div>
 
       <div className="glass p-5 text-center sm:p-8">

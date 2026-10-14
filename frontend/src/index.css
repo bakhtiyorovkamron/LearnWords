@@ -74,36 +74,77 @@
 }
 .animate-rise { animation: rise 0.5s ease-out both; }
 
-/* Hero widget moods — see lib/heroAssets.ts. All disabled under prefers-reduced-motion below. */
-@keyframes hero-idle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.04); }
-}
-@keyframes hero-happy {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-6px) rotate(-6deg); }
-}
-@keyframes hero-sad {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(3px); }
-}
-@keyframes hero-cheer {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  25% { transform: scale(1.15) rotate(8deg); }
-  75% { transform: scale(1.15) rotate(-8deg); }
-}
-@keyframes hero-sleepy {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-.hero-anim-idle { animation: hero-idle 3s ease-in-out infinite; }
-.hero-anim-happy { animation: hero-happy 0.5s ease-in-out 3; }
-.hero-anim-sad { animation: hero-sad 0.6s ease-in-out 3; }
-.hero-anim-cheer { animation: hero-cheer 0.6s ease-in-out 2; }
-.hero-anim-sleepy { animation: hero-sleepy 2.5s ease-in-out infinite; }
+/* ---------- German hero (components/Hero.tsx) ----------
+   Ported from docs/hero-prototype.html. Ids became classes (h-char, h-torso, …) because a page
+   can show several heroes; keyframes got a hero- prefix so they don't clash with Tailwind's. */
+.hero-svg .h-char, .hero-svg .h-torso, .hero-svg .h-headg, .hero-svg .h-armR, .hero-svg .h-armL,
+.hero-svg .eyes, .hero-svg .fx { transform-box: fill-box; }
+.hero-svg .h-char { transform-origin: 50% 100%; }
+.hero-svg .h-torso, .hero-svg .torso2 { transform-box: fill-box; transform-origin: 50% 100%; animation: hero-breathe 3.2s ease-in-out infinite; }
+.hero-svg .torso2 { animation-delay: -1.4s; }
+.hero-svg .h-headg { transform-origin: 50% 90%; transition: transform .5s cubic-bezier(.3,1.4,.5,1); }
+.hero-svg .eyes { transform-origin: 50% 50%; animation: hero-blink 4.6s infinite; }
+.hero-svg .h-armR { transform-origin: 15% 8%; transition: transform .4s; }
+.hero-svg .h-armL { transform-origin: 85% 8%; transition: transform .4s; }
+@keyframes hero-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.025); } }
+@keyframes hero-blink { 0%,94%,100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+@keyframes hero-bounce { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-16px) scaleY(1.02); } 55% { transform: translateY(0) scaleY(.97); } 70% { transform: translateY(-5px); } }
+@keyframes hero-sway { 0%,100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+@keyframes hero-wave { 0%,100% { transform: rotate(-150deg); } 50% { transform: rotate(-115deg); } }
+@keyframes hero-nod { 0%,100% { transform: rotate(0); } 30% { transform: translateY(5px) rotate(3deg); } 60% { transform: translateY(-2px); } }
+@keyframes hero-floatZ { 0% { transform: translate(0,0) scale(.6); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(26px,-60px) scale(1.2); opacity: 0; } }
+@keyframes hero-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes hero-tear { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(26px); opacity: 0; } }
+@keyframes hero-spark { 0% { transform: scale(0) rotate(0); opacity: 0; } 40% { opacity: 1; } 100% { transform: scale(1.2) rotate(90deg); opacity: 0; } }
+@keyframes hero-shadowPulse { 0%,100% { transform: scaleX(1); } 50% { transform: scaleX(.96); } }
+.hero-svg.m-happy .h-char { animation: hero-bounce 1.6s ease-in-out infinite; }
+.hero-svg.m-sleepy .h-char { animation: hero-sway 4s ease-in-out infinite; }
+.hero-svg.m-sleepy .h-headg { transform: rotate(-9deg) translateY(4px); }
+.hero-svg.m-sleepy .eyes { animation: none; }
+.hero-svg.m-think .h-headg { transform: rotate(8deg); }
+.hero-svg.m-sad .h-headg { transform: rotate(-5deg) translateY(6px); }
+.hero-svg.m-sad .h-armL { transform: rotate(6deg); }
+.hero-svg.m-sad .h-armR { transform: rotate(-6deg); }
+.hero-svg.waving .h-armR { animation: hero-wave .45s ease-in-out 3; }
+.hero-svg.nodding .h-headg { animation: hero-nod .6s ease-in-out; }
+.hero-svg .z { transform-box: fill-box; animation: hero-floatZ 2.6s ease-in infinite; }
+.hero-svg .z2 { animation-delay: .9s; }
+.hero-svg .z3 { animation-delay: 1.8s; }
+.hero-svg .q { transform-box: fill-box; animation: hero-bob 1.4s ease-in-out infinite; }
+.hero-svg .drop { transform-box: fill-box; animation: hero-tear 2s ease-in infinite; }
+.hero-svg .sp { transform-box: fill-box; transform-origin: center; animation: hero-spark 1.6s ease-out infinite; }
+.hero-svg .sp2 { animation-delay: .5s; }
+.hero-svg .sp3 { animation-delay: 1s; }
+.hero-svg .h-shadow { transform-box: fill-box; transform-origin: center; animation: hero-shadowPulse 3.2s ease-in-out infinite; }
+.hero-svg:focus-visible { outline: 2px solid #CFFA4D; outline-offset: 4px; border-radius: 16px; }
+
+/* Speech bubble */
+.hero-bubble { background: #1E4A35; border: 1.5px solid #CFFA4D; border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.25); text-align: center; }
+.hero-bubble .de { font-style: italic; font-weight: 600; }
+.hero-bubble .tr { color: #A9C4B3; }
+.hero-bubble-up { position: absolute; left: 50%; transform: translateX(-50%); padding: 10px 16px; max-width: 86%; z-index: 1; }
+.hero-bubble-up .de { font-size: 17px; }
+.hero-bubble-up .tr { font-size: 13px; margin-top: 3px; }
+.hero-bubble-up::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; background: #1E4A35; border-right: 1.5px solid #CFFA4D; border-bottom: 1.5px solid #CFFA4D; transform: translateX(-50%) rotate(45deg); }
+.hero-bubble-up.pop { animation: hero-pop .35s cubic-bezier(.3,1.6,.5,1); }
+@keyframes hero-pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+/* small hero: the bubble sits beside the figure */
+.hero-bubble-side { padding: 8px 12px; } /* position (relative/absolute) is set where it is used */
+.hero-bubble-side .de { font-size: 14px; }
+.hero-bubble-side .tr { font-size: 12px; margin-top: 2px; }
+.hero-bubble-side::after { content: ""; position: absolute; top: 50%; width: 12px; height: 12px; background: #1E4A35; transform: translateY(-50%) rotate(45deg); }
+.hero-bubble-side.tail-left::after { left: -7px; border-left: 1.5px solid #CFFA4D; border-bottom: 1.5px solid #CFFA4D; }
+.hero-bubble-side.tail-right::after { right: -7px; border-right: 1.5px solid #CFFA4D; border-top: 1.5px solid #CFFA4D; }
+.hero-bubble-side.pop { animation: hero-pop-side .35s cubic-bezier(.3,1.6,.5,1); }
+@keyframes hero-pop-side { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Progress bar: learned (solid) + almost learned (hatched) */
+.hero-bar { height: 12px; border-radius: 999px; background: #0A2419; overflow: hidden; display: flex; }
+.hero-bar .learned { background: linear-gradient(90deg, #A8EB12, #12D8B5); transition: width .6s; }
+.hero-bar .almost { background: repeating-linear-gradient(135deg, rgba(207,250,77,.55) 0 6px, rgba(207,250,77,.18) 6px 12px); transition: width .6s; }
+.hero-legend-learned { background: linear-gradient(90deg, #A8EB12, #12D8B5); }
+.hero-legend-almost { background: repeating-linear-gradient(135deg, rgba(207,250,77,.55) 0 3px, rgba(207,250,77,.18) 3px 6px); }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-anim-idle, .hero-anim-happy, .hero-anim-sad, .hero-anim-cheer, .hero-anim-sleepy {
-    animation: none !important;
-  }
+  .hero-svg, .hero-svg *, .hero-bubble, .hero-bar * { animation: none !important; transition: none !important; }
 }

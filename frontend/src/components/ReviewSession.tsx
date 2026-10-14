@@ -13,6 +13,7 @@ import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
 import { DirectionToggle, useStoredChoice } from './DirectionToggle'
 import { FolderSelect } from './Folders'
+import { ReviewHero, TrainingHero } from './TrainingHero'
 
 const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
@@ -220,7 +221,7 @@ export function ReviewSession() {
     if (!total) {
       return (
         <div className="glass p-6 text-center sm:p-10">
-          <div className="text-5xl">🎉</div>
+          <ReviewHero fallback="🎉" />
           <p className="mt-3 text-lg font-semibold">{t('review.nothingToday')}</p>
           <p className="mt-1 text-sm text-emerald-100/70">{t('review.comeBack')}</p>
           {folderPicker}
@@ -233,7 +234,7 @@ export function ReviewSession() {
     const sessionCount = due.data?.cards.length ?? 0
     return (
       <div className="glass p-6 text-center sm:p-10">
-        <div className="text-5xl">🃏</div>
+        <ReviewHero fallback="🃏" />
         <p className="mt-3 text-lg font-semibold">{t('review.dueCount', { count: total })}</p>
         <p className="mt-1 text-xs text-emerald-100/60">{t('review.sessionLine', { count: sessionCount })}</p>
         {folderPicker}
@@ -264,6 +265,7 @@ export function ReviewSession() {
       )}
       <QuizQuestion
         key={item.card.id}
+        corner={<TrainingHero />}
         item={item}
         pool={pool.data ?? []}
         position={index + 1}

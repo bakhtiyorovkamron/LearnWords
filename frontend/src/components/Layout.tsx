@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
-import { HeroWidget } from './HeroWidget'
+import { StageUpOverlay } from './StageUpOverlay'
 import { InstallBanner, InstallMenuItem } from './InstallPrompt'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
@@ -145,7 +145,7 @@ export function Layout() {
       </nav>
 
       <Toaster />
-      <HeroWidget />
+      <StageUpOverlay />
       <InstallBanner />
     </div>
   )

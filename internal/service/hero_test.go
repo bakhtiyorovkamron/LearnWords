@@ -28,9 +28,13 @@ func (f *fakeUserRepoForHero) GetByID(context.Context, uuid.UUID) (*domain.User,
 type fakeHeroRepo struct {
 	learnedCount int
 	almostCount  int
-	learnedWords []string
+	learnedWords []domain.HeroWord
 	stage        int
 	hasStage     bool
+	seen         int
+	hasSeen      bool
+	due          int
+	activeDays   []time.Time
 }
 
 func (f *fakeHeroRepo) CountLearned(context.Context, uuid.UUID) (int, error) {
@@ -39,7 +43,7 @@ func (f *fakeHeroRepo) CountLearned(context.Context, uuid.UUID) (int, error) {
 func (f *fakeHeroRepo) CountAlmostLearned(context.Context, uuid.UUID, int) (int, error) {
 	return f.almostCount, nil
 }
-func (f *fakeHeroRepo) LearnedWords(context.Context, uuid.UUID) ([]string, error) {
+func (f *fakeHeroRepo) LearnedWords(context.Context, uuid.UUID, string) ([]domain.HeroWord, error) {
 	return f.learnedWords, nil
 }
 func (f *fakeHeroRepo) HeroStage(context.Context, uuid.UUID) (int, bool, error) {
@@ -48,6 +52,19 @@ func (f *fakeHeroRepo) HeroStage(context.Context, uuid.UUID) (int, bool, error) 
 func (f *fakeHeroRepo) SetHeroStage(_ context.Context, _ uuid.UUID, stage int) error {
 	f.stage, f.hasStage = stage, true
 	return nil
+}
+func (f *fakeHeroRepo) StageSeen(context.Context, uuid.UUID) (int, bool, error) {
+	return f.seen, f.hasSeen, nil
+}
+func (f *fakeHeroRepo) SetStageSeen(_ context.Context, _ uuid.UUID, stage int) error {
+	f.seen, f.hasSeen = stage, true
+	return nil
+}
+func (f *fakeHeroRepo) CountDueToday(context.Context, uuid.UUID, time.Time) (int, error) {
+	return f.due, nil
+}
+func (f *fakeHeroRepo) ActiveDaysSince(context.Context, uuid.UUID, time.Time) ([]time.Time, error) {
+	return f.activeDays, nil
 }
 
 func newHeroService(email, learningLang string, createdAt time.Time, allowed []string, repo *fakeHeroRepo) *HeroService {
@@ -120,46 +137,96 @@ func TestHeroGet_StageNeverDecreases(t *testing.T) {
 	if hero.LearnedCount != 10 {
 		t.Errorf("learned_count = %d, want the true current count (10)", hero.LearnedCount)
 	}
-	if hero.StageChanged {
-		t.Error("stage_changed must be false — the effective stage did not grow")
+	if hero.StageUp {
+		t.Error("stage_up must be false — the effective stage did not grow")
 	}
 }
 
-// --- stage_changed fires exactly once ------------------------------------
+// --- stage_up: set once on growth, cleared by stage-seen ----------------
 
-func TestHeroGet_StageChanged_FiresOnce(t *testing.T) {
+func TestHeroGet_StageUp_UntilSeen(t *testing.T) {
 	allowed := []string{"allowed@example.com"}
 	repo := &fakeHeroRepo{learnedCount: 60} // stage 2, never computed before
 	s := newHeroService("allowed@example.com", "de", time.Now(), allowed, repo)
-
-	first, err := s.Get(context.Background(), uuid.New(), "ru")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first.StageChanged {
-		t.Error("first-ever call must not report stage_changed (nothing to compare against)")
-	}
-	if first.Stage != 2 {
-		t.Fatalf("stage = %d, want 2", first.Stage)
+	uid := uuid.New()
+	get := func() *domain.Hero {
+		t.Helper()
+		h, err := s.Get(context.Background(), uid, "ru")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return h
 	}
 
-	// Learn more words, crossing into stage 3.
-	repo.learnedCount = 250
-	second, err := s.Get(context.Background(), uuid.New(), "ru")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !second.StageChanged || second.Stage != 3 {
-		t.Fatalf("second call: stage=%d stage_changed=%v, want stage=3 stage_changed=true", second.Stage, second.StageChanged)
+	if h := get(); h.StageUp || h.Stage != 2 {
+		t.Fatalf("first-ever call: stage=%d stage_up=%v, want 2/false (nothing grew yet)", h.Stage, h.StageUp)
 	}
 
-	// Same count again: must not re-report the change.
-	third, err := s.Get(context.Background(), uuid.New(), "ru")
-	if err != nil {
+	repo.learnedCount = 250 // crosses into stage 3
+	h := get()
+	if !h.StageUp || h.Stage != 3 {
+		t.Fatalf("after growth: stage=%d stage_up=%v, want 3/true", h.Stage, h.StageUp)
+	}
+	if h.Phrase.De != heroGrowthLine.de {
+		t.Errorf("phrase while stage_up = %q, want the growth line", h.Phrase.De)
+	}
+	if !get().StageUp {
+		t.Fatal("stage_up must stay true until the congratulation is marked as seen")
+	}
+
+	if err := s.MarkStageSeen(context.Background(), uid); err != nil {
 		t.Fatal(err)
 	}
-	if third.StageChanged {
-		t.Error("stage_changed must not fire again once already recorded")
+	if get().StageUp {
+		t.Fatal("stage_up must be false after stage-seen")
+	}
+
+	repo.learnedCount = 600 // stage 4: a new congratulation
+	if !get().StageUp {
+		t.Fatal("stage_up must turn true again on the next growth")
+	}
+}
+
+func TestHeroMarkStageSeen_NotAllowlisted_404(t *testing.T) {
+	s := newHeroService("x@example.com", "de", time.Now(), []string{"allowed@example.com"}, &fakeHeroRepo{})
+	if err := s.MarkStageSeen(context.Background(), uuid.New()); err != domain.ErrNotFound {
+		t.Fatalf("got %v, want ErrNotFound", err)
+	}
+}
+
+// --- mood ------------------------------------------------------------------
+
+func TestHeroMood(t *testing.T) {
+	today := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	day := func(offset int) time.Time { return today.AddDate(0, 0, offset) }
+	cases := []struct {
+		name   string
+		due    int
+		active []time.Time
+		want   string
+	}{
+		{"sleepy: words due, no training today", 7, []time.Time{day(-1)}, domain.HeroSleepy},
+		{"happy: trained today, nothing due", 0, []time.Time{day(0), day(-1)}, domain.HeroHappy},
+		{"sad: streak broke yesterday", 3, []time.Time{day(-2)}, domain.HeroSad},
+		{"idle: trained today but words still due", 4, []time.Time{day(0)}, domain.HeroIdle},
+		{"idle: nothing due, no training today", 0, []time.Time{day(-1)}, domain.HeroIdle},
+		{"sad only on the first day after the break", 3, []time.Time{day(-3)}, domain.HeroSleepy},
+		{"training today beats sad", 0, []time.Time{day(0), day(-2)}, domain.HeroHappy},
+	}
+	for _, c := range cases {
+		if got := heroMood(c.due, c.active, today); got != c.want {
+			t.Errorf("%s: got %s, want %s", c.name, got, c.want)
+		}
+	}
+}
+
+func TestHeroGet_ReturnsMood(t *testing.T) {
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	repo := &fakeHeroRepo{due: 5}
+	s := newHeroService("allowed@example.com", "de", now.AddDate(0, -1, 0), []string{"allowed@example.com"}, repo)
+	h, err := s.Get(context.Background(), uuid.New(), "ru")
+	if err != nil || h.Mood != domain.HeroSleepy {
+		t.Fatalf("mood = %q (%v), want sleepy", h.Mood, err)
 	}
 }
 
@@ -192,59 +259,85 @@ func TestIsHeroBirthday(t *testing.T) {
 	}
 }
 
-// --- 5. phrase: gender, plural exclusion, fallback -----------------------
+// --- 5. phrase: gender, case, translation, only learned words ---------------
 
-func TestHeroPhrase_AllThreeGenders(t *testing.T) {
+func noun(word, tr string) domain.HeroWord { return domain.HeroWord{Word: word, Translation: tr} }
+
+func TestHeroPhrase_ArticlesAndCases(t *testing.T) {
 	pick0 := func(int) int { return 0 }
 	cases := []struct {
-		stage int
-		word  string
-		want  string
+		stage  int
+		word   domain.HeroWord
+		lang   string
+		wantDe string
+		wantTr string
 	}{
-		{1, "der Hund", "Hund!"},
-		{1, "die Katze", "Katze!"},
-		{1, "das Kind", "Kind!"},
-		{2, "der Hund", "Ich will den Hund."},
-		{2, "die Katze", "Ich will die Katze."},
-		{2, "das Kind", "Ich will das Kind."},
-		{3, "der Hund", "Ich habe einen Hund."},
-		{3, "die Katze", "Ich habe eine Katze."},
-		{3, "das Kind", "Ich habe ein Kind."},
-		{4, "der Hund", "Heute sehe ich den Hund."},
-		{5, "die Katze", "Ich möchte eine Katze kaufen."},
+		{1, noun("der Hund", "собака"), "ru", "Der Hund!", "Собака!"},
+		{2, noun("die Katze", "кошка"), "ru", "Wo ist die Katze?", "Где кошка?"},
+		{3, noun("der Hund", "собака"), "ru", "Ich habe einen Hund.", "У меня есть собака."},
+		{3, noun("die Katze", "cat"), "en", "Ich habe eine Katze.", "I have a cat."},
+		{3, noun("das Ei", "egg"), "en", "Ich habe ein Ei.", "I have an egg."},
+		{4, noun("das Kind", "bola"), "uz", "Mir gefällt das Kind sehr.", "Bola menga juda yoqadi."},
+		{5, noun("der Weg", "дорога"), "ru", "Kannst du mir bitte den Weg zeigen?", "Покажешь мне, где дорога?"},
+		{6, noun("das Buch", "the book"), "en", "Ohne das Buch kann ich nicht leben.", "I can't live without the book."},
+		// grammar from the word check wins over the saved text ("Sfit" accepted as der Stift)
+		{3, domain.HeroWord{Word: "Stift", Lemma: "Stift", Article: "der", PartOfSpeech: "noun", Translation: "ручка, карандаш"}, "ru",
+			"Ich habe einen Stift.", "У меня есть ручка."},
 	}
 	for _, c := range cases {
-		if got := heroPhrase(c.stage, []string{c.word}, pick0); got != c.want {
-			t.Errorf("heroPhrase(%d, %q) = %q, want %q", c.stage, c.word, got, c.want)
+		got := heroPhrase(c.stage, []domain.HeroWord{c.word}, c.lang, pick0)
+		if got.De != c.wantDe || got.Translation != c.wantTr {
+			t.Errorf("stage %d %q: got %+v, want %q / %q", c.stage, c.word.Word, got, c.wantDe, c.wantTr)
 		}
 	}
-	if got := heroPhrase(6, nil, pick0); got != "Ich möchte in Deutschland arbeiten und leben." {
-		t.Errorf("stage 6 phrase = %q", got)
-	}
 }
 
-func TestHeroPhrase_SkipsWordsWithoutKnownGender(t *testing.T) {
-	pick0 := func(int) int { return 0 }
-	// "laufen" (no article) must be skipped; only "der Hund" is a valid candidate.
-	got := heroPhrase(1, []string{"laufen", "der Hund"}, pick0)
-	if got != "Hund!" {
-		t.Errorf("got %q, want %q (the genderless word must be skipped)", got, "Hund!")
+// The phrase never contains a word the user hasn't learned: the only open slot is filled from
+// the learned list, and without a suitable learned noun the stage's own ready phrase is used.
+func TestHeroPhrase_OnlyLearnedWords(t *testing.T) {
+	learned := []domain.HeroWord{
+		noun("der Hund", "собака"),
+		noun("die Katze", "кошка"),
+		noun("laufen", "бегать"),  // not a noun → skipped
+		noun("die Leute", "люди"), // plural-only → skipped
+		noun("das Haus", ""),      // no translation in this language → skipped
+		{Word: "schnell", PartOfSpeech: "adjective", Translation: "быстрый"}, // not a noun
 	}
-}
-
-func TestHeroPhrase_SkipsPluralOnlyNouns(t *testing.T) {
-	pick0 := func(int) int { return 0 }
-	got := heroPhrase(1, []string{"die Leute"}, pick0)
-	if got != heroFallbackPhrases[0] {
-		t.Errorf("got %q, want the fallback %q (plural-only noun must be skipped)", got, heroFallbackPhrases[0])
-	}
-}
-
-func TestHeroPhrase_FallbackWhenNoCandidates(t *testing.T) {
-	pick0 := func(int) int { return 0 }
-	for stage := 1; stage <= 5; stage++ {
-		if got := heroPhrase(stage, nil, pick0); got != heroFallbackPhrases[stage-1] {
-			t.Errorf("stage %d: got %q, want fallback %q", stage, got, heroFallbackPhrases[stage-1])
+	usable := map[string]bool{"Hund": true, "Katze": true}
+	for stage := 1; stage <= 6; stage++ {
+		for i := 0; i < 2; i++ {
+			got := heroPhrase(stage, learned, "ru", func(int) int { return i })
+			ok := false
+			for n := range usable {
+				for _, a := range []string{"der", "die"} {
+					if want := renderHeroTemplate(stage-1, heroNoun{article: a, noun: n, translation: map[string]string{"Hund": "собака", "Katze": "кошка"}[n]}, "ru"); got == want {
+						ok = true
+					}
+				}
+			}
+			if !ok {
+				t.Errorf("stage %d: phrase %q is not a template filled with a learned noun", stage, got.De)
+			}
 		}
+	}
+
+	none := []domain.HeroWord{noun("laufen", "бегать"), noun("das Haus", ""), noun("die Leute", "люди")}
+	for stage := 1; stage <= 6; stage++ {
+		got := heroPhrase(stage, none, "en", func(int) int { return 0 })
+		if want := heroStageSay[stage-1][0].phrase("en"); got != want {
+			t.Errorf("stage %d without usable nouns: got %+v, want the stage's ready phrase %+v", stage, got, want)
+		}
+	}
+}
+
+func TestHeroStageNames(t *testing.T) {
+	if got := heroStageName(1, "ru"); got != "Маленький Моцарт" {
+		t.Errorf("stage 1 ru = %q", got)
+	}
+	if got := heroStageName(6, "uz"); got != "Gyote" {
+		t.Errorf("stage 6 uz = %q", got)
+	}
+	if got := heroStageName(2, "xx"); got != "Братья Гримм" {
+		t.Errorf("fallback = %q", got)
 	}
 }

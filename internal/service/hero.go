@@ -63,9 +63,17 @@ func isHeroBirthday(bornAt, now time.Time) (isToday bool, years int) {
 type HeroRepository interface {
 	CountLearned(ctx context.Context, userID uuid.UUID) (int, error)
 	CountAlmostLearned(ctx context.Context, userID uuid.UUID, box int) (int, error)
-	LearnedWords(ctx context.Context, userID uuid.UUID) ([]string, error)
+	// LearnedWords: every learned German word with its grammar and translation into lang.
+	LearnedWords(ctx context.Context, userID uuid.UUID, lang string) ([]domain.HeroWord, error)
 	HeroStage(ctx context.Context, userID uuid.UUID) (stage int, ok bool, err error)
 	SetHeroStage(ctx context.Context, userID uuid.UUID, stage int) error
+	// StageSeen: the highest stage whose congratulation was shown; ok=false if never set.
+	StageSeen(ctx context.Context, userID uuid.UUID) (stage int, ok bool, err error)
+	SetStageSeen(ctx context.Context, userID uuid.UUID, stage int) error
+	// CountDueToday: words due for review today (same rule as the review queue).
+	CountDueToday(ctx context.Context, userID uuid.UUID, today time.Time) (int, error)
+	// ActiveDaysSince: distinct UTC days with at least one answer (review or practice) since from.
+	ActiveDaysSince(ctx context.Context, userID uuid.UUID, from time.Time) ([]time.Time, error)
 }
 
 type HeroService struct {
@@ -88,12 +96,11 @@ func NewHeroService(users UserRepository, repo HeroRepository, allowedEmails []s
 	return &HeroService{users: users, repo: repo, allowed: allowed, now: time.Now, pick: rand.Intn}
 }
 
-// Get builds the hero card for userID in the given interface language. Returns
-// domain.ErrNotFound (→ 404) when the feature isn't available to this user at all: not on the
-// FEATURE_HERO_EMAILS allowlist, or the account isn't learning German — the frontend must see
-// no difference between "not allowed" and "no such endpoint", and the email never reaches the
-// client either way.
-func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang string) (*domain.Hero, error) {
+// available returns domain.ErrNotFound (→ 404) when the feature isn't available to this user
+// at all: not on the FEATURE_HERO_EMAILS allowlist, or the account isn't learning German — the
+// frontend must see no difference between "not allowed" and "no such endpoint", and the email
+// never reaches the client either way.
+func (s *HeroService) available(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	user, err := s.users.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -101,6 +108,41 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 	if !s.allowed[strings.ToLower(user.Email)] || user.LearningLanguage != domain.DefaultLearningLang {
 		return nil, domain.ErrNotFound
 	}
+	return user, nil
+}
+
+// heroMood decides the hero's mood of the day. activeDays are the days with any training;
+// today is a UTC date (midnight).
+//   - trained today: happy if nothing is due any more, otherwise idle;
+//   - not trained today: sad on the first day after the streak broke (yesterday missed, the day
+//     before active), else sleepy if words are due, else idle.
+func heroMood(dueToday int, activeDays []time.Time, today time.Time) string {
+	active := make(map[string]bool, len(activeDays))
+	for _, d := range activeDays {
+		active[d.UTC().Format("2006-01-02")] = true
+	}
+	day := func(offset int) bool { return active[today.AddDate(0, 0, offset).Format("2006-01-02")] }
+	switch {
+	case day(0) && dueToday == 0:
+		return domain.HeroHappy
+	case day(0):
+		return domain.HeroIdle
+	case !day(-1) && day(-2):
+		return domain.HeroSad
+	case dueToday > 0:
+		return domain.HeroSleepy
+	default:
+		return domain.HeroIdle
+	}
+}
+
+// Get builds the hero card for userID in the given interface language.
+func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang string) (*domain.Hero, error) {
+	user, err := s.available(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	interfaceLang = domain.NormTranslationLang(interfaceLang)
 
 	learnedCount, err := s.repo.CountLearned(ctx, userID)
 	if err != nil {
@@ -112,39 +154,60 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 	if err != nil {
 		return nil, err
 	}
-	rawStage := heroStageFor(learnedCount)
 
+	// The hero only ever grows forward.
+	stage := heroStageFor(learnedCount)
 	prevStage, hadPrev, err := s.repo.HeroStage(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	stage := rawStage
-	stageChanged := false
-	if hadPrev {
-		stageChanged = rawStage > prevStage
-		if prevStage > stage {
-			stage = prevStage // the hero only ever grows forward
-		}
+	if hadPrev && prevStage > stage {
+		stage = prevStage
 	}
 	if !hadPrev || stage != prevStage {
 		if err := s.repo.SetHeroStage(ctx, userID, stage); err != nil {
 			return nil, err
 		}
 	}
-
-	words, err := s.repo.LearnedWords(ctx, userID)
+	// stage_up stays true until the congratulation is marked as seen. The very first stage a
+	// hero is computed at is not "growth" — it counts as seen right away.
+	seen, hadSeen, err := s.repo.StageSeen(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	phrase := heroPhrase(stage, words, s.pick)
+	if !hadSeen {
+		seen = stage
+		if hadPrev {
+			seen = prevStage
+		}
+		if err := s.repo.SetStageSeen(ctx, userID, seen); err != nil {
+			return nil, err
+		}
+	}
+	stageUp := stage > seen
 
 	now := s.now()
+	today := dateOf(now)
+	due, err := s.repo.CountDueToday(ctx, userID, today)
+	if err != nil {
+		return nil, err
+	}
+	days, err := s.repo.ActiveDaysSince(ctx, userID, today.AddDate(0, 0, -2))
+	if err != nil {
+		return nil, err
+	}
+
+	words, err := s.repo.LearnedWords(ctx, userID, interfaceLang)
+	if err != nil {
+		return nil, err
+	}
+	phrase := heroPhrase(stage, words, interfaceLang, s.pick)
 	birthdayToday, years := isHeroBirthday(user.CreatedAt, now)
 	switch {
 	case birthdayToday:
-		phrase = heroBirthdayPhrase(years)
-	case stageChanged:
-		phrase = heroGrowthPhrase
+		phrase = heroBirthdayLine(years).phrase(interfaceLang)
+	case stageUp:
+		phrase = heroGrowthLine.phrase(interfaceLang)
 	}
 
 	return &domain.Hero{
@@ -156,7 +219,21 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		BornAt:           user.CreatedAt,
 		AgeDays:          int(now.Sub(user.CreatedAt).Hours() / 24),
 		BirthdayToday:    birthdayToday,
+		Mood:             heroMood(due, days, today),
 		Phrase:           phrase,
-		StageChanged:     stageChanged,
+		StageUp:          stageUp,
 	}, nil
+}
+
+// MarkStageSeen handles POST /api/hero/stage-seen: the congratulation for the current stage
+// was shown, so stage_up turns false until the hero grows again.
+func (s *HeroService) MarkStageSeen(ctx context.Context, userID uuid.UUID) error {
+	if _, err := s.available(ctx, userID); err != nil {
+		return err
+	}
+	stage, ok, err := s.repo.HeroStage(ctx, userID)
+	if err != nil || !ok {
+		return err
+	}
+	return s.repo.SetStageSeen(ctx, userID, stage)
 }

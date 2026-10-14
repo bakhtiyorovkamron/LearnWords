@@ -224,8 +224,11 @@ export const meApi = {
   get: () => api.get<Me>('/me').then((r) => r.data),
 }
 
+export interface HeroPhrase { de: string; translation: string }
+export type HeroMoodApi = 'idle' | 'sleepy' | 'happy' | 'sad'
+
 export interface Hero {
-  stage: number
+  stage: number // 1-6 (drawn as 0-5, see lib/heroStages.ts)
   stage_name: string
   learned_count: number
   almost_count: number // words one Leitner box below "learned"
@@ -233,8 +236,9 @@ export interface Hero {
   born_at: string
   age_days: number
   birthday_today: boolean
-  phrase: string
-  stage_changed: boolean
+  mood: HeroMoodApi
+  phrase: HeroPhrase
+  stage_up: boolean // grew and the congratulation wasn't seen yet → POST /hero/stage-seen
 }
 
 // Gated server-side (FEATURE_HERO_EMAILS) — not everyone has this endpoint at all. A 404 means
@@ -242,6 +246,7 @@ export interface Hero {
 export const heroApi = {
   get: (nativeLanguage: string) =>
     api.get<Hero>('/hero', { params: { native_language: nativeLanguage } }).then((r) => r.data),
+  stageSeen: () => api.post('/hero/stage-seen'),
 }
 
 export interface AdminUser {

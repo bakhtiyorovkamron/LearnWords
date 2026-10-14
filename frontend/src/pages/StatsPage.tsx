@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { statsApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { HeroCard } from '../components/HeroCard'
+import { HeroPanel } from '../components/HeroPanel'
 import { ReviewsChart } from '../components/ReviewsChart'
 
 export function StatsPage() {
@@ -34,7 +34,7 @@ export function StatsPage() {
         <p className="mt-2 text-emerald-100/70">{t('stats.subtitle')}</p>
       </div>
 
-      <HeroCard />
+      <HeroPanel />
 
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {cards.map((c) => (

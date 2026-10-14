@@ -135,6 +135,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.PUT("/me/settings", d.Settings.Update)
 		protected.GET("/me", d.Admin.Me)
 		protected.GET("/hero", d.Hero.Get)
+		protected.POST("/hero/stage-seen", d.Hero.StageSeen)
 	}
 
 	// Every /api/admin/* route goes through AuthRequired + ActiveUser + RequireAdmin (role from the DB).

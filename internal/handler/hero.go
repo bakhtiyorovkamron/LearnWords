@@ -25,3 +25,13 @@ func (h *HeroHandler) Get(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, hero)
 }
+
+// StageSeen handles POST /api/hero/stage-seen — the "your hero grew up" screen was shown.
+// Same 404 gating as Get.
+func (h *HeroHandler) StageSeen(c *gin.Context) {
+	if err := h.svc.MarkStageSeen(c.Request.Context(), userID(c)); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}

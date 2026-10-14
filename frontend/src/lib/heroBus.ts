@@ -1,5 +1,5 @@
 // Simple global event bus for the hero widget: training (and later, other features) emit
-// events here and know nothing else about the hero — HeroWidget is the only listener.
+// events here and know nothing else about the hero — the hero components (TrainingHero) and lib/pwa.ts listen.
 // Mirrors the same window CustomEvent pattern as components/Toaster.tsx's toast().
 
 export type HeroEvent =
