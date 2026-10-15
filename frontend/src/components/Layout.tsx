@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
 import { StageUpOverlay } from './StageUpOverlay'
+import { HeroIntroOverlay } from './HeroIntroOverlay'
 import { InstallBanner, InstallMenuItem } from './InstallPrompt'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
@@ -146,6 +147,7 @@ export function Layout() {
 
       <Toaster />
       <StageUpOverlay />
+      <HeroIntroOverlay />
       <InstallBanner />
     </div>
   )

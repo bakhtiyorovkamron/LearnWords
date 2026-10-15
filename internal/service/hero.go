@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,6 +69,9 @@ type HeroRepository interface {
 	// StageSeen: the highest stage whose congratulation was shown; ok=false if never set.
 	StageSeen(ctx context.Context, userID uuid.UUID) (stage int, ok bool, err error)
 	SetStageSeen(ctx context.Context, userID uuid.UUID, stage int) error
+	// IntroSeen: the one-time "Meet your German hero!" screen was shown.
+	IntroSeen(ctx context.Context, userID uuid.UUID) (bool, error)
+	SetIntroSeen(ctx context.Context, userID uuid.UUID) error
 	// CountDueToday: words due for review today (same rule as the review queue).
 	CountDueToday(ctx context.Context, userID uuid.UUID, today time.Time) (int, error)
 	// ActiveDaysSince: distinct UTC days with at least one answer (review or practice) since from.
@@ -79,33 +81,28 @@ type HeroRepository interface {
 type HeroService struct {
 	users   UserRepository
 	repo    HeroRepository
-	allowed map[string]bool // lowercased emails from FEATURE_HERO_EMAILS
+	enabled bool // FEATURE_HERO_ENABLED
 	now     func() time.Time
 	pick    func(n int) int // injected for deterministic tests; production uses rand.Intn
 }
 
-// NewHeroService builds the service. allowedEmails comes straight from the
-// FEATURE_HERO_EMAILS env var (comma-separated) — never hardcoded, compared case-insensitively.
-func NewHeroService(users UserRepository, repo HeroRepository, allowedEmails []string) *HeroService {
-	allowed := make(map[string]bool, len(allowedEmails))
-	for _, e := range allowedEmails {
-		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
-			allowed[e] = true
-		}
-	}
-	return &HeroService{users: users, repo: repo, allowed: allowed, now: time.Now, pick: rand.Intn}
+// NewHeroService builds the service. enabled is the FEATURE_HERO_ENABLED switch.
+func NewHeroService(users UserRepository, repo HeroRepository, enabled bool) *HeroService {
+	return &HeroService{users: users, repo: repo, enabled: enabled, now: time.Now, pick: rand.Intn}
 }
 
-// available returns domain.ErrNotFound (→ 404) when the feature isn't available to this user
-// at all: not on the FEATURE_HERO_EMAILS allowlist, or the account isn't learning German — the
-// frontend must see no difference between "not allowed" and "no such endpoint", and the email
-// never reaches the client either way.
+// available returns domain.ErrNotFound (→ 404) when the hero isn't there for this user: the
+// feature is switched off, or the account isn't learning German. The frontend treats the 404 as
+// "no hero" and shows nothing.
 func (s *HeroService) available(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	if !s.enabled {
+		return nil, domain.ErrNotFound
+	}
 	user, err := s.users.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if !s.allowed[strings.ToLower(user.Email)] || user.LearningLanguage != domain.DefaultLearningLang {
+	if user.LearningLanguage != domain.DefaultLearningLang {
 		return nil, domain.ErrNotFound
 	}
 	return user, nil
@@ -170,7 +167,8 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		}
 	}
 	// stage_up stays true until the congratulation is marked as seen. The very first stage a
-	// hero is computed at is not "growth" — it counts as seen right away.
+	// hero is computed at is not "growth" — it counts as seen right away (so an existing user
+	// with words gets the one-time intro below instead of a "your hero grew up" screen).
 	seen, hadSeen, err := s.repo.StageSeen(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -185,6 +183,10 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		}
 	}
 	stageUp := stage > seen
+	introSeen, err := s.repo.IntroSeen(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	now := s.now()
 	today := dateOf(now)
@@ -222,6 +224,7 @@ func (s *HeroService) Get(ctx context.Context, userID uuid.UUID, interfaceLang s
 		Mood:             heroMood(due, days, today),
 		Phrase:           phrase,
 		StageUp:          stageUp,
+		Intro:            !introSeen,
 	}, nil
 }
 
@@ -236,4 +239,12 @@ func (s *HeroService) MarkStageSeen(ctx context.Context, userID uuid.UUID) error
 		return err
 	}
 	return s.repo.SetStageSeen(ctx, userID, stage)
+}
+
+// MarkIntroSeen handles POST /api/hero/intro-seen: the one-time introduction was shown.
+func (s *HeroService) MarkIntroSeen(ctx context.Context, userID uuid.UUID) error {
+	if _, err := s.available(ctx, userID); err != nil {
+		return err
+	}
+	return s.repo.SetIntroSeen(ctx, userID)
 }

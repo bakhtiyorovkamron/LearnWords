@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,9 +46,13 @@ func (r *HeroRepository) CountAlmostLearned(ctx context.Context, userID uuid.UUI
 	return n, err
 }
 
-// LearnedWords returns every learned German word with its grammar (from the word check) and
-// its cached translation into lang — small enough (a few thousand short rows at most) to fetch
-// whole and pick/filter in Go, which avoids any sampling bias from picking in SQL first.
+// heroWordSample caps LearnedWords: /api/hero is called on several pages, and the phrase only
+// needs a pool to pick from — not every learned word of a user with thousands.
+const heroWordSample = 300
+
+// LearnedWords returns a random sample (≤ heroWordSample) of the user's learned German words with
+// their grammar (from the word check) and cached translation into lang; the phrase is built from
+// it in Go by templates.
 func (r *HeroRepository) LearnedWords(ctx context.Context, userID uuid.UUID, lang string) ([]domain.HeroWord, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.word, COALESCE(w.lemma, ''), COALESCE(w.article, ''), COALESCE(w.part_of_speech, ''),
@@ -55,7 +60,8 @@ func (r *HeroRepository) LearnedWords(ctx context.Context, userID uuid.UUID, lan
 		FROM word_progress p
 		JOIN word_cards w ON w.id = p.word_id
 		LEFT JOIN word_translations t ON t.word_id = w.id AND t.language = $2
-		WHERE p.user_id = $1 AND p.is_learned AND w.language = 'de'`,
+		WHERE p.user_id = $1 AND p.is_learned AND w.language = 'de'
+		ORDER BY random() LIMIT `+strconv.Itoa(heroWordSample),
 		userID, lang)
 	if err != nil {
 		return nil, err
@@ -82,6 +88,21 @@ func (r *HeroRepository) StageSeen(ctx context.Context, userID uuid.UUID) (int, 
 
 func (r *HeroRepository) SetStageSeen(ctx context.Context, userID uuid.UUID, stage int) error {
 	_, err := r.pool.Exec(ctx, `UPDATE users SET hero_stage_seen = $2 WHERE id = $1`, userID, stage)
+	return err
+}
+
+// IntroSeen: has the user seen the one-time hero introduction.
+func (r *HeroRepository) IntroSeen(ctx context.Context, userID uuid.UUID) (bool, error) {
+	var seen bool
+	err := r.pool.QueryRow(ctx, `SELECT hero_intro_seen FROM users WHERE id = $1`, userID).Scan(&seen)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return seen, err
+}
+
+func (r *HeroRepository) SetIntroSeen(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET hero_intro_seen = true WHERE id = $1`, userID)
 	return err
 }
 

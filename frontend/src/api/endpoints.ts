@@ -248,14 +248,16 @@ export interface Hero {
   mood: HeroMoodApi
   phrase: HeroPhrase
   stage_up: boolean // grew and the congratulation wasn't seen yet → POST /hero/stage-seen
+  intro: boolean // the one-time «Meet your German hero!» wasn't seen yet → POST /hero/intro-seen
 }
 
-// Gated server-side (FEATURE_HERO_EMAILS) — not everyone has this endpoint at all. A 404 means
-// "not available to you", not an error: callers should treat it as "no hero", nothing to show.
+// Open to everyone who learns German, unless the server switches it off (FEATURE_HERO_ENABLED).
+// A 404 means "no hero", not an error: callers just show nothing.
 export const heroApi = {
   get: (nativeLanguage: string) =>
     api.get<Hero>('/hero', { params: { native_language: nativeLanguage } }).then((r) => r.data),
   stageSeen: () => api.post('/hero/stage-seen'),
+  introSeen: () => api.post('/hero/intro-seen'),
 }
 
 export interface AdminUser {

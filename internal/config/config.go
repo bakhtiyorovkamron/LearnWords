@@ -21,9 +21,9 @@ type Config struct {
 	TargetLang   string // language to translate into
 	AutoMigrate  bool
 	CookieSecure bool // set true behind HTTPS
-	// HeroEmails: FEATURE_HERO_EMAILS, comma-separated, case-insensitive. Empty = feature off
-	// for everyone. Never hardcode an email here or anywhere else — this is the only switch.
-	HeroEmails []string
+	// HeroEnabled: FEATURE_HERO_ENABLED (default true). false → GET /api/hero answers 404 for
+	// everyone — a switch to hide the hero quickly without a deploy of code.
+	HeroEnabled bool
 }
 
 func Load() (*Config, error) {
@@ -41,7 +41,7 @@ func Load() (*Config, error) {
 		TargetLang:   env("TRANSLATION_TARGET_LANG", "ru"),
 		AutoMigrate:  env("AUTO_MIGRATE", "true") == "true",
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
-		HeroEmails:   strings.Split(env("FEATURE_HERO_EMAILS", ""), ","),
+		HeroEnabled:  !isOff(env("FEATURE_HERO_ENABLED", "true")),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")
@@ -63,4 +63,13 @@ func duration(key string, def time.Duration) time.Duration {
 		}
 	}
 	return def
+}
+
+// isOff: "false", "0", "no", "off" (any case).
+func isOff(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "false", "0", "no", "off":
+		return true
+	}
+	return false
 }

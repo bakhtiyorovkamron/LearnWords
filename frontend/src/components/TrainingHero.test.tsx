@@ -8,13 +8,13 @@ import { TrainingHero } from './TrainingHero'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, heroApi: { get: vi.fn(), stageSeen: vi.fn() } }
+  return { ...mod, heroApi: { get: vi.fn(), stageSeen: vi.fn(), introSeen: vi.fn() } }
 })
 
 const hero: HeroData = {
   stage: 2, stage_name: 'Братья Гримм', learned_count: 60, almost_count: 3, words_to_next_stage: 140,
   born_at: '2026-01-01T00:00:00Z', age_days: 10, birthday_today: false, mood: 'idle',
-  phrase: { de: 'Wo ist der Hund?', translation: 'Где собака?' }, stage_up: false,
+  phrase: { de: 'Wo ist der Hund?', translation: 'Где собака?' }, stage_up: false, intro: false,
 }
 
 function renderWithClient() {

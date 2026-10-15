@@ -35,6 +35,13 @@ type fakeHeroRepo struct {
 	hasSeen      bool
 	due          int
 	activeDays   []time.Time
+	introSeen    bool
+}
+
+func (f *fakeHeroRepo) IntroSeen(context.Context, uuid.UUID) (bool, error) { return f.introSeen, nil }
+func (f *fakeHeroRepo) SetIntroSeen(context.Context, uuid.UUID) error {
+	f.introSeen = true
+	return nil
 }
 
 func (f *fakeHeroRepo) CountLearned(context.Context, uuid.UUID) (int, error) {
@@ -67,11 +74,11 @@ func (f *fakeHeroRepo) ActiveDaysSince(context.Context, uuid.UUID, time.Time) ([
 	return f.activeDays, nil
 }
 
-func newHeroService(email, learningLang string, createdAt time.Time, allowed []string, repo *fakeHeroRepo) *HeroService {
+func newHeroService(email, learningLang string, createdAt time.Time, enabled bool, repo *fakeHeroRepo) *HeroService {
 	users := &fakeUserRepoForHero{user: domain.User{
 		ID: uuid.New(), Email: email, LearningLanguage: learningLang, CreatedAt: createdAt,
 	}}
-	s := NewHeroService(users, repo, allowed)
+	s := NewHeroService(users, repo, enabled)
 	s.now = func() time.Time { return time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC) }
 	s.pick = func(int) int { return 0 } // deterministic: always the first candidate
 	return s
@@ -79,23 +86,74 @@ func newHeroService(email, learningLang string, createdAt time.Time, allowed []s
 
 // --- 1. allowlist / learning-language gating ---------------------------
 
-func TestHeroGet_NotAllowlisted_404(t *testing.T) {
-	s := newHeroService("someone-else@example.com", "de", time.Now(), []string{"allowed@example.com"}, &fakeHeroRepo{})
-	_, err := s.Get(context.Background(), uuid.New(), "ru")
-	if err != domain.ErrNotFound {
-		t.Fatalf("got %v, want domain.ErrNotFound", err)
+func TestHeroGet_AnyEmail_Allowed(t *testing.T) {
+	// There is no email allow-list any more: whoever learns German gets the hero.
+	for _, email := range []string{"someone-else@example.com", "Another@Example.COM", ""} {
+		s := newHeroService(email, "de", time.Now(), true, &fakeHeroRepo{})
+		if _, err := s.Get(context.Background(), uuid.New(), "ru"); err != nil {
+			t.Errorf("%q: expected access, got %v", email, err)
+		}
 	}
 }
 
-func TestHeroGet_AllowlistCaseInsensitive(t *testing.T) {
-	s := newHeroService("Allowed@Example.com", "de", time.Now(), []string{"allowed@example.com"}, &fakeHeroRepo{})
-	if _, err := s.Get(context.Background(), uuid.New(), "ru"); err != nil {
-		t.Fatalf("expected access, got %v", err)
+func TestHero_Disabled_404(t *testing.T) {
+	repo := &fakeHeroRepo{learnedCount: 120}
+	s := newHeroService("a@example.com", "de", time.Now(), false, repo)
+	if _, err := s.Get(context.Background(), uuid.New(), "ru"); err != domain.ErrNotFound {
+		t.Fatalf("Get: got %v, want ErrNotFound", err)
+	}
+	if err := s.MarkStageSeen(context.Background(), uuid.New()); err != domain.ErrNotFound {
+		t.Errorf("MarkStageSeen: got %v, want ErrNotFound", err)
+	}
+	if err := s.MarkIntroSeen(context.Background(), uuid.New()); err != domain.ErrNotFound {
+		t.Errorf("MarkIntroSeen: got %v, want ErrNotFound", err)
+	}
+	if repo.hasStage || repo.hasSeen {
+		t.Error("a disabled hero must not create any state")
+	}
+}
+
+// An existing user with words meets the hero for the first time: current stage, no "grew up"
+// congratulation, the introduction exactly once.
+func TestHeroGet_FirstVisitWithWords_IntroNotStageUp(t *testing.T) {
+	repo := &fakeHeroRepo{learnedCount: 120}
+	s := newHeroService("old@example.com", "de", time.Now(), true, repo)
+	uid := uuid.New()
+	get := func() *domain.Hero {
+		t.Helper()
+		h, err := s.Get(context.Background(), uid, "ru")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return h
+	}
+
+	h := get()
+	if h.Stage != 2 || h.StageName != "Братья Гримм" {
+		t.Errorf("stage = %d %q, want 2 «Братья Гримм»", h.Stage, h.StageName)
+	}
+	if h.StageUp {
+		t.Error("stage_up must be false on the first visit")
+	}
+	if !h.Intro {
+		t.Error("intro must be shown on the first visit")
+	}
+	if !repo.hasStage || !repo.hasSeen || repo.seen != 2 {
+		t.Errorf("hero record not created as seen: %+v", repo)
+	}
+	if !get().Intro {
+		t.Error("intro stays until it is marked as seen")
+	}
+	if err := s.MarkIntroSeen(context.Background(), uid); err != nil {
+		t.Fatal(err)
+	}
+	if h := get(); h.Intro || h.StageUp {
+		t.Errorf("after intro-seen: intro=%v stage_up=%v, want false/false", h.Intro, h.StageUp)
 	}
 }
 
 func TestHeroGet_NotGerman_404(t *testing.T) {
-	s := newHeroService("allowed@example.com", "en", time.Now(), []string{"allowed@example.com"}, &fakeHeroRepo{})
+	s := newHeroService("allowed@example.com", "en", time.Now(), true, &fakeHeroRepo{})
 	_, err := s.Get(context.Background(), uuid.New(), "ru")
 	if err != domain.ErrNotFound {
 		t.Fatalf("got %v, want domain.ErrNotFound (hero is German-only)", err)
@@ -121,9 +179,8 @@ func TestHeroStageFor_Boundaries(t *testing.T) {
 // --- 3. stage never decreases -------------------------------------------
 
 func TestHeroGet_StageNeverDecreases(t *testing.T) {
-	allowed := []string{"allowed@example.com"}
 	repo := &fakeHeroRepo{learnedCount: 500, stage: 4, hasStage: true} // previously reached stage 4
-	s := newHeroService("allowed@example.com", "de", time.Now(), allowed, repo)
+	s := newHeroService("allowed@example.com", "de", time.Now(), true, repo)
 
 	// Words regressed: now only 10 learned (would be stage 1 on its own).
 	repo.learnedCount = 10
@@ -145,9 +202,8 @@ func TestHeroGet_StageNeverDecreases(t *testing.T) {
 // --- stage_up: set once on growth, cleared by stage-seen ----------------
 
 func TestHeroGet_StageUp_UntilSeen(t *testing.T) {
-	allowed := []string{"allowed@example.com"}
 	repo := &fakeHeroRepo{learnedCount: 60} // stage 2, never computed before
-	s := newHeroService("allowed@example.com", "de", time.Now(), allowed, repo)
+	s := newHeroService("allowed@example.com", "de", time.Now(), true, repo)
 	uid := uuid.New()
 	get := func() *domain.Hero {
 		t.Helper()
@@ -187,13 +243,6 @@ func TestHeroGet_StageUp_UntilSeen(t *testing.T) {
 	}
 }
 
-func TestHeroMarkStageSeen_NotAllowlisted_404(t *testing.T) {
-	s := newHeroService("x@example.com", "de", time.Now(), []string{"allowed@example.com"}, &fakeHeroRepo{})
-	if err := s.MarkStageSeen(context.Background(), uuid.New()); err != domain.ErrNotFound {
-		t.Fatalf("got %v, want ErrNotFound", err)
-	}
-}
-
 // --- mood ------------------------------------------------------------------
 
 func TestHeroMood(t *testing.T) {
@@ -223,7 +272,7 @@ func TestHeroMood(t *testing.T) {
 func TestHeroGet_ReturnsMood(t *testing.T) {
 	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 	repo := &fakeHeroRepo{due: 5}
-	s := newHeroService("allowed@example.com", "de", now.AddDate(0, -1, 0), []string{"allowed@example.com"}, repo)
+	s := newHeroService("allowed@example.com", "de", now.AddDate(0, -1, 0), true, repo)
 	h, err := s.Get(context.Background(), uuid.New(), "ru")
 	if err != nil || h.Mood != domain.HeroSleepy {
 		t.Fatalf("mood = %q (%v), want sleepy", h.Mood, err)

@@ -13,9 +13,9 @@ type HeroHandler struct{ svc *service.HeroService }
 
 func NewHeroHandler(svc *service.HeroService) *HeroHandler { return &HeroHandler{svc: svc} }
 
-// Get handles GET /api/hero?native_language=. Only ever responds for users on the
-// FEATURE_HERO_EMAILS allowlist who are learning German — everyone else gets a plain 404,
-// indistinguishable from the route not existing at all.
+// Get handles GET /api/hero?native_language=. Responds for everyone who learns German while
+// FEATURE_HERO_ENABLED is on — otherwise a plain 404, indistinguishable from the route not
+// existing.
 func (h *HeroHandler) Get(c *gin.Context) {
 	native := domain.NormTranslationLang(c.Query("native_language"))
 	hero, err := h.svc.Get(c.Request.Context(), userID(c), native)
@@ -30,6 +30,15 @@ func (h *HeroHandler) Get(c *gin.Context) {
 // Same 404 gating as Get.
 func (h *HeroHandler) StageSeen(c *gin.Context) {
 	if err := h.svc.MarkStageSeen(c.Request.Context(), userID(c)); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// IntroSeen handles POST /api/hero/intro-seen — the one-time introduction was shown. Same 404 gating.
+func (h *HeroHandler) IntroSeen(c *gin.Context) {
+	if err := h.svc.MarkIntroSeen(c.Request.Context(), userID(c)); err != nil {
 		writeError(c, err)
 		return
 	}

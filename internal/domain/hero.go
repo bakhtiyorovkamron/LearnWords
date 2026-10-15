@@ -41,4 +41,7 @@ type Hero struct {
 	// StageUp: the hero reached a stage whose congratulation the user hasn't seen yet. Stays true
 	// until POST /api/hero/stage-seen.
 	StageUp bool `json:"stage_up"`
+	// Intro: the user hasn't seen the one-time "Meet your German hero!" screen yet. Stays true
+	// until POST /api/hero/intro-seen.
+	Intro bool `json:"intro"`
 }

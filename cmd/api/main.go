@@ -104,7 +104,7 @@ func run() error {
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)
-	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEmails)
+	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
 	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
 	wordFixSvc := service.NewWordFixService(postgres.NewWordFixRepository(pool), wordCheckSvc)
