@@ -143,6 +143,7 @@ func run() error {
 		Admin:        handler.NewAdminHandler(adminRepo, userRepo),
 		Collection:   handler.NewCollectionHandler(cardRepo),
 		WordEdit:     handler.NewWordEditHandler(cardRepo),
+		WordMove:     handler.NewWordMoveHandler(cardRepo),
 		Folders:      handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
 		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),

@@ -11,6 +11,9 @@ import { FlipCards } from '../components/FlipCards'
 import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
 import { FolderBar } from '../components/Folders'
 import { WordFixes } from '../components/WordFixes'
+import { FolderPicker } from '../components/FolderPicker'
+import { toast } from '../components/Toaster'
+import { useMoveWords } from '../lib/moveWords'
 
 const PAGE = 48
 const VIEW_KEY = 'collection-view'
@@ -77,6 +80,22 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view) }, [view])
 
+  // Bulk move: «Select» shows checkboxes (list view only); the bar at the bottom moves the picked words.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [picking, setPicking] = useState(false)
+  const [selectingAll, setSelectingAll] = useState(false)
+  const moveWords = useMoveWords()
+  const filterKey = JSON.stringify({ status, period, sort, search, folder })
+  useEffect(() => { setSelected(new Set()) }, [filterKey]) // picked words may be filtered out now
+  useEffect(() => { if (view !== 'list') setSelecting(false) }, [view])
+  const stopSelecting = () => { setSelecting(false); setSelected(new Set()) }
+  const toggle = (id: string) => setSelected((s) => {
+    const n = new Set(s)
+    if (!n.delete(id)) n.add(id)
+    return n
+  })
+
   // Filtering/sorting/search are done by the backend; pages of 48 are loaded on demand.
   const query = useInfiniteQuery({
     queryKey: ['collection', { status, period, sort, search, folder }],
@@ -92,6 +111,24 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
 
   const cards = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data])
   const filteredTotal = query.data?.pages[0]?.total
+  async function selectAll() {
+    setSelectingAll(true)
+    try {
+      const r = await collectionApi.ids({ status, period, sort, q: search, folder })
+      setSelected(new Set(r.ids))
+      if (r.total > r.ids.length) toast(t('select.limit', { n: r.ids.length, total: r.total }))
+    } catch (e) {
+      toast(errorMessage(e))
+    } finally {
+      setSelectingAll(false)
+    }
+  }
+
+  async function moveSelected(folderId: string | null, folderName: string) {
+    setPicking(false)
+    if (await moveWords([...selected], folderId, folderName)) stopSelecting()
+  }
+
   const filtersActive = status !== 'all' || period !== 'all' || !!search || !!folder
 
   // The heading always shows the TRUE total word count, independent of any filter — a separate
@@ -105,7 +142,7 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   })
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${selecting ? 'pb-24' : ''}`}>
       <div className="animate-rise flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="display text-3xl font-extrabold md:text-4xl">
@@ -166,11 +203,28 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
 
       <div className={`transition-opacity ${query.isPlaceholderData ? 'opacity-50' : ''}`}>
         {view === 'list' ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.map((c, i) => (
-              <WordCardView key={c.id} card={c} index={i}
-                progress={{ boxLevel: c.box_level, isLearned: c.is_learned }} />
-            ))}
+          <div className="space-y-3">
+            {cards.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+                  className={selecting ? 'btn-primary !px-4 !py-2 text-sm' : 'btn-ghost !px-4 !py-2 text-sm'}>
+                  {selecting ? t('select.cancel') : `☑ ${t('select.start')}`}
+                </button>
+                {selecting && (
+                  <button type="button" onClick={() => void selectAll()} disabled={selectingAll}
+                    className="btn-ghost !px-4 !py-2 text-sm disabled:opacity-50">
+                    {t('select.all')}
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {cards.map((c, i) => (
+                <WordCardView key={c.id} card={c} index={i}
+                  progress={{ boxLevel: c.box_level, isLearned: c.is_learned }}
+                  selection={selecting ? { checked: selected.has(c.id), onToggle: () => toggle(c.id) } : undefined} />
+              ))}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -204,6 +258,21 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
           <p className="mt-3 text-emerald-100/70">{filtersActive ? t('cards.nothingFound') : t('cards.empty')}</p>
         </div>
       )}
+
+      {selecting && (
+        // Above the tab bar on phones (--nav-h), at the very bottom on desktop (--nav-h is 0 there).
+        <div className="fixed inset-x-0 bottom-[var(--nav-h)] z-30 border-t border-emerald-400/20 bg-emerald-950/95 px-4 py-3 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-white">{t('select.count', { n: selected.size })}</span>
+            <button type="button" disabled={!selected.size} onClick={() => setPicking(true)}
+              className="btn-primary disabled:opacity-50">
+              {t('move.button', { n: selected.size })}
+            </button>
+          </div>
+        </div>
+      )}
+      {picking && <FolderPicker title={t('move.button', { n: selected.size })} current={folder === 'none' ? '' : folder || undefined}
+        onPick={(id, name) => void moveSelected(id, name)} onClose={() => setPicking(false)} />}
     </div>
   )
 }

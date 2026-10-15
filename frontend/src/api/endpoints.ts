@@ -117,6 +117,15 @@ export const wordsApi = {
       .then((r) => r.data),
   // Only changed fields are sent; learning progress is not affected.
   update: (id: string, u: WordUpdate) => api.patch<WordCard>(`/words/${id}`, u).then((r) => r.data),
+  // One word or many (≤ 500) into a folder (null = no folder). Only the folder changes; the answer
+  // has every word's previous folder for "Undo".
+  move: (wordIds: string[], folderId: string | null) =>
+    api.post<MoveResult>('/words/move', { word_ids: wordIds, folder_id: folderId }).then((r) => r.data),
+}
+
+export interface MoveResult {
+  moved: number
+  previous: { word_id: string; folder_id: string | null }[]
 }
 
 export interface WordUpdate {
@@ -344,6 +353,13 @@ export const collectionApi = {
           status: f.status, period: f.period, sort: f.sort, q: f.q || undefined,
           folder_id: f.folder || undefined, limit: f.limit ?? 48, offset: f.offset ?? 0,
         },
+      })
+      .then((r) => r.data),
+  // Ids of every word matching the filters (≤ 500) — "select all" across pages.
+  ids: (f: Omit<CollectionQuery, 'limit' | 'offset'>) =>
+    api
+      .get<{ ids: string[]; total: number }>('/collection/ids', {
+        params: { status: f.status, period: f.period, sort: f.sort, q: f.q || undefined, folder_id: f.folder || undefined },
       })
       .then((r) => r.data),
 }

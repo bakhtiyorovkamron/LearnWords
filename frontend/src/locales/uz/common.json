@@ -335,5 +335,9 @@
     "confirmDelete": "{{email}} va uning BARCHA ma’lumotlari qaytarib bo‘lmaydigan tarzda o‘chirilsinmi?",
     "actionFailed": "Amal bajarilmadi: {{error}}",
     "nothingFound": "Hech kim topilmadi"
-  }
+  },
+  "word": {"move": "Papkaga koʻchirish", "more": "Amallar"},
+  "folder": {"none": "Papkasiz", "new": "+ Yangi papka"},
+  "select": {"start": "Tanlash", "all": "Hammasini tanlash", "count": "Tanlandi: {{n}}", "cancel": "Tayyor", "limit": "{{total}} tadan dastlabki {{n}} tasi tanlandi"},
+  "move": {"button": "Koʻchirish ({{n}})", "done": "{{folder}} papkasiga koʻchirildi: {{n}}", "undo": "Qaytarish", "failed": "Koʻchirib boʻlmadi"}
 }

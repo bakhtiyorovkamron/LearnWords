@@ -16,9 +16,52 @@ import (
 // plus the total number of matching cards (for "load more").
 // Cards without a progress row count as box 1, not learned.
 func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUID, f domain.CollectionFilter) ([]domain.CollectionCard, int, error) {
+	base, args, arg := collectionFrom(userID, f)
+	order := collectionOrder(f.Sort)
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+base, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	q := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
+	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''),
+	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id` +
+		base + ` ORDER BY ` + order + ` LIMIT ` + arg(f.Limit) + ` OFFSET ` + arg(f.Offset)
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.CollectionCard, error) {
+		var c domain.CollectionCard
+		err := row.Scan(&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL,
+			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned, &c.FolderID)
+		return c, err
+	})
+	return items, total, err
+}
+
+// ListCollectionIDs returns the ids of up to f.Limit cards matching the filter (in list order)
+// and the total number of matches — for "select all" over every page.
+func (r *WordCardRepository) ListCollectionIDs(ctx context.Context, userID uuid.UUID, f domain.CollectionFilter) ([]uuid.UUID, int, error) {
+	base, args, arg := collectionFrom(userID, f)
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+base, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.pool.Query(ctx, `SELECT w.id`+base+` ORDER BY `+collectionOrder(f.Sort)+` LIMIT `+arg(f.Limit), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	return ids, total, err
+}
+
+// collectionFrom builds " FROM … WHERE …" for the filter plus its args; arg adds one more.
+func collectionFrom(userID uuid.UUID, f domain.CollectionFilter) (base string, args []any, arg func(any) string) {
 	where := []string{"w.user_id = $1"}
-	args := []any{userID}
-	arg := func(v any) string {
+	args = []any{userID}
+	arg = func(v any) string {
 		args = append(args, v)
 		return fmt.Sprintf("$%d", len(args))
 	}
@@ -56,36 +99,19 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 		}
 	}
 
-	// Fixed whitelist → no SQL injection through the sort parameter.
+	base = ` FROM word_cards w LEFT JOIN word_progress p ON p.word_id = w.id WHERE ` + strings.Join(where, " AND ")
+	return base, args, arg
+}
+
+// collectionOrder maps the sort parameter to a fixed whitelist → no SQL injection.
+func collectionOrder(sort string) string {
 	order := "w.created_at DESC"
-	switch f.Sort {
+	switch sort {
 	case "alpha":
 		order = "lower(w.word) ASC, w.created_at DESC"
 	case "progress":
 		// Weakest first: not learned before learned, then lowest box, then longest unseen.
 		order = "COALESCE(p.is_learned, false) ASC, COALESCE(p.box_level, 1) ASC, p.last_reviewed_at ASC NULLS FIRST, w.created_at DESC"
 	}
-
-	base := ` FROM word_cards w LEFT JOIN word_progress p ON p.word_id = w.id WHERE ` + strings.Join(where, " AND ")
-
-	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+base, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
-	q := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
-	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''),
-	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id` +
-		base + ` ORDER BY ` + order + ` LIMIT ` + arg(f.Limit) + ` OFFSET ` + arg(f.Offset)
-	rows, err := r.pool.Query(ctx, q, args...)
-	if err != nil {
-		return nil, 0, err
-	}
-	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.CollectionCard, error) {
-		var c domain.CollectionCard
-		err := row.Scan(&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL,
-			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned, &c.FolderID)
-		return c, err
-	})
-	return items, total, err
+	return order
 }

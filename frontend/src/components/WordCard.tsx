@@ -1,12 +1,13 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { cardsApi, wordsApi } from '../api/endpoints'
+import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
 import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
 import { EditWordModal } from './EditWordModal'
-import { FolderSelect } from './Folders'
-import { toast } from './Toaster'
+import { FolderPicker } from './FolderPicker'
+import { useMoveWords } from '../lib/moveWords'
 
 // Pronunciation is available only for German; other languages have no audio.
 export const hasAudio = (lang: string) => lang === 'de'
@@ -29,24 +30,45 @@ function speak(card: WordCard) {
   window.speechSynthesis.speak(u)
 }
 
-export function WordCardView({ card, index = 0, meaning, progress }: {
+/** The «⋯» menu: a bottom sheet on phones (above the tab bar), a centered dialog on desktop. */
+function WordMenu({ title, onMove, onClose }: { title: string; onMove: () => void; onClose: () => void }) {
+  const { t } = useTranslation()
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm md:items-center md:p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div role="menu" aria-label={title}
+        className="animate-rise glass w-full !rounded-b-none rounded-t-3xl pb-[var(--nav-h)] md:max-w-xs md:!rounded-3xl md:pb-0">
+        <p className="truncate border-b border-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100/70">{title}</p>
+        <div className="p-2">
+          <button type="button" role="menuitem" onClick={onMove}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base transition hover:bg-emerald-400/10">
+            📁 {t('word.move')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+export function WordCardView({ card, index = 0, meaning, progress, selection }: {
   card: WordCard; index?: number; meaning?: string
   // When given (Collection page): status colour + 5-dot box_level indicator.
   progress?: { boxLevel: number; isLearned: boolean }
+  // Select mode (Collection, bulk move): a checkbox instead of the action buttons; a tap toggles.
+  selection?: { checked: boolean; onToggle: () => void }
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
-  // Move to folder: only changes grouping, progress stays the same.
-  const move = useMutation({
-    mutationFn: (folder: string) => wordsApi.update(card.id, { folder_id: folder }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['collection'] })
-      qc.invalidateQueries({ queryKey: ['folders'] })
-      qc.invalidateQueries({ queryKey: ['review-due'] })
-      toast(t('folders.moved'))
-    },
-  })
+  // «⋯» → «Move to folder»: only the grouping changes, progress stays the same.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const moveWords = useMoveWords()
+  async function moveTo(folderId: string | null, folderName: string) {
+    setPicking(false)
+    await moveWords([card.id], folderId, folderName)
+  }
   const regen = useMutation({
     mutationFn: () => cardsApi.regenerateAudio(card.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cards'] }),
@@ -72,13 +94,19 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
   return (
     <div
       style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-      className={`animate-rise group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${tone} p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20 ${remove.isPending ? 'pointer-events-none opacity-40' : ''}`}
+      onClick={selection?.onToggle}
+      className={`animate-rise group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${tone} p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20 ${remove.isPending ? 'pointer-events-none opacity-40' : ''} ${selection ? 'cursor-pointer' : ''} ${selection?.checked ? 'ring-2 ring-lime-300' : ''}`}
     >
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-lime-400/10 blur-2xl transition group-hover:bg-lime-400/25" />
       {progress && (
         <div className="relative mb-2"><ProgressDots boxLevel={progress.boxLevel} isLearned={progress.isLearned} /></div>
       )}
       <div className="relative flex items-center gap-3">
+        {selection && (
+          <input type="checkbox" checked={selection.checked} onChange={selection.onToggle}
+            onClick={(e) => e.stopPropagation()} aria-label={card.word}
+            className="h-5 w-5 shrink-0 accent-lime-400" />
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-lg font-bold text-white">{card.word}</div>
           <div className="font-mono text-xs text-lime-300/80">{card.transcription}</div>
@@ -110,6 +138,7 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
           ↻
         </button>
         </>)}
+        {!selection && (<>
         <button
           onClick={() => setEditing(true)}
           title={t('editWord.title')}
@@ -126,17 +155,25 @@ export function WordCardView({ card, index = 0, meaning, progress }: {
         >
           🗑
         </button>
+        {progress && (
+          <button
+            onClick={() => setMenuOpen(true)}
+            title={t('word.more')}
+            aria-label={t('word.more')}
+            aria-haspopup="menu"
+            className="grid h-9 w-9 place-items-center rounded-full text-lg font-bold text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300"
+          >
+            ⋯
+          </button>
+        )}
+        </>)}
       </div>
       {remove.error && <p className="relative mt-2 text-xs text-red-300">{t('wordCard.deleteFailed')}</p>}
-      {progress && (
-        <div className="relative mt-3 flex items-center gap-2 text-xs text-emerald-100/60">
-          <span>📁 {t('folders.moveTo')}</span>
-          <FolderSelect value={card.folder_id ?? ''} onChange={(v) => move.mutate(v)}
-            className={`!py-1 !text-xs ${move.isPending ? 'opacity-50' : ''}`} />
-          {move.error && <span className="text-red-300">{t('folders.moveFailed')}</span>}
-        </div>
-      )}
       {editing && <EditWordModal card={card} onClose={() => setEditing(false)} />}
+      {menuOpen && <WordMenu title={card.word} onClose={() => setMenuOpen(false)}
+        onMove={() => { setMenuOpen(false); setPicking(true) }} />}
+      {picking && <FolderPicker title={t('word.move')} current={card.folder_id ?? ''}
+        onPick={moveTo} onClose={() => setPicking(false)} />}
     </div>
   )
 }

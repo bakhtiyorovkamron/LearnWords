@@ -335,5 +335,9 @@
     "confirmDelete": "Delete {{email}} and ALL their data permanently?",
     "actionFailed": "Action failed: {{error}}",
     "nothingFound": "No users found"
-  }
+  },
+  "word": {"move": "Move to folder", "more": "Actions"},
+  "folder": {"none": "No folder", "new": "+ New folder"},
+  "select": {"start": "Select", "all": "Select all", "count": "Selected: {{n}}", "cancel": "Done", "limit": "First {{n}} of {{total}} selected"},
+  "move": {"button": "Move ({{n}})", "done": "Moved to “{{folder}}”: {{n}}", "undo": "Undo", "failed": "Couldn’t move"}
 }

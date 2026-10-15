@@ -7,6 +7,7 @@ import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import type { CollectionCard, WordCard } from '../api/types'
 import { toast } from './Toaster'
 import { useLearningLang } from '../lib/learningLang'
+import { FolderSelect } from './Folders'
 
 type CollectionPage = { items: CollectionCard[]; total: number }
 
@@ -32,6 +33,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
     example_sentence: card.example_sentence ?? '',
     example_translation: card.example_translation ?? '',
   })
+  const [folderId, setFolderId] = useState(card.folder_id ?? '') // '' = no folder
   const [localError, setLocalError] = useState<string | null>(null)
 
   // Same endpoint/flow as on the "Add" page, but uses the CURRENT values of the form fields.
@@ -49,6 +51,11 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
     mutationFn: (u: WordUpdate) => wordsApi.update(card.id, u),
     onSuccess: (updated) => {
       patchCaches(qc, updated)
+      if ((updated.folder_id ?? '') !== (card.folder_id ?? '')) {
+        // Folder counters and folder-filtered lists change with the folder.
+        qc.invalidateQueries({ queryKey: ['collection'] })
+        qc.invalidateQueries({ queryKey: ['folders'] })
+      }
       toast(t('editWord.saved'))
       onClose()
     },
@@ -74,6 +81,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
     for (const k of Object.keys(form) as (keyof typeof form)[]) {
       if (form[k].trim() !== original[k].trim()) changes[k] = form[k].trim()
     }
+    if (folderId !== (card.folder_id ?? '')) changes.folder_id = folderId
     if (!Object.keys(changes).length) return onClose()
     save.mutate(changes)
   }
@@ -134,6 +142,11 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
         <div>
           <label className={label} htmlFor="ew-ext">{t('editWord.exampleTranslation')}</label>
           <textarea id="ew-ext" rows={2} className="field" value={form.example_translation} onChange={set('example_translation')} maxLength={500} />
+        </div>
+
+        <div>
+          <label className={label} htmlFor="ew-folder">{t('folders.fieldLabel')}</label>
+          <FolderSelect value={folderId} onChange={setFolderId} className="w-full" />
         </div>
 
         <p className="text-xs text-emerald-100/50">{t('editWord.progressKept')}</p>
