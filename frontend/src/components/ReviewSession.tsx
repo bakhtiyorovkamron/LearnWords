@@ -83,6 +83,7 @@ export function ReviewSession() {
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
   const [streak, setStreak] = useState(0) // consecutive correct answers; resets on a wrong one
+  const [movedUp, setMovedUp] = useState(0) // words that went up a Leitner box in this session
   const [moreLoading, setMoreLoading] = useState(false)
   // Only changes how words are asked; progress (box_level) is shared by all directions.
   const [direction, setDirection] = useStoredChoice<Direction>('review-direction', DIRECTIONS, 'mixed')
@@ -90,7 +91,7 @@ export function ReviewSession() {
   // The hero widget only ever hears about training through these events — it has no other
   // hook into this component, and this component has no idea the hero exists.
   const answer = useMutation({
-    mutationFn: async ({ id, ok }: { id: string; ok: boolean; wasLearned: boolean }) => {
+    mutationFn: async ({ id, ok }: { id: string; ok: boolean; wasLearned: boolean; prevBox: number }) => {
       if (mode === 'practice') {
         await practiceApi.answer(id, ok)
         return null
@@ -101,6 +102,7 @@ export function ReviewSession() {
       qc.invalidateQueries({ queryKey: ['stats'] })
       // null in practice mode — nothing was mutated, so there is nothing to detect here.
       if (progress && progress.box_level >= 4 && !variables.wasLearned) emitHeroEvent({ type: 'word_learned' })
+      if (progress && progress.box_level > variables.prevBox) setMovedUp((n) => n + 1)
     },
   })
 
@@ -119,6 +121,7 @@ export function ReviewSession() {
     setIndex(0)
     setCorrect(0)
     setStreak(0)
+    setMovedUp(0)
     answer.reset()
     emitHeroEvent({ type: 'session_started' })
   }
@@ -140,6 +143,7 @@ export function ReviewSession() {
       setIndex(0)
       setCorrect(0)
       setStreak(0)
+      setMovedUp(0)
       setPracticeSetup(false)
       answer.reset()
       emitHeroEvent({ type: 'session_started' })
@@ -159,6 +163,7 @@ export function ReviewSession() {
       setIndex(0)
       setCorrect(0)
       setStreak(0)
+      setMovedUp(0)
       answer.reset()
       emitHeroEvent({ type: 'session_started' })
     } finally {
@@ -253,7 +258,8 @@ export function ReviewSession() {
     const moreCount = remaining > 0 ? Number(sessionSize) || 0 : 0
     return (
       <ReviewResult correct={correct} total={deck.length} onRestart={restart} restartLabel={t('practice.again')}
-        moreCount={moreCount} onMore={more} moreLoading={moreLoading} />
+        moreCount={moreCount} onMore={more} moreLoading={moreLoading}
+        boxes={mode === 'practice' ? 'practice' : { movedUp }} />
     )
   }
 
@@ -281,7 +287,7 @@ export function ReviewSession() {
           const newStreak = ok ? streak + 1 : 0
           setStreak(newStreak)
           emitHeroEvent({ type: 'answer', correct: ok, streak: newStreak })
-          answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4 }) // saved immediately, not at the end
+          answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4, prevBox: item.card.box_level }) // saved immediately, not at the end
         }}
         onNext={() => {
           answer.reset()

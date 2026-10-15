@@ -12,9 +12,11 @@ interface Props {
   moreCount?: number
   onMore?: () => void
   moreLoading?: boolean
+  // What happened to the Leitner boxes: review → how many words moved up; practice → they don't change.
+  boxes?: 'practice' | { movedUp: number }
 }
 
-export function ReviewResult({ correct, total, onRestart, restartLabel, moreCount = 0, onMore, moreLoading }: Props) {
+export function ReviewResult({ correct, total, onRestart, restartLabel, moreCount = 0, onMore, moreLoading, boxes }: Props) {
   const { t } = useTranslation()
   const wrong = total - correct
   const hasMore = moreCount > 0
@@ -33,6 +35,11 @@ export function ReviewResult({ correct, total, onRestart, restartLabel, moreCoun
         </div>
       </div>
       <p className="mt-4 text-sm text-emerald-100/70">{t('result.total', { count: total })}</p>
+      {boxes && (
+        <p className="mt-2 text-sm font-semibold text-lime-200">
+          {boxes === 'practice' ? t('summary.practice') : t('summary.moved', { n: boxes.movedUp })}
+        </p>
+      )}
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
         {hasMore && (
           <button type="button" onClick={onMore} disabled={moreLoading} className="btn-primary disabled:opacity-60">

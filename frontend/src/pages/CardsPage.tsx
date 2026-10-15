@@ -221,7 +221,7 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {cards.map((c, i) => (
                 <WordCardView key={c.id} card={c} index={i}
-                  progress={{ boxLevel: c.box_level, isLearned: c.is_learned }}
+                  progress={{ boxLevel: c.box_level, isLearned: c.is_learned, nextReviewAt: c.next_review_at, reviewedToday: c.reviewed_today }}
                   selection={selecting ? { checked: selected.has(c.id), onToggle: () => toggle(c.id) } : undefined} />
               ))}
             </div>

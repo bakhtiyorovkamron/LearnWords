@@ -24,9 +24,14 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 		return nil, 0, err
 	}
 
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	todayArg := q.arg(today)
 	sql := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''),
-	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id` +
+	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id,
+	             COALESCE(p.next_review_at, ` + todayArg + `::date)::timestamp,
+	             COALESCE(p.last_reviewed_at >= ` + todayArg + `::date::timestamp AT TIME ZONE 'UTC', false)` +
 		q.from + ` ORDER BY ` + order + ` LIMIT ` + q.arg(f.Limit) + ` OFFSET ` + q.arg(f.Offset)
 	rows, err := r.pool.Query(ctx, sql, q.args...)
 	if err != nil {
@@ -35,7 +40,8 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.CollectionCard, error) {
 		var c domain.CollectionCard
 		err := row.Scan(&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL,
-			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned, &c.FolderID)
+			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned, &c.FolderID,
+			&c.NextReviewAt, &c.ReviewedToday)
 		return c, err
 	})
 	return items, total, err

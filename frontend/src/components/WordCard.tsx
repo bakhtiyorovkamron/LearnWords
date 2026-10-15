@@ -54,7 +54,7 @@ function WordMenu({ title, onMove, onClose }: { title: string; onMove: () => voi
 export function WordCardView({ card, index = 0, meaning, progress, selection }: {
   card: WordCard; index?: number; meaning?: string
   // When given (Collection page): status colour + 5-dot box_level indicator.
-  progress?: { boxLevel: number; isLearned: boolean }
+  progress?: { boxLevel: number; isLearned: boolean; nextReviewAt: string; reviewedToday: boolean }
   // Select mode (Collection, bulk move): a checkbox instead of the action buttons; a tap toggles.
   selection?: { checked: boolean; onToggle: () => void }
 }) {
@@ -99,7 +99,8 @@ export function WordCardView({ card, index = 0, meaning, progress, selection }: 
     >
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-lime-400/10 blur-2xl transition group-hover:bg-lime-400/25" />
       {progress && (
-        <div className="relative mb-2"><ProgressDots boxLevel={progress.boxLevel} isLearned={progress.isLearned} /></div>
+        <div className="relative mb-2"><ProgressDots boxLevel={progress.boxLevel} isLearned={progress.isLearned}
+          schedule={{ nextReviewAt: progress.nextReviewAt, reviewedToday: progress.reviewedToday }} /></div>
       )}
       <div className="relative flex items-center gap-3">
         {selection && (

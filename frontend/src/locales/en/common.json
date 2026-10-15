@@ -339,5 +339,7 @@
   "word": {"move": "Move to folder", "more": "Actions"},
   "folder": {"none": "No folder", "new": "+ New folder"},
   "select": {"start": "Select", "all": "Select all", "count": "Selected: {{n}}", "cancel": "Done", "limit": "First {{n}} of {{total}} selected"},
-  "move": {"button": "Move ({{n}})", "done": "Moved to “{{folder}}”: {{n}}", "undo": "Undo", "failed": "Couldn’t move"}
+  "move": {"button": "Move ({{n}})", "done": "Moved to “{{folder}}”: {{n}}", "undo": "Undo", "failed": "Couldn’t move"},
+  "box": {"title": "Box {{n}} of 5", "next": "Next review: {{when}}", "rule": "Answer correctly and it moves to box {{next}}. Make a mistake and it goes back to box 1.", "lastBox": "A few more correct answers in a row and the word is learned. Make a mistake and it goes back to box 1.", "learned": "Word learned. We'll check it again {{when}}.", "today": "Already reviewed today", "when": {"today": "today", "tomorrow": "tomorrow", "inDays": "in {{n}} days"}},
+  "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"}
 }

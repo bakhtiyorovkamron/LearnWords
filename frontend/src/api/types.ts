@@ -73,8 +73,10 @@ export interface DueCard extends WordCard {
 
 // Card with Leitner progress (Collection page).
 export interface CollectionCard extends WordCard {
-  box_level: number
+  box_level: number // Leitner box 1-5
   is_learned: boolean
+  next_review_at: string // RFC 3339, UTC midnight of the review day
+  reviewed_today: boolean // answered in a Leitner review today (extra practice doesn't count)
 }
 
 export type CollectionStatus = 'all' | 'new' | 'learning' | 'learned'

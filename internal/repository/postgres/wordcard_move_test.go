@@ -348,3 +348,38 @@ func TestCheckMigrated(t *testing.T) {
 		t.Fatalf("pending migration not reported: %v", err)
 	}
 }
+
+// next_review_at and reviewed_today feed the box tooltip on the Collection page.
+func TestListCollection_NextReviewAndReviewedToday(t *testing.T) {
+	f := newMoveFixture(t)
+	repo, ctx := NewWordCardRepository(f.pool), context.Background()
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	noProgress := f.oldWord(t, "ohne", time.Hour)
+	reviewedNow := f.word(t, f.user, nil, today.AddDate(0, 0, 4))
+	f.exec(t, `UPDATE word_progress SET last_reviewed_at = now() WHERE word_id = $1`, reviewedNow)
+	reviewedYesterday := f.word(t, f.user, nil, today.AddDate(0, 0, 2))
+	f.exec(t, `UPDATE word_progress SET last_reviewed_at = $2 WHERE word_id = $1`, reviewedYesterday, today.Add(-time.Hour))
+	neverReviewed := f.word(t, f.user, nil, today.AddDate(0, 0, 1)) // progress row, last_reviewed_at NULL
+
+	items, _, err := repo.ListCollection(ctx, f.user, domain.CollectionFilter{Limit: 48})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[uuid.UUID]domain.CollectionCard{}
+	for _, c := range items {
+		got[c.ID] = c
+	}
+	check := func(name string, id uuid.UUID, next time.Time, reviewed bool) {
+		t.Helper()
+		c := got[id]
+		if !c.NextReviewAt.Equal(next) || c.ReviewedToday != reviewed {
+			t.Errorf("%s: next %v (want %v), reviewed_today %v (want %v)", name, c.NextReviewAt, next, c.ReviewedToday, reviewed)
+		}
+	}
+	check("no progress row: due today", noProgress, today, false)
+	check("reviewed just now", reviewedNow, today.AddDate(0, 0, 4), true)
+	check("reviewed before midnight UTC", reviewedYesterday, today.AddDate(0, 0, 2), false)
+	check("never reviewed", neverReviewed, today.AddDate(0, 0, 1), false)
+}

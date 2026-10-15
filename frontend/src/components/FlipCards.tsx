@@ -46,6 +46,7 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
     function onKey(e: KeyboardEvent) {
       if (editing) return // typing in the edit form must not flip/scroll cards
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      if (e.target instanceof HTMLElement && e.target.getAttribute('role') === 'button') return // the box info dots
       if (e.key === 'ArrowLeft') go(-1)
       else if (e.key === 'ArrowRight') go(1)
       else if (e.key === ' ' || e.key === 'Enter') {
@@ -107,7 +108,8 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
         >
           {/* Front: only the side being asked (German word or Russian translation) */}
           <div className={face}>
-            <div className="absolute left-5 top-5"><ProgressDots boxLevel={card.box_level} isLearned={card.is_learned} /></div>
+            <div className="absolute left-5 top-5"><ProgressDots boxLevel={card.box_level} isLearned={card.is_learned}
+              schedule={{ nextReviewAt: card.next_review_at, reviewedToday: card.reviewed_today }} /></div>
             <div className="display text-4xl font-extrabold text-white">
               {ruFirst ? (card.translation || '—') : card.word}
             </div>
