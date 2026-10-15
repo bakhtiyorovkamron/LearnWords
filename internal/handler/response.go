@@ -16,6 +16,16 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+// requestLogAttrs: what an operator needs to find a failed request — error text, method, path
+// (the real URL path, not the route pattern), user_id when authenticated.
+func requestLogAttrs(c *gin.Context, err error) []any {
+	attrs := []any{"err", err, "method", c.Request.Method, "path", c.Request.URL.Path}
+	if v, ok := c.Get(userIDKey); ok {
+		attrs = append(attrs, "user_id", v)
+	}
+	return attrs
+}
+
 func writeError(c *gin.Context, err error) {
 	status, msg := http.StatusInternalServerError, "internal error"
 	switch {
@@ -36,10 +46,11 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrUnavailable):
 		status, msg = http.StatusServiceUnavailable, "example generation is not configured"
 	case errors.Is(err, domain.ErrUpstream):
-		slog.ErrorContext(c.Request.Context(), "upstream failed", "err", err, "path", c.FullPath())
+		slog.ErrorContext(c.Request.Context(), "upstream failed", requestLogAttrs(c, err)...)
 		status, msg = http.StatusBadGateway, err.Error()
 	default:
-		slog.ErrorContext(c.Request.Context(), "request failed", "err", err, "path", c.FullPath())
+		// The details stay in the log; the client only ever gets "internal error".
+		slog.ErrorContext(c.Request.Context(), "request failed", requestLogAttrs(c, err)...)
 	}
 	c.AbortWithStatusJSON(status, errorResponse{Error: msg})
 }

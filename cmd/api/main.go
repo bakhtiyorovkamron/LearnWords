@@ -61,6 +61,8 @@ func run() error {
 			return err
 		}
 		slog.Info("migrations applied")
+	} else if err := postgres.CheckMigrated(ctx, pool); err != nil {
+		return err // never serve on an old schema
 	}
 
 	// Repositories

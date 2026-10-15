@@ -16,19 +16,19 @@ import (
 // plus the total number of matching cards (for "load more").
 // Cards without a progress row count as box 1, not learned.
 func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUID, f domain.CollectionFilter) ([]domain.CollectionCard, int, error) {
-	base, args, arg := collectionFrom(userID, f)
+	q := collectionFrom(userID, f)
 	order := collectionOrder(f.Sort)
 
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+base, args...).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+q.from, q.args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	q := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
+	sql := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''),
 	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id` +
-		base + ` ORDER BY ` + order + ` LIMIT ` + arg(f.Limit) + ` OFFSET ` + arg(f.Offset)
-	rows, err := r.pool.Query(ctx, q, args...)
+		q.from + ` ORDER BY ` + order + ` LIMIT ` + q.arg(f.Limit) + ` OFFSET ` + q.arg(f.Offset)
+	rows, err := r.pool.Query(ctx, sql, q.args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -44,12 +44,12 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 // ListCollectionIDs returns the ids of up to f.Limit cards matching the filter (in list order)
 // and the total number of matches — for "select all" over every page.
 func (r *WordCardRepository) ListCollectionIDs(ctx context.Context, userID uuid.UUID, f domain.CollectionFilter) ([]uuid.UUID, int, error) {
-	base, args, arg := collectionFrom(userID, f)
+	q := collectionFrom(userID, f)
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+base, args...).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+q.from, q.args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := r.pool.Query(ctx, `SELECT w.id`+base+` ORDER BY `+collectionOrder(f.Sort)+` LIMIT `+arg(f.Limit), args...)
+	rows, err := r.pool.Query(ctx, `SELECT w.id`+q.from+` ORDER BY `+collectionOrder(f.Sort)+` LIMIT `+q.arg(f.Limit), q.args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -57,14 +57,24 @@ func (r *WordCardRepository) ListCollectionIDs(ctx context.Context, userID uuid.
 	return ids, total, err
 }
 
-// collectionFrom builds " FROM … WHERE …" for the filter plus its args; arg adds one more.
-func collectionFrom(userID uuid.UUID, f domain.CollectionFilter) (base string, args []any, arg func(any) string) {
+// collectionQuery is " FROM … WHERE …" for a filter with its arguments. The args live in the
+// struct, so arg() after building is seen by whoever runs the query (a closure over a returned
+// slice would append to a copy).
+type collectionQuery struct {
+	from string
+	args []any
+}
+
+// arg adds a query argument and returns its placeholder ("$3").
+func (q *collectionQuery) arg(v any) string {
+	q.args = append(q.args, v)
+	return fmt.Sprintf("$%d", len(q.args))
+}
+
+func collectionFrom(userID uuid.UUID, f domain.CollectionFilter) *collectionQuery {
+	q := &collectionQuery{args: []any{userID}}
+	arg := q.arg
 	where := []string{"w.user_id = $1"}
-	args = []any{userID}
-	arg = func(v any) string {
-		args = append(args, v)
-		return fmt.Sprintf("$%d", len(args))
-	}
 
 	switch f.Status {
 	case "new":
@@ -83,10 +93,10 @@ func collectionFrom(userID uuid.UUID, f domain.CollectionFilter) (base string, a
 		where = append(where, "w.created_at >= "+arg(now.AddDate(0, 0, -7)))
 	}
 
-	if q := strings.TrimSpace(f.Q); q != "" {
+	if text := strings.TrimSpace(f.Q); text != "" {
 		// Escape LIKE wildcards in user input.
-		q = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q)
-		p := arg("%" + q + "%")
+		text = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(text)
+		p := arg("%" + text + "%")
 		where = append(where, "(w.word ILIKE "+p+" OR w.translation ILIKE "+p+")")
 	}
 
@@ -99,8 +109,8 @@ func collectionFrom(userID uuid.UUID, f domain.CollectionFilter) (base string, a
 		}
 	}
 
-	base = ` FROM word_cards w LEFT JOIN word_progress p ON p.word_id = w.id WHERE ` + strings.Join(where, " AND ")
-	return base, args, arg
+	q.from = ` FROM word_cards w LEFT JOIN word_progress p ON p.word_id = w.id WHERE ` + strings.Join(where, " AND ")
+	return q
 }
 
 // collectionOrder maps the sort parameter to a fixed whitelist → no SQL injection.

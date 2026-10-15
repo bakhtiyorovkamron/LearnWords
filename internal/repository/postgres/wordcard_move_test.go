@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -222,5 +223,128 @@ func TestFolderCountsFollowMoves(t *testing.T) {
 				t.Errorf("b: %+v", fl.FolderStats)
 			}
 		}
+	}
+}
+
+// --- GET /api/collection ---------------------------------------------------------------
+
+// oldWord: a card as it was saved before the grammar columns existed (all of them NULL), with
+// no word_progress row at all (counts as box 1, not learned).
+func (f moveFixture) oldWord(t *testing.T, word string, createdAgo time.Duration) uuid.UUID {
+	ctxID, id := uuid.New(), uuid.New()
+	f.exec(t, `INSERT INTO contexts (id, user_id, source_text) VALUES ($1, $2, 'x')`, ctxID, f.user)
+	f.exec(t, `INSERT INTO word_cards (id, context_id, user_id, word, created_at, lemma, article, plural, part_of_speech, audio_url)
+		VALUES ($1, $2, $3, $4, $5, NULL, NULL, NULL, NULL, NULL)`,
+		id, ctxID, f.user, word, time.Now().Add(-createdAgo))
+	return id
+}
+
+func TestListCollection_OldAndNewWords_AllFiltersAndPaging(t *testing.T) {
+	f := newMoveFixture(t)
+	repo, ctx := NewWordCardRepository(f.pool), context.Background()
+	folder := f.folder(t, f.user)
+
+	old1 := f.oldWord(t, "alt eins", 100*24*time.Hour) // NULL grammar, no progress row
+	old2 := f.oldWord(t, "alt zwei", 50*24*time.Hour)
+	newW := f.word(t, f.user, &folder, time.Now()) // folder + progress row (box 4)
+	f.exec(t, `UPDATE word_cards SET word = 'neu', lemma = 'neu', part_of_speech = 'adjective' WHERE id = $1`, newW)
+
+	list := func(fl domain.CollectionFilter) ([]domain.CollectionCard, int) {
+		t.Helper()
+		items, total, err := repo.ListCollection(ctx, f.user, fl)
+		if err != nil {
+			t.Fatalf("%+v: %v", fl, err)
+		}
+		return items, total
+	}
+	ids := func(items []domain.CollectionCard) map[uuid.UUID]bool {
+		m := map[uuid.UUID]bool{}
+		for _, c := range items {
+			m[c.ID] = true
+		}
+		return m
+	}
+
+	// The exact request from the bug: status=all period=all sort=date limit=48 offset=0.
+	items, total := list(domain.CollectionFilter{Status: "all", Period: "all", Sort: "date", Limit: 48})
+	if total != 3 || len(items) != 3 {
+		t.Fatalf("all: total=%d items=%d", total, len(items))
+	}
+	if got := ids(items); !got[old1] || !got[old2] || !got[newW] {
+		t.Errorf("old and new words must both be listed: %v", got)
+	}
+	for _, c := range items {
+		if c.ID == old1 && (c.BoxLevel != 1 || c.IsLearned || c.FolderID != nil) {
+			t.Errorf("old word without progress: %+v", c)
+		}
+	}
+
+	for _, status := range []string{"", "all", "new", "learning", "learned"} {
+		for _, period := range []string{"", "all", "today", "week"} {
+			for _, sort := range []string{"", "date", "alpha", "progress"} {
+				list(domain.CollectionFilter{Status: status, Period: period, Sort: sort, Limit: 48})
+			}
+		}
+	}
+	if _, total := list(domain.CollectionFilter{Status: "new", Limit: 48}); total != 2 {
+		t.Errorf("new (box ≤ 2, incl. no progress row): %d, want 2", total)
+	}
+	if _, total := list(domain.CollectionFilter{Status: "learning", Limit: 48}); total != 1 {
+		t.Errorf("learning (box 4): %d, want 1", total)
+	}
+	if _, total := list(domain.CollectionFilter{Period: "today", Limit: 48}); total != 1 {
+		t.Errorf("today: %d, want 1", total)
+	}
+	if items, _ := list(domain.CollectionFilter{Sort: "alpha", Limit: 48}); items[0].Word != "alt eins" || items[2].Word != "neu" {
+		t.Errorf("alpha order: %v %v %v", items[0].Word, items[1].Word, items[2].Word)
+	}
+	if items, total := list(domain.CollectionFilter{Q: "neu", Limit: 48}); total != 1 || items[0].ID != newW {
+		t.Errorf("search: %d", total)
+	}
+	if _, total := list(domain.CollectionFilter{Folder: &domain.FolderFilter{ID: folder}, Limit: 48}); total != 1 {
+		t.Errorf("folder: %d", total)
+	}
+	if _, total := list(domain.CollectionFilter{Folder: &domain.FolderFilter{None: true}, Limit: 48}); total != 2 {
+		t.Errorf("no folder: %d", total)
+	}
+
+	// Pagination: pages of 2 cover all three exactly once and keep the total.
+	seen := map[uuid.UUID]bool{}
+	for off := 0; off < 4; off += 2 {
+		page, total := list(domain.CollectionFilter{Sort: "date", Limit: 2, Offset: off})
+		if total != 3 {
+			t.Errorf("offset %d: total %d", off, total)
+		}
+		for _, c := range page {
+			if seen[c.ID] {
+				t.Errorf("%s on two pages", c.ID)
+			}
+			seen[c.ID] = true
+		}
+	}
+	if len(seen) != 3 {
+		t.Errorf("pages cover %d of 3 words", len(seen))
+	}
+
+	// "Select all": the ids endpoint follows the same filters.
+	idList, idTotal, err := repo.ListCollectionIDs(ctx, f.user, domain.CollectionFilter{Status: "new", Limit: domain.MaxMoveWords})
+	if err != nil || idTotal != 2 || len(idList) != 2 {
+		t.Errorf("ids: %v total=%d err=%v", idList, idTotal, err)
+	}
+}
+
+// With AUTO_MIGRATE off the server must not start on an old schema.
+func TestCheckMigrated(t *testing.T) {
+	pool := testPool(t) // migrated
+	ctx := context.Background()
+	if err := CheckMigrated(ctx, pool); err != nil {
+		t.Fatalf("migrated database: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM schema_migrations WHERE version = '000026_hero_intro'`); err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Exec(ctx, `INSERT INTO schema_migrations (version) VALUES ('000026_hero_intro') ON CONFLICT DO NOTHING`) //nolint:errcheck
+	if err := CheckMigrated(ctx, pool); err == nil || !strings.Contains(err.Error(), "000026_hero_intro") {
+		t.Fatalf("pending migration not reported: %v", err)
 	}
 }

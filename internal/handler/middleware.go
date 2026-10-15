@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -36,7 +37,7 @@ func RequestLogger() gin.HandlerFunc {
 // Recovery converts panics into JSON 500 responses.
 func Recovery() gin.HandlerFunc {
 	return gin.CustomRecovery(func(c *gin.Context, rec any) {
-		slog.ErrorContext(c.Request.Context(), "panic recovered", "panic", rec, "path", c.Request.URL.Path)
+		slog.ErrorContext(c.Request.Context(), "panic recovered", requestLogAttrs(c, fmt.Errorf("panic: %v", rec))...)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, errorResponse{Error: "internal error"})
 	})
 }

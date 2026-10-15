@@ -71,3 +71,39 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	return nil
 }
+
+// CheckMigrated fails when some embedded migration is not applied. With AUTO_MIGRATE off the
+// server must refuse to start on an old schema instead of answering 500 on every request.
+func CheckMigrated(ctx context.Context, pool *pgxpool.Pool) error {
+	files, err := fs.Glob(migrations.FS, "*.up.sql")
+	if err != nil {
+		return err
+	}
+	var pending []string
+	rows, err := pool.Query(ctx, `SELECT version FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("read schema_migrations (is the database migrated?): %w", err)
+	}
+	defer rows.Close()
+	have := map[string]bool{}
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return err
+		}
+		have[v] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	sort.Strings(files)
+	for _, f := range files {
+		if v := strings.TrimSuffix(f, ".up.sql"); !have[v] {
+			pending = append(pending, v)
+		}
+	}
+	if len(pending) > 0 {
+		return fmt.Errorf("database schema is out of date, pending migrations: %s (run with AUTO_MIGRATE=true)", strings.Join(pending, ", "))
+	}
+	return nil
+}
