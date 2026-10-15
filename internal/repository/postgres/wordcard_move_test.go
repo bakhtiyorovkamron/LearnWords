@@ -383,3 +383,20 @@ func TestListCollection_NextReviewAndReviewedToday(t *testing.T) {
 	check("reviewed before midnight UTC", reviewedYesterday, today.AddDate(0, 0, 2), false)
 	check("never reviewed", neverReviewed, today.AddDate(0, 0, 1), false)
 }
+
+func TestSoundsEnabled_DefaultOnAndPersisted(t *testing.T) {
+	f := newMoveFixture(t)
+	users, ctx := &UserRepository{pool: f.pool}, context.Background()
+	if on, err := users.SoundsEnabled(ctx, f.user); err != nil || !on {
+		t.Fatalf("default: %v %v", on, err)
+	}
+	if err := users.SetSoundsEnabled(ctx, f.user, false); err != nil {
+		t.Fatal(err)
+	}
+	if on, _ := users.SoundsEnabled(ctx, f.user); on {
+		t.Error("not stored")
+	}
+	if _, err := users.SoundsEnabled(ctx, uuid.New()); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown user: %v", err)
+	}
+}

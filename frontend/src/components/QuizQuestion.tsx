@@ -8,6 +8,7 @@ import {
   type QuizItem, type Verdict,
 } from '../lib/quiz'
 import { useLearningLang } from '../lib/learningLang'
+import { afterSounds } from '../lib/sounds'
 
 function speak(card: WordCard) {
   // Pronunciation is available only for German.
@@ -15,7 +16,8 @@ function speak(card: WordCard) {
   // "der Samstag / der Sonnabend" → pronounce only the first variant.
   const u = new SpeechSynthesisUtterance(firstVariant(card.word))
   u.lang = 'de-DE'
-  window.speechSynthesis.speak(u)
+  // The answer sound plays first; the word is spoken once it has finished.
+  afterSounds(() => window.speechSynthesis.speak(u))
 }
 
 interface Props {

@@ -61,3 +61,26 @@ func (r *UserRepository) SetReviewSessionSize(ctx context.Context, id uuid.UUID,
 	}
 	return nil
 }
+
+// SoundsEnabled: whether training sounds are on (default true).
+func (r *UserRepository) SoundsEnabled(ctx context.Context, id uuid.UUID) (bool, error) {
+	var on bool
+	err := r.pool.QueryRow(ctx, `SELECT sounds_enabled FROM users WHERE id = $1`, id).Scan(&on)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, domain.ErrNotFound
+	}
+	return on, err
+}
+
+// SetSoundsEnabled stores the training-sounds switch.
+func (r *UserRepository) SetSoundsEnabled(ctx context.Context, id uuid.UUID, on bool) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE users SET sounds_enabled = $2, updated_at = now() WHERE id = $1`, id, on)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}

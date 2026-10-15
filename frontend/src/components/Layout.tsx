@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { authApi, meApi } from '../api/endpoints'
+import { authApi, meApi, settingsApi } from '../api/endpoints'
 import { StageUpOverlay } from './StageUpOverlay'
 import { HeroIntroOverlay } from './HeroIntroOverlay'
 import { InstallBanner, InstallMenuItem } from './InstallPrompt'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
+import { SoundToggle } from './SoundToggle'
+import { adoptServerSounds } from '../lib/sounds'
 import { useLearningLang } from '../lib/learningLang'
 
 const link = ({ isActive }: { isActive: boolean }) =>
@@ -53,6 +55,11 @@ export function Layout() {
   const learning = useLearningLang()
   const [moreOpen, setMoreOpen] = useState(false)
 
+  // Training sounds: the profile's value wins over this device's localStorage once it loads.
+  useEffect(() => {
+    settingsApi.get().then((s) => adoptServerSounds(s.sounds_enabled)).catch(() => undefined)
+  }, [])
+
   useEffect(() => setMoreOpen(false), [pathname])
   useEffect(() => {
     if (!moreOpen) return
@@ -93,6 +100,7 @@ export function Layout() {
           <div className="ml-auto flex items-center gap-2">
             {learningBadge}
             <LanguageSwitcher />
+            <SoundToggle />
             <InstallMenuItem />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
           </div>
@@ -119,6 +127,7 @@ export function Layout() {
               {learningBadge}
               <LanguageSwitcher />
             </div>
+            <SoundToggle variant="row" />
             <InstallMenuItem className="btn-ghost w-full py-3" />
             <button onClick={logout} className="btn-ghost mt-2 w-full py-3">{t('nav.logout')}</button>
           </div>

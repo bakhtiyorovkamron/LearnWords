@@ -14,6 +14,8 @@ type SettingsStore interface {
 	SetInterfaceLanguage(ctx context.Context, id uuid.UUID, lang string) error
 	ReviewSessionSize(ctx context.Context, id uuid.UUID) (string, error)
 	SetReviewSessionSize(ctx context.Context, id uuid.UUID, size string) error
+	SoundsEnabled(ctx context.Context, id uuid.UUID) (bool, error)
+	SetSoundsEnabled(ctx context.Context, id uuid.UUID, on bool) error
 }
 
 type SettingsHandler struct{ store SettingsStore }
@@ -24,7 +26,7 @@ var supportedLanguages = map[string]bool{"ru": true, "en": true, "uz": true}
 
 var supportedReviewSessionSizes = map[string]bool{"10": true, "20": true, "50": true, "all": true}
 
-// Get handles GET /api/me/settings → {"interface_language": "ru"|"en"|"uz"|"", "review_session_size": "10"|"20"|"50"|"all"|""}.
+// Get handles GET /api/me/settings → {"interface_language": "ru"|"en"|"uz"|"", "review_session_size": "10"|"20"|"50"|"all"|"", "sounds_enabled": bool}.
 func (h *SettingsHandler) Get(c *gin.Context) {
 	ctx := c.Request.Context()
 	lang, err := h.store.InterfaceLanguage(ctx, userID(c))
@@ -37,21 +39,27 @@ func (h *SettingsHandler) Get(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"interface_language": lang, "review_session_size": size})
+	sounds, err := h.store.SoundsEnabled(ctx, userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"interface_language": lang, "review_session_size": size, "sounds_enabled": sounds})
 }
 
-// Update handles PUT /api/me/settings {"interface_language"?, "review_session_size"?} — each
+// Update handles PUT /api/me/settings {"interface_language"?, "review_session_size"?, "sounds_enabled"?} — each
 // field is independently optional, so one setting can be changed without resending the other.
 func (h *SettingsHandler) Update(c *gin.Context) {
 	var req struct {
 		InterfaceLanguage *string `json:"interface_language"`
 		ReviewSessionSize *string `json:"review_session_size"`
+		SoundsEnabled     *bool   `json:"sounds_enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		badRequest(c, "invalid JSON body")
 		return
 	}
-	if req.InterfaceLanguage == nil && req.ReviewSessionSize == nil {
+	if req.InterfaceLanguage == nil && req.ReviewSessionSize == nil && req.SoundsEnabled == nil {
 		badRequest(c, "nothing to update")
 		return
 	}
@@ -72,6 +80,12 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 			return
 		}
 		if err := h.store.SetReviewSessionSize(ctx, userID(c), *req.ReviewSessionSize); err != nil {
+			writeError(c, err)
+			return
+		}
+	}
+	if req.SoundsEnabled != nil {
+		if err := h.store.SetSoundsEnabled(ctx, userID(c), *req.SoundsEnabled); err != nil {
 			writeError(c, err)
 			return
 		}

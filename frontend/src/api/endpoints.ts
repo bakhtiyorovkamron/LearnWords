@@ -222,9 +222,10 @@ export const isSessionSize = (v: unknown): v is SessionSize =>
 
 export const settingsApi = {
   get: () =>
-    api.get<{ interface_language: string; review_session_size: string }>('/me/settings').then((r) => r.data),
+    api.get<{ interface_language: string; review_session_size: string; sounds_enabled: boolean }>('/me/settings').then((r) => r.data),
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
   setReviewSessionSize: (size: SessionSize) => api.put('/me/settings', { review_session_size: size }),
+  setSounds: (on: boolean) => api.put('/me/settings', { sounds_enabled: on }),
 }
 
 export interface Me { id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang }
