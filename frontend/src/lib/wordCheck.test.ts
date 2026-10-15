@@ -28,6 +28,10 @@ describe('word check helpers', () => {
     expect(showBaseForm(res({ input: 'Bis nächste Wohce', lemma: 'Bis nächste Woche', part_of_speech: 'phrase' }))).toBe(false)
   })
 
+  it('stores no grammar for failed checks', () => {
+    expect(grammarOf(res({ status: 'error', input: 'Zeit', lemma: 'Zeit' }))).toBeNull()
+  })
+
   it('stores no grammar for unknown words', () => {
     expect(grammarOf(res({ status: 'unknown', input: 'Qwrtz' }))).toBeNull()
   })

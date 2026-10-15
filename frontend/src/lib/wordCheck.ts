@@ -25,7 +25,7 @@ export function suggestionOf(r: WordCheck): string {
 }
 
 export function grammarOf(r: WordCheck): WordGrammar | null {
-  if (r.status === 'unknown' || !r.lemma) return null
+  if (r.status === 'unknown' || r.status === 'error' || !r.lemma) return null
   return { lemma: r.lemma, article: r.article, plural: r.plural, part_of_speech: r.part_of_speech }
 }
 
@@ -65,6 +65,10 @@ export function useWordCheck(text: string, enabled: boolean) {
     setState({ key: k, state: { status: 'checking' } })
     const promise = wordCheckApi.check(input, nativeLang, ctrl.signal)
       .then((r) => {
+        if (r.status === 'error') { // the server's check failed: stay silent, retry next time
+          setState((s) => (s.key === k ? { key: k, state: { status: 'error' } } : s))
+          return null
+        }
         cache.current.set(k, r)
         setState((s) => (s.key === k ? { key: k, state: { status: 'done', result: r } } : s))
         return r

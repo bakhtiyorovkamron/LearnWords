@@ -147,6 +147,8 @@ func (s *WordFixService) checkCard(ctx context.Context, c domain.CardToCheck) {
 			Lemma: w.Lemma, Article: w.Article, Plural: w.Plural, PartOfSpeech: w.PartOfSpeech, Reason: w.Reason,
 		})
 		s.update(func(st *WordFixJobStatus) { st.Suggestions++ })
+	case domain.CheckError:
+		s.update(func(st *WordFixJobStatus) { st.Failed++ })
 	default:
 		s.update(func(st *WordFixJobStatus) { st.Unknown++ })
 	}

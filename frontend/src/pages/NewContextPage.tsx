@@ -113,6 +113,9 @@ export function NewContextPage() {
             autoFocus
             placeholder={learning.phrasePlaceholder}
             lang={learning.code}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="field resize-none text-lg leading-relaxed"
           />
           <span className="absolute bottom-3 right-4 text-xs text-emerald-300/50">

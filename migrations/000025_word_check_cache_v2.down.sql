@@ -1,0 +1,1 @@
+-- nothing to restore: deleted cache rows are recomputed on demand

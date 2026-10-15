@@ -45,7 +45,7 @@ export interface WordGrammar {
 }
 
 export interface WordCheck {
-  status: 'ok' | 'corrected' | 'unknown'
+  status: 'ok' | 'corrected' | 'unknown' | 'error' // 'error': the check itself failed — no warning
   input: string
   lemma: string
   article: 'der' | 'die' | 'das' | null

@@ -61,7 +61,7 @@ func TestWordFixJob_OnlySuggests(t *testing.T) {
 		{ID: unknown, Word: "Qwrtz", NativeLang: "ru"},
 		{ID: variants, Word: "der Samstag / der Sonnabend", NativeLang: "ru"},
 	}}
-	svc := NewWordFixService(repo, NewWordCheckService(ai, nil))
+	svc := NewWordFixService(repo, NewWordCheckService(ai, nil, nil))
 	if started, err := svc.Start(context.Background()); !started || err != nil {
 		t.Fatalf("start: %v %v", started, err)
 	}

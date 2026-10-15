@@ -106,7 +106,7 @@ func run() error {
 	adminRepo := postgres.NewAdminRepository(pool)
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEmails)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
-	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool))
+	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
 	wordFixSvc := service.NewWordFixService(postgres.NewWordFixRepository(pool), wordCheckSvc)
 
 	// Daily story cron: STORY_CRON_HOUR (default 23) in STORY_CRON_TZ (default Europe/Berlin).

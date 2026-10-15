@@ -14,7 +14,8 @@ import (
 const (
 	CheckOK        = "ok"        // spelled correctly and already in its base form
 	CheckCorrected = "corrected" // typo / inflected form / wrong article → a suggestion
-	CheckUnknown   = "unknown"   // no such word and nothing sensible to suggest
+	CheckUnknown   = "unknown"   // AI confidently answered: no such word and nothing sensible to suggest
+	CheckError     = "error"     // the check itself failed (timeout, invalid answer) — says nothing about the word
 )
 
 // Parts of speech for word_cards.part_of_speech.
@@ -67,9 +68,9 @@ type WordGrammar struct {
 	PartOfSpeech string
 }
 
-// Grammar of the checked word (nil for "unknown").
+// Grammar of the checked word (nil for "unknown" and "error").
 func (w WordCheck) Grammar() *WordGrammar {
-	if w.Status == CheckUnknown || w.Lemma == "" {
+	if w.Status == CheckUnknown || w.Status == CheckError || w.Lemma == "" {
 		return nil
 	}
 	return &WordGrammar{Lemma: w.Lemma, Article: w.Article, Plural: w.Plural, PartOfSpeech: w.PartOfSpeech}
