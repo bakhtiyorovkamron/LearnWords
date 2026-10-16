@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { wordsApi, type WordUpdate } from '../api/endpoints'
-import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
+import { isRateLimited, rateLimitMessage } from '../api/client'
 import type { CollectionCard, WordCard } from '../api/types'
 import { toast } from './Toaster'
 import { useLearningLang } from '../lib/learningLang'
@@ -11,15 +11,57 @@ import { FolderSelect } from './Folders'
 
 type CollectionPage = { items: CollectionCard[]; total: number }
 
-/** Replaces the edited card in every cached list (keeps box_level/is_learned of collection items). */
-function patchCaches(qc: ReturnType<typeof useQueryClient>, updated: WordCard) {
+const isInfinite = (d: unknown): d is InfiniteData<CollectionPage> =>
+  !!d && typeof d === 'object' && Array.isArray((d as { pages?: unknown }).pages)
+
+/** Does a Collection query (key ['collection', { folder, … }]) show cards of this folder? */
+function viewShows(key: readonly unknown[], folderId: string | null): boolean {
+  const f = (key[1] as { folder?: string } | undefined)?.folder ?? ''
+  return f === '' || (f === 'none' ? !folderId : f === folderId)
+}
+
+/**
+ * Puts the edited card into every cached list. Cached data is checked before it is touched: not
+ * every query under these keys is a list (['collection', 'grand-total'] holds a number), and an
+ * unexpected shape must never break a save that already succeeded on the server.
+ */
+function patchCaches(qc: ReturnType<typeof useQueryClient>, updated: CollectionCard, oldFolder: string | null) {
   const merge = <T extends WordCard>(c: T): T => (c.id === updated.id ? { ...c, ...updated } : c)
-  qc.setQueriesData<WordCard[]>({ queryKey: ['cards'] }, (old) => old?.map(merge))
-  qc.setQueriesData<WordCard[]>({ queryKey: ['context-words'] }, (old) => old?.map(merge))
-  qc.setQueriesData<InfiniteData<CollectionPage>>({ queryKey: ['collection'] }, (old) =>
-    old && { ...old, pages: old.pages.map((p) => ({ ...p, items: p.items.map(merge) })) })
-  // Training queue is re-read next time it starts.
-  qc.invalidateQueries({ queryKey: ['review-due'] })
+  const mergeList = (old: unknown) => (Array.isArray(old) ? old.map(merge) : old)
+  qc.setQueriesData<unknown>({ queryKey: ['cards'] }, mergeList)
+  qc.setQueriesData<unknown>({ queryKey: ['context-words'] }, mergeList)
+
+  const folderChanged = (updated.folder_id ?? null) !== oldFolder
+  qc.setQueriesData<unknown>({ queryKey: ['collection'] }, (old: unknown) => {
+    if (!isInfinite(old)) return old
+    return {
+      ...old,
+      pages: old.pages.map((p) => ({ ...p, items: (p.items ?? []).map(merge) })),
+    }
+  })
+  if (folderChanged) {
+    // The card leaves the folder views it no longer belongs to right away…
+    for (const q of qc.getQueryCache().findAll({ queryKey: ['collection'] })) {
+      const data = q.state.data
+      if (!isInfinite(data) || viewShows(q.queryKey, updated.folder_id ?? null)) continue
+      qc.setQueryData<InfiniteData<CollectionPage>>(q.queryKey, {
+        ...data,
+        pages: data.pages.map((p) => {
+          const items = (p.items ?? []).filter((c) => c.id !== updated.id)
+          return { ...p, items, total: Math.max(p.total - (p.items.length - items.length), 0) }
+        }),
+      })
+    }
+  }
+}
+
+/** After any successful save: lists that may now be stale are re-read (and the new folder's view gets the card). */
+function refreshLists(qc: ReturnType<typeof useQueryClient>, folderChanged: boolean) {
+  qc.invalidateQueries({ queryKey: ['review-due'] }) // training queue is re-read next time it starts
+  if (folderChanged) {
+    qc.invalidateQueries({ queryKey: ['collection'] }) // the card appears in its new folder's view
+    qc.invalidateQueries({ queryKey: ['folders'] }) // folder counters
+  }
 }
 
 export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () => void }) {
@@ -49,16 +91,24 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
 
   const save = useMutation({
     mutationFn: (u: WordUpdate) => wordsApi.update(card.id, u),
-    onSuccess: (updated) => {
-      patchCaches(qc, updated)
-      if ((updated.folder_id ?? '') !== (card.folder_id ?? '')) {
-        // Folder counters and folder-filtered lists change with the folder.
-        qc.invalidateQueries({ queryKey: ['collection'] })
-        qc.invalidateQueries({ queryKey: ['folders'] })
+    onSuccess: (updated, sent) => {
+      const oldFolder = card.folder_id ?? null
+      const folderChanged = sent.folder_id !== undefined && (sent.folder_id || null) !== oldFolder
+      try {
+        if (updated?.id) patchCaches(qc, updated, oldFolder)
+        else { // no card in the response: re-read the lists instead of guessing
+          for (const key of ['cards', 'context-words', 'collection']) qc.invalidateQueries({ queryKey: [key] })
+        }
+        refreshLists(qc, folderChanged)
+      } catch (e) {
+        // The server already saved the card; a cache hiccup must not turn that into an error.
+        console.error('edit word: updating caches failed', e)
+        qc.invalidateQueries()
       }
-      toast(t('editWord.saved'))
+      toast(t('cards.saved'))
       onClose()
     },
+    onError: (e) => console.error('edit word: save failed', e),
   })
 
   useEffect(() => {
@@ -152,7 +202,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
         <p className="text-xs text-emerald-100/50">{t('editWord.progressKept')}</p>
         {(localError || save.error) && (
           <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
-            {localError ?? t('editWord.saveFailed', { error: errorMessage(save.error) })}
+            {localError ?? t('errors.saveFailed')}
           </p>
         )}
         <div className="flex justify-end gap-2">

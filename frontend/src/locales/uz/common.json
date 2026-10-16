@@ -120,6 +120,7 @@
     "words": "So‘zlar"
   },
   "cards": {
+    "saved": "Saqlandi",
     "tabReview": "Takrorlash",
     "tabCollection": "To‘plam",
     "titleA": "Mening ",
@@ -343,5 +344,6 @@
   "box": {"title": "{{n}}-quti (5 tadan)", "next": "Keyingi takrorlash: {{when}}", "rule": "Toʻgʻri javob bersangiz — {{next}}-qutiga oʻtadi. Xato qilsangiz — 1-qutiga qaytadi.", "lastBox": "Yana bir necha marta ketma-ket toʻgʻri javob bersangiz — soʻz yodlanadi. Xato qilsangiz — 1-qutiga qaytadi.", "learned": "Soʻz yodlandi. Uni yana {{when}} tekshiramiz.", "today": "Bugun takrorlangan", "when": {"today": "bugun", "tomorrow": "ertaga", "inDays": "{{n}} kundan keyin"}},
   "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}", "practice": "Qutilar oʻzgarmaydi: bu qoʻshimcha mashq"},
   "sound": {"on": "Ovoz yoqilgan", "off": "Ovoz oʻchirilgan"},
-  "settings": {"sounds": "Mashqdagi ovozlar"}
+  "settings": {"sounds": "Mashqdagi ovozlar"},
+  "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring."}
 }

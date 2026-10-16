@@ -120,6 +120,7 @@
     "words": "Words"
   },
   "cards": {
+    "saved": "Saved",
     "tabReview": "Review",
     "tabCollection": "Collection",
     "titleA": "My ",
@@ -343,5 +344,6 @@
   "box": {"title": "Box {{n}} of 5", "next": "Next review: {{when}}", "rule": "Answer correctly and it moves to box {{next}}. Make a mistake and it goes back to box 1.", "lastBox": "A few more correct answers in a row and the word is learned. Make a mistake and it goes back to box 1.", "learned": "Word learned. We'll check it again {{when}}.", "today": "Already reviewed today", "when": {"today": "today", "tomorrow": "tomorrow", "inDays": "in {{n}} days"}},
   "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"},
   "sound": {"on": "Sound on", "off": "Sound off"},
-  "settings": {"sounds": "Training sounds"}
+  "settings": {"sounds": "Training sounds"},
+  "errors": {"saveFailed": "Couldn't save. Please try again."}
 }

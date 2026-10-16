@@ -12,7 +12,7 @@ import (
 )
 
 type WordCardUpdater interface {
-	UpdateContent(ctx context.Context, userID, id uuid.UUID, u domain.WordCardUpdate) (*domain.WordCard, error)
+	UpdateContent(ctx context.Context, userID, id uuid.UUID, u domain.WordCardUpdate) (*domain.CollectionCard, error)
 }
 
 type WordEditHandler struct{ store WordCardUpdater }
@@ -28,8 +28,8 @@ var wordFieldLimits = map[string]int{
 }
 
 // Update handles PATCH /api/words/:id — edits word/translation/pronunciation/example.
-// Only the owner's card can be changed (user_id is part of the UPDATE's WHERE);
-// learning progress is kept as is.
+// Answers with the updated card in the shape of a GET /api/collection item. Only the owner's
+// card can be changed (user_id is part of the UPDATE's WHERE); learning progress is kept as is.
 func (h *WordEditHandler) Update(c *gin.Context) {
 	id, ok := pathUUID(c, "id")
 	if !ok {

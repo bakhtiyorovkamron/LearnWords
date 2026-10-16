@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -398,5 +399,100 @@ func TestSoundsEnabled_DefaultOnAndPersisted(t *testing.T) {
 	}
 	if _, err := users.SoundsEnabled(ctx, uuid.New()); !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("unknown user: %v", err)
+	}
+}
+
+// --- PATCH /api/words/:id -----------------------------------------------------------------
+
+func jsonKeys(t *testing.T, v any) map[string]bool {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	keys := map[string]bool{}
+	for k, val := range m {
+		keys[k] = true
+		if arr, isArr := val.([]any); isArr && arr == nil {
+			t.Errorf("array field %q serialized as null", k)
+		}
+	}
+	return keys
+}
+
+func ptr(s string) *string { return &s }
+
+func TestUpdateContent_EmptyExampleReturnsFullCollectionCard(t *testing.T) {
+	f := newMoveFixture(t)
+	repo, ctx := NewWordCardRepository(f.pool), context.Background()
+	folder := f.folder(t, f.user)
+	w := f.word(t, f.user, nil, time.Now().AddDate(0, 0, 3))
+
+	// "Süden" / "юг" / pronunciation, example texts EMPTY, folder set: the report's repro.
+	card, err := repo.UpdateContent(ctx, f.user, w, domain.WordCardUpdate{
+		Word: ptr("Süden"), Translation: ptr("юг"), Transcription: ptr("[ˈzyːdn̩]"),
+		ExampleSentence: ptr(""), ExampleTranslation: ptr(""),
+		SetFolder: true, Folder: &folder,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if card.Word != "Süden" || card.Translation != "юг" || card.ExampleSentence != "" || card.ExampleTranslation != "" {
+		t.Errorf("content: %+v", card.WordCard)
+	}
+	if card.FolderID == nil || *card.FolderID != folder {
+		t.Errorf("folder not returned: %v", card.FolderID)
+	}
+	if card.BoxLevel != 4 || card.IsLearned || card.NextReviewAt.IsZero() {
+		t.Errorf("progress fields missing: box %d next %v", card.BoxLevel, card.NextReviewAt)
+	}
+
+	// Same JSON fields as an item of GET /api/collection.
+	items, _, err := repo.ListCollection(ctx, f.user, domain.CollectionFilter{Limit: 10})
+	if err != nil || len(items) != 1 {
+		t.Fatalf("list: %v %v", items, err)
+	}
+	got, want := jsonKeys(t, card), jsonKeys(t, items[0])
+	for k := range want {
+		if !got[k] {
+			t.Errorf("update response lacks %q that the collection item has", k)
+		}
+	}
+	for k := range got {
+		if !want[k] {
+			t.Errorf("update response has extra %q", k)
+		}
+	}
+	if items[0].Word != "Süden" || items[0].ExampleSentence != "" {
+		t.Errorf("stored: %+v", items[0].WordCard)
+	}
+}
+
+func TestUpdateContent_MoveToAnotherFolderReturnsWholeCard(t *testing.T) {
+	f := newMoveFixture(t)
+	repo, ctx := NewWordCardRepository(f.pool), context.Background()
+	a, b := f.folder(t, f.user), f.folder(t, f.user)
+	w := f.word(t, f.user, &a, time.Now())
+
+	card, err := repo.UpdateContent(ctx, f.user, w, domain.WordCardUpdate{SetFolder: true, Folder: &b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if card.ID != w || card.Word != "w" || card.FolderID == nil || *card.FolderID != b || card.BoxLevel != 4 {
+		t.Errorf("not the full card: %+v", card)
+	}
+	// Out of any folder again.
+	card, err = repo.UpdateContent(ctx, f.user, w, domain.WordCardUpdate{SetFolder: true})
+	if err != nil || card.FolderID != nil {
+		t.Errorf("remove from folder: %+v %v", card, err)
+	}
+	// Someone else's card or folder.
+	other := newMoveFixture(t)
+	if _, err := repo.UpdateContent(ctx, other.user, w, domain.WordCardUpdate{Word: ptr("x")}); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("foreign card: %v", err)
 	}
 }

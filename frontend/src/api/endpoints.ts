@@ -116,7 +116,7 @@ export const wordsApi = {
       )
       .then((r) => r.data),
   // Only changed fields are sent; learning progress is not affected.
-  update: (id: string, u: WordUpdate) => api.patch<WordCard>(`/words/${id}`, u).then((r) => r.data),
+  update: (id: string, u: WordUpdate) => api.patch<CollectionCard>(`/words/${id}`, u).then((r) => r.data),
   // One word or many (≤ 500) into a folder (null = no folder). Only the folder changes; the answer
   // has every word's previous folder for "Undo".
   move: (wordIds: string[], folderId: string | null) =>
