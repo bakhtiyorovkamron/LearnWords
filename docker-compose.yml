@@ -52,10 +52,6 @@ services:
     dns: [1.1.1.1, 8.8.8.8]
     environment:
       ACME_EMAIL: ${ACME_EMAIL:-admin@yodla.fun}
-      # Basic auth in front of https://monitor.yodla.fun (see README «Мониторинг»). Passed through
-      # only when set in .env: without them the Caddyfile default keeps the panel locked.
-      BESZEL_BASIC_USER:
-      BESZEL_BASIC_HASH:
     ports:
       - "80:80"
       - "443:443"
@@ -75,8 +71,9 @@ services:
     container_name: beszel
     restart: unless-stopped
     environment:
-      APP_URL: https://monitor.yodla.fun
-    # Localhost only: the agent (host network) connects here; Caddy reaches the hub as beszel:8090.
+      APP_URL: http://localhost:8090
+    # Localhost only, not exposed to the internet: the agent (host network) connects here, and the
+    # panel is opened through an SSH tunnel (README «Мониторинг»).
     ports: ["127.0.0.1:8090:8090"]
     volumes:
       - ./beszel_data:/beszel_data

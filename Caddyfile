@@ -8,29 +8,6 @@ www.yodla.fun {
 	redir https://yodla.fun{uri} permanent
 }
 
-# Server monitoring (Beszel hub, see docker-compose.yml / README «Мониторинг»).
-monitor.yodla.fun {
-	encode zstd gzip
-
-	# Extra login in front of Beszel's own. /api/* is left out: the Beszel web app sends its own
-	# token in the Authorization header there (PocketBase), which basic auth would reject — and
-	# that API requires a Beszel login anyway. User/hash come from .env; without them the default
-	# hash below (of a random, discarded password) keeps the panel locked.
-	@ui not path /api/*
-	basic_auth @ui {
-		{$BESZEL_BASIC_USER:admin} {$BESZEL_BASIC_HASH:$2a$12$2siEvm5bLdoXCwG/cPyt1.0.a0xI435o9bhRs6ZplgYl4xqdH6r1K}
-	}
-
-	reverse_proxy beszel:8090
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
-	}
-}
-
 # Requests by bare IP (http://129.121.97.22) or any unknown host → main domain.
 # Without this Caddy closes the connection (ERR_EMPTY_RESPONSE).
 http:// {
