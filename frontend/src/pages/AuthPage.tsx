@@ -20,7 +20,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const isLogin = mode === 'login'
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/contexts'
+  // Where to go after signing in (e.g. a shared-folder link /s/:token); kept when switching login ↔ register.
+  const fromLoc = (location.state as { from?: { pathname: string; search?: string } } | null)?.from
+  const from = fromLoc ? fromLoc.pathname + (fromLoc.search ?? '') : '/contexts'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -115,7 +117,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </button>
           <p className="text-center text-sm text-emerald-100/60">
             {isLogin ? t('auth.noAccount') : t('auth.haveAccount')}
-            <Link to={isLogin ? '/register' : '/login'} className="font-semibold text-lime-300 hover:underline">
+            <Link to={isLogin ? '/register' : '/login'} state={location.state} className="font-semibold text-lime-300 hover:underline">
               {isLogin ? t('auth.registerLink') : t('auth.loginLink')}
             </Link>
           </p>

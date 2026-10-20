@@ -9,6 +9,7 @@ import type { Folder, FolderSelection, FolderStats } from '../api/types'
 import { useLearningLang } from '../lib/learningLang'
 import { STATUS_STYLE } from './ProgressDots'
 import { toast } from './Toaster'
+import { ShareFolderModal } from './ShareFolderModal'
 
 export const FOLDER_COLORS = ['lime', 'amber', 'sky', 'rose', 'violet', 'slate'] as const
 
@@ -81,6 +82,7 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
   const folders = useFolders()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Folder | null>(null)
+  const [sharing, setSharing] = useState<Folder | null>(null)
 
   const remove = useMutation({
     mutationFn: (id: string) => foldersApi.remove(id),
@@ -120,6 +122,9 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
           <button type="button" className="text-emerald-100/60 hover:text-lime-300" onClick={() => setEditing(active)}>
             ✏️ {t('folders.rename')}
           </button>
+          <button type="button" className="text-emerald-100/60 hover:text-lime-300" onClick={() => setSharing(active)}>
+            🔗 {t('folders.share')}
+          </button>
           <button type="button" className="text-emerald-100/60 hover:text-red-300" disabled={remove.isPending}
             onClick={() => { if (window.confirm(t('folders.deleteConfirm', { name: active.name }))) remove.mutate(active.id) }}>
             🗑 {t('folders.delete')}
@@ -127,6 +132,7 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
         </div>
       )}
       {remove.error && <p className="text-xs text-red-300">{errorMessage(remove.error)}</p>}
+      {sharing && <ShareFolderModal folder={sharing} onClose={() => setSharing(null)} />}
       {(creating || editing) && (
         <FolderFormModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }}
           onCreated={(f) => onChange(f.id)} />

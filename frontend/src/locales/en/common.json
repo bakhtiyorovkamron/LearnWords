@@ -177,6 +177,7 @@
     "addFailed": "Could not add: {{error}}"
   },
   "folders": {
+    "share": "Share",
     "label": "Folder",
     "fieldLabel": "Folder (optional)",
     "all": "All words",
@@ -345,5 +346,7 @@
   "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"},
   "sound": {"on": "Sound on", "off": "Sound off"},
   "settings": {"sounds": "Training sounds"},
-  "errors": {"saveFailed": "Couldn't save. Please try again."}
+  "errors": {"saveFailed": "Couldn't save. Please try again."},
+  "share": {"title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},
+  "shared": {"words": "Words: {{count}}", "add": "Add to my words", "loginToAdd": "Log in to add these words", "added": "Added: {{added}}. Already had: {{skipped}}", "notFound": "This link is invalid or was turned off", "own": "This is your folder", "langMismatch": "This folder is for a different learning language", "empty": "This folder is empty"}
 }

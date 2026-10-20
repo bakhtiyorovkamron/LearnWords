@@ -54,6 +54,8 @@ export interface Folder extends FolderStats {
   name: string
   color: string
   created_at: string
+  share_token?: string | null // public link token; null/absent = not shared
+  import_count?: number // how many users added a copy of the shared folder
 }
 
 // GET /api/folders response: the user's folders plus the "all words" aggregate. Words without
@@ -117,4 +119,21 @@ export interface Page<T> {
   items: T[]
   limit?: number
   offset?: number
+}
+
+// GET /api/shared/:token — the public view of a shared folder (nothing identifies the owner).
+export interface SharedWord {
+  word: string
+  article: string | null
+  translation: string
+  transcription: string
+  example_sentence: string
+  example_translation: string
+}
+export interface SharedFolder {
+  name: string
+  color: string
+  language: string
+  word_count: number
+  words: SharedWord[]
 }

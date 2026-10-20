@@ -64,6 +64,8 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
 
 interface ApiErrorBody {
   error?: string
+  code?: string // stable reason: own_folder, lang_mismatch
+  folder_id?: string
   message?: string
   retry_after_seconds?: number
 }
@@ -87,4 +89,11 @@ export function errorMessage(err: unknown): string {
     return (err.response?.data as ApiErrorBody | undefined)?.error ?? err.message
   }
   return err instanceof Error ? err.message : i18n.t('common.unknownError')
+}
+
+/** HTTP status, machine-readable code and (own_folder) folder id of an API error. */
+export function apiErrorInfo(err: unknown): { status?: number; code?: string; folderId?: string } {
+  if (!axios.isAxiosError(err)) return {}
+  const body = err.response?.data as ApiErrorBody | undefined
+  return { status: err.response?.status, code: body?.code, folderId: body?.folder_id }
 }

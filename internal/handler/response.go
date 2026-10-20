@@ -14,6 +14,10 @@ import (
 
 type errorResponse struct {
 	Error string `json:"error"`
+	// Code is a stable machine-readable reason for the few errors a client reacts to specially.
+	Code string `json:"code,omitempty"`
+	// FolderID: with own_folder — the caller's own folder, so the client can open it.
+	FolderID string `json:"folder_id,omitempty"`
 }
 
 // requestLogAttrs: what an operator needs to find a failed request — error text, method, path
@@ -33,6 +37,16 @@ func writeError(c *gin.Context, err error) {
 		status, msg = http.StatusBadRequest, err.Error()
 	case errors.Is(err, domain.ErrNotFound):
 		status, msg = http.StatusNotFound, "not found"
+	case errors.Is(err, domain.ErrOwnFolder):
+		resp := errorResponse{Error: "own folder", Code: "own_folder"}
+		if id, ok := domain.IsOwnFolder(err); ok {
+			resp.FolderID = id.String()
+		}
+		c.AbortWithStatusJSON(http.StatusConflict, resp)
+		return
+	case errors.Is(err, domain.ErrLangMismatch):
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "folder language does not match your learning language", Code: "lang_mismatch"})
+		return
 	case errors.Is(err, domain.ErrAlreadyExists):
 		status, msg = http.StatusConflict, "already exists"
 	case errors.Is(err, domain.ErrInvalidCredentials):

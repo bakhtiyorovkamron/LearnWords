@@ -18,6 +18,8 @@ var (
 	ErrUpstream           = errors.New("upstream service error")
 	ErrForbidden          = errors.New("forbidden")
 	ErrBanned             = errors.New("account is banned")
+	ErrOwnFolder          = errors.New("own folder")                     // importing your own shared folder
+	ErrLangMismatch       = errors.New("folder language does not match") // folder is for another learning language
 )
 
 const (

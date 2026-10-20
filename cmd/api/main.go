@@ -100,6 +100,8 @@ func run() error {
 		slog.Warn("ANTHROPIC_API_KEY is not set: example, story, word search and translation generation are disabled")
 	}
 
+	folderRepo := postgres.NewFolderRepository(pool)
+
 	// Services
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
@@ -146,7 +148,8 @@ func run() error {
 		Collection:   handler.NewCollectionHandler(cardRepo),
 		WordEdit:     handler.NewWordEditHandler(cardRepo),
 		WordMove:     handler.NewWordMoveHandler(cardRepo),
-		Folders:      handler.NewFolderHandler(postgres.NewFolderRepository(pool)),
+		Folders:      handler.NewFolderHandler(folderRepo),
+		Shared:       handler.NewSharedHandler(folderRepo),
 		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
 		Hero:         handler.NewHeroHandler(heroSvc),

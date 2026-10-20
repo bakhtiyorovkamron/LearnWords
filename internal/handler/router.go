@@ -27,6 +27,7 @@ type RouterDeps struct {
 	WordEdit     *WordEditHandler
 	WordMove     *WordMoveHandler
 	Folders      *FolderHandler
+	Shared       *SharedHandler
 	Search       *SearchHandler
 	Translations *TranslationHandler
 	Hero         *HeroHandler
@@ -44,6 +45,8 @@ const (
 	aiPerUserPerMin      = 20  // search-word, generate-example
 	storyPerUserPerMin   = 5   // daily story generation
 	checkPerUserPerMin   = 40  // word check while typing (debounced; repeats come from the cache)
+	sharedPerIPPerMin    = 30  // public shared-folder preview, by IP
+	importPerUserPerMin  = 10  // importing a shared folder
 	generalPerUserPerMin = 100 // everything else under /api
 )
 
@@ -63,6 +66,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	exampleLimit := RateLimitByUser(NewRateLimiter(ctx, "example", aiPerUserPerMin, time.Minute))
 	storyLimit := RateLimitByUser(NewRateLimiter(ctx, "story", storyPerUserPerMin, time.Minute))
 	translateLimit := RateLimitByUser(NewRateLimiter(ctx, "translate", aiPerUserPerMin, time.Minute))
+	sharedLimit := RateLimitByIP(NewRateLimiter(ctx, "shared", sharedPerIPPerMin, time.Minute))
+	importLimit := RateLimitByUser(NewRateLimiter(ctx, "shared-import", importPerUserPerMin, time.Minute))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
 		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations", "/api/words/check")
@@ -92,6 +97,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 
 	api := r.Group("/api")
 	{
+		// Public folder preview: no login, limited per IP.
+		api.GET("/shared/:token", sharedLimit, d.Shared.Get)
 		a := api.Group("/auth")
 		a.POST("/register", authLimit, d.Auth.Register)
 		a.POST("/login", authLimit, d.Auth.Login)
@@ -117,6 +124,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/folders", d.Folders.Create)
 		protected.PATCH("/folders/:id", d.Folders.Update)
 		protected.DELETE("/folders/:id", d.Folders.Delete)
+		protected.POST("/folders/:id/share", d.Folders.EnableShare)
+		protected.POST("/folders/:id/share/regenerate", d.Folders.RegenerateShare)
+		protected.DELETE("/folders/:id/share", d.Folders.DisableShare)
+		protected.POST("/shared/:token/import", importLimit, d.Shared.Import)
 		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
 		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)

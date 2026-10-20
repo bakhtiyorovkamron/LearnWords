@@ -10,10 +10,13 @@ import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
 import { AdminPage } from './pages/AdminPage'
 import { SearchPage } from './pages/SearchPage'
+import { SharedFolderPage } from './pages/SharedFolderPage'
 
 export default function App() {
   return (
     <Routes>
+      {/* Public: works logged in and logged out, so it sits outside both guards. */}
+      <Route path="/s/:token" element={<SharedFolderPage />} />
       <Route element={<GuestRoute />}>
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/register" element={<AuthPage mode="register" />} />

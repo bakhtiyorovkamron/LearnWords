@@ -177,6 +177,7 @@
     "addFailed": "Qo‘shib bo‘lmadi: {{error}}"
   },
   "folders": {
+    "share": "Ulashish",
     "label": "Papka",
     "fieldLabel": "Papka (ixtiyoriy)",
     "all": "Barcha so‘zlar",
@@ -345,5 +346,7 @@
   "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}", "practice": "Qutilar oʻzgarmaydi: bu qoʻshimcha mashq"},
   "sound": {"on": "Ovoz yoqilgan", "off": "Ovoz oʻchirilgan"},
   "settings": {"sounds": "Mashqdagi ovozlar"},
-  "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring."}
+  "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring."},
+  "share": {"title": "«{{name}}» papkasini ulashish", "hint": "Havolasi bor har kim so‘zlarni ko‘rib, o‘ziga qo‘sha oladi. Sizning natijalaringiz ulashilmaydi.", "copy": "Havolani nusxalash", "copied": "Havola nusxalandi", "telegram": "Telegram orqali yuborish", "telegramText": "yodla.fun saytida nemis tilini o‘rganyapman — mana mening «{{name}}» so‘zlarim", "regenerate": "Yangi havola yaratish", "disable": "Havolani o‘chirish", "disabled": "Havola o‘chirildi", "imports": "O‘ziga qo‘shganlar: {{count}}"},
+  "shared": {"words": "So‘zlar: {{count}}", "add": "O‘zimga qo‘shish", "loginToAdd": "So‘zlarni qo‘shish uchun kiring", "added": "Qo‘shildi: {{added}}. Avvaldan bor edi: {{skipped}}", "notFound": "Havola noto‘g‘ri yoki o‘chirilgan", "own": "Bu sizning papkangiz", "langMismatch": "Bu papka boshqa o‘rganish tili uchun", "empty": "Bu papkada hali so‘z yo‘q"}
 }

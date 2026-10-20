@@ -18,6 +18,9 @@ type FolderStore interface {
 	Create(ctx context.Context, userID uuid.UUID, name, color string) (*domain.Folder, error)
 	Update(ctx context.Context, userID, id uuid.UUID, name, color *string) (*domain.Folder, error)
 	Delete(ctx context.Context, userID, id uuid.UUID) error
+	EnableShare(ctx context.Context, userID, id uuid.UUID) (string, error)
+	RegenerateShare(ctx context.Context, userID, id uuid.UUID) (string, error)
+	DisableShare(ctx context.Context, userID, id uuid.UUID) error
 }
 
 type FolderHandler struct{ store FolderStore }

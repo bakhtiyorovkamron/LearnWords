@@ -1,7 +1,7 @@
 import { api, tokenStore } from './client'
 import type {
   AuthResponse, CollectionCard, CollectionPeriod, CollectionSort, CollectionStatus,
-  Context, ContextWithCards, DueCard, Folder, FolderList, FolderSelection, Page, Progress, Stats, WordCard,
+  Context, ContextWithCards, DueCard, Folder, FolderList, FolderSelection, Page, Progress, SharedFolder, Stats, WordCard,
 } from './types'
 
 export interface Credentials {
@@ -140,6 +140,10 @@ export const foldersApi = {
   create: (name: string, color: string) => api.post<Folder>('/folders', { name, color }).then((r) => r.data),
   update: (id: string, u: { name?: string; color?: string }) => api.patch<Folder>(`/folders/${id}`, u).then((r) => r.data),
   remove: (id: string) => api.delete(`/folders/${id}`),
+  // Public link: enable (or get the existing one) / new token (the old link stops) / turn off.
+  share: (id: string) => api.post<ShareInfo>(`/folders/${id}/share`).then((r) => r.data),
+  regenerateShare: (id: string) => api.post<ShareInfo>(`/folders/${id}/share/regenerate`).then((r) => r.data),
+  disableShare: (id: string) => api.delete(`/folders/${id}/share`),
 }
 
 export interface WordInfo {
@@ -365,4 +369,14 @@ export const collectionApi = {
         params: { status: f.status, period: f.period, sort: f.sort, q: f.q || undefined, folder_id: f.folder || undefined },
       })
       .then((r) => r.data),
+}
+
+export interface ShareInfo { token: string; url: string }
+export interface ImportResult { folder_id: string; added: number; skipped: number }
+
+// Shared folders. The preview is public (works logged out); importing needs a login.
+export const sharedApi = {
+  get: (token: string, lang: string) =>
+    api.get<SharedFolder>(`/shared/${token}`, { params: { lang } }).then((r) => r.data),
+  import: (token: string) => api.post<ImportResult>(`/shared/${token}/import`).then((r) => r.data),
 }

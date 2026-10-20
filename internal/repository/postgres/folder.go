@@ -22,7 +22,8 @@ func (r *FolderRepository) List(ctx context.Context, userID uuid.UUID) (*domain.
 	today := time.Now().UTC()
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT f.id, f.name, f.color, f.created_at,
+		SELECT f.id, f.name, f.color, f.created_at, f.share_token,
+		       (SELECT count(*) FROM folder_imports i WHERE i.folder_id = f.id) AS import_count,
 		       count(w.id) AS total,
 		       count(w.id) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) <= 2) AS new_count,
 		       count(w.id) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) BETWEEN 3 AND 5) AS learning_count,
@@ -39,7 +40,7 @@ func (r *FolderRepository) List(ctx context.Context, userID uuid.UUID) (*domain.
 	}
 	folders, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Folder, error) {
 		f := domain.Folder{UserID: userID}
-		err := row.Scan(&f.ID, &f.Name, &f.Color, &f.CreatedAt,
+		err := row.Scan(&f.ID, &f.Name, &f.Color, &f.CreatedAt, &f.ShareToken, &f.ImportCount,
 			&f.Total, &f.NewCount, &f.LearningCount, &f.LearnedCount, &f.DueToday)
 		return f, err
 	})
@@ -83,9 +84,10 @@ func (r *FolderRepository) Update(ctx context.Context, userID, id uuid.UUID, nam
 		WITH updated AS (
 			UPDATE folders SET name = COALESCE($3, name), color = COALESCE($4, color)
 			WHERE id = $1 AND user_id = $2
-			RETURNING id, name, color, created_at
+			RETURNING id, name, color, created_at, share_token
 		)
-		SELECT u.id, u.name, u.color, u.created_at,
+		SELECT u.id, u.name, u.color, u.created_at, u.share_token,
+		       (SELECT count(*) FROM folder_imports i WHERE i.folder_id = u.id),
 		       count(w.id),
 		       count(w.id) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) <= 2),
 		       count(w.id) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) BETWEEN 3 AND 5),
@@ -94,8 +96,8 @@ func (r *FolderRepository) Update(ctx context.Context, userID, id uuid.UUID, nam
 		FROM updated u
 		LEFT JOIN word_cards w ON w.folder_id = u.id
 		LEFT JOIN word_progress p ON p.word_id = w.id
-		GROUP BY u.id, u.name, u.color, u.created_at`,
-		id, userID, name, color, today).Scan(&f.ID, &f.Name, &f.Color, &f.CreatedAt,
+		GROUP BY u.id, u.name, u.color, u.created_at, u.share_token`,
+		id, userID, name, color, today).Scan(&f.ID, &f.Name, &f.Color, &f.CreatedAt, &f.ShareToken, &f.ImportCount,
 		&f.Total, &f.NewCount, &f.LearningCount, &f.LearnedCount, &f.DueToday)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrNotFound

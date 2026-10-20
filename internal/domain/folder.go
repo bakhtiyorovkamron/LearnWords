@@ -25,6 +25,10 @@ type Folder struct {
 	Name      string    `json:"name"`
 	Color     string    `json:"color"`
 	CreatedAt time.Time `json:"created_at"`
+	// ShareToken: the public link token; nil = the folder is not shared.
+	ShareToken *string `json:"share_token"`
+	// ImportCount: how many users added a copy of this shared folder.
+	ImportCount int `json:"import_count"`
 	FolderStats
 }
 
