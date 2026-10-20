@@ -11,7 +11,8 @@ import { Toaster } from './Toaster'
 import { SoundToggle } from './SoundToggle'
 import { ContactLinks } from './ContactLinks'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
-import { adoptServerSounds } from '../lib/sounds'
+import { adoptServerSounds, adoptServerUiSounds } from '../lib/sounds'
+import { usePageSounds } from '../lib/pageSounds'
 import { useLearningLang } from '../lib/learningLang'
 
 const link = ({ isActive }: { isActive: boolean }) =>
@@ -59,8 +60,10 @@ export function Layout() {
 
   // Training sounds: the profile's value wins over this device's localStorage once it loads.
   useEffect(() => {
-    settingsApi.get().then((s) => adoptServerSounds(s.sounds_enabled)).catch(() => undefined)
+    settingsApi.get().then((s) => { adoptServerSounds(s.sounds_enabled); adoptServerUiSounds(s.ui_sounds_enabled) }).catch(() => undefined)
   }, [])
+
+  usePageSounds() // page-turn rustle between sections
 
   useEffect(() => setMoreOpen(false), [pathname])
   useEffect(() => {
@@ -103,6 +106,7 @@ export function Layout() {
             {learningBadge}
             <LanguageSwitcher />
             <SoundToggle />
+            <SoundToggle variant="ui-icon" />
             <InstallMenuItem />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
           </div>

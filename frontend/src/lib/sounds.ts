@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { settingsApi } from '../api/endpoints'
+import { setUiSoundsEnabled as setUiEngineEnabled } from './uiSounds'
 
 // Training sounds, generated with the Web Audio API (no audio files). The AudioContext is created
 // only after the first user gesture (browsers keep it suspended before that, and iOS needs it).
@@ -135,11 +136,14 @@ function readStored(): boolean {
 }
 let enabledState = typeof localStorage === 'undefined' ? true : readStored()
 engine.setEnabled(enabledState)
+// The UI switch is declared further down; until then there is nothing to sync.
+let syncUiEngineIfReady: () => void = () => undefined
 
 function applyEnabled(v: boolean) {
   enabledState = v
   engine.setEnabled(v)
   try { localStorage.setItem(KEY, String(v)) } catch { /* private mode: keep it in memory */ }
+  syncUiEngineIfReady()
   listeners.forEach((l) => l())
 }
 
@@ -159,6 +163,50 @@ export function useSoundsEnabled(): boolean {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => { listeners.delete(cb) } },
     () => enabledState,
+  )
+}
+
+// --- interface sounds (taps, page turns): a second switch UNDER the master one ---------------------
+// Same storage pattern: localStorage first, then the profile. The UI engine plays only when BOTH
+// the master (training sounds) switch and this one are on.
+
+const UI_KEY = 'ui-sounds-enabled'
+const uiListeners = new Set<() => void>()
+
+let uiEnabledState = typeof localStorage === 'undefined' ? true : (() => {
+  try { return localStorage.getItem(UI_KEY) !== 'false' } catch { return true }
+})()
+
+/** The UI engine is on only when the master switch AND the UI switch are on. */
+function syncUiEngine() {
+  setUiEngineEnabled(enabledState && uiEnabledState)
+}
+syncUiEngine()
+syncUiEngineIfReady = syncUiEngine
+
+function applyUiEnabled(v: boolean) {
+  uiEnabledState = v
+  try { localStorage.setItem(UI_KEY, String(v)) } catch { /* private mode: keep it in memory */ }
+  syncUiEngine()
+  uiListeners.forEach((l) => l())
+}
+
+/** User toggled the interface-sounds switch: local + profile. */
+export function setUiSoundsSwitch(v: boolean) {
+  applyUiEnabled(v)
+  settingsApi.setUiSounds(v).catch(() => undefined)
+}
+
+/** Adopt the value saved in the profile (once, on login). */
+export function adoptServerUiSounds(v: unknown) {
+  if (typeof v === 'boolean' && v !== uiEnabledState) applyUiEnabled(v)
+}
+
+/** The user's own preference for interface sounds (the master switch may still mute them). */
+export function useUiSoundsEnabled(): boolean {
+  return useSyncExternalStore(
+    (cb) => { uiListeners.add(cb); return () => { uiListeners.delete(cb) } },
+    () => uiEnabledState,
   )
 }
 

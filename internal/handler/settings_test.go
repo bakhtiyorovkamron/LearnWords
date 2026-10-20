@@ -15,6 +15,7 @@ import (
 type memSettings struct {
 	lang, size string
 	sounds     bool
+	uiSounds   bool
 }
 
 func (m *memSettings) InterfaceLanguage(context.Context, uuid.UUID) (string, error) {
@@ -48,7 +49,7 @@ func settingsRouter(m *memSettings) *gin.Engine {
 }
 
 func TestSettings_SoundsEnabled(t *testing.T) {
-	m := &memSettings{sounds: true}
+	m := &memSettings{sounds: true, uiSounds: true}
 	r := settingsRouter(m)
 	do := func(method, body string) map[string]any {
 		t.Helper()
@@ -79,4 +80,28 @@ func TestSettings_SoundsEnabled(t *testing.T) {
 	if got := do(http.MethodPut, `{"sounds_enabled":true}`)["sounds_enabled"]; got != true {
 		t.Errorf("on: %v", got)
 	}
+
+	// The interface-sounds switch is independent of the training-sounds one.
+	if got := do(http.MethodGet, "")["ui_sounds_enabled"]; got != true {
+		t.Errorf("ui default: %v, want true", got)
+	}
+	out := do(http.MethodPut, `{"ui_sounds_enabled":false}`)
+	if out["ui_sounds_enabled"] != false || out["sounds_enabled"] != true || m.uiSounds || !m.sounds {
+		t.Errorf("ui off: %v (sounds %v, ui %v)", out, m.sounds, m.uiSounds)
+	}
+	out = do(http.MethodPut, `{"sounds_enabled":false}`)
+	if out["ui_sounds_enabled"] != false || out["sounds_enabled"] != false {
+		t.Errorf("master off must not flip the ui preference: %v", out)
+	}
+	if got := do(http.MethodPut, `{"ui_sounds_enabled":true}`)["ui_sounds_enabled"]; got != true {
+		t.Errorf("ui on: %v", got)
+	}
+}
+
+func (m *memSettings) UISoundsEnabled(context.Context, uuid.UUID) (bool, error) {
+	return m.uiSounds, nil
+}
+func (m *memSettings) SetUISoundsEnabled(_ context.Context, _ uuid.UUID, on bool) error {
+	m.uiSounds = on
+	return nil
 }

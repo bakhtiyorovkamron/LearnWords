@@ -84,3 +84,26 @@ func (r *UserRepository) SetSoundsEnabled(ctx context.Context, id uuid.UUID, on 
 	}
 	return nil
 }
+
+// UISoundsEnabled: whether interface sounds (taps, page turns) are on (default true).
+func (r *UserRepository) UISoundsEnabled(ctx context.Context, id uuid.UUID) (bool, error) {
+	var on bool
+	err := r.pool.QueryRow(ctx, `SELECT ui_sounds_enabled FROM users WHERE id = $1`, id).Scan(&on)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, domain.ErrNotFound
+	}
+	return on, err
+}
+
+// SetUISoundsEnabled stores the interface-sounds switch.
+func (r *UserRepository) SetUISoundsEnabled(ctx context.Context, id uuid.UUID, on bool) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE users SET ui_sounds_enabled = $2, updated_at = now() WHERE id = $1`, id, on)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}

@@ -17,6 +17,7 @@ import { ReviewHero, TrainingHero } from './TrainingHero'
 import { SoundToggle } from './SoundToggle'
 import { ErrorState } from './ErrorState'
 import { playAnswer, playSound } from '../lib/sounds'
+import { setTrainingOpen } from '../lib/pageSounds'
 
 const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
@@ -108,6 +109,13 @@ export function ReviewSession() {
       if (progress && progress.box_level > variables.prevBox) setMovedUp((n) => n + 1)
     },
   })
+
+  // No page-turn rustle while questions are on screen.
+  const inSession = !!deck && index < deck.length
+  useEffect(() => {
+    setTrainingOpen(inSession)
+    return () => setTrainingOpen(false)
+  }, [inSession])
 
   // Reports exactly once when the deck is exhausted, not on every re-render of the result screen.
   useEffect(() => {

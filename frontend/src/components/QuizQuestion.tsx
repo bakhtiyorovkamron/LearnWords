@@ -172,7 +172,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       {isChoice ? (
         <div className="space-y-2 sm:space-y-3">
           {options.map((o, i) => (
-            <button key={i} type="button" disabled={answered} onClick={() => choose(i)} className={style(i)}>
+            <button key={i} type="button" data-no-ui-sound disabled={answered} onClick={() => choose(i)} className={style(i)}>
               {o.text}
             </button>
           ))}
@@ -190,7 +190,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
             lang={learning.code}
           />
           {!answered && (
-            <button type="submit" disabled={!typed.trim()} className="btn-primary shrink-0">{t('quiz.check')}</button>
+            <button type="submit" data-no-ui-sound disabled={!typed.trim()} className="btn-primary shrink-0">{t('quiz.check')}</button>
           )}
         </form>
       )}
@@ -201,7 +201,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       {error && <p className="text-center text-sm text-red-300">{error}</p>}
 
       {answered && (
-        <button type="button" onClick={onNext} disabled={saving} className="btn-primary w-full text-lg">
+        <button type="button" data-no-ui-sound onClick={onNext} disabled={saving} className="btn-primary w-full text-lg">
           {position === total ? t('quiz.finish') : t('quiz.next')}
         </button>
       )}

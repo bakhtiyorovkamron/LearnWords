@@ -344,7 +344,7 @@
   "move": {"button": "Koʻchirish ({{n}})", "done": "{{folder}} papkasiga koʻchirildi: {{n}}", "undo": "Qaytarish", "failed": "Koʻchirib boʻlmadi"},
   "box": {"title": "{{n}}-quti (5 tadan)", "next": "Keyingi takrorlash: {{when}}", "rule": "Toʻgʻri javob bersangiz — {{next}}-qutiga oʻtadi. Xato qilsangiz — 1-qutiga qaytadi.", "lastBox": "Yana bir necha marta ketma-ket toʻgʻri javob bersangiz — soʻz yodlanadi. Xato qilsangiz — 1-qutiga qaytadi.", "learned": "Soʻz yodlandi. Uni yana {{when}} tekshiramiz.", "today": "Bugun takrorlangan", "when": {"today": "bugun", "tomorrow": "ertaga", "inDays": "{{n}} kundan keyin"}},
   "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}", "practice": "Qutilar oʻzgarmaydi: bu qoʻshimcha mashq"},
-  "sound": {"on": "Ovoz yoqilgan", "off": "Ovoz oʻchirilgan"},
+  "sound": {"ui": "Interfeys tovushlari", "uiHint": "Bosish va sahifa shitirlashi", "on": "Ovoz yoqilgan", "off": "Ovoz oʻchirilgan"},
   "settings": {"sounds": "Mashqdagi ovozlar"},
   "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring."},
   "share": {"emptyFolder": "Papka bo‘sh — ulashish uchun so‘z qo‘shing", "isShared": "Havola orqali ulashilgan", "title": "«{{name}}» papkasini ulashish", "hint": "Havolasi bor har kim so‘zlarni ko‘rib, o‘ziga qo‘sha oladi. Sizning natijalaringiz ulashilmaydi.", "copy": "Havolani nusxalash", "copied": "Havola nusxalandi", "telegram": "Telegram orqali yuborish", "telegramText": "yodla.fun saytida nemis tilini o‘rganyapman — mana mening «{{name}}» so‘zlarim", "regenerate": "Yangi havola yaratish", "disable": "Havolani o‘chirish", "disabled": "Havola o‘chirildi", "imports": "O‘ziga qo‘shganlar: {{count}}"},

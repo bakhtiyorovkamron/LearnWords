@@ -344,7 +344,7 @@
   "move": {"button": "Move ({{n}})", "done": "Moved to “{{folder}}”: {{n}}", "undo": "Undo", "failed": "Couldn’t move"},
   "box": {"title": "Box {{n}} of 5", "next": "Next review: {{when}}", "rule": "Answer correctly and it moves to box {{next}}. Make a mistake and it goes back to box 1.", "lastBox": "A few more correct answers in a row and the word is learned. Make a mistake and it goes back to box 1.", "learned": "Word learned. We'll check it again {{when}}.", "today": "Already reviewed today", "when": {"today": "today", "tomorrow": "tomorrow", "inDays": "in {{n}} days"}},
   "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"},
-  "sound": {"on": "Sound on", "off": "Sound off"},
+  "sound": {"ui": "Interface sounds", "uiHint": "Taps and page turns", "on": "Sound on", "off": "Sound off"},
   "settings": {"sounds": "Training sounds"},
   "errors": {"saveFailed": "Couldn't save. Please try again."},
   "share": {"emptyFolder": "The folder is empty — add words to share it", "isShared": "Shared via link", "title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},

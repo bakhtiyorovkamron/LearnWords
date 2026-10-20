@@ -498,3 +498,23 @@ func TestUpdateContent_MoveToAnotherFolderReturnsWholeCard(t *testing.T) {
 }
 
 func (f moveFixture) moveNow() time.Time { return time.Now() }
+
+func TestUISoundsEnabled_DefaultOnAndPersisted(t *testing.T) {
+	f := newMoveFixture(t)
+	users, ctx := &UserRepository{pool: f.pool}, context.Background()
+	if on, err := users.UISoundsEnabled(ctx, f.user); err != nil || !on {
+		t.Fatalf("default: %v %v", on, err)
+	}
+	if err := users.SetUISoundsEnabled(ctx, f.user, false); err != nil {
+		t.Fatal(err)
+	}
+	if on, _ := users.UISoundsEnabled(ctx, f.user); on {
+		t.Error("not stored")
+	}
+	if on, _ := users.SoundsEnabled(ctx, f.user); !on {
+		t.Error("the ui switch changed the training-sounds switch")
+	}
+	if _, err := users.UISoundsEnabled(ctx, uuid.New()); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown user: %v", err)
+	}
+}
