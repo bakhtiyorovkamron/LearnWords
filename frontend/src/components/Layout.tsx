@@ -37,10 +37,10 @@ export function Logo() {
   return (
     <span className="display flex items-center gap-2 text-xl font-extrabold tracking-tight">
       <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-lime-300 to-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/40">
-        W
+        y
       </span>
       <span>
-        Wort<span className="text-lime-300">kontext</span>
+        yod<span className="text-lime-300">la</span>
       </span>
     </span>
   )

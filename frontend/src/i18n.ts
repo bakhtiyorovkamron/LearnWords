@@ -38,9 +38,16 @@ void i18n.use(initReactI18next).init({
 
 document.documentElement.lang = i18n.language
 
+/** Tab title / install name follows the interface language. */
+function setDocumentTitle() {
+  document.title = i18n.t('app.title')
+}
+setDocumentTitle()
+
 // Persist the choice so it survives page reloads.
 i18n.on('languageChanged', (lng) => {
   document.documentElement.lang = lng
+  setDocumentTitle()
   try {
     localStorage.setItem(STORAGE_KEY, lng)
   } catch {

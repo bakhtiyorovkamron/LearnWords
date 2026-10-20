@@ -52,7 +52,7 @@ export async function renderHeroCard(stage: number, stageName: string): Promise<
 /** Shares the picture via the Web Share API, or downloads it where sharing files isn't supported. */
 export async function shareHeroCard(stage: number, stageName: string): Promise<void> {
   const blob = await renderHeroCard(stage, stageName)
-  const file = new File([blob], 'wortkontext-hero.png', { type: 'image/png' })
+  const file = new File([blob], 'yodla-hero.png', { type: 'image/png' })
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: stageName, text: 'yodla.fun' })

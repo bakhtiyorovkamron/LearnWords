@@ -5,7 +5,7 @@
   "hero": {"intro": "Meet your German hero!", "introText": "He grows with every word you learn", "introOk": "Got it", "stages": {"0": "Little Mozart", "1": "The Brothers Grimm", "2": "Schiller", "3": "Beethoven", "4": "Humboldt", "5": "Goethe"}, "stageUp": "Your hero grew up: meet {{name}}!", "share": "Share", "tapHint": "Tap the hero", "learned": "Learned", "almost": "Almost learned", "inWords_one": "in {{count}} word", "inWords_other": "in {{count}} words", "wordsAt_one": "{{count}} word", "wordsAt_other": "{{count}} words", "locked": "Still a secret", "toNextStage": "To the next stage: {{n}}", "lastStage": "Final stage", "close": "Close", "range": "{{from}}–{{to}} words", "rangeFrom": "{{from}}+ words"},
 "practice": { "start": "Practice more", "again": "Practice again", "pick": "Which words to practice?", "hard": "Hardest", "random": "Random", "recent": "Recently added", "note": "This practice does not change your review schedule" },
   "check": {"checking": "Checking the word…", "suggest": "Did you mean: {{word}}", "baseForm": "Base form: {{lemma}}", "plural": "Plural: {{plural}}", "useSuggestion": "Use this", "keep": "Keep as is", "unknown": "We couldn't find this word. Check the spelling"},
-  "pwa": {"install": "Install app", "banner": "Add Wortkontext to your phone — it opens like an app", "iosHint": "Tap Share, then Add to Home Screen", "offline": "No internet connection. Reconnect and tap Retry", "retry": "Retry", "later": "Not now"},
+  "pwa": {"install": "Install app", "banner": "Add yodla to your phone — it opens like an app", "iosHint": "Tap Share, then Add to Home Screen", "offline": "No internet connection. Reconnect and tap Retry", "retry": "Retry", "later": "Not now"},
   "nav": {
     "contexts": "Contexts",
     "add": "Add",
@@ -350,5 +350,6 @@
   "share": {"emptyFolder": "The folder is empty — add words to share it", "isShared": "Shared via link", "title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},
   "shared": {"words": "Words: {{count}}", "add": "Add to my words", "loginToAdd": "Log in to add these words", "added": "Added: {{added}}. Already had: {{skipped}}", "notFound": "This link is invalid or was turned off", "own": "This is your folder", "langMismatch": "This folder is for a different learning language", "empty": "This folder is empty"},
   "contact": {"title": "Contact us", "question": "Questions or problems? Message us:", "loginProblem": "Can't log in? Message us:", "reportProblem": "Report a problem"},
-  "errorBoundary": {"title": "Something went wrong", "text": "The page crashed. Reload it — if that doesn't help, message us.", "reload": "Reload"}
+  "errorBoundary": {"title": "Something went wrong", "text": "The page crashed. Reload it — if that doesn't help, message us.", "reload": "Reload"},
+  "app": {"title": "yodla — German words in context", "tagline": "Learn words in real sentences"}
 }

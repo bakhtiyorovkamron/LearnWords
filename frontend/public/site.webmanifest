@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Wortkontext",
-  "short_name": "Wortkontext",
-  "description": "Немецкий через контекст",
+  "name": "yodla — nemis tili",
+  "short_name": "yodla",
+  "description": "yodla — so‘zlarni kontekst bilan yodla",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
