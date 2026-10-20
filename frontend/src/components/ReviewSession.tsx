@@ -289,6 +289,7 @@ export function ReviewSession() {
         pool={pool.data ?? []}
         position={index + 1}
         total={deck.length}
+        isLast={index === deck.length - 1}
         saving={answer.isPending}
         error={answer.error
           ? isRateLimited(answer.error)

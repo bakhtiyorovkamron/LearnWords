@@ -9,6 +9,7 @@ import {
 } from '../lib/quiz'
 import { useLearningLang } from '../lib/learningLang'
 import { afterSounds } from '../lib/sounds'
+import { playUi } from '../lib/uiSounds'
 
 function speak(card: WordCard) {
   // Pronunciation is available only for German.
@@ -29,6 +30,7 @@ interface Props {
   error?: string | null
   onAnswer: (correct: boolean) => void // sent to the backend right after the answer
   onNext: () => void
+  isLast?: boolean // the last card of the session: no card sound (the result screen plays its own)
   corner?: ReactNode // e.g. the training hero, at the right end of the progress row
 }
 
@@ -41,7 +43,7 @@ interface Props {
 // it up via /api/translations, which returns a cached value or generates+caches one via AI. The
 // 'gap' format needs no blocking lookup — its prompt is the learning-language sentence itself;
 // the native-language hint underneath it just appears once (if) the lookup resolves.
-export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner }: Props) {
+export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, isLast = false, corner }: Props) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const { card, format } = item
@@ -201,7 +203,8 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       {error && <p className="text-center text-sm text-red-300">{error}</p>}
 
       {answered && (
-        <button type="button" data-no-ui-sound onClick={onNext} disabled={saving} className="btn-primary w-full text-lg">
+        <button type="button" data-no-ui-sound disabled={saving} className="btn-primary w-full text-lg"
+          onClick={() => { if (!isLast) playUi('cardNext'); onNext() }}>
           {position === total ? t('quiz.finish') : t('quiz.next')}
         </button>
       )}

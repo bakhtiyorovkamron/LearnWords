@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
 import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
 import { EditWordModal } from './EditWordModal'
+import { playUi } from '../lib/uiSounds'
 
 function speak(card: CollectionCard) {
   // Pronunciation is available only for German.
@@ -37,10 +38,20 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
     if (onNearEnd && index >= cards.length - 3) onNearEnd()
   }, [index, cards.length, onNearEnd])
 
+  // Buttons and keys share these two functions, so they make the same sounds. The card sounds
+  // are the only ones here (the buttons carry data-no-ui-sound: no generic tap on top).
+  const indexRef = useRef(index)
+  indexRef.current = index
   const go = useCallback((delta: number) => {
+    const next = Math.min(Math.max(indexRef.current + delta, 0), cards.length - 1)
+    if (next !== indexRef.current) playUi(delta > 0 ? 'cardNext' : 'cardPrev') // silent at the first/last card
     setFlipped(false)
-    setIndex((i) => Math.min(Math.max(i + delta, 0), cards.length - 1))
+    setIndex(next)
   }, [cards.length])
+  const flip = useCallback(() => {
+    playUi('cardFlip')
+    setFlipped((f) => !f)
+  }, [])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -51,12 +62,12 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
       else if (e.key === 'ArrowRight') go(1)
       else if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault()
-        setFlipped((f) => !f)
+        flip()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, editing])
+  }, [go, flip, editing])
 
   if (!cards.length) return null
   const card = cards[Math.min(index, cards.length - 1)]
@@ -102,7 +113,8 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
         </button>
         <button
           type="button"
-          onClick={() => setFlipped((f) => !f)}
+          data-no-ui-sound
+          onClick={flip}
           aria-label={t('collection.flipHint')}
           className={`relative h-80 w-full transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? '[transform:rotateY(180deg)]' : ''}`}
         >
@@ -123,14 +135,14 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={() => go(-1)} disabled={index === 0} className="btn-ghost disabled:opacity-30">
+        <button type="button" data-no-ui-sound onClick={() => go(-1)} disabled={index === 0} className="btn-ghost disabled:opacity-30">
           ← {t('collection.prev')}
         </button>
         {/* In RU → DE, listening before flipping would give the answer away. */}
         {card.language === 'de' && (!ruFirst || flipped) ? (
           <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')}>▶</button>
         ) : <span />}
-        <button type="button" onClick={() => go(1)} disabled={index >= cards.length - 1} className="btn-ghost disabled:opacity-30">
+        <button type="button" data-no-ui-sound onClick={() => go(1)} disabled={index >= cards.length - 1} className="btn-ghost disabled:opacity-30">
           {t('collection.next')} →
         </button>
       </div>
