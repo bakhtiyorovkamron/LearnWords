@@ -194,6 +194,14 @@ export interface DailyStory {
   // is unavailable or failed — never a guess in the wrong language.
   story_translation: string; language: string
   words_used: StoryWord[]; created_at: string
+  source: 'ai' | 'user' // generated from the day's words, or written / pasted by the user
+  translation_source: 'ai' | 'user' | '' // who wrote story_translation ('' = there is none yet)
+}
+
+/** Body of creating / editing an own story. `translation` only counts for translation_mode 'manual'. */
+export interface OwnStoryInput {
+  title: string; text: string
+  translation_mode: 'auto' | 'manual'; translation: string
 }
 
 // native_language = the UI language (ru/en/uz): the story's translation and word glosses come
@@ -215,6 +223,15 @@ export const storiesApi = {
     api
       .post<DailyStory>('/stories/generate', { genre, native_language: nativeLanguage }, { timeout: 420_000 })
       .then((r) => r.data),
+  // One story (AI or own) with its text; the translation comes in the interface language
+  // (X-Native-Language header).
+  byId: (id: string) => api.get<DailyStory>(`/stories/by-id/${id}`).then((r) => r.data),
+  // Automatic translation can take a while (the server retries), so the timeout is generous.
+  createOwn: (body: OwnStoryInput) =>
+    api.post<DailyStory>('/stories/own', body, { timeout: 200_000 }).then((r) => r.data),
+  updateOwn: (id: string, body: OwnStoryInput) =>
+    api.put<DailyStory>(`/stories/own/${id}`, body, { timeout: 200_000 }).then((r) => r.data),
+  deleteOwn: (id: string) => api.delete(`/stories/own/${id}`),
 }
 
 // Training-session size: how many due words one "Review" round asks at once. Persisted on
