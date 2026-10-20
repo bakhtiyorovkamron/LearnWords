@@ -122,7 +122,9 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
           <button type="button" className="text-emerald-100/60 hover:text-lime-300" onClick={() => setEditing(active)}>
             ✏️ {t('folders.rename')}
           </button>
-          <button type="button" className="text-emerald-100/60 hover:text-lime-300" onClick={() => setSharing(active)}>
+          <button type="button" className="text-emerald-100/60 hover:text-lime-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-emerald-100/60"
+            disabled={active.total === 0} title={active.total === 0 ? t('share.emptyFolder') : undefined}
+            onClick={() => setSharing(active)}>
             🔗 {t('folders.share')}
           </button>
           <button type="button" className="text-emerald-100/60 hover:text-red-300" disabled={remove.isPending}
@@ -269,11 +271,12 @@ interface FolderCardData {
   color?: string // real folders only; All/No-folder use `icon` instead
   icon?: string
   stats: FolderStats
-  locked?: boolean // All/No-folder: no rename/delete menu
+  locked?: boolean // All/No-folder: no rename/delete/share menu
+  shareToken?: string | null // set = shared by a public link
 }
 
-function FolderCard({ data, onEdit, onDelete, deleting }: {
-  data: FolderCardData; onEdit?: () => void; onDelete?: () => void; deleting?: boolean
+function FolderCard({ data, onEdit, onDelete, onShare, deleting }: {
+  data: FolderCardData; onEdit?: () => void; onDelete?: () => void; onShare?: () => void; deleting?: boolean
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -294,14 +297,27 @@ function FolderCard({ data, onEdit, onDelete, deleting }: {
           <h3 className="truncate text-lg font-bold text-white" title={data.name}>{shortFolderName(data.name)}</h3>
         </div>
         {!data.locked ? (
-          <div className="relative shrink-0">
+          <div className="relative flex shrink-0 items-center">
+            {data.shareToken && (
+              <button type="button" onClick={() => onShare?.()} aria-label={t('share.isShared')} title={t('share.isShared')}
+                className="grid h-8 w-8 place-items-center rounded-full text-sm text-lime-300 transition hover:bg-lime-400/10">
+                🔗
+              </button>
+            )}
             <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label={t('folders.menu')}
               className="grid h-8 w-8 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300">
               ⋯
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-9 z-20 w-40 overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-950 shadow-xl"
+              <div className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-950 shadow-xl"
                 onMouseLeave={() => setMenuOpen(false)}>
+                {/* First item. An empty folder has nothing to share (disabled, with the reason). */}
+                <button type="button" disabled={data.stats.total === 0}
+                  title={data.stats.total === 0 ? t('share.emptyFolder') : undefined}
+                  onClick={() => { setMenuOpen(false); onShare?.() }}
+                  className="block w-full px-4 py-2 text-left text-sm text-emerald-100/80 hover:bg-emerald-400/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent">
+                  🔗 {t('folders.share')}
+                </button>
                 <button type="button" onClick={() => { setMenuOpen(false); onEdit?.() }}
                   className="block w-full px-4 py-2 text-left text-sm text-emerald-100/80 hover:bg-emerald-400/10 hover:text-white">
                   ✏️ {t('folders.rename')}
@@ -353,6 +369,7 @@ export function FolderGrid() {
   const list = useFolderList()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Folder | null>(null)
+  const [sharing, setSharing] = useState<string | null>(null) // folder id; the folder itself is read live from the list
 
   const remove = useMutation({
     mutationFn: (id: string) => foldersApi.remove(id),
@@ -391,8 +408,8 @@ export function FolderGrid() {
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <FolderCard data={{ linkId: '', name: t('folders.all'), icon: '📚', stats: all, locked: true }} />
         {folders.map((f) => (
-          <FolderCard key={f.id} data={{ linkId: f.id, name: f.name, color: f.color, stats: f }}
-            onEdit={() => setEditing(f)}
+          <FolderCard key={f.id} data={{ linkId: f.id, name: f.name, color: f.color, stats: f, shareToken: f.share_token }}
+            onEdit={() => setEditing(f)} onShare={() => setSharing(f.id)}
             onDelete={() => { if (window.confirm(t('folders.deleteConfirm', { name: f.name }))) remove.mutate(f.id) }}
             deleting={remove.isPending && remove.variables === f.id} />
         ))}
@@ -408,6 +425,9 @@ export function FolderGrid() {
 
       {(creating || editing) && (
         <FolderFormModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }} />
+      )}
+      {sharing && folders.find((f) => f.id === sharing) && (
+        <ShareFolderModal folder={folders.find((f) => f.id === sharing)!} onClose={() => setSharing(null)} />
       )}
     </div>
   )
