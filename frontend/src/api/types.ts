@@ -34,6 +34,7 @@ export interface WordCard {
   example_sentence?: string
   example_translation?: string
   folder_id?: string | null // optional folder; null = no folder
+  translation_language?: string | null // language `translation` is written in (ru | en | uz)
   // Grammar from the word check, stored next to the typed text; null = not checked.
   lemma?: string | null
   article?: string | null

@@ -50,18 +50,25 @@ func (h *SearchHandler) Add(c *gin.Context) {
 		ExampleSentence    string `json:"example_sentence" binding:"max=500"`
 		ExampleTranslation string `json:"example_translation" binding:"max=500"`
 		FolderID           string `json:"folder_id"`
+		// Language the search result's translation is written in (info.translation_language);
+		// the user may have switched the interface since searching.
+		TranslationLanguage string `json:"translation_language"`
 		grammarJSON
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		badRequest(c, "invalid body")
 		return
 	}
+	ctx := c.Request.Context()
+	if req.TranslationLanguage != "" {
+		ctx = domain.WithTranslationLang(ctx, req.TranslationLanguage)
+	}
 	folder, err := parseOptionalFolder(req.FolderID)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	res, err := h.svc.Add(c.Request.Context(), userID(c), service.AddInput{
+	res, err := h.svc.Add(ctx, userID(c), service.AddInput{
 		Word: req.Word, Translation: req.Translation, Pronunciation: req.Pronunciation,
 		ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, FolderID: folder,
 		Grammar: req.grammar(),

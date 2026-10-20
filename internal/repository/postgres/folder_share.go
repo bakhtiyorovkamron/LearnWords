@@ -246,11 +246,12 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 			audioURL                                   *string
 			exampleSentence, exampleTranslation        string
 			lemma, article, plural, partOfSpeech       *string
+			translationLanguage                        *string
 		}
 		rows, err = tx.Query(ctx, `
 			SELECT id, word, translation, transcription, audio_url, language,
 			       COALESCE(example_sentence, ''), COALESCE(example_translation, ''),
-			       lemma, article, plural, part_of_speech
+			       lemma, article, plural, part_of_speech, translation_language
 			FROM word_cards WHERE folder_id = $1
 			ORDER BY created_at, id LIMIT $2`, srcID, domain.MaxSharedWords)
 		if err != nil {
@@ -259,7 +260,7 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 		words, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (src, error) {
 			var s src
 			err := row.Scan(&s.id, &s.word, &s.translation, &s.transcription, &s.audioURL, &s.language,
-				&s.exampleSentence, &s.exampleTranslation, &s.lemma, &s.article, &s.plural, &s.partOfSpeech)
+				&s.exampleSentence, &s.exampleTranslation, &s.lemma, &s.article, &s.plural, &s.partOfSpeech, &s.translationLanguage)
 			return s, err
 		})
 		if err != nil {
@@ -291,10 +292,10 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO word_cards
 				  (id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
-				   example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+				   example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech, translation_language)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
 				cardID, ctxID, callerID, s.word, s.translation, s.transcription, s.audioURL, s.language, created,
-				s.exampleSentence, s.exampleTranslation, res.FolderID, s.lemma, s.article, s.plural, s.partOfSpeech); err != nil {
+				s.exampleSentence, s.exampleTranslation, res.FolderID, s.lemma, s.article, s.plural, s.partOfSpeech, s.translationLanguage); err != nil {
 				return err
 			}
 			if _, err := tx.Exec(ctx, `
@@ -302,6 +303,18 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 				SELECT $2, language, translation, example_translation FROM word_translations WHERE word_id = $1`,
 				s.id, cardID); err != nil {
 				return err
+			}
+			// The translation is in the source's language (copied as is), so training finds it
+			// under that language even if the source's cache lacked the row.
+			if s.translationLanguage != nil && strings.TrimSpace(s.translation) != "" {
+				if _, err := tx.Exec(ctx, `
+					INSERT INTO word_translations (word_id, language, translation, example_translation)
+					VALUES ($1, $2, $3, $4)
+					ON CONFLICT (word_id, language) DO UPDATE
+					SET translation = EXCLUDED.translation, example_translation = EXCLUDED.example_translation`,
+					cardID, *s.translationLanguage, s.translation, s.exampleTranslation); err != nil {
+					return err
+				}
 			}
 			res.Added++
 		}

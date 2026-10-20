@@ -112,11 +112,17 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 			lookup = variants[0] // generate only for the first variant
 		}
 		card := s.buildCard(ctx, c, w, lookup)
+		// The generated translation is in the configured target language.
+		if card.Translation != "" {
+			card.TranslationLanguage = ptrString(domain.NormTranslationLang(s.targetLang))
+		}
 		card.FolderID = in.FolderID
 		// A single-word phrase: the user's meaning is the word's translation.
 		if len(words) == 1 {
 			if meaning != "" {
 				card.Translation = meaning
+				// What the user typed is in the language they use the app in right now.
+				card.TranslationLanguage = ptrString(domain.TranslationLangFrom(ctx))
 			}
 			if p := strings.TrimSpace(in.Pronunciation); p != "" {
 				card.Transcription = p
@@ -144,6 +150,8 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	}
 	return &domain.ContextWithCards{Context: c, Cards: cards}, nil
 }
+
+func ptrString(s string) *string { return &s }
 
 // buildCard creates a card for word. Translation/transcription/audio are generated for lookup
 // (the first spelling variant). Generation failures are logged and the field is left EMPTY —

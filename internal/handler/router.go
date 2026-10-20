@@ -76,10 +76,11 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		Recovery(),
 		otelgin.Middleware(d.ServiceName),
 		RequestLogger(),
+		NativeLang(),
 		cors.New(cors.Config{
 			AllowOrigins:     d.CORSOrigins,
 			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-			AllowHeaders:     []string{"Authorization", "Content-Type"},
+			AllowHeaders:     []string{"Authorization", "Content-Type", NativeLanguageHeader},
 			AllowCredentials: true,
 			MaxAge:           12 * time.Hour,
 		}),

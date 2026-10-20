@@ -496,3 +496,5 @@ func TestUpdateContent_MoveToAnotherFolderReturnsWholeCard(t *testing.T) {
 		t.Errorf("foreign card: %v", err)
 	}
 }
+
+func (f moveFixture) moveNow() time.Time { return time.Now() }

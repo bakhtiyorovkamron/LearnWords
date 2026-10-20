@@ -154,6 +154,11 @@ func (r *WordFixRepository) Accept(ctx context.Context, userID, id uuid.UUID) er
 		if tag.RowsAffected() == 0 {
 			return domain.ErrNotFound
 		}
+		// The word's spelling changed: cached translations were made for the old text. The card's
+		// own translation is untouched (so is its translation_language) and still wins in training.
+		if _, err := tx.Exec(ctx, `DELETE FROM word_translations WHERE word_id = $1`, f.WordID); err != nil {
+			return err
+		}
 		_, err = tx.Exec(ctx, `UPDATE word_fix_suggestions SET status = 'accepted', resolved_at = $2 WHERE id = $1`,
 			id, time.Now().UTC())
 		return err

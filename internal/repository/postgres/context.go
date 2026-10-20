@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -38,11 +39,19 @@ func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Conte
 			// folder_id is taken only if that folder belongs to the same user (otherwise NULL).
 			batch.Queue(`INSERT INTO word_cards
 				(id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
-				 example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech)
+				 example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech, translation_language)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-				        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3), $13, $14, $15, $16)`,
+				        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3), $13, $14, $15, $16, $17)`,
 				w.ID, w.ContextID, w.UserID, w.Word, w.Translation, w.Transcription, w.AudioURL, w.Language, w.CreatedAt,
-				w.ExampleSentence, w.ExampleTranslation, w.FolderID, w.Lemma, w.Article, w.Plural, w.PartOfSpeech)
+				w.ExampleSentence, w.ExampleTranslation, w.FolderID, w.Lemma, w.Article, w.Plural, w.PartOfSpeech, w.TranslationLanguage)
+			// The same translation is the cache entry for its own language (training reads it from there).
+			if w.TranslationLanguage != nil && strings.TrimSpace(w.Translation) != "" {
+				batch.Queue(`INSERT INTO word_translations (word_id, language, translation, example_translation)
+					VALUES ($1, $2, $3, $4)
+					ON CONFLICT (word_id, language) DO UPDATE
+					SET translation = EXCLUDED.translation, example_translation = EXCLUDED.example_translation`,
+					w.ID, *w.TranslationLanguage, w.Translation, w.ExampleTranslation)
+			}
 		}
 		return tx.SendBatch(ctx, batch).Close()
 	})

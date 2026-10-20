@@ -76,6 +76,10 @@ type WordCard struct {
 
 	FolderID *uuid.UUID `json:"folder_id"` // optional grouping; nil = no folder
 
+	// TranslationLanguage: the language Translation / ExampleTranslation are written in (ru | en | uz).
+	// nil = unknown (an old card whose translation isn't Cyrillic).
+	TranslationLanguage *string `json:"translation_language"`
+
 	// Grammar from the word check, stored next to (never instead of) the text the user typed.
 	// nil = not checked (older words, other learning languages, "keep as is").
 	Lemma        *string `json:"lemma"`

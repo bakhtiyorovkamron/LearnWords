@@ -14,6 +14,7 @@ import (
 )
 
 const translateCardPrompt = `Translate the {{target}} word "{{word}}"{{exampleNote}} into {{native}}.
+{{hint}}
 "translation" MUST contain ONLY the short {{native}} equivalent (1-4 words) — NO parentheses, NO grammatical comments, NO language names, nothing but the bare translation.
 "example_translation" is the plain {{native}} translation of the example sentence below (empty string "" if there is none), with the same rule: no parentheses or comments mixed in.
 {{exampleBlock}}
@@ -23,9 +24,33 @@ Return ONLY this JSON:
 const reinforceTranslate = `
 IMPORTANT: your previous answer put an explanation in "translation" or "example_translation" (parentheses, a grammar comment, a language name). Return a clean, bare translation this time.`
 
-func buildTranslatePrompt(targetCode, native, word, exampleSentence string, reinforce bool) string {
-	learning := domain.Lang(targetCode)
-	native = domain.NormTranslationLang(native)
+// translateHint tells the model which sense of the word is meant: the card's own translation.
+// Without it a homograph goes wrong ("still" = quiet, not the English "still"/"ещё").
+func translateHint(req domain.TranslateRequest) string {
+	learning := domain.Lang(req.LearningLang)
+	var b strings.Builder
+	if m := clean(req.KnownMeaning); m != "" {
+		if req.KnownMeaningLang != "" {
+			fmt.Fprintf(&b, "Known meaning in %s: %q\n", domain.TranslationLangName(req.KnownMeaningLang), m)
+		} else {
+			fmt.Fprintf(&b, "Known meaning: %q\n", m)
+		}
+	}
+	notEnglish := ""
+	if learning.Code != "en" {
+		notEnglish = " (not English)"
+	}
+	fmt.Fprintf(&b, "This is a %s word%s.", learning.NameEN, notEnglish)
+	if clean(req.KnownMeaning) != "" {
+		b.WriteString(" Translate exactly this meaning.")
+	}
+	return b.String()
+}
+
+func buildTranslatePrompt(req domain.TranslateRequest, reinforce bool) string {
+	learning := domain.Lang(req.LearningLang)
+	native := domain.NormTranslationLang(req.NativeLang)
+	word, exampleSentence := req.Word, req.ExampleSentence
 	exampleNote, exampleBlock := "", "No example sentence."
 	if s := clean(exampleSentence); s != "" {
 		exampleNote = " (used in the example sentence below)"
@@ -34,6 +59,7 @@ func buildTranslatePrompt(targetCode, native, word, exampleSentence string, rein
 	p := strings.NewReplacer(
 		"{{word}}", clean(word),
 		"{{target}}", learning.NameEN,
+		"{{hint}}", translateHint(req),
 		"{{native}}", domain.TranslationLangName(native),
 		"{{exampleNote}}", exampleNote,
 		"{{exampleBlock}}", exampleBlock,
@@ -79,10 +105,10 @@ func parseTranslation(s string) (translationResult, error) {
 // example sentence it's used in) into nativeLang. Two attempts: a validation failure (an
 // explanation leaking into the translation, same bug class as the search endpoint) is retried
 // once with a reinforced prompt before giving up.
-func (c *Client) TranslateCard(ctx context.Context, learningLang, nativeLang, word, exampleSentence string) (translation, exampleTranslation string, err error) {
+func (c *Client) TranslateCard(ctx context.Context, req domain.TranslateRequest) (translation, exampleTranslation string, err error) {
 	prompts := []string{
-		buildTranslatePrompt(learningLang, nativeLang, word, exampleSentence, false),
-		buildTranslatePrompt(learningLang, nativeLang, word, exampleSentence, true),
+		buildTranslatePrompt(req, false),
+		buildTranslatePrompt(req, true),
 	}
 	var lastErr error
 	for i, prompt := range prompts {
@@ -105,5 +131,5 @@ func (c *Client) TranslateCard(ctx context.Context, learningLang, nativeLang, wo
 		}
 		return res.Translation, res.ExampleTranslation, nil
 	}
-	return "", "", fmt.Errorf("could not translate %q into %s: %w", word, nativeLang, lastErr)
+	return "", "", fmt.Errorf("could not translate %q into %s: %w", req.Word, req.NativeLang, lastErr)
 }

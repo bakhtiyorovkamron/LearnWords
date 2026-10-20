@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -13,7 +14,7 @@ import (
 // WordTranslator translates an already-identified word (and its example sentence) into a
 // given native/interface language. nil → feature disabled (no AI key).
 type WordTranslator interface {
-	TranslateCard(ctx context.Context, learningLang, nativeLang, word, exampleSentence string) (translation, exampleTranslation string, err error)
+	TranslateCard(ctx context.Context, req domain.TranslateRequest) (translation, exampleTranslation string, err error)
 }
 
 // WordTranslationCache stores a word's translation per interface language.
@@ -40,21 +41,38 @@ type CardTranslation struct {
 
 const maxTranslationBatch = 10
 
-// Translate returns wordID's translation in nativeLang: cached if already seen, generated via
-// AI and cached otherwise. Never falls back to a different language silently.
+// Translate returns wordID's translation in nativeLang. In order:
+//  1. the card's own translation, when it is written in nativeLang (what the user saw and typed —
+//     training must agree with the card; no cache lookup, no AI);
+//  2. the cache;
+//  3. AI, told the card's known meaning so it translates exactly that sense, then cached.
+//
+// Never falls back to a different language silently.
 func (s *TranslationService) Translate(ctx context.Context, userID, wordID uuid.UUID, nativeLang string) (CardTranslation, error) {
 	card, err := s.cards.GetByID(ctx, userID, wordID)
 	if err != nil {
 		return CardTranslation{}, err
 	}
 	nativeLang = domain.NormTranslationLang(nativeLang)
+	if card.TranslationLanguage != nil && *card.TranslationLanguage == nativeLang && strings.TrimSpace(card.Translation) != "" {
+		return CardTranslation{Translation: card.Translation, ExampleTranslation: card.ExampleTranslation}, nil
+	}
 	if tr, ex, ok, err := s.cache.Get(ctx, wordID, nativeLang); err == nil && ok {
 		return CardTranslation{Translation: tr, ExampleTranslation: ex}, nil
 	}
 	if s.ai == nil {
 		return CardTranslation{}, domain.ErrUnavailable
 	}
-	tr, ex, err := s.ai.TranslateCard(ctx, card.Language, nativeLang, firstCardWord(card.Word), card.ExampleSentence)
+	req := domain.TranslateRequest{
+		LearningLang: card.Language, NativeLang: nativeLang,
+		Word:            firstCardWord(card.Word),
+		ExampleSentence: fillGap(card),
+		KnownMeaning:    strings.TrimSpace(card.Translation),
+	}
+	if card.TranslationLanguage != nil {
+		req.KnownMeaningLang = *card.TranslationLanguage
+	}
+	tr, ex, err := s.ai.TranslateCard(ctx, req)
 	if err != nil {
 		return CardTranslation{}, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
@@ -90,6 +108,23 @@ func (s *TranslationService) TranslateBatch(ctx context.Context, userID uuid.UUI
 	}
 	wg.Wait()
 	return out
+}
+
+// fillGap turns the stored gap sentence ("Ich bin ___.") into the full one by putting the word
+// back: the lemma when the word check found one, else the word without its article.
+func fillGap(card *domain.WordCard) string {
+	sentence := strings.TrimSpace(card.ExampleSentence)
+	if !strings.Contains(sentence, "___") {
+		return sentence
+	}
+	fill := ""
+	if card.Lemma != nil {
+		fill = strings.TrimSpace(*card.Lemma)
+	}
+	if fill == "" {
+		_, fill = domain.SplitArticle(firstCardWord(card.Word))
+	}
+	return strings.ReplaceAll(sentence, "___", fill)
 }
 
 // firstCardWord: "der Samstag / der Sonnabend" → "der Samstag" (translate one spelling, not the slash-joined pair).

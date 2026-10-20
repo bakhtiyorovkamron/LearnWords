@@ -28,6 +28,8 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
+  // The interface language: new translations (a word you add or edit) are written in it.
+  config.headers['X-Native-Language'] = i18n.language
   return config
 })
 

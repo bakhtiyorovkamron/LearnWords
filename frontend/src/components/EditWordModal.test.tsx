@@ -39,6 +39,7 @@ function setup() {
   qc.setQueryData(['collection', { folder: 'f-new', status: 'all' }], page([]))
   qc.setQueryData(['cards'], [card, other])
   qc.setQueryData(['context-words', 'c1'], [card])
+  qc.setQueryData(['translations', 'w1,w2', 'ru'], { w1: { translation: 'ещё', example_translation: '' } }) // what training cached
   const onClose = vi.fn()
   render(<QueryClientProvider client={qc}><EditWordModal card={card} onClose={onClose} /></QueryClientProvider>)
   return { qc, onClose }
@@ -77,6 +78,8 @@ describe('EditWordModal save', () => {
     expect(items(qc, '')[0].translation).toBe('юг (сторона света)')
     expect(items(qc, '')[0].box_level).toBe(2) // progress fields of the cached item are kept
     expect(qc.getQueryData(['collection', 'grand-total'])).toBe(2) // untouched
+    // Training reads translations from here: it must ask again after an edit.
+    expect(qc.getQueryState(['translations', 'w1,w2', 'ru'])?.isInvalidated).toBe(true)
   })
 
   it('folder change → the card leaves the old folder view at once, the new view is re-read', async () => {

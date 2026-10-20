@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"learnwords/internal/auth"
+	"learnwords/internal/domain"
 	"learnwords/internal/service"
 )
 
@@ -62,4 +63,20 @@ func AuthRequired(tokens service.TokenManager) gin.HandlerFunc {
 
 func userID(c *gin.Context) uuid.UUID {
 	return c.MustGet(userIDKey).(uuid.UUID)
+}
+
+// NativeLanguageHeader is sent by the web client on every request: the interface language
+// (ru | en | uz) the user sees right now. It is what new translations are written in.
+const NativeLanguageHeader = "X-Native-Language"
+
+// NativeLang puts the interface language from X-Native-Language into the request context
+// (domain.TranslationLangFrom). Handlers with an explicit language in the body override it;
+// a missing or unknown value leaves the default.
+func NativeLang() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if v := strings.ToLower(strings.TrimSpace(c.GetHeader(NativeLanguageHeader))); supportedLanguages[v] {
+			c.Request = c.Request.WithContext(domain.WithTranslationLang(c.Request.Context(), v))
+		}
+		c.Next()
+	}
 }

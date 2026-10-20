@@ -102,6 +102,7 @@ function WordResult({ info }: { info: WordInfo }) {
       pronunciation: info.pronunciation,
       example_sentence: info.example_sentence,
       example_translation: info.example_translation,
+      translation_language: info.translation_language,
       folder_id: folder || undefined,
       // The search result is already a checked dictionary form (German only: der/die/das).
       ...(learning.code === 'de' && {

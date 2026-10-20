@@ -176,6 +176,7 @@ export const searchApi = {
   add: (w: {
     word: string; translation: string; pronunciation: string
     example_sentence: string; example_translation: string; folder_id?: string
+    translation_language?: string // the language `translation` is written in (info.translation_language)
   } & Partial<WordGrammar>) => api.post<ContextWithCards>('/search-word/add', w).then((r) => r.data),
 }
 
