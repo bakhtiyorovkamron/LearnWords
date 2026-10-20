@@ -281,6 +281,8 @@ function FolderCard({ data, onEdit, onDelete, onShare, deleting }: {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const empty = data.stats.total === 0 // nothing to share yet
+  const shared = !!data.shareToken
 
   function train() {
     localStorage.setItem('review-folder', data.linkId)
@@ -298,12 +300,17 @@ function FolderCard({ data, onEdit, onDelete, onShare, deleting }: {
         </div>
         {!data.locked ? (
           <div className="relative flex shrink-0 items-center">
-            {data.shareToken && (
-              <button type="button" onClick={() => onShare?.()} aria-label={t('share.isShared')} title={t('share.isShared')}
-                className="grid h-8 w-8 place-items-center rounded-full text-sm text-lime-300 transition hover:bg-lime-400/10">
-                🔗
-              </button>
-            )}
+            {/* Always there for a real folder: muted when not shared, lime (+ dot) when shared. */}
+            <button type="button" onClick={() => onShare?.()} disabled={empty}
+              aria-label={empty ? t('share.emptyFolder') : shared ? t('share.isShared') : t('folders.share')}
+              title={empty ? t('share.emptyFolder') : shared ? t('share.isShared') : t('folders.share')}
+              className={`relative grid h-8 w-8 place-items-center rounded-full text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                shared ? 'bg-lime-400/10 text-lime-300 hover:bg-lime-400/20'
+                  : 'text-emerald-300/60 hover:bg-emerald-400/10 hover:text-lime-300 disabled:hover:bg-transparent disabled:hover:text-emerald-300/60'
+              }`}>
+              🔗
+              {shared && <span aria-hidden className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-lime-400 ring-2 ring-emerald-900" />}
+            </button>
             <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label={t('folders.menu')}
               className="grid h-8 w-8 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300">
               ⋯
