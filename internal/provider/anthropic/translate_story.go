@@ -19,16 +19,22 @@ Story:
 """
 {{story}}
 """
+{{glossBlock}}
+Return ONLY this JSON:
+{{jsonShape}}
+"translation" is the plain {{native}} translation of the whole story, preserving paragraph
+breaks as \n (escaped). Do not translate the **bold** markers — keep them around the same words.`
 
+// glossBlockTpl is left out entirely when there are no words to gloss (own stories have no word list).
+const glossBlockTpl = `
 Also give a short gloss (1-4 words, no parentheses or grammatical comments) in {{native}} for
 each of these {{target}} words, exactly as spelled below — one entry per word, using that exact
 spelling as the JSON key:
 {{words}}
+`
 
-Return ONLY this JSON:
-{"translation":"...","word_glosses":{"<word>":"..."}}
-"translation" is the plain {{native}} translation of the whole story, preserving paragraph
-breaks as \n (escaped). Do not translate the **bold** markers — keep them around the same words.`
+const reinforceStoryTranslateNoWords = `
+IMPORTANT: your previous answer left "translation" empty or was not valid JSON. Return the complete translation of the whole story this time.`
 
 const reinforceStoryTranslate = `
 IMPORTANT: your previous answer was missing a gloss for one or more of the listed words, or left "translation" empty. Return a complete answer this time, with exactly one gloss per listed word.`
@@ -36,18 +42,32 @@ IMPORTANT: your previous answer was missing a gloss for one or more of the liste
 func buildStoryTranslatePrompt(learningLang, nativeLang, storyDE string, words []string, reinforce bool) string {
 	target := domain.Lang(learningLang).NameEN
 	native := domain.NormTranslationLang(nativeLang)
-	var b strings.Builder
-	for _, w := range words {
-		fmt.Fprintf(&b, "- %s\n", clean(w))
+	nativeName := domain.TranslationLangName(native)
+
+	glossBlock, jsonShape := "", `{"translation":"...","word_glosses":{}}`
+	if len(words) > 0 {
+		var b strings.Builder
+		for _, w := range words {
+			fmt.Fprintf(&b, "- %s\n", clean(w))
+		}
+		glossBlock = strings.NewReplacer(
+			"{{target}}", target, "{{native}}", nativeName, "{{words}}", strings.TrimRight(b.String(), "\n"),
+		).Replace(glossBlockTpl)
+		jsonShape = `{"translation":"...","word_glosses":{"<word>":"..."}}`
 	}
 	p := strings.NewReplacer(
+		"{{glossBlock}}", glossBlock,
+		"{{jsonShape}}", jsonShape,
 		"{{target}}", target,
-		"{{native}}", domain.TranslationLangName(native),
+		"{{native}}", nativeName,
 		"{{story}}", storyDE,
-		"{{words}}", strings.TrimRight(b.String(), "\n"),
 	).Replace(storyTranslatePrompt)
 	if reinforce {
-		p += reinforceStoryTranslate
+		if len(words) > 0 {
+			p += reinforceStoryTranslate
+		} else {
+			p += reinforceStoryTranslateNoWords
+		}
 	}
 	return p
 }
@@ -89,11 +109,11 @@ func validateStoryTranslation(res storyTranslationResult, words []string) error 
 }
 
 // storyTranslateMaxTokens: translated text is roughly the size of the source plus a small
-// per-word gloss map.
+// per-word gloss map. A 4000-character own story must fit (cap 4096).
 func storyTranslateMaxTokens(storyDE string, words int) int {
-	n := len(storyDE)/2 + 100*words + 500
-	if n > 3000 {
-		n = 3000
+	n := len(storyDE)*3/4 + 100*words + 500
+	if n > 4096 {
+		n = 4096
 	}
 	if n < 800 {
 		n = 800

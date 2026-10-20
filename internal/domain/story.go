@@ -35,7 +35,13 @@ func (w StoryWord) PromptForm() string {
 	}
 }
 
-// DailyStory is an AI-generated story in the user's learning language, built from the words
+// Who wrote a story / its translation: the AI pipeline or the user (own stories).
+const (
+	StorySourceAI   = "ai"
+	StorySourceUser = "user"
+)
+
+// DailyStory is a story in the user's learning language, built from the words
 // added that day. StoryDE (and the title) are in the learning language and shared by every
 // viewer regardless of interface language. StoryTranslation and each WordsUsed[].Translation
 // are resolved for whichever native language was requested — see Language — generated via AI
@@ -57,6 +63,10 @@ type DailyStory struct {
 	WordsUsed        []StoryWord `json:"words_used"`
 	ProofreadStatus  string      `json:"proofread_status"`
 	CreatedAt        time.Time   `json:"created_at"`
+	// Source: "ai" (generated from the day's words) or "user" (written or pasted by the user).
+	Source string `json:"source"`
+	// TranslationSource: who wrote StoryTranslation — "ai", "user", or "" while there is none yet.
+	TranslationSource string `json:"translation_source"`
 }
 
 // Proofread outcome stored in daily_stories.proofread_status.
@@ -92,4 +102,19 @@ type GeneratedStory struct {
 type StoryTranslation struct {
 	Translation string            `json:"translation"`
 	WordGlosses map[string]string `json:"word_glosses"`
+	Source      string            `json:"source"` // StorySourceAI | StorySourceUser
+}
+
+// Translation modes of an own story.
+const (
+	TranslationAuto   = "auto"   // the system translates it (AI)
+	TranslationManual = "manual" // the user wrote the translation
+)
+
+// OwnStoryInput is the body of creating / editing an own story.
+type OwnStoryInput struct {
+	Title           string `json:"title"`
+	Text            string `json:"text"`
+	TranslationMode string `json:"translation_mode"` // auto | manual
+	Translation     string `json:"translation"`      // required for manual
 }

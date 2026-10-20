@@ -42,8 +42,14 @@ type StoryRepository interface {
 	SaveCorrections(ctx context.Context, storyID, userID uuid.UUID, cs []domain.StoryCorrection) error
 	ByDate(ctx context.Context, userID uuid.UUID, day string) (domain.DailyStory, error)
 	List(ctx context.Context, userID uuid.UUID, limit int) ([]domain.DailyStory, error)
-	GetTranslation(ctx context.Context, storyID uuid.UUID, lang string) (translation string, wordGlosses map[string]string, ok bool, err error)
-	PutTranslation(ctx context.Context, storyID uuid.UUID, lang, translation string, wordGlosses map[string]string) error
+	GetTranslation(ctx context.Context, storyID uuid.UUID, lang string) (domain.StoryTranslation, bool, error)
+	PutTranslation(ctx context.Context, storyID uuid.UUID, lang string, tr domain.StoryTranslation) error
+	DeleteTranslation(ctx context.Context, storyID uuid.UUID, lang string) error
+	// Own stories (source 'user'): written or pasted by the user.
+	ByID(ctx context.Context, userID, id uuid.UUID) (domain.DailyStory, error)
+	CreateOwn(ctx context.Context, s domain.DailyStory) (domain.DailyStory, error)
+	UpdateOwn(ctx context.Context, userID, id uuid.UUID, title, text string) (domain.DailyStory, error)
+	DeleteOwn(ctx context.Context, userID, id uuid.UUID) error
 }
 
 var StoryGenres = []string{"приключение", "детектив", "комедия", "сказка", "фантастика", "повседневная жизнь", "романтика"}
@@ -51,6 +57,9 @@ var StoryGenres = []string{"приключение", "детектив", "ком
 // maxStoryWords caps how many of the day's words go into one story: a long word list makes the
 // answer much more likely to be cut off or malformed.
 const maxStoryWords = 12
+
+// maxStoryList caps the archive (AI and own stories together).
+const maxStoryList = 500
 
 type StoryService struct {
 	repo       StoryRepository
@@ -247,6 +256,7 @@ func (s *StoryService) ByDate(ctx context.Context, userID uuid.UUID, day, native
 func (s *StoryService) resolveTranslation(ctx context.Context, st *domain.DailyStory, nativeLang string) {
 	nativeLang = domain.NormTranslationLang(nativeLang)
 	st.Language = nativeLang
+	st.TranslationSource = ""
 	// WordsUsed is stored with whatever language was active when the words were first added —
 	// not necessarily nativeLang. Blank it out up front so a cache miss (or a failed AI call,
 	// with no translator configured) leaves every gloss empty instead of silently showing that
@@ -255,9 +265,13 @@ func (s *StoryService) resolveTranslation(ctx context.Context, st *domain.DailyS
 		st.WordsUsed[i].Translation = ""
 	}
 
-	if tr, glosses, ok, err := s.repo.GetTranslation(ctx, st.ID, nativeLang); err == nil && ok {
-		st.StoryTranslation = tr
-		applyGlosses(st.WordsUsed, glosses)
+	if tr, ok, err := s.repo.GetTranslation(ctx, st.ID, nativeLang); err == nil && ok {
+		st.StoryTranslation = tr.Translation
+		st.TranslationSource = tr.Source
+		if st.TranslationSource == "" {
+			st.TranslationSource = domain.StorySourceAI
+		}
+		applyGlosses(st.WordsUsed, tr.WordGlosses)
 		return
 	} else if err != nil {
 		slog.WarnContext(ctx, "story translation cache read failed", "story", st.ID, "err", err)
@@ -275,10 +289,12 @@ func (s *StoryService) resolveTranslation(ctx context.Context, st *domain.DailyS
 		slog.WarnContext(ctx, "story translation failed", "story", st.ID, "lang", nativeLang, "err", err)
 		return
 	}
-	if err := s.repo.PutTranslation(ctx, st.ID, nativeLang, tr, glosses); err != nil {
+	if err := s.repo.PutTranslation(ctx, st.ID, nativeLang,
+		domain.StoryTranslation{Translation: tr, WordGlosses: glosses, Source: domain.StorySourceAI}); err != nil {
 		slog.WarnContext(ctx, "story translation cache write failed", "story", st.ID, "err", err)
 	}
 	st.StoryTranslation = tr
+	st.TranslationSource = domain.StorySourceAI
 	applyGlosses(st.WordsUsed, glosses)
 }
 
@@ -300,7 +316,7 @@ func applyGlosses(words []domain.StoryWord, glosses map[string]string) {
 }
 
 func (s *StoryService) List(ctx context.Context, userID uuid.UUID) ([]domain.DailyStory, error) {
-	return s.repo.List(ctx, userID, 365)
+	return s.repo.List(ctx, userID, maxStoryList)
 }
 
 // RunScheduler generates stories once a day at hour:00 (in loc) for every user who added

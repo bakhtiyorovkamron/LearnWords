@@ -68,8 +68,8 @@ func (r *AdminRepository) Stats(ctx context.Context) (domain.AdminStats, error) 
 		  (SELECT count(*) FROM word_cards),
 		  (SELECT count(*) FROM review_logs),
 		  (SELECT count(*) FROM (SELECT DISTINCT user_id, (reviewed_at AT TIME ZONE 'UTC')::date FROM review_logs) t),
-		  (SELECT count(*) FROM daily_stories),
-		  (SELECT count(*) FROM daily_stories WHERE created_at >= $2)`,
+		  (SELECT count(*) FROM daily_stories WHERE source = 'ai'),
+		  (SELECT count(*) FROM daily_stories WHERE source = 'ai' AND created_at >= $2)`,
 		weekAgo, monthAgo).Scan(
 		&s.TotalUsers, &s.BannedUsers, &s.NewUsers7d, &s.ActiveUsers7d,
 		&s.TotalWords, &s.TotalReviews, &s.TrainingSessions,

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -18,26 +19,70 @@ type fakeStoryRepo struct {
 	words       []domain.StoryWord // WordsAddedOn
 	saved       []domain.DailyStory
 	corrections []domain.StoryCorrection
+
+	own map[uuid.UUID]domain.DailyStory // own and AI stories by id (ByID, CreateOwn, ...)
 }
 
 func newFakeStoryRepo() *fakeStoryRepo {
-	return &fakeStoryRepo{cache: map[string]domain.StoryTranslation{}}
+	return &fakeStoryRepo{cache: map[string]domain.StoryTranslation{}, own: map[uuid.UUID]domain.DailyStory{}}
 }
 
 func (r *fakeStoryRepo) key(storyID uuid.UUID, lang string) string {
 	return storyID.String() + ":" + lang
 }
 
-func (r *fakeStoryRepo) GetTranslation(_ context.Context, storyID uuid.UUID, lang string) (string, map[string]string, bool, error) {
+func (r *fakeStoryRepo) GetTranslation(_ context.Context, storyID uuid.UUID, lang string) (domain.StoryTranslation, bool, error) {
 	v, ok := r.cache[r.key(storyID, lang)]
-	if !ok {
-		return "", nil, false, nil
-	}
-	return v.Translation, v.WordGlosses, true, nil
+	return v, ok, nil
 }
 
-func (r *fakeStoryRepo) PutTranslation(_ context.Context, storyID uuid.UUID, lang, translation string, wordGlosses map[string]string) error {
-	r.cache[r.key(storyID, lang)] = domain.StoryTranslation{Translation: translation, WordGlosses: wordGlosses}
+func (r *fakeStoryRepo) PutTranslation(_ context.Context, storyID uuid.UUID, lang string, tr domain.StoryTranslation) error {
+	r.cache[r.key(storyID, lang)] = tr
+	return nil
+}
+
+func (r *fakeStoryRepo) DeleteTranslation(_ context.Context, storyID uuid.UUID, lang string) error {
+	delete(r.cache, r.key(storyID, lang))
+	return nil
+}
+
+func (r *fakeStoryRepo) ByID(_ context.Context, userID, id uuid.UUID) (domain.DailyStory, error) {
+	st, ok := r.own[id]
+	if !ok || st.UserID != userID {
+		return domain.DailyStory{}, domain.ErrNotFound
+	}
+	return st, nil
+}
+
+func (r *fakeStoryRepo) CreateOwn(_ context.Context, s domain.DailyStory) (domain.DailyStory, error) {
+	s.ID, s.Source, s.WordsUsed = uuid.New(), domain.StorySourceUser, []domain.StoryWord{}
+	r.own[s.ID] = s
+	return s, nil
+}
+
+func (r *fakeStoryRepo) UpdateOwn(_ context.Context, userID, id uuid.UUID, title, text string) (domain.DailyStory, error) {
+	st, ok := r.own[id]
+	if !ok || st.UserID != userID || st.Source != domain.StorySourceUser {
+		return domain.DailyStory{}, domain.ErrNotFound
+	}
+	if st.StoryDE != text { // the real repository drops the cached translations of the old text
+		for k := range r.cache {
+			if strings.HasPrefix(k, id.String()+":") {
+				delete(r.cache, k)
+			}
+		}
+	}
+	st.Title, st.StoryDE = title, text
+	r.own[id] = st
+	return st, nil
+}
+
+func (r *fakeStoryRepo) DeleteOwn(_ context.Context, userID, id uuid.UUID) error {
+	st, ok := r.own[id]
+	if !ok || st.UserID != userID || st.Source != domain.StorySourceUser {
+		return domain.ErrNotFound
+	}
+	delete(r.own, id)
 	return nil
 }
 
@@ -51,8 +96,9 @@ func (r *fakeStoryRepo) LearningLanguage(context.Context, uuid.UUID) (string, er
 	return "de", nil
 }
 func (r *fakeStoryRepo) Upsert(_ context.Context, s domain.DailyStory) (domain.DailyStory, error) {
-	s.ID = uuid.New()
+	s.ID, s.Source = uuid.New(), domain.StorySourceAI
 	r.saved = append(r.saved, s)
+	r.own[s.ID] = s
 	return s, nil
 }
 func (r *fakeStoryRepo) SaveCorrections(_ context.Context, _, _ uuid.UUID, cs []domain.StoryCorrection) error {

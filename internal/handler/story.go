@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -71,4 +72,86 @@ func (h *StoryHandler) ByDate(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, st)
+}
+
+// maxOwnStoryBody caps the request body of an own story (text ≤ 4000 + translation ≤ 8000 characters).
+const maxOwnStoryBody = 64 << 10
+
+// readOwnStory parses the body of POST/PUT /stories/own[/:id], at most maxOwnStoryBody bytes.
+func readOwnStory(c *gin.Context) (domain.OwnStoryInput, bool) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxOwnStoryBody)
+	var in domain.OwnStoryInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, errorResponse{Error: "request body too large"})
+		} else {
+			badRequest(c, "invalid JSON body")
+		}
+		return in, false
+	}
+	return in, true
+}
+
+// ByID handles GET /api/stories/by-id/:id — one story (AI or own) with the text; the translation is
+// resolved for the interface language (X-Native-Language).
+func (h *StoryHandler) ByID(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	ctx := c.Request.Context()
+	st, err := h.svc.ByID(ctx, userID(c), id, domain.TranslationLangFrom(ctx))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
+}
+
+// CreateOwn handles POST /api/stories/own {"title"?, "text", "translation_mode", "translation"?} → 201.
+func (h *StoryHandler) CreateOwn(c *gin.Context) {
+	in, ok := readOwnStory(c)
+	if !ok {
+		return
+	}
+	ctx := c.Request.Context()
+	st, err := h.svc.CreateOwnStory(ctx, userID(c), in, domain.TranslationLangFrom(ctx))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, st)
+}
+
+// UpdateOwn handles PUT /api/stories/own/:id. An AI story is a 404.
+func (h *StoryHandler) UpdateOwn(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	in, ok := readOwnStory(c)
+	if !ok {
+		return
+	}
+	ctx := c.Request.Context()
+	st, err := h.svc.UpdateOwnStory(ctx, userID(c), id, in, domain.TranslationLangFrom(ctx))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
+}
+
+// DeleteOwn handles DELETE /api/stories/own/:id → 204. An AI story is a 404.
+func (h *StoryHandler) DeleteOwn(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteOwnStory(c.Request.Context(), userID(c), id); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
