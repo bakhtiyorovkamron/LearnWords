@@ -15,6 +15,7 @@ import { DirectionToggle, useStoredChoice } from './DirectionToggle'
 import { FolderSelect } from './Folders'
 import { ReviewHero, TrainingHero } from './TrainingHero'
 import { SoundToggle } from './SoundToggle'
+import { ErrorState } from './ErrorState'
 import { playAnswer, playSound } from '../lib/sounds'
 
 const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
@@ -175,7 +176,7 @@ export function ReviewSession() {
   }
 
   if (due.isLoading || pool.isLoading) return <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />
-  if (due.error) return <p className="text-red-300">{errorMessage(due.error)}</p>
+  if (due.error) return <ErrorState error={due.error} />
 
   const chooseFolder = (v: string) => {
     setFolder(v)

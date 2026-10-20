@@ -6,6 +6,7 @@ import { errorMessage, isRateLimited, rateLimitMessage } from "../api/client";
 import { dateLocale } from '../i18n'
 import { useLearningLang } from '../lib/learningLang'
 import { highlightStory } from '../lib/storyHighlight'
+import { ErrorState } from '../components/ErrorState'
 
 // story.date is YYYY-MM-DD; parse as a local date so it doesn't shift by timezone.
 function formatDate(iso: string) {
@@ -137,7 +138,7 @@ export function StoryPage() {
           </>
         )}
         {gen.error && <p className="text-red-300">{genError(gen.error)}</p>}
-        {today.error && <p className="text-red-300">{errorMessage(today.error)}</p>}
+        {today.error && <ErrorState error={today.error} />}
       </section>
 
       {story && <StoryView story={story} />}

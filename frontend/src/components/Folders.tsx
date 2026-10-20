@@ -9,6 +9,7 @@ import type { Folder, FolderSelection, FolderStats } from '../api/types'
 import { useLearningLang } from '../lib/learningLang'
 import { STATUS_STYLE } from './ProgressDots'
 import { toast } from './Toaster'
+import { ErrorState } from './ErrorState'
 import { ShareFolderModal } from './ShareFolderModal'
 
 export const FOLDER_COLORS = ['lime', 'amber', 'sky', 'rose', 'violet', 'slate'] as const
@@ -395,7 +396,7 @@ export function FolderGrid() {
       </div>
     )
   }
-  if (list.error) return <p className="text-red-300">{errorMessage(list.error)}</p>
+  if (list.error) return <ErrorState error={list.error} />
   if (!list.data) return null
 
   const { all, folders } = list.data

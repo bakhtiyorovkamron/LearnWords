@@ -14,6 +14,7 @@ import { WordFixes } from '../components/WordFixes'
 import { FolderPicker } from '../components/FolderPicker'
 import { toast } from '../components/Toaster'
 import { useMoveWords } from '../lib/moveWords'
+import { ErrorState } from '../components/ErrorState'
 
 const PAGE = 48
 const VIEW_KEY = 'collection-view'
@@ -199,7 +200,7 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
           ))}
         </div>
       )}
-      {query.error && <p className="text-red-300">{errorMessage(query.error)}</p>}
+      {query.error && <ErrorState error={query.error} />}
 
       <div className={`transition-opacity ${query.isPlaceholderData ? 'opacity-50' : ''}`}>
         {view === 'list' ? (

@@ -6,6 +6,7 @@ import { authApi, LEARNING_LANGS, type LearningLang } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { Logo } from '../components/Layout'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
+import { ContactLinks } from '../components/ContactLinks'
 
 // German words are learning content (not translated); only their glosses come from i18n.
 const floating = [
@@ -76,6 +77,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </div>
         </div>
 
+        <div className="space-y-4">
         <form onSubmit={submit} className="glass animate-rise space-y-4 p-8 md:p-10">
           <h2 className="display text-2xl font-extrabold">{isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}</h2>
           <p className="text-sm text-emerald-100/60">
@@ -122,6 +124,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             </Link>
           </p>
         </form>
+        <p className="text-center text-sm text-emerald-100/60">{t('contact.loginProblem')} <ContactLinks /></p>
+        </div>
       </div>
     </div>
   )

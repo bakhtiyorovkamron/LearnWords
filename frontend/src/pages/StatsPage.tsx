@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { statsApi } from '../api/endpoints'
-import { errorMessage } from '../api/client'
 import { HeroPanel } from '../components/HeroPanel'
 import { ReviewsChart } from '../components/ReviewsChart'
+import { ErrorState } from '../components/ErrorState'
 
 export function StatsPage() {
   const { t } = useTranslation()
@@ -59,7 +59,7 @@ export function StatsPage() {
         </div>
 
         {isLoading && <div className="h-56 animate-pulse rounded-2xl bg-emerald-800/30" />}
-        {error && <p className="text-red-300">{errorMessage(error)}</p>}
+        {error && <ErrorState error={error} />}
         {data && (
           <>
             <ReviewsChart data={data.daily} />
