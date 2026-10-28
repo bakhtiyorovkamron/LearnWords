@@ -14,14 +14,15 @@ import (
 var pngBytes = append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 64)...)
 
 type fakeReader struct {
-	words []domain.PhotoWord
-	err   error
-	calls int
+	words  []domain.PhotoWord
+	status string // "" = ok
+	err    error
+	calls  int
 }
 
-func (f *fakeReader) ExtractPhotoWords(context.Context, []byte, string) ([]domain.PhotoWord, error) {
+func (f *fakeReader) ExtractPhotoWords(context.Context, []byte, string) (domain.PhotoReading, error) {
 	f.calls++
-	return f.words, f.err
+	return domain.PhotoReading{Status: f.status, Words: f.words}, f.err
 }
 
 type fakeExists map[string]bool
@@ -155,4 +156,54 @@ func TestPhotoImport_CapsTheList(t *testing.T) {
 	if err != nil || len(res.Words) != maxPhotoWords {
 		t.Errorf("%d words, %v", len(res.Words), err)
 	}
+}
+
+func TestPhotoImport_RejectedPhotoIsRefunded(t *testing.T) {
+	ctx := context.Background()
+	for status, want := range map[string]error{
+		domain.PhotoNotDocument: domain.ErrPhotoNotDocument,
+		domain.PhotoUnreadable:  domain.ErrPhotoUnreadable,
+	} {
+		e := newPhotoEnv([]domain.PhotoWord{{Word: "Hund", Translation: "собака"}}, nil)
+		e.ai.status = status
+		// one good photo first, so "unchanged" is not just zero
+		e.ai.status = ""
+		if _, err := e.svc.Import(ctx, e.user, pngBytes); err != nil {
+			t.Fatal(err)
+		}
+		e.ai.status = status
+		if _, err := e.svc.Import(ctx, e.user, pngBytes); !errors.Is(err, want) {
+			t.Fatalf("%s: %v", status, err)
+		}
+		if e.ai.calls != 2 || e.used(t) != 1 {
+			t.Errorf("%s: calls %d, used %d — the rejected photo must not stay charged", status, e.ai.calls, e.used(t))
+		}
+		st, _ := e.feats.State(ctx, e.user, domain.FeaturePhotoImport)
+		if *st.Remaining != 3 {
+			t.Errorf("%s: remaining %d, want 3", status, *st.Remaining)
+		}
+	}
+}
+
+func TestPhotoImport_RefundIsCalledOnce(t *testing.T) {
+	q := &countingQuota{}
+	svc := NewPhotoImportService(&fakeReader{status: domain.PhotoUnreadable}, fakeExists{}, q)
+	if _, err := svc.Import(context.Background(), uuid.New(), pngBytes); !errors.Is(err, domain.ErrPhotoUnreadable) {
+		t.Fatal(err)
+	}
+	if q.consumed != 1 || q.refunded != 1 {
+		t.Errorf("consumed %d, refunded %d", q.consumed, q.refunded)
+	}
+}
+
+type countingQuota struct{ consumed, refunded int }
+
+func (q *countingQuota) Consume(context.Context, uuid.UUID, string, int) (*int, error) {
+	q.consumed++
+	n := 3
+	return &n, nil
+}
+func (q *countingQuota) Refund(context.Context, uuid.UUID, string, int) error {
+	q.refunded++
+	return nil
 }

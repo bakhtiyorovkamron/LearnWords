@@ -20,7 +20,7 @@ const maxPhotoWords = 50
 
 // PhotoReader reads the vocabulary off an image. The learning and translation languages come from ctx.
 type PhotoReader interface {
-	ExtractPhotoWords(ctx context.Context, image []byte, mediaType string) ([]domain.PhotoWord, error)
+	ExtractPhotoWords(ctx context.Context, image []byte, mediaType string) (domain.PhotoReading, error)
 }
 
 // PhotoQuota is the user's daily photo quota (FeatureService).
@@ -63,13 +63,21 @@ func (s *PhotoImportService) Import(ctx context.Context, userID uuid.UUID, image
 	if err != nil {
 		return nil, err
 	}
-	found, err := s.ai.ExtractPhotoWords(ctx, image, mediaType)
+	reading, err := s.ai.ExtractPhotoWords(ctx, image, mediaType)
 	if err != nil {
-		if rerr := s.quota.Refund(context.WithoutCancel(ctx), userID, domain.FeaturePhotoImport, 1); rerr != nil {
-			slog.ErrorContext(ctx, "photo import: refund failed", "user_id", userID, "err", rerr)
-		}
+		s.refund(ctx, userID)
 		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
+	// A photo the AI cannot use is rejected like a failed call: the unit is given back.
+	switch reading.Status {
+	case domain.PhotoNotDocument:
+		s.refund(ctx, userID)
+		return nil, domain.ErrPhotoNotDocument
+	case domain.PhotoUnreadable:
+		s.refund(ctx, userID)
+		return nil, domain.ErrPhotoUnreadable
+	}
+	found := reading.Words
 
 	words, err := s.clean(ctx, userID, found)
 	if err != nil {
@@ -77,6 +85,13 @@ func (s *PhotoImportService) Import(ctx context.Context, userID uuid.UUID, image
 	}
 	slog.InfoContext(ctx, "photo-import", "user_id", userID, "found", len(found), "words", len(words))
 	return &domain.PhotoImportResult{Words: words, Remaining: remaining}, nil
+}
+
+// refund gives the photo's quota unit back (also when the request was cancelled).
+func (s *PhotoImportService) refund(ctx context.Context, userID uuid.UUID) {
+	if err := s.quota.Refund(context.WithoutCancel(ctx), userID, domain.FeaturePhotoImport, 1); err != nil {
+		slog.ErrorContext(ctx, "photo import: refund failed", "user_id", userID, "err", err)
+	}
 }
 
 // clean trims the AI's list: drops entries without a word or translation and duplicates, caps the

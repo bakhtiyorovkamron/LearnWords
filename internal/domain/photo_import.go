@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 // PhotoWord is a word read off a photo, not saved yet. Saved by the user through the usual
 // "add word" call (POST /search-word/add) with FullWord and Translation.
@@ -30,3 +33,22 @@ func (w PhotoWord) Full() string {
 	}
 	return strings.TrimSpace(w.Word)
 }
+
+// What the AI decided about a photo.
+const (
+	PhotoOK          = "ok"
+	PhotoNotDocument = "not_document" // no learning material / no text in the learning language
+	PhotoUnreadable  = "unreadable"   // text is there but too small, blurred, cut off or skewed
+)
+
+// PhotoReading is the AI's answer for a photo: its verdict and, for "ok", the words.
+type PhotoReading struct {
+	Status string
+	Words  []PhotoWord
+}
+
+// A rejected photo is never charged (the quota unit is given back).
+var (
+	ErrPhotoNotDocument = errors.New("photo is not study material")
+	ErrPhotoUnreadable  = errors.New("photo text is unreadable")
+)

@@ -5,8 +5,14 @@ import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { foldersApi, meApi, photoApi, searchApi, type Me, type PhotoWord } from '../api/endpoints'
+import * as photoLib from '../lib/photo'
 import * as toaster from './Toaster'
 import { PhotoImport } from './PhotoImport'
+
+vi.mock('../lib/photo', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../lib/photo')>()
+  return { ...mod, preparePhoto: vi.fn(mod.preparePhoto) }
+})
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
@@ -222,5 +228,55 @@ describe('PhotoImport: folder', () => {
     renderIt()
     await readPhoto()
     expect(screen.queryByRole('radio', { name: 'Existing folder' })).toBeNull()
+  })
+})
+
+describe('PhotoImport: rejected photos', () => {
+  const NOT_CHARGED = 'Your daily limit was not used.'
+
+  it.each([
+    ['too_small', 'The photo is too small — take it closer to the page.'],
+    ['too_dark', 'Too dark — take the photo in good light.'],
+    ['blurry', 'The photo is blurry — hold the phone steady and try again.'],
+  ] as const)('a %s photo is stopped on the device: message, "not charged", no request', async (reason, text) => {
+    vi.mocked(photoLib.preparePhoto).mockRejectedValueOnce(new photoLib.PhotoQualityError(reason))
+    renderIt()
+    await pick(png())
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(text)
+    expect(alert.textContent).toContain(NOT_CHARGED)
+    expect(photoApi.import).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['photo_not_document', 'No study text in this photo — take a picture of a textbook page or a word list.'],
+    ['photo_unreadable', "The text can't be read — take the photo closer and straighter."],
+  ])('the server\'s 422 %s gets its text, "not charged", and refreshes the quota', async (code, text) => {
+    vi.mocked(photoApi.import).mockRejectedValue(fail(422, { error: 'x', code }))
+    renderIt()
+    await screen.findByText('Left today: 4 of 4')
+    vi.mocked(meApi.get).mockClear()
+    await pick(png())
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(text)
+    expect(alert.textContent).toContain(NOT_CHARGED)
+    await waitFor(() => expect(meApi.get).toHaveBeenCalled()) // /me re-read: the shown quota stays right
+  })
+
+  it('a device-side rejection does not re-read /me (nothing was used)', async () => {
+    vi.mocked(photoLib.preparePhoto).mockRejectedValueOnce(new photoLib.PhotoQualityError('blurry'))
+    renderIt()
+    await screen.findByText('Left today: 4 of 4')
+    vi.mocked(meApi.get).mockClear()
+    await pick(png())
+    await screen.findByRole('alert')
+    expect(meApi.get).not.toHaveBeenCalled()
+  })
+
+  it('other errors do not say the limit was not used', async () => {
+    vi.mocked(photoApi.import).mockRejectedValue(fail(502, { error: 'upstream' }))
+    renderIt()
+    await pick(png())
+    expect((await screen.findByRole('alert')).textContent).not.toContain(NOT_CHARGED)
   })
 })

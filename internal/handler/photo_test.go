@@ -16,11 +16,12 @@ import (
 
 var png = append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 64)...)
 
-type okReader struct{}
+// okReader answers with one word; a non-empty status makes it reject the photo instead.
+type okReader struct{ status string }
 
-func (okReader) ExtractPhotoWords(context.Context, []byte, string) ([]domain.PhotoWord, error) {
+func (r okReader) ExtractPhotoWords(context.Context, []byte, string) (domain.PhotoReading, error) {
 	art := "der"
-	return []domain.PhotoWord{{Word: "Hund", Article: &art, WordType: "noun", Translation: "собака"}}, nil
+	return domain.PhotoReading{Status: r.status, Words: []domain.PhotoWord{{Word: "Hund", Article: &art, WordType: "noun", Translation: "собака"}}}, nil
 }
 
 type noWords struct{}
@@ -99,5 +100,30 @@ func TestPhotoImport_Errors(t *testing.T) {
 	w = upload(r, "image", png)
 	if m := decode(t, w); w.Code != 403 || m["code"] != "feature_disabled" {
 		t.Errorf("disabled: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestPhotoImport_RejectedPhotoIs422_AndNotCharged(t *testing.T) {
+	for status, code := range map[string]string{
+		domain.PhotoNotDocument: "photo_not_document",
+		domain.PhotoUnreadable:  "photo_unreadable",
+	} {
+		gin.SetMode(gin.TestMode)
+		user := uuid.New()
+		feats := service.NewFeatureService(&memFeatures{ov: map[string]domain.FeatureOverride{}})
+		r := gin.New()
+		r.Use(func(c *gin.Context) { c.Set(userIDKey, user) }, NativeLang())
+		r.POST("/photo-import", NewPhotoHandler(service.NewPhotoImportService(okReader{status: status}, noWords{}, feats)).Import)
+
+		for range 6 { // more than the daily limit of 4: rejected photos never use it up
+			w := upload(r, "image", png)
+			if m := decode(t, w); w.Code != 422 || m["code"] != code {
+				t.Fatalf("%s: %d %s", status, w.Code, w.Body)
+			}
+		}
+		st, _ := feats.State(context.Background(), user, domain.FeaturePhotoImport)
+		if st.UsedToday != 0 || *st.Remaining != 4 {
+			t.Errorf("%s: %+v", status, st)
+		}
 	}
 }

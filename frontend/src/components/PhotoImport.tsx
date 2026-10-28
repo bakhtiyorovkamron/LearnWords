@@ -6,7 +6,7 @@ import { foldersApi, photoApi, searchApi, type PhotoImportResult, type PhotoWord
 import { apiErrorInfo, errorMessage, isFeatureError } from '../api/client'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
-import { MAX_PHOTO_BYTES, isPhotoType, preparePhoto } from '../lib/photo'
+import { PhotoQualityError, isPhotoType, preparePhoto } from '../lib/photo'
 import { FOLDER_COLORS, FolderSelect, useFolders } from './Folders'
 import { toast } from './Toaster'
 
@@ -15,6 +15,13 @@ import { toast } from './Toaster'
  * chosen ones. One photo costs one unit of the daily quota (shown); the words are saved only when
  * the user confirms, through the same call as the search page.
  */
+// Which message a rejected photo gets: by the on-device verdict, or by the server's 422 code.
+const REJECTIONS = { too_small: 'photo.errTooSmall', too_dark: 'photo.errTooDark', blurry: 'photo.errBlurry' } as const
+const REJECTION_CODES: Record<string, string> = {
+  photo_not_document: 'photo.errNotDocument',
+  photo_unreadable: 'photo.errUnreadable',
+}
+
 /** Today as dd.MM — the default folder is named after the lesson day. */
 function todayLabel(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0')
@@ -46,7 +53,9 @@ export function PhotoImport() {
       setPicked(new Set(r.words.filter((w) => !w.already_added).map((w) => w.full_word)))
       void qc.invalidateQueries({ queryKey: ['me'] }) // the quota left
     },
-    onError: () => void qc.invalidateQueries({ queryKey: ['me'] }),
+    // A photo rejected on this device never reached the server — nothing to refresh. A server-side
+    // rejection (422) was refunded: the refresh keeps the shown quota correct.
+    onError: (e) => { if (!(e instanceof PhotoQualityError)) void qc.invalidateQueries({ queryKey: ['me'] }) },
   })
 
   const add = useMutation({
@@ -135,9 +144,12 @@ export function PhotoImport() {
   const chosen = (result?.words ?? []).filter((w) => picked.has(w.full_word) && !saved.has(w.full_word))
   const err = read.error ?? add.error
   let shown: string | null = localError
+  // Photos rejected before or after the AI look: the daily limit was not used.
+  const rejection = err instanceof PhotoQualityError ? REJECTIONS[err.reason] : REJECTION_CODES[apiErrorInfo(err).code ?? '']
   if (err && !localError) {
     const status = apiErrorInfo(err).status
-    shown = isFeatureError(err) ? errorMessage(err)
+    shown = rejection ? t(rejection)
+      : isFeatureError(err) ? errorMessage(err)
       : status === 503 ? t('photo.notConfigured')
       : status === 413 ? t('photo.tooLarge')
       : t('photo.failed', { error: errorMessage(err) })
@@ -222,7 +234,12 @@ export function PhotoImport() {
         </div>
       ))}
 
-      {shown && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">{shown}</p>}
+      {shown && (
+        <div role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
+          <p>{shown}</p>
+          {rejection && !localError && <p className="mt-1 text-red-200/70">{t('photo.notCharged')}</p>}
+        </div>
+      )}
     </section>
   )
 }

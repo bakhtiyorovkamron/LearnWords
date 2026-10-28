@@ -49,6 +49,12 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrLangMismatch):
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "folder language does not match your learning language", Code: "lang_mismatch"})
 		return
+	case errors.Is(err, domain.ErrPhotoNotDocument):
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "no study text in the photo", Code: "photo_not_document"})
+		return
+	case errors.Is(err, domain.ErrPhotoUnreadable):
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "the text in the photo cannot be read", Code: "photo_unreadable"})
+		return
 	case errors.Is(err, domain.ErrFeatureDisabled):
 		c.AbortWithStatusJSON(http.StatusForbidden, errorResponse{Error: "this feature is disabled for your account", Code: "feature_disabled"})
 		return

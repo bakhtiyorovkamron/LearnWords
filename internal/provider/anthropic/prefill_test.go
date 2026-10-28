@@ -92,7 +92,7 @@ func TestParsers_AcceptPlainFencedAndChattyAnswers(t *testing.T) {
 		"text first": func(s string) string { return "Here is the result:\n" + s + "\nHope it helps!" },
 	}
 	for name, w := range wrap {
-		if got, err := parsePhotoWords(w(photo)); err != nil || len(got) != 1 || got[0].Word != "Hund" {
+		if got, err := parsePhotoWords(w(photo)); err != nil || len(got.Words) != 1 || got.Words[0].Word != "Hund" {
 			t.Errorf("photo/%s: %v %v", name, got, err)
 		}
 		if got, err := parseWordCheck(w(check)); err != nil || got.Lemma != "Hund" {

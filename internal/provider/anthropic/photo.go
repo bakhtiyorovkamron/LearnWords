@@ -21,7 +21,13 @@ const (
 )
 
 const photoPrompt = `The photo shows learning material (a textbook page, a word list, a board, a notebook) for a learner of {{target}}.
-Extract the vocabulary worth learning: words and short fixed phrases in {{target}} that appear in the photo.
+First decide what the photo is, and put it in "status":
+- "ok": study material (textbook page, word list, board, notebook) with readable {{target}} text.
+- "not_document": no learning material or no text in {{target}} at all (a selfie, an animal, a street, a screenshot of an app without study text, ...).
+- "unreadable": there is text, but it is too small, blurred, cut off or skewed to read reliably.
+For "not_document" and "unreadable" return "words": [] immediately and nothing else.
+
+For "ok", extract the vocabulary worth learning: words and short fixed phrases in {{target}} that appear in the photo.
 
 Rules:
 1) Give each word in its base form: nouns in the nominative singular, verbs in the infinitive, adjectives in the base form. Keep a short phrase as it is.
@@ -33,7 +39,7 @@ Rules:
 7) If there is nothing to learn in the photo, return an empty list.
 
 Return ONLY this JSON:
-{"words":[{"word":"","article":null,"word_type":"noun|verb|adjective|adverb|phrase|other","translation":""}]}`
+{"status":"ok|not_document|unreadable","words":[{"word":"","article":null,"word_type":"noun|verb|adjective|adverb|phrase|other","translation":""}]}`
 
 func buildPhotoPrompt(learningLang, nativeLang string) string {
 	return strings.NewReplacer(
@@ -45,7 +51,7 @@ func buildPhotoPrompt(learningLang, nativeLang string) string {
 
 // ExtractPhotoWords asks the model to read the vocabulary off the image (mediaType: image/jpeg|png|webp|gif).
 // The learning language is domain.LangFrom(ctx), the translation language domain.TranslationLangFrom(ctx).
-func (c *Client) ExtractPhotoWords(ctx context.Context, image []byte, mediaType string) ([]domain.PhotoWord, error) {
+func (c *Client) ExtractPhotoWords(ctx context.Context, image []byte, mediaType string) (domain.PhotoReading, error) {
 	content := []map[string]any{
 		{"type": "image", "source": map[string]string{
 			"type": "base64", "media_type": mediaType, "data": base64.StdEncoding.EncodeToString(image),
@@ -54,20 +60,27 @@ func (c *Client) ExtractPhotoWords(ctx context.Context, image []byte, mediaType 
 	}
 	text, err := c.completeMessages(ctx, c.model, []message{{Role: "user", Content: content}}, searchPrefill, photoMaxTokens, photoTimeout)
 	if err != nil {
-		return nil, err
+		return domain.PhotoReading{}, err
 	}
 	return parsePhotoWords(text)
 }
 
-func parsePhotoWords(s string) ([]domain.PhotoWord, error) {
+// parsePhotoWords reads the model's answer. A missing or unknown status counts as "ok" (older
+// answers had none); a rejected photo carries no words.
+func parsePhotoWords(s string) (domain.PhotoReading, error) {
 	s = extractJSONObject(s)
 	var out struct {
-		Words []domain.PhotoWord `json:"words"`
+		Status string             `json:"status"`
+		Words  []domain.PhotoWord `json:"words"`
 	}
 	if err := json.Unmarshal([]byte(s), &out); err != nil {
 		if err2 := json.Unmarshal([]byte(repairJSONStrings(s)), &out); err2 != nil {
-			return nil, fmt.Errorf("parse photo words json: %w", err)
+			return domain.PhotoReading{}, fmt.Errorf("parse photo words json: %w", err)
 		}
 	}
-	return out.Words, nil
+	switch status := strings.ToLower(strings.TrimSpace(out.Status)); status {
+	case domain.PhotoNotDocument, domain.PhotoUnreadable:
+		return domain.PhotoReading{Status: status}, nil
+	}
+	return domain.PhotoReading{Status: domain.PhotoOK, Words: out.Words}, nil
 }
