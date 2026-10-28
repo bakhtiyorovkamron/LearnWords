@@ -76,8 +76,9 @@ type request struct {
 }
 
 type message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role string `json:"role"`
+	// Content is a plain string, or a list of content blocks (text, image) for vision requests.
+	Content any `json:"content"`
 }
 
 type response struct {

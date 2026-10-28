@@ -87,6 +87,7 @@ func run() error {
 	var wordChecker service.WordChecker
 	var wordLookup service.WordLookup
 	var wordTranslator service.WordTranslator
+	var photoReader service.PhotoReader
 
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 		ai := anthropic.New(key, os.Getenv("ANTHROPIC_MODEL"))
@@ -97,6 +98,7 @@ func run() error {
 		wordChecker = ai
 		wordLookup = ai
 		wordTranslator = ai
+		photoReader = ai
 	} else {
 		slog.Warn("ANTHROPIC_API_KEY is not set: example, story, word search and translation generation are disabled")
 	}
@@ -153,6 +155,7 @@ func run() error {
 		Folders:      handler.NewFolderHandler(folderRepo),
 		Shared:       handler.NewSharedHandler(folderRepo),
 		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
+		Photo:        handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
 		Hero:         handler.NewHeroHandler(heroSvc),
 		UserStatus:   adminRepo,

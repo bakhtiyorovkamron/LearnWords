@@ -16,8 +16,9 @@ import (
 )
 
 type memFeatures struct {
-	mu sync.Mutex
-	ov map[string]domain.FeatureOverride
+	mu    sync.Mutex
+	ov    map[string]domain.FeatureOverride
+	count map[string]int // feature → used (one day is enough for these tests)
 }
 
 func (r *memFeatures) Overrides(context.Context, uuid.UUID) (map[string]domain.FeatureOverride, error) {
@@ -30,12 +31,32 @@ func (r *memFeatures) Overrides(context.Context, uuid.UUID) (map[string]domain.F
 	return out, nil
 }
 func (r *memFeatures) Usage(context.Context, uuid.UUID, string) (map[string]int, error) {
-	return map[string]int{}, nil
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := map[string]int{}
+	for k, v := range r.count {
+		out[k] = v
+	}
+	return out, nil
 }
-func (r *memFeatures) Consume(context.Context, uuid.UUID, string, string, int, int) (int, bool, error) {
-	return 1, true, nil
+func (r *memFeatures) Consume(_ context.Context, _ uuid.UUID, f, _ string, n, limit int) (int, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.count[f]+n > limit {
+		return 0, false, nil
+	}
+	if r.count == nil {
+		r.count = map[string]int{}
+	}
+	r.count[f] += n
+	return r.count[f], true, nil
 }
-func (r *memFeatures) Refund(context.Context, uuid.UUID, string, string, int) error { return nil }
+func (r *memFeatures) Refund(_ context.Context, _ uuid.UUID, f, _ string, n int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.count[f] = max(r.count[f]-n, 0)
+	return nil
+}
 func (r *memFeatures) SetOverride(_ context.Context, _ uuid.UUID, f string, en bool, l *int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

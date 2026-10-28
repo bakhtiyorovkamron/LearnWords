@@ -29,6 +29,7 @@ type RouterDeps struct {
 	Folders      *FolderHandler
 	Shared       *SharedHandler
 	Search       *SearchHandler
+	Photo        *PhotoHandler
 	Translations *TranslationHandler
 	Hero         *HeroHandler
 	Practice     *PracticeHandler
@@ -47,6 +48,7 @@ const (
 	checkPerUserPerMin   = 40  // word check while typing (debounced; repeats come from the cache)
 	sharedPerIPPerMin    = 30  // public shared-folder preview, by IP
 	importPerUserPerMin  = 10  // importing a shared folder
+	photoPerUserPerMin   = 5   // photo import (also capped by the daily photo_import quota)
 	generalPerUserPerMin = 100 // everything else under /api
 )
 
@@ -68,9 +70,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	translateLimit := RateLimitByUser(NewRateLimiter(ctx, "translate", aiPerUserPerMin, time.Minute))
 	sharedLimit := RateLimitByIP(NewRateLimiter(ctx, "shared", sharedPerIPPerMin, time.Minute))
 	importLimit := RateLimitByUser(NewRateLimiter(ctx, "shared-import", importPerUserPerMin, time.Minute))
+	photoLimit := RateLimitByUser(NewRateLimiter(ctx, "photo-import", photoPerUserPerMin, time.Minute))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
-		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations", "/api/words/check")
+		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations", "/api/words/check", "/api/photo-import")
 
 	r.Use(
 		Recovery(),
@@ -131,6 +134,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/shared/:token/import", importLimit, d.Shared.Import)
 		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
+		protected.POST("/photo-import", photoLimit, d.Photo.Import)
 		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)
 		protected.POST("/words/check", checkLimit, d.WordCheck.Check)
 		protected.GET("/word-fixes", d.WordCheck.ListFixes)

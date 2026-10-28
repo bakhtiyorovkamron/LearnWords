@@ -317,7 +317,11 @@ func (c *Client) complete(ctx context.Context, prompt string, maxTokens int, tim
 // as the start of the assistant's answer and prepended to the returned text (the API doesn't echo it).
 // Transient failures (network, 429, 5xx, truncated output) are wrapped in retryableError.
 func (c *Client) completeWith(ctx context.Context, model, prompt, prefill string, maxTokens int, timeout time.Duration) (string, error) {
-	msgs := []message{{Role: "user", Content: prompt}}
+	return c.completeMessages(ctx, model, []message{{Role: "user", Content: prompt}}, prefill, maxTokens, timeout)
+}
+
+// completeMessages is completeWith for a prepared conversation (e.g. one with an image block).
+func (c *Client) completeMessages(ctx context.Context, model string, msgs []message, prefill string, maxTokens int, timeout time.Duration) (string, error) {
 	if prefill != "" {
 		msgs = append(msgs, message{Role: "assistant", Content: prefill})
 	}
