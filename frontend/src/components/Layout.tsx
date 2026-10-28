@@ -15,6 +15,10 @@ import { adoptServerSounds, adoptServerUiSounds } from '../lib/sounds'
 import { usePageSounds } from '../lib/pageSounds'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
+import { isTrainingOpen } from '../lib/pageSounds'
+import { FeedbackModal } from './FeedbackModal'
+
+export const FEEDBACK_DELAY_MS = 3000
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -67,6 +71,19 @@ export function Layout() {
   }, [])
 
   usePageSounds() // page-turn rustle between sections
+
+  // The one-time rating window: 3 seconds after the page loads, and never in the middle of a training.
+  const [feedbackDue, setFeedbackDue] = useState(false)
+  const askFeedback = me.data?.ask_feedback === true
+  useEffect(() => {
+    if (!askFeedback) return
+    let poll: ReturnType<typeof setInterval> | undefined
+    const timer = setTimeout(() => {
+      if (!isTrainingOpen()) return setFeedbackDue(true)
+      poll = setInterval(() => { if (!isTrainingOpen()) { clearInterval(poll); setFeedbackDue(true) } }, 1000)
+    }, FEEDBACK_DELAY_MS)
+    return () => { clearTimeout(timer); clearInterval(poll) }
+  }, [askFeedback])
 
   useEffect(() => setMoreOpen(false), [pathname])
   useEffect(() => {
@@ -170,6 +187,7 @@ export function Layout() {
       </nav>
 
       <Toaster />
+      {askFeedback && feedbackDue && <FeedbackModal />}
       <StageUpOverlay />
       <HeroIntroOverlay />
       <InstallBanner />

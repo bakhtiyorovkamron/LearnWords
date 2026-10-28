@@ -285,6 +285,7 @@ export type MeFeatures = Record<FeatureName, { enabled: boolean; daily_limit: nu
 export interface Me {
   id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang
   features?: MeFeatures
+  ask_feedback?: boolean // ask for a rating once (account ≥ 2 days old, not answered yet)
 }
 
 export const meApi = {
@@ -321,6 +322,16 @@ export const heroApi = {
 export interface AdminUser {
   id: string; email: string; role: 'user' | 'admin'; is_banned: boolean
   created_at: string; words_count: number; last_activity_at: string | null
+  rating?: number | null // the user's feedback rating
+}
+
+export interface FeedbackItem { email: string; rating: number; comment: string; created_at: string }
+export interface FeedbackSummary { average: number; count: number; items: FeedbackItem[] }
+
+export const feedbackApi = {
+  // Only the first answer counts on the server.
+  submit: (rating: number, comment: string) => api.post('/feedback', { rating, comment }),
+  dismiss: () => api.post('/feedback/dismiss'),
 }
 
 export interface AdminStats {
@@ -333,6 +344,7 @@ export interface AdminStats {
 export const adminApi = {
   users: () => api.get<{ users: AdminUser[] }>('/admin/users').then((r) => r.data.users),
   stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
+  feedback: () => api.get<FeedbackSummary>('/admin/feedback').then((r) => r.data),
   remove: (id: string) => api.delete(`/admin/users/${id}`),
   setBanned: (id: string, banned: boolean) => api.patch(`/admin/users/${id}/ban`, { banned }),
   userFeatures: (id: string) =>

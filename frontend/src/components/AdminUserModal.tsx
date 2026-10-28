@@ -29,6 +29,7 @@ export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: ()
           <div className="mt-2 space-y-0.5 text-sm text-emerald-100/70">
             <p>{t('admin.userCard.registered', { date: date(user.created_at) })}</p>
             <p>{t('admin.userCard.words', { n: user.words_count })}</p>
+            {user.rating ? <p>{t('admin.feedback.userRating', { rating: user.rating })}</p> : null}
             <p>{t('admin.userCard.lastActive', { date: user.last_activity_at ? date(user.last_activity_at) : t('admin.userCard.never') })}</p>
           </div>
         </div>

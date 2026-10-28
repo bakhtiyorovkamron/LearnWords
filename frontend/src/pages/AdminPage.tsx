@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { adminApi, meApi, type AdminUser } from '../api/endpoints'
+import { adminApi, meApi, type AdminUser, type FeedbackSummary } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
 import { AdminUserModal } from '../components/AdminUserModal'
@@ -28,6 +28,7 @@ export function AdminPage() {
         <p className="mt-2 text-emerald-100/70">{t('admin.subtitle')}</p>
       </div>
       <StatsBlock />
+      <FeedbackBlock />
       <WordCheckJobPanel />
       <UsersTable myId={me.data!.id} />
     </div>
@@ -73,6 +74,7 @@ function WordCheckJobPanel() {
 function StatsBlock() {
   const { t } = useTranslation()
   const { data, error } = useQuery({ queryKey: ['admin', 'stats'], queryFn: adminApi.stats })
+  const feedback = useQuery({ queryKey: ['admin', 'feedback'], queryFn: adminApi.feedback })
   const v = (n?: number) => (n === undefined ? '—' : n)
   const cards = [
     { icon: '👥', value: v(data?.total_users), label: t('admin.stats.users'),
@@ -83,11 +85,13 @@ function StatsBlock() {
       hint: data ? t('admin.stats.answers', { count: data.total_reviews }) : '' },
     { icon: '📖', value: v(data?.total_stories), label: t('admin.stats.stories'),
       hint: data ? t('admin.stats.stories30d', { count: data.stories_30d }) : '' },
+    { icon: '⭐', value: feedback.data?.count ? feedback.data.average.toFixed(1) : '—', label: t('admin.feedback.tile'),
+      hint: feedback.data ? t('admin.feedback.count', { n: feedback.data.count }) : '' },
   ]
   return (
     <section>
       {error && <p className="mb-3 text-red-300">{errorMessage(error)}</p>}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {cards.map((c) => (
           <div key={c.icon} className="glass p-5 text-center">
             <div className="text-2xl">{c.icon}</div>
@@ -97,6 +101,30 @@ function StatsBlock() {
           </div>
         ))}
       </div>
+    </section>
+  )
+}
+
+/** The ratings users left, newest first. */
+function FeedbackBlock() {
+  const { t } = useTranslation()
+  const { data } = useQuery<FeedbackSummary>({ queryKey: ['admin', 'feedback'], queryFn: adminApi.feedback })
+  if (!data?.items.length) return null
+  return (
+    <section className="glass space-y-3 p-6">
+      <h2 className="display text-xl font-bold">{t('admin.feedback.title')} <span className="text-lime-300">({data.count})</span></h2>
+      <ul className="max-h-96 space-y-3 overflow-y-auto">
+        {data.items.map((f, i) => (
+          <li key={`${f.email}-${i}`} className="border-t border-emerald-400/10 pt-3 first:border-0 first:pt-0">
+            <div className="flex flex-wrap items-center gap-x-3 text-sm">
+              <span className="text-lime-300" aria-label={`${f.rating} / 5`}>{'★'.repeat(f.rating)}<span className="text-white/20">{'★'.repeat(5 - f.rating)}</span></span>
+              <span className="font-semibold">{f.email}</span>
+              <span className="text-xs text-emerald-100/50">{new Date(f.created_at).toLocaleDateString(dateLocale())}</span>
+            </div>
+            <p className={`mt-1 text-sm ${f.comment ? 'text-emerald-50' : 'text-emerald-100/40'}`}>{f.comment || t('admin.feedback.noComment')}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -59,6 +59,12 @@ describe('AdminUserModal', () => {
     expect(screen.getByText('today: 2')).toBeTruthy()
   })
 
+  it('shows the user\'s feedback rating when there is one', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(<QueryClientProvider client={qc}><AdminUserModal user={{ ...user, rating: 4 }} onClose={vi.fn()} /></QueryClientProvider>)
+    expect(screen.getByText('Rating: 4 ⭐')).toBeTruthy()
+  })
+
   it('toggling a feature saves at once, keeping the limit override', async () => {
     renderModal()
     fireEvent.click(await screen.findByRole('switch', { name: '📖 Daily story' }))

@@ -30,6 +30,7 @@ type RouterDeps struct {
 	Shared       *SharedHandler
 	Search       *SearchHandler
 	Photo        *PhotoHandler
+	Feedback     *FeedbackHandler
 	Translations *TranslationHandler
 	Hero         *HeroHandler
 	Practice     *PracticeHandler
@@ -135,6 +136,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
 		protected.POST("/photo-import", photoLimit, d.Photo.Import)
+		protected.POST("/feedback", d.Feedback.Submit)
+		protected.POST("/feedback/dismiss", d.Feedback.Dismiss)
 		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)
 		protected.POST("/words/check", checkLimit, d.WordCheck.Check)
 		protected.GET("/word-fixes", d.WordCheck.ListFixes)
@@ -167,6 +170,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	{
 		admin.GET("/users", d.Admin.Users)
 		admin.GET("/stats", d.Admin.Stats)
+		admin.GET("/feedback", d.Admin.Feedback)
 		admin.DELETE("/users/:id", d.Admin.DeleteUser)
 		admin.PATCH("/users/:id/ban", d.Admin.Ban)
 		admin.GET("/users/:id/features", d.Admin.UserFeatures)

@@ -86,7 +86,7 @@ func newFeatureEnv() featureEnv {
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set(userIDKey, user) }, NativeLang())
 	stories := NewStoryHandler(service.NewStoryService(nil, nil, nil, nil), feats)
-	admin := NewAdminHandler(nil, fakeUsers{known: map[uuid.UUID]bool{user: true}}, feats)
+	admin := NewAdminHandler(nil, fakeUsers{known: map[uuid.UUID]bool{user: true}}, feats, newMemFeedback())
 	r.POST("/stories/generate", stories.Generate)
 	r.POST("/stories/own", stories.CreateOwn)
 	r.PUT("/stories/own/:id", stories.UpdateOwn)

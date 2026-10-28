@@ -338,7 +338,8 @@
     "confirmDelete": "Delete {{email}} and ALL their data permanently?",
     "actionFailed": "Action failed: {{error}}",
     "nothingFound": "No users found",
-    "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "limitDefault": "default: {{n}}", "usedToday": "today: {{used}}", "saved": "Saved", "close": "Close"}
+    "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "limitDefault": "default: {{n}}", "usedToday": "today: {{used}}", "saved": "Saved", "close": "Close"},
+    "feedback": {"tile": "Average rating", "count": "reviews: {{n}}", "title": "Feedback", "noComment": "no comment", "userRating": "Rating: {{rating}} ⭐"}
   },
   "word": {"move": "Move to folder", "more": "Actions"},
   "folder": {"none": "No folder", "new": "+ New folder"},
@@ -348,6 +349,7 @@
   "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"},
   "sound": {"ui": "Interface sounds", "uiHint": "Taps and page turns", "on": "Sound on", "off": "Sound off"},
   "settings": {"sounds": "Training sounds"},
+  "feedback": {"title": "How do you like yodla?", "star": "{{n}} of 5", "placeholder": "What could be better? (optional)", "placeholderLow": "What went wrong? (optional)", "placeholderHigh": "What did you like? (optional)", "send": "Send", "thanks": "Thanks for your feedback! 💚"},
   "errors": {"saveFailed": "Couldn't save. Please try again.", "featureDisabled": "This feature is turned off for your account.", "dailyLimit": "Today's limit is used up — tomorrow you get {{limit}} again."},
   "photo": {"title": "Words from a photo", "hint": "Take a photo of a textbook page or a word list — we find the words and translate them. You choose which to add.", "choose": "📷 Choose a photo", "another": "📷 Another photo", "reading": "Reading the photo…", "left": "Left today: {{n}} of {{limit}}", "found": "Words found: {{n}}", "noWords": "No words to learn were found in the photo. Try a closer, sharper shot.", "have": "already added", "add": "Add {{count}}", "adding": "Adding…", "added": "Added: {{added}}. Already had: {{skipped}}", "notImage": "Please choose an image: JPEG, PNG, WebP or GIF.", "tooLarge": "The photo is too large (5 MB at most).", "notConfigured": "Reading photos is not available right now.", "failed": "Could not read the photo: {{error}}", "noneLeft": "No photos left today — {{limit}} again tomorrow", "folderNew": "📁 New folder", "folderExisting": "Existing folder", "folderName": "Folder name", "folderDefault": "Lesson — {{date}}", "addedTo": "Added to “{{folder}}”: {{added}}. Already there: {{skipped}}", "openFolder": "Open folder"},
   "features": {"photo_import": "📷 Textbook photo", "daily_story": "📖 Daily story", "word_search": "🔍 AI word search", "story_autotranslate": "✍️ Auto-translation of own stories"},

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -32,10 +33,12 @@ type AdminHandler struct {
 	store    AdminStore
 	users    UserGetter
 	features FeatureAdmin
+	feedback FeedbackStore
+	now      func() time.Time
 }
 
-func NewAdminHandler(store AdminStore, users UserGetter, features FeatureAdmin) *AdminHandler {
-	return &AdminHandler{store: store, users: users, features: features}
+func NewAdminHandler(store AdminStore, users UserGetter, features FeatureAdmin, feedback FeedbackStore) *AdminHandler {
+	return &AdminHandler{store: store, users: users, features: features, feedback: feedback, now: time.Now}
 }
 
 // Me handles GET /api/me — current user's id, email and role (used by the UI to show the admin link).
@@ -54,7 +57,23 @@ func (h *AdminHandler) Me(c *gin.Context) {
 	for _, st := range states {
 		features[st.Feature] = gin.H{"enabled": st.Enabled, "daily_limit": st.DailyLimit, "remaining": st.Remaining}
 	}
-	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role, "learning_language": u.LearningLanguage, "features": features})
+	ask, err := askFeedback(c.Request.Context(), h.feedback, u, h.now())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role, "learning_language": u.LearningLanguage,
+		"features": features, "ask_feedback": ask})
+}
+
+// Feedback handles GET /api/admin/feedback → {average, count, items} (ratings only, newest first).
+func (h *AdminHandler) Feedback(c *gin.Context) {
+	s, err := h.feedback.Summary(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, s)
 }
 
 // UserFeatures handles GET /api/admin/users/:id/features.
