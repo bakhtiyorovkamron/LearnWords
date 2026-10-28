@@ -8,7 +8,6 @@ import { HeroIntroOverlay } from './HeroIntroOverlay'
 import { InstallBanner, InstallMenuItem } from './InstallPrompt'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
-import { SoundToggle } from './SoundToggle'
 import { ContactLinks } from './ContactLinks'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
 import { adoptServerSounds, adoptServerUiSounds } from '../lib/sounds'
@@ -125,8 +124,6 @@ export function Layout() {
           <div className="ml-auto flex items-center gap-2">
             {learningBadge}
             <LanguageSwitcher />
-            <SoundToggle />
-            <SoundToggle variant="ui-icon" />
             <InstallMenuItem />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
           </div>
@@ -154,7 +151,6 @@ export function Layout() {
               {learningBadge}
               <LanguageSwitcher />
             </div>
-            <SoundToggle variant="row" />
             <InstallMenuItem className="btn-ghost w-full py-3" />
             <button onClick={logout} className="btn-ghost mt-2 w-full py-3">{t('nav.logout')}</button>
             <a href={CONTACT.instagram} {...EXTERNAL_LINK} className="mt-1 flex items-center justify-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white">
