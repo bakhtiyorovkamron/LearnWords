@@ -165,6 +165,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/stats", d.Admin.Stats)
 		admin.DELETE("/users/:id", d.Admin.DeleteUser)
 		admin.PATCH("/users/:id/ban", d.Admin.Ban)
+		admin.GET("/users/:id/features", d.Admin.UserFeatures)
+		admin.PUT("/users/:id/features/:feature", d.Admin.SetUserFeature)
 		admin.POST("/word-check", d.WordCheck.StartJob)
 		admin.GET("/word-check", d.WordCheck.JobStatus)
 	}

@@ -1,18 +1,39 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
 	"learnwords/internal/service"
 )
 
-type StoryHandler struct{ svc *service.StoryService }
+// FeatureGate checks that a feature is switched on for a user.
+type FeatureGate interface {
+	Require(ctx context.Context, userID uuid.UUID, feature string) error
+}
 
-func NewStoryHandler(svc *service.StoryService) *StoryHandler { return &StoryHandler{svc: svc} }
+type StoryHandler struct {
+	svc      *service.StoryService
+	features FeatureGate
+}
+
+func NewStoryHandler(svc *service.StoryService, features FeatureGate) *StoryHandler {
+	return &StoryHandler{svc: svc, features: features}
+}
+
+// require writes the error and returns false when the feature is off for the caller.
+func (h *StoryHandler) require(c *gin.Context, feature string) bool {
+	if err := h.features.Require(c.Request.Context(), userID(c), feature); err != nil {
+		writeError(c, err)
+		return false
+	}
+	return true
+}
 
 // Today handles GET /api/stories/today?native_language= → {story|null, words_today, genres}.
 // native_language = the user's UI/native language: the story's translation and word glosses
@@ -36,6 +57,9 @@ func (h *StoryHandler) Generate(c *gin.Context) {
 	var req struct {
 		Genre          string `json:"genre"`
 		NativeLanguage string `json:"native_language"`
+	}
+	if !h.require(c, domain.FeatureDailyStory) {
+		return
 	}
 	_ = c.ShouldBindJSON(&req)
 	ctx := domain.WithTranslationLang(c.Request.Context(), req.NativeLanguage)
@@ -115,6 +139,9 @@ func (h *StoryHandler) CreateOwn(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if in.TranslationMode == domain.TranslationAuto && !h.require(c, domain.FeatureStoryAutotranslate) {
+		return
+	}
 	ctx := c.Request.Context()
 	st, err := h.svc.CreateOwnStory(ctx, userID(c), in, domain.TranslationLangFrom(ctx))
 	if err != nil {
@@ -132,6 +159,9 @@ func (h *StoryHandler) UpdateOwn(c *gin.Context) {
 	}
 	in, ok := readOwnStory(c)
 	if !ok {
+		return
+	}
+	if in.TranslationMode == domain.TranslationAuto && !h.require(c, domain.FeatureStoryAutotranslate) {
 		return
 	}
 	ctx := c.Request.Context()

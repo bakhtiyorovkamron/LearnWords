@@ -9,15 +9,24 @@ import (
 	"learnwords/internal/service"
 )
 
-type SearchHandler struct{ svc *service.SearchService }
+type SearchHandler struct {
+	svc      *service.SearchService
+	features FeatureGate
+}
 
-func NewSearchHandler(svc *service.SearchService) *SearchHandler { return &SearchHandler{svc: svc} }
+func NewSearchHandler(svc *service.SearchService, features FeatureGate) *SearchHandler {
+	return &SearchHandler{svc: svc, features: features}
+}
 
 // Search handles POST /api/search-word {"query": "...", "native_language": "uz"|"ru"|"en"}.
 // native_language = the user's UI/native language: the query is most likely written in it and
 // translations come back in it. The learning language comes from the account (ActiveUser).
 // "translation_language" is accepted as an alias for older frontends.
 func (h *SearchHandler) Search(c *gin.Context) {
+	if err := h.features.Require(c.Request.Context(), userID(c), domain.FeatureWordSearch); err != nil {
+		writeError(c, err)
+		return
+	}
 	var req struct {
 		Query               string `json:"query"`
 		NativeLanguage      string `json:"native_language"`

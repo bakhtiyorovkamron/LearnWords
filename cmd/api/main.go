@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // Asia/Tashkent (daily limits) must resolve in the minimal Docker image
 
 	"github.com/gin-gonic/gin"
 
@@ -108,6 +109,7 @@ func run() error {
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)
+	featureSvc := service.NewFeatureService(postgres.NewFeatureRepository(pool))
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
 	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
@@ -142,15 +144,15 @@ func run() error {
 		Practice:     handler.NewPracticeHandler(reviewSvc),
 		WordCheck:    handler.NewWordCheckHandler(wordCheckSvc, wordFixSvc),
 		Stats:        handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
-		Stories:      handler.NewStoryHandler(storySvc),
+		Stories:      handler.NewStoryHandler(storySvc, featureSvc),
 		Settings:     handler.NewSettingsHandler(userRepo),
-		Admin:        handler.NewAdminHandler(adminRepo, userRepo),
+		Admin:        handler.NewAdminHandler(adminRepo, userRepo, featureSvc),
 		Collection:   handler.NewCollectionHandler(cardRepo),
 		WordEdit:     handler.NewWordEditHandler(cardRepo),
 		WordMove:     handler.NewWordMoveHandler(cardRepo),
 		Folders:      handler.NewFolderHandler(folderRepo),
 		Shared:       handler.NewSharedHandler(folderRepo),
-		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool))),
+		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
 		Hero:         handler.NewHeroHandler(heroSvc),
 		UserStatus:   adminRepo,

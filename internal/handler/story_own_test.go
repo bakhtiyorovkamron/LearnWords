@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -18,7 +19,7 @@ func ownStoryRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set(userIDKey, uuid.New()) }, NativeLang())
-	h := NewStoryHandler(service.NewStoryService(nil, nil, nil, nil))
+	h := NewStoryHandler(service.NewStoryService(nil, nil, nil, nil), allowAll{})
 	r.POST("/stories/own", h.CreateOwn)
 	r.PUT("/stories/own/:id", h.UpdateOwn)
 	r.DELETE("/stories/own/:id", h.DeleteOwn)
@@ -60,3 +61,8 @@ func TestOwnStoryEndpoints_RejectBadInputBeforeAnythingElse(t *testing.T) {
 		}
 	}
 }
+
+// allowAll is a FeatureGate with every feature on.
+type allowAll struct{}
+
+func (allowAll) Require(context.Context, uuid.UUID, string) error { return nil }

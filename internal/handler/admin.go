@@ -21,13 +21,21 @@ type UserGetter interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }
 
-type AdminHandler struct {
-	store AdminStore
-	users UserGetter
+// FeatureAdmin reads and edits per-user features.
+type FeatureAdmin interface {
+	States(ctx context.Context, userID uuid.UUID) ([]domain.FeatureState, error)
+	State(ctx context.Context, userID uuid.UUID, feature string) (domain.FeatureState, error)
+	Set(ctx context.Context, userID uuid.UUID, feature string, enabled bool, dailyLimit *int) error
 }
 
-func NewAdminHandler(store AdminStore, users UserGetter) *AdminHandler {
-	return &AdminHandler{store: store, users: users}
+type AdminHandler struct {
+	store    AdminStore
+	users    UserGetter
+	features FeatureAdmin
+}
+
+func NewAdminHandler(store AdminStore, users UserGetter, features FeatureAdmin) *AdminHandler {
+	return &AdminHandler{store: store, users: users, features: features}
 }
 
 // Me handles GET /api/me — current user's id, email and role (used by the UI to show the admin link).
@@ -37,7 +45,70 @@ func (h *AdminHandler) Me(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role, "learning_language": u.LearningLanguage})
+	states, err := h.features.States(c.Request.Context(), u.ID)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	features := make(map[string]gin.H, len(states))
+	for _, st := range states {
+		features[st.Feature] = gin.H{"enabled": st.Enabled, "daily_limit": st.DailyLimit, "remaining": st.Remaining}
+	}
+	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role, "learning_language": u.LearningLanguage, "features": features})
+}
+
+// UserFeatures handles GET /api/admin/users/:id/features.
+func (h *AdminHandler) UserFeatures(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	if _, err := h.users.GetByID(c.Request.Context(), id); err != nil {
+		writeError(c, err)
+		return
+	}
+	states, err := h.features.States(c.Request.Context(), id)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"features": states})
+}
+
+// SetUserFeature handles PUT /api/admin/users/:id/features/:feature {"enabled": bool, "daily_limit": number|null}.
+func (h *AdminHandler) SetUserFeature(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		Enabled    *bool `json:"enabled"`
+		DailyLimit *int  `json:"daily_limit"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil {
+		badRequest(c, `body must be {"enabled": true|false, "daily_limit": number|null}`)
+		return
+	}
+	ctx := c.Request.Context()
+	feature := c.Param("feature")
+	if !domain.IsFeature(feature) {
+		badRequest(c, "unknown feature")
+		return
+	}
+	if _, err := h.users.GetByID(ctx, id); err != nil {
+		writeError(c, err)
+		return
+	}
+	if err := h.features.Set(ctx, id, feature, *req.Enabled, req.DailyLimit); err != nil {
+		writeError(c, err)
+		return
+	}
+	st, err := h.features.State(ctx, id, feature)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
 }
 
 // Users handles GET /api/admin/users.

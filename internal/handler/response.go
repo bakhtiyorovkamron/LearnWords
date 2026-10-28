@@ -18,6 +18,8 @@ type errorResponse struct {
 	Code string `json:"code,omitempty"`
 	// FolderID: with own_folder — the caller's own folder, so the client can open it.
 	FolderID string `json:"folder_id,omitempty"`
+	// Limit: with daily_limit — the daily limit that was reached.
+	Limit *int `json:"limit,omitempty"`
 }
 
 // requestLogAttrs: what an operator needs to find a failed request — error text, method, path
@@ -46,6 +48,16 @@ func writeError(c *gin.Context, err error) {
 		return
 	case errors.Is(err, domain.ErrLangMismatch):
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "folder language does not match your learning language", Code: "lang_mismatch"})
+		return
+	case errors.Is(err, domain.ErrFeatureDisabled):
+		c.AbortWithStatusJSON(http.StatusForbidden, errorResponse{Error: "this feature is disabled for your account", Code: "feature_disabled"})
+		return
+	case errors.Is(err, domain.ErrDailyLimit):
+		resp := errorResponse{Error: "daily limit reached", Code: "daily_limit"}
+		if n, ok := domain.DailyLimitOf(err); ok {
+			resp.Limit = &n
+		}
+		c.AbortWithStatusJSON(http.StatusTooManyRequests, resp)
 		return
 	case errors.Is(err, domain.ErrAlreadyExists):
 		status, msg = http.StatusConflict, "already exists"
