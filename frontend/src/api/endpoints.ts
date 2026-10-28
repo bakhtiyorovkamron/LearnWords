@@ -180,6 +180,22 @@ export const searchApi = {
   } & Partial<WordGrammar>) => api.post<ContextWithCards>('/search-word/add', w).then((r) => r.data),
 }
 
+export interface PhotoWord {
+  word: string; article: string | null; word_type: PartOfSpeech; translation: string
+  full_word: string // "der Hund" for nouns, otherwise the word — what is saved
+  already_added: boolean
+}
+export interface PhotoImportResult { words: PhotoWord[]; remaining: number | null }
+
+export const photoApi = {
+  // Vision AI call → generous timeout. Costs one unit of the daily photo quota; nothing is saved.
+  import: (image: Blob) => {
+    const form = new FormData()
+    form.append('image', image, 'photo.jpg')
+    return api.post<PhotoImportResult>('/photo-import', form, { timeout: 120_000 }).then((r) => r.data)
+  },
+}
+
 export interface StoryWord {
   word: string; translation: string
   // From the word check (may be absent for older words) — used to find the word in the text.

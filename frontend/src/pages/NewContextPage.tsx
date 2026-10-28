@@ -8,6 +8,7 @@ import { FolderSelect } from '../components/Folders'
 import { WordCheckHint } from '../components/WordCheckHint'
 import { collapseSpaces, grammarOf, suggestionOf, useWordCheck } from '../lib/wordCheck'
 import { useLearningLang } from '../lib/learningLang'
+import { PhotoImport } from '../components/PhotoImport'
 
 const MAX_LEN = 2000
 
@@ -100,6 +101,8 @@ export function NewContextPage() {
         </h1>
         <p className="mt-2 text-emerald-100/70">{t('newContext.subtitle')}</p>
       </div>
+
+      <PhotoImport />
 
       <form onSubmit={submit} className="glass animate-rise space-y-5 p-6 md:p-8">
         <div className="relative">
