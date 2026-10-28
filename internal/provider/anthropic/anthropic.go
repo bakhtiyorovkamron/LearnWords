@@ -15,8 +15,10 @@ import (
 	"learnwords/internal/domain"
 )
 
+// endpoint is a variable only so tests can point the client at a local server.
+var endpoint = "https://api.anthropic.com/v1/messages"
+
 const (
-	endpoint     = "https://api.anthropic.com/v1/messages"
 	apiVersion   = "2023-06-01"
 	DefaultModel = "claude-sonnet-4-6"
 )

@@ -232,8 +232,7 @@ func (c *Client) resolveWord(ctx context.Context, targetCode, native, query stri
 	}
 	var lastErr error
 	for i, prompt := range prompts {
-		// claude-sonnet-4-6 rejects an assistant-prefilled turn ("the conversation must end
-		// with a user message") — no prefill for the resolve step.
+		// No prefill for the resolve step (the model there may be one that rejects it).
 		info, err := c.callAndParse(ctx, searchResolveModel, prompt, "", searchResolveMaxTokens, parseResolution)
 		if err != nil {
 			lastErr = err
@@ -313,8 +312,16 @@ func (c *Client) complete(ctx context.Context, prompt string, maxTokens int, tim
 	return c.completeWith(ctx, c.model, prompt, "", maxTokens, timeout)
 }
 
+// prefillModels matches the model ids that still accept an assistant-prefilled turn: Claude 3.x
+// and older, and the 4.0 / 4.1 / 4.5 generation (with or without a date suffix). Everything else —
+// 4.6 and later, and ids we do not know — is treated as not supporting it.
+var prefillModels = regexp.MustCompile(`^claude-((3|2|instant)\b.*|(opus|sonnet|haiku)-4(-[015])?(-\d{8}|-latest)?)$`)
+
+func supportsPrefill(model string) bool { return prefillModels.MatchString(model) }
+
 // completeWith performs one Messages API call and returns the text. A non-empty prefill is sent
-// as the start of the assistant's answer and prepended to the returned text (the API doesn't echo it).
+// as the start of the assistant's answer (only for models that support it, see supportsPrefill) and
+// prepended to the returned text (the API doesn't echo it).
 // Transient failures (network, 429, 5xx, truncated output) are wrapped in retryableError.
 func (c *Client) completeWith(ctx context.Context, model, prompt, prefill string, maxTokens int, timeout time.Duration) (string, error) {
 	return c.completeMessages(ctx, model, []message{{Role: "user", Content: prompt}}, prefill, maxTokens, timeout)
@@ -322,6 +329,9 @@ func (c *Client) completeWith(ctx context.Context, model, prompt, prefill string
 
 // completeMessages is completeWith for a prepared conversation (e.g. one with an image block).
 func (c *Client) completeMessages(ctx context.Context, model string, msgs []message, prefill string, maxTokens int, timeout time.Duration) (string, error) {
+	if !supportsPrefill(model) {
+		prefill = "" // newer models reject an assistant-prefilled turn; every parser finds the JSON object anyway
+	}
 	if prefill != "" {
 		msgs = append(msgs, message{Role: "assistant", Content: prefill})
 	}
@@ -364,7 +374,7 @@ func (c *Client) completeMessages(ctx context.Context, model string, msgs []mess
 		return "", apiErr
 	}
 	var text strings.Builder
-	text.WriteString(prefill)
+	text.WriteString(prefill) // "" when the model does not take a prefill
 	for _, part := range out.Content {
 		if part.Type == "text" {
 			text.WriteString(part.Text)
