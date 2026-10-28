@@ -42,10 +42,11 @@ export function shortFolderName(name: string, max = MAX_FOLDER_LABEL): string {
 }
 
 /** Native select: "all words" (optional) / "without folder" / each folder. Fixed width, never stretches its container. */
-export function FolderSelect({ value, onChange, includeAll = false, className = '' }: {
+export function FolderSelect({ value, onChange, includeAll = false, withoutNone = false, className = '' }: {
   value: FolderSelection
   onChange: (v: FolderSelection) => void
   includeAll?: boolean // '' means "all words" when true, "no folder" when false
+  withoutNone?: boolean // no "without folder" option: a folder must be chosen
   className?: string
 }) {
   const { t } = useTranslation()
@@ -61,7 +62,7 @@ export function FolderSelect({ value, onChange, includeAll = false, className = 
       // nowrap + ellipsis: long text is cut instead of wrapping; leading-normal + items-center keeps 📁, text and ▼ on one line.
       className={`field block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap py-2 text-sm leading-normal ${className}`}
     >
-      {includeAll ? (
+      {withoutNone ? null : includeAll ? (
         <>
           <option value="">{t('folders.all')}</option>
           <option value="none">{t('folders.none')}</option>

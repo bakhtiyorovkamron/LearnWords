@@ -11,5 +11,7 @@ export function useFeatures() {
   return {
     isOn: (name: FeatureName) => features?.[name]?.enabled ?? true,
     remaining: (name: FeatureName) => features?.[name]?.remaining ?? null,
+    /** The user's effective daily limit (null = unlimited). */
+    dailyLimit: (name: FeatureName) => features?.[name]?.daily_limit ?? null,
   }
 }

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
@@ -14,7 +15,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     meApi: { get: vi.fn() },
     photoApi: { import: vi.fn() },
     searchApi: { add: vi.fn() },
-    foldersApi: { list: vi.fn() },
+    foldersApi: { list: vi.fn(), create: vi.fn() },
   }
 })
 
@@ -41,7 +42,7 @@ const fail = (status: number, data: unknown) =>
 
 function renderIt() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={qc}><PhotoImport /></QueryClientProvider>)
+  render(<QueryClientProvider client={qc}><MemoryRouter><PhotoImport /></MemoryRouter></QueryClientProvider>)
 }
 const png = () => new File([new Uint8Array(100)], 'page.png', { type: 'image/png' })
 const pick = async (file: File) => fireEvent.change(await screen.findByTestId('photo-input'), { target: { files: [file] } })
@@ -50,6 +51,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.mocked(meApi.get).mockResolvedValue(me(true))
   vi.mocked(foldersApi.list).mockResolvedValue({ folders: [] } as never)
+  vi.mocked(foldersApi.create).mockImplementation(async (name) => ({ id: 'new-id', name, color: 'lime' }) as never)
   vi.mocked(photoApi.import).mockResolvedValue({ words, remaining: 3 })
   vi.mocked(searchApi.add).mockResolvedValue({} as never)
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
@@ -66,10 +68,10 @@ describe('PhotoImport', () => {
 
   it('shows the quota left, lists the found words, and adds only the chosen ones', async () => {
     renderIt()
-    expect(await screen.findByText('Photos left today: 4')).toBeTruthy()
+    expect(await screen.findByText('Left today: 4 of 4')).toBeTruthy()
     await pick(png())
     expect(await screen.findByText('Words found: 3')).toBeTruthy()
-    expect(screen.getByText('Photos left today: 3')).toBeTruthy()
+    expect(screen.getByText('Left today: 3 of 4')).toBeTruthy()
 
     const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
     expect(boxes.map((b) => b.checked)).toEqual([true, false, true]) // new ones preselected
@@ -82,7 +84,7 @@ describe('PhotoImport', () => {
     expect(vi.mocked(searchApi.add).mock.calls[0][0]).toMatchObject({
       word: 'der Hund', translation: 'собака', translation_language: 'en', lemma: 'Hund', article: 'der', part_of_speech: 'noun',
     })
-    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Added: 1. Already had: 0'))
+    await waitFor(() => expect(toaster.toast).toHaveBeenCalledTimes(1))
   })
 
   it('a 409 from add counts as "already had", not as a failure', async () => {
@@ -90,7 +92,7 @@ describe('PhotoImport', () => {
     renderIt()
     await pick(png())
     fireEvent.click(await screen.findByRole('button', { name: 'Add 2' }))
-    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Added: 1. Already had: 1'))
+    await waitFor(() => expect(vi.mocked(toaster.toast).mock.calls[0][0]).toMatch(/: 1\. Already there: 1$/))
   })
 
   it('a used-up daily quota shows the daily-limit text, not the rate-limit one', async () => {
@@ -113,5 +115,112 @@ describe('PhotoImport', () => {
     await pick(png())
     expect(await screen.findByText(/No words to learn were found/)).toBeTruthy()
     expect((screen.getByRole('button', { name: /Another photo/ }) as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+const dd = () => {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+const folder = (id: string, name: string) => ({ id, name, color: 'sky' })
+
+describe('PhotoImport: quota pill', () => {
+  it('shows "3 of 4" with 4 dots, 3 of them filled', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 3))
+    renderIt()
+    const pill = await screen.findByTestId('photo-quota')
+    expect(pill.textContent).toBe('Left today: 3 of 4')
+    const dots = screen.getAllByTestId('photo-dot')
+    expect(dots).toHaveLength(4)
+    expect(dots.map((d) => d.getAttribute('data-filled'))).toEqual(['true', 'true', 'true', 'false'])
+  })
+
+  it('with none left the button is disabled and a muted line replaces the pill', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 0))
+    renderIt()
+    expect(await screen.findByText('No photos left today — 4 again tomorrow')).toBeTruthy()
+    expect(screen.queryByTestId('photo-quota')).toBeNull()
+    expect((screen.getByRole('button', { name: /Choose a photo/ }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows no pill for an unlimited feature', async () => {
+    vi.mocked(meApi.get).mockResolvedValue({ ...me(true), features: { ...me(true).features!, photo_import: feature(true) } })
+    renderIt()
+    await waitFor(() => expect(meApi.get).toHaveBeenCalled())
+    expect(screen.queryByTestId('photo-quota')).toBeNull()
+  })
+})
+
+describe('PhotoImport: folder', () => {
+  const readPhoto = async () => {
+    await pick(png())
+    await screen.findByText('Words found: 3')
+  }
+
+  it('creates "Lesson — dd.MM" once, before the first word, and every word goes into it', async () => {
+    const order: string[] = []
+    vi.mocked(foldersApi.create).mockImplementation(async (name) => { order.push('create'); return folder('new-id', name) as never })
+    vi.mocked(searchApi.add).mockImplementation(async () => { order.push('add'); return {} as never })
+    renderIt()
+    await readPhoto()
+    expect((screen.getByLabelText('Folder name') as HTMLInputElement).value).toBe(`Lesson — ${dd()}`)
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2' }))
+    await waitFor(() => expect(searchApi.add).toHaveBeenCalledTimes(2))
+    expect(foldersApi.create).toHaveBeenCalledTimes(1)
+    expect(foldersApi.create).toHaveBeenCalledWith(`Lesson — ${dd()}`, 'lime')
+    expect(order).toEqual(['create', 'add', 'add'])
+    for (const c of vi.mocked(searchApi.add).mock.calls) expect(c[0].folder_id).toBe('new-id')
+  })
+
+  it('an empty name falls back to the default; a typed name is used', async () => {
+    renderIt()
+    await readPhoto()
+    const input = screen.getByLabelText('Folder name')
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2' }))
+    await waitFor(() => expect(foldersApi.create).toHaveBeenCalledWith(`Lesson — ${dd()}`, 'lime'))
+  })
+
+  it('reuses a folder with the same name (case-insensitive) instead of creating one', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue({ folders: [folder('f1', `  LESSON — ${dd()} `)] } as never)
+    renderIt()
+    await readPhoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2' }))
+    await waitFor(() => expect(searchApi.add).toHaveBeenCalledTimes(2))
+    expect(foldersApi.create).not.toHaveBeenCalled()
+    for (const c of vi.mocked(searchApi.add).mock.calls) expect(c[0].folder_id).toBe('f1')
+  })
+
+  it('"Existing folder" sends the selected id and creates nothing', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue({ folders: [folder('f1', 'Tiere'), folder('f2', 'Essen')] } as never)
+    renderIt()
+    await readPhoto()
+    fireEvent.click(await screen.findByRole('radio', { name: 'Existing folder' }))
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    expect(select.value).toBe('f1') // the first folder by default, no "without folder" option
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['f1', 'f2'])
+    fireEvent.change(select, { target: { value: 'f2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2' }))
+    await waitFor(() => expect(searchApi.add).toHaveBeenCalledTimes(2))
+    expect(foldersApi.create).not.toHaveBeenCalled()
+    for (const c of vi.mocked(searchApi.add).mock.calls) expect(c[0].folder_id).toBe('f2')
+    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith(
+      'Added to “Essen”: 2. Already there: 0', expect.objectContaining({ action: expect.objectContaining({ label: 'Open folder' }) })))
+  })
+
+  it('the toast offers to open the new folder on the Cards page', async () => {
+    renderIt()
+    await readPhoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2' }))
+    await waitFor(() => expect(toaster.toast).toHaveBeenCalledTimes(1))
+    const [text, opts] = vi.mocked(toaster.toast).mock.calls[0]
+    expect(text).toBe(`Added to “Lesson — ${dd()}”: 2. Already there: 0`)
+    expect(opts?.action?.label).toBe('Open folder')
+  })
+
+  it('hides "Existing folder" when the user has no folders', async () => {
+    renderIt()
+    await readPhoto()
+    expect(screen.queryByRole('radio', { name: 'Existing folder' })).toBeNull()
   })
 })
