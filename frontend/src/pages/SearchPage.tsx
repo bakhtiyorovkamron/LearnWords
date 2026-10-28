@@ -2,10 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { searchApi, type WordInfo } from '../api/endpoints'
-import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
+import { errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
 import { FolderSelect } from '../components/Folders'
 import { toast } from '../components/Toaster'
 import { useLearningLang } from '../lib/learningLang'
+import { useFeatures } from '../lib/features'
 
 // Pronoun labels per learning language (keys are positions returned by the backend).
 const PERSONS_BY_LANG: Record<string, [string, string][]> = {
@@ -37,6 +38,7 @@ function speak(text: string, lang: string) {
 export function SearchPage() {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
+  const { isOn } = useFeatures()
   const [query, setQuery] = useState('')
   // Translation comes back in the current UI language (ru/en/uz).
   const search = useMutation({ mutationFn: (q: string) => searchApi.search(q, i18n.language) })
@@ -48,6 +50,9 @@ export function SearchPage() {
   }
 
   const err = search.error
+  if (!isOn('word_search')) {
+    return <p className="mx-auto max-w-3xl rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{t('errors.featureDisabled')}</p>
+  }
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="animate-rise text-center">
@@ -74,7 +79,9 @@ export function SearchPage() {
         <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {status(err) === 503
             ? t('search.notConfigured')
-            : isRateLimited(err)
+            : isFeatureError(err)
+              ? errorMessage(err)
+              : isRateLimited(err)
               ? rateLimitMessage(err)
               : t('search.failed', { error: errorMessage(err) })}
         </p>

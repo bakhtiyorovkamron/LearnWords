@@ -70,11 +70,14 @@ interface ApiErrorBody {
   folder_id?: string
   message?: string
   retry_after_seconds?: number
+  limit?: number // with daily_limit
 }
 
 /** True when the backend rejected the request with 429 (rate limit). */
 export function isRateLimited(err: unknown): boolean {
-  return axios.isAxiosError(err) && err.response?.status === 429
+  if (!axios.isAxiosError(err) || err.response?.status !== 429) return false
+  // A used-up daily quota is also a 429, but it is not "too many requests, wait a minute".
+  return (err.response.data as ApiErrorBody | undefined)?.code !== 'daily_limit'
 }
 
 /** User-facing text for a 429: localized with the server's retry_after_seconds, else the API message. */
@@ -85,7 +88,19 @@ export function rateLimitMessage(err: unknown): string {
   return body?.message ?? i18n.t('common.rateLimited', { seconds: 60 })
 }
 
+/** True for the two per-user feature errors (403 feature_disabled, 429 daily_limit). */
+export function isFeatureError(err: unknown): boolean {
+  const code = apiErrorInfo(err).code
+  return code === 'feature_disabled' || code === 'daily_limit'
+}
+
 export function errorMessage(err: unknown): string {
+  const code = apiErrorInfo(err).code
+  if (code === 'feature_disabled') return i18n.t('errors.featureDisabled')
+  if (code === 'daily_limit') {
+    const limit = (axios.isAxiosError(err) ? (err.response?.data as ApiErrorBody | undefined)?.limit : undefined) ?? ''
+    return i18n.t('errors.dailyLimit', { limit })
+  }
   if (isRateLimited(err)) return rateLimitMessage(err)
   if (axios.isAxiosError(err)) {
     return (err.response?.data as ApiErrorBody | undefined)?.error ?? err.message

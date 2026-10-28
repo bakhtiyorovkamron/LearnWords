@@ -251,7 +251,25 @@ export const settingsApi = {
   setUiSounds: (on: boolean) => api.put('/me/settings', { ui_sounds_enabled: on }),
 }
 
-export interface Me { id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang }
+export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate'
+
+/** A feature as the admin sees it for one user. daily_limit is the effective limit (null = unlimited). */
+export interface FeatureState {
+  feature: FeatureName
+  enabled: boolean
+  daily_limit: number | null
+  default_limit: number | null
+  limit_override: number | null
+  used_today: number
+  remaining: number | null
+}
+
+export type MeFeatures = Record<FeatureName, { enabled: boolean; daily_limit: number | null; remaining: number | null }>
+
+export interface Me {
+  id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang
+  features?: MeFeatures
+}
 
 export const meApi = {
   get: () => api.get<Me>('/me').then((r) => r.data),
@@ -301,6 +319,10 @@ export const adminApi = {
   stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
   remove: (id: string) => api.delete(`/admin/users/${id}`),
   setBanned: (id: string, banned: boolean) => api.patch(`/admin/users/${id}/ban`, { banned }),
+  userFeatures: (id: string) =>
+    api.get<{ features: FeatureState[] }>(`/admin/users/${id}/features`).then((r) => r.data.features),
+  setUserFeature: (id: string, feature: FeatureName, body: { enabled: boolean; daily_limit: number | null }) =>
+    api.put<FeatureState>(`/admin/users/${id}/features/${feature}`, body).then((r) => r.data),
   wordCheckStatus: () => api.get<WordCheckJob>('/admin/word-check').then((r) => r.data),
   // 202 started, 409 already running — both return the current status.
   startWordCheck: () =>

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { adminApi, meApi, type AdminUser } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
+import { AdminUserModal } from '../components/AdminUserModal'
 
 type SortKey = 'email' | 'created_at' | 'words_count' | 'last_activity_at'
 
@@ -105,6 +106,7 @@ function UsersTable({ myId }: { myId: string }) {
   const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['admin', 'users'], queryFn: adminApi.users })
   const [q, setQ] = useState('')
+  const [opened, setOpened] = useState<AdminUser | null>(null)
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'created_at', desc: true })
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin'] })
@@ -185,7 +187,10 @@ function UsersTable({ myId }: { myId: string }) {
                 const protectedUser = self || u.role === 'admin'
                 const busy = (ban.isPending && ban.variables?.id === u.id) || (remove.isPending && remove.variables?.id === u.id)
                 return (
-                  <tr key={u.id} className={`border-t border-emerald-400/10 ${u.is_banned ? 'opacity-60' : ''}`}>
+                  <tr key={u.id} tabIndex={0}
+                    onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) setOpened(u) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setOpened(u) }}
+                    className={`cursor-pointer border-t border-emerald-400/10 hover:bg-emerald-400/5 ${u.is_banned ? 'opacity-60' : ''}`}>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-white">{u.email}</div>
                       <div className="font-mono text-[10px] text-emerald-300/50">{u.id}</div>
@@ -223,6 +228,7 @@ function UsersTable({ myId }: { myId: string }) {
           {!rows.length && <p className="py-6 text-center text-emerald-100/60">{t('admin.nothingFound')}</p>}
         </div>
       )}
+      {opened && <AdminUserModal user={opened} onClose={() => setOpened(null)} />}
     </section>
   )
 }

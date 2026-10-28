@@ -196,3 +196,32 @@ describe('StoryPage: adding, deleting', () => {
     expect(screen.queryAllByText(/^Translation: /)).toHaveLength(1)
   })
 })
+
+describe('StoryPage: daily_story switched off', () => {
+  const withFeatures = (daily: boolean) => ({
+    id: 'u', email: 'a@b.co', role: 'user' as const, learning_language: 'de' as const,
+    features: {
+      photo_import: { enabled: true, daily_limit: null, remaining: null },
+      daily_story: { enabled: daily, daily_limit: null, remaining: null },
+      word_search: { enabled: true, daily_limit: null, remaining: null },
+      story_autotranslate: { enabled: true, daily_limit: null, remaining: null },
+    },
+  })
+  const words = [{ word: 'Hund', translation: 'собака' }] as never
+
+  it('shows the generate block while on', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(withFeatures(true))
+    vi.mocked(storiesApi.today).mockResolvedValue({ story: null, words_today: words, genres: [] })
+    renderPage()
+    expect(await screen.findByRole('button', { name: '✨ Generate story' })).toBeTruthy()
+  })
+
+  it('hides the generate block when off; the archive and own stories stay', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(withFeatures(false))
+    vi.mocked(storiesApi.today).mockResolvedValue({ story: null, words_today: words, genres: [] })
+    renderPage()
+    expect(await within(archive()).findByRole('button', { name: /✍️ Mein Tag heute im Park/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '✨ Generate story' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Your own story/ })).toBeTruthy()
+  })
+})

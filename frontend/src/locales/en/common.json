@@ -337,7 +337,8 @@
     "confirmUnban": "Unban {{email}}?",
     "confirmDelete": "Delete {{email}} and ALL their data permanently?",
     "actionFailed": "Action failed: {{error}}",
-    "nothingFound": "No users found"
+    "nothingFound": "No users found",
+    "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "limitDefault": "default: {{n}}", "usedToday": "today: {{used}}", "saved": "Saved", "close": "Close"}
   },
   "word": {"move": "Move to folder", "more": "Actions"},
   "folder": {"none": "No folder", "new": "+ New folder"},
@@ -347,7 +348,8 @@
   "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"},
   "sound": {"ui": "Interface sounds", "uiHint": "Taps and page turns", "on": "Sound on", "off": "Sound off"},
   "settings": {"sounds": "Training sounds"},
-  "errors": {"saveFailed": "Couldn't save. Please try again."},
+  "errors": {"saveFailed": "Couldn't save. Please try again.", "featureDisabled": "This feature is turned off for your account.", "dailyLimit": "Today's limit is used up — tomorrow you get {{limit}} again."},
+  "features": {"photo_import": "📷 Textbook photo", "daily_story": "📖 Daily story", "word_search": "🔍 AI word search", "story_autotranslate": "✍️ Auto-translation of own stories"},
   "share": {"emptyFolder": "The folder is empty — add words to share it", "isShared": "Shared via link", "title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},
   "shared": {"words": "Words: {{count}}", "add": "Add to my words", "loginToAdd": "Log in to add these words", "added": "Added: {{added}}. Already had: {{skipped}}", "notFound": "This link is invalid or was turned off", "own": "This is your folder", "langMismatch": "This folder is for a different learning language", "empty": "This folder is empty"},
   "contact": {"title": "Contact us", "question": "Questions or problems? Message us:", "loginProblem": "Can't log in? Message us:", "reportProblem": "Report a problem"},

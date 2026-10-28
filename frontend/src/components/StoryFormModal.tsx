@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { storiesApi, type DailyStory, type OwnStoryInput } from '../api/endpoints'
-import { apiErrorInfo, errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
+import { apiErrorInfo, errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
+import { useFeatures } from '../lib/features'
 import { useLearningLang } from '../lib/learningLang'
 import { toast } from './Toaster'
 
@@ -58,7 +59,9 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
 
   const [title, setTitle] = useState(story?.title ?? '')
   const [text, setText] = useState(story?.story_de ?? '')
-  const [mode, setMode] = useState<Mode>(initialMode ?? (story?.translation_source === 'user' ? 'manual' : 'auto'))
+  const autoOn = useFeatures().isOn('story_autotranslate')
+  const [pickedMode, setMode] = useState<Mode>(initialMode ?? (story?.translation_source === 'user' ? 'manual' : 'auto'))
+  const mode: Mode = autoOn ? pickedMode : 'manual' // automatic translation switched off for this user
   const [translation, setTranslation] = useState(story?.story_translation ?? '')
   const [problem, setProblem] = useState<Problem | null>(null)
 
@@ -94,7 +97,8 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
   // everything the user typed in every case.
   let serverError: string | null = null
   if (save.error) {
-    serverError = isRateLimited(save.error) ? rateLimitMessage(save.error)
+    serverError = isFeatureError(save.error) ? errorMessage(save.error)
+      : isRateLimited(save.error) ? rateLimitMessage(save.error)
       : apiErrorInfo(save.error).status === 503 ? t('story.own.autoUnavailable')
       : t('story.own.saveFailed', { error: errorMessage(save.error) })
   }
@@ -138,8 +142,10 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
         <div>
           <p className={label}>{t('story.own.translationLabel')}</p>
           <div role="radiogroup" aria-label={t('story.own.translationLabel')} className="flex flex-wrap gap-2">
-            <button type="button" role="radio" aria-checked={mode === 'auto'} className={pill(mode === 'auto')}
-              onClick={() => setMode('auto')}>{t('story.own.modeAuto')}</button>
+            {autoOn && (
+              <button type="button" role="radio" aria-checked={mode === 'auto'} className={pill(mode === 'auto')}
+                onClick={() => setMode('auto')}>{t('story.own.modeAuto')}</button>
+            )}
             <button type="button" role="radio" aria-checked={mode === 'manual'} className={pill(mode === 'manual')}
               onClick={() => setMode('manual')}>{t('story.own.modeManual')}</button>
           </div>

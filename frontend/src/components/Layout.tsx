@@ -14,6 +14,7 @@ import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
 import { adoptServerSounds, adoptServerUiSounds } from '../lib/sounds'
 import { usePageSounds } from '../lib/pageSounds'
 import { useLearningLang } from '../lib/learningLang'
+import { useFeatures } from '../lib/features'
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `rounded-xl px-4 py-2 text-sm font-semibold transition ${
@@ -56,6 +57,8 @@ export function Layout() {
   const me = useQuery({ queryKey: ['me'], queryFn: meApi.get, staleTime: 5 * 60_000 })
   const isAdmin = me.data?.role === 'admin'
   const learning = useLearningLang()
+  const { isOn } = useFeatures()
+  const searchOn = isOn('word_search')
   const [moreOpen, setMoreOpen] = useState(false)
 
   // Training sounds: the profile's value wins over this device's localStorage once it loads.
@@ -97,7 +100,7 @@ export function Layout() {
           <NavLink to="/contexts" className="mr-4"><Logo /></NavLink>
           <NavLink to="/contexts" end className={link}>📚 {t('nav.contexts')}</NavLink>
           <NavLink to="/contexts/new" className={link}>✨ {t('nav.add')}</NavLink>
-          <NavLink to="/search" className={link}>🔍 {t('nav.search')}</NavLink>
+          {searchOn && <NavLink to="/search" className={link}>🔍 {t('nav.search')}</NavLink>}
           <NavLink to="/cards" className={link}>🃏 {t('nav.cards')}</NavLink>
           <NavLink to="/stats" className={link}>📈 {t('nav.stats')}</NavLink>
           <NavLink to="/story" className={link}>📖 {t('nav.dailyStory')}</NavLink>
@@ -152,9 +155,11 @@ export function Layout() {
         <NavLink to="/contexts/new" className={({ isActive }) => tab(isActive && !moreOpen)}>
           <span className="text-xl">✨</span>{t('nav.add')}
         </NavLink>
-        <NavLink to="/search" className={({ isActive }) => tab(isActive && !moreOpen)}>
-          <span className="text-xl">🔍</span>{t('nav.search')}
-        </NavLink>
+        {searchOn && (
+          <NavLink to="/search" className={({ isActive }) => tab(isActive && !moreOpen)}>
+            <span className="text-xl">🔍</span>{t('nav.search')}
+          </NavLink>
+        )}
         <NavLink to="/story" className={({ isActive }) => tab(isActive && !moreOpen)}>
           <span className="text-xl">📖</span>{t('nav.dailyStory')}
         </NavLink>

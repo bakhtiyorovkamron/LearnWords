@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { storiesApi, type DailyStory, type StoryWord } from '../api/endpoints'
-import { errorMessage, isRateLimited, rateLimitMessage } from "../api/client";
+import { errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
 import { dateLocale } from '../i18n'
 import { useLearningLang } from '../lib/learningLang'
+import { useFeatures } from '../lib/features'
 import { highlightStory } from '../lib/storyHighlight'
 import { ErrorState } from '../components/ErrorState'
 import { StoryFormModal } from '../components/StoryFormModal'
@@ -119,6 +120,7 @@ function ownChipLabel(title: string, max = 24): string {
 export function StoryPage() {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
+  const { isOn } = useFeatures()
   const qc = useQueryClient()
   const today = useQuery({
     queryKey: ['stories', 'today', i18n.language],
@@ -143,6 +145,7 @@ export function StoryPage() {
     const status = (err as { response?: { status?: number } }).response?.status
     if (status === 503) return t('story.notConfigured')
     if (status === 422) return t('story.noWordsError')
+    if (isFeatureError(err)) return errorMessage(err)
     if (isRateLimited(err)) return rateLimitMessage(err)
     return t('story.generateFailed', { error: errorMessage(err) })
   }
@@ -219,7 +222,7 @@ export function StoryPage() {
         <button type="button" className="btn-ghost" onClick={() => setAdding(true)}>{t('story.own.add')}</button>
       </div>
 
-      <section className="glass space-y-4 p-6">
+      {isOn('daily_story') && <section className="glass space-y-4 p-6">
         {today.isLoading ? (
           <p>{t('common.loading')}</p>
         ) : words.length === 0 ? (
@@ -242,7 +245,7 @@ export function StoryPage() {
         )}
         {gen.error && <p className="text-red-300">{genError(gen.error)}</p>}
         {today.error && <ErrorState error={today.error} />}
-      </section>
+      </section>}
 
       {story && <StoryView story={story} />}
 

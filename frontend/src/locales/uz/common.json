@@ -337,7 +337,8 @@
     "confirmUnban": "{{email}} blokdan chiqarilsinmi?",
     "confirmDelete": "{{email}} va uning BARCHA ma’lumotlari qaytarib bo‘lmaydigan tarzda o‘chirilsinmi?",
     "actionFailed": "Amal bajarilmadi: {{error}}",
-    "nothingFound": "Hech kim topilmadi"
+    "nothingFound": "Hech kim topilmadi",
+    "userCard": {"registered": "Ro‘yxatdan o‘tgan: {{date}}", "words": "So‘zlar: {{n}}", "lastActive": "Oxirgi faollik: {{date}}", "never": "hech qachon", "features": "Funksiyalar", "limit": "Kunlik limit", "limitDefault": "standart: {{n}}", "usedToday": "bugun: {{used}}", "saved": "Saqlandi", "close": "Yopish"}
   },
   "word": {"move": "Papkaga koʻchirish", "more": "Amallar"},
   "folder": {"none": "Papkasiz", "new": "+ Yangi papka"},
@@ -347,7 +348,8 @@
   "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}", "practice": "Qutilar oʻzgarmaydi: bu qoʻshimcha mashq"},
   "sound": {"ui": "Interfeys tovushlari", "uiHint": "Bosish va sahifa shitirlashi", "on": "Ovoz yoqilgan", "off": "Ovoz oʻchirilgan"},
   "settings": {"sounds": "Mashqdagi ovozlar"},
-  "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring."},
+  "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring.", "featureDisabled": "Bu funksiya siz uchun o‘chirilgan.", "dailyLimit": "Bugungi limit tugadi, ertaga yana {{limit}} ta bo‘ladi."},
+  "features": {"photo_import": "📷 Darslik surati", "daily_story": "📖 Kun hikoyasi", "word_search": "🔍 AI orqali so‘z qidirish", "story_autotranslate": "✍️ O‘z hikoyalarini avtomatik tarjima qilish"},
   "share": {"emptyFolder": "Papka bo‘sh — ulashish uchun so‘z qo‘shing", "isShared": "Havola orqali ulashilgan", "title": "«{{name}}» papkasini ulashish", "hint": "Havolasi bor har kim so‘zlarni ko‘rib, o‘ziga qo‘sha oladi. Sizning natijalaringiz ulashilmaydi.", "copy": "Havolani nusxalash", "copied": "Havola nusxalandi", "telegram": "Telegram orqali yuborish", "telegramText": "yodla.fun saytida nemis tilini o‘rganyapman — mana mening «{{name}}» so‘zlarim", "regenerate": "Yangi havola yaratish", "disable": "Havolani o‘chirish", "disabled": "Havola o‘chirildi", "imports": "O‘ziga qo‘shganlar: {{count}}"},
   "shared": {"words": "So‘zlar: {{count}}", "add": "O‘zimga qo‘shish", "loginToAdd": "So‘zlarni qo‘shish uchun kiring", "added": "Qo‘shildi: {{added}}. Avvaldan bor edi: {{skipped}}", "notFound": "Havola noto‘g‘ri yoki o‘chirilgan", "own": "Bu sizning papkangiz", "langMismatch": "Bu papka boshqa o‘rganish tili uchun", "empty": "Bu papkada hali so‘z yo‘q"},
   "contact": {"title": "Biz bilan bog‘lanish", "question": "Savol yoki muammo bormi? Bizga yozing:", "loginProblem": "Kira olmayapsizmi? Bizga yozing:", "reportProblem": "Muammo haqida xabar berish"},
