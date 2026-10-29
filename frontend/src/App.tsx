@@ -22,7 +22,8 @@ export default function App() {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="/contexts" element={<ContextsPage />} />
+          <Route index element={<ContextsPage />} />
+          <Route path="/contexts" element={<Navigate to="/" replace />} />
           <Route path="/contexts/new" element={<NewContextPage />} />
           <Route path="/cards" element={<CardsPage />} />
           <Route path="/stats" element={<StatsPage />} />
@@ -31,7 +32,7 @@ export default function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/contexts" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

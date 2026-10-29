@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -34,18 +34,22 @@ beforeEach(async () => { await i18n.changeLanguage('en') })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('Layout: word_search', () => {
-  it('shows the Search link (desktop menu and phone tab) while the feature is on — and while /me loads', async () => {
+  it('shows the Search link (desktop menu; the phone sheet after tapping More) while the feature is on — and while /me loads', async () => {
     vi.mocked(meApi.get).mockResolvedValue(me(true))
     renderLayout()
-    expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(1) // the header
     await waitFor(() => expect(meApi.get).toHaveBeenCalled())
-    expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(2) // + the More sheet
   })
 
-  it('hides both Search links when it is off', async () => {
+  it('hides every Search link when it is off', async () => {
     vi.mocked(meApi.get).mockResolvedValue(me(false))
     renderLayout()
     await waitFor(() => expect(screen.queryAllByRole('link', { name: /Search/ })).toHaveLength(0))
+    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    expect(screen.queryAllByRole('link', { name: /Search/ })).toHaveLength(0)
     expect(screen.getAllByRole('link', { name: /Cards/ }).length).toBeGreaterThan(0)
   })
 })

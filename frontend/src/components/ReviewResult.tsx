@@ -47,7 +47,7 @@ export function ReviewResult({ correct, total, onRestart, restartLabel, moreCoun
           </button>
         )}
         <button type="button" onClick={onRestart} className={hasMore ? 'btn-ghost' : 'btn-primary'}>{restartLabel ?? t('result.restart')}</button>
-        <Link to="/contexts" className="btn-ghost">{t('result.home')}</Link>
+        <Link to="/" className="btn-ghost">{t('result.home')}</Link>
       </div>
     </div>
   )

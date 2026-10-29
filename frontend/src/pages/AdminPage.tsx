@@ -17,7 +17,7 @@ export function AdminPage() {
   const isAdmin = me.data?.role === 'admin'
 
   if (me.isLoading) return <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />
-  if (!isAdmin) return <Navigate to="/contexts" replace />
+  if (!isAdmin) return <Navigate to="/" replace />
 
   return (
     <div className="space-y-8">

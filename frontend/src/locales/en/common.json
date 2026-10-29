@@ -7,7 +7,7 @@
   "check": {"checking": "Checking the word…", "suggest": "Did you mean: {{word}}", "baseForm": "Base form: {{lemma}}", "plural": "Plural: {{plural}}", "useSuggestion": "Use this", "keep": "Keep as is", "unknown": "We couldn't find this word. Check the spelling"},
   "pwa": {"install": "Install app", "banner": "Add yodla to your phone — it opens like an app", "iosHint": "Tap Share, then Add to Home Screen", "offline": "No internet connection. Reconnect and tap Retry", "retry": "Retry", "later": "Not now"},
   "nav": {
-    "contexts": "Contexts",
+    "home": "Home",
     "add": "Add",
     "search": "Search",
     "cards": "Cards",

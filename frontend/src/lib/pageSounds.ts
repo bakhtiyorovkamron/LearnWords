@@ -4,13 +4,14 @@ import { hasUserGesture } from './uiSoundEvents'
 import { playUi, type UiSound } from './uiSounds'
 
 // Sections in the order of the bottom menu / header: moving to a later one turns the page forward.
-export const ORDER = ['/cards', '/contexts/new', '/search', '/story', '/contexts', '/stats', '/admin']
+export const ORDER = ['/', '/cards', '/contexts/new', '/search', '/story', '/stats', '/admin']
 
 /**
  * The page sound for going from one path to another (null = none).
  *   - browser back/forward (POP) → pageBack;
  *   - both paths are sections in ORDER → forward when the index grows, else back;
- *   - a deeper page (/contexts → /contexts/:id) → forward; back up → back;
+ *   - a deeper page (/x → /x/y) → forward; back up → back ("/" is a section of its own and
+ *     never counts as the parent of other paths);
  *   - anything else (a push to an unrelated page) → forward.
  * Only the pathname counts: search params and hashes are the caller's business (ignored).
  */

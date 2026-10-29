@@ -7,7 +7,7 @@
   "check": {"checking": "Soʻz tekshirilmoqda…", "suggest": "Toʻgʻrisi shundaymi: {{word}}?", "baseForm": "Boshlangʻich shakli: {{lemma}}", "plural": "Koʻplik shakli: {{plural}}", "useSuggestion": "Tuzatish", "keep": "Oʻzgartirmaslik", "unknown": "Bunday soʻz topilmadi. Yozilishini tekshiring"},
   "pwa": {"install": "Ilovani oʻrnatish", "banner": "yodla’ni telefoningizga oʻrnating — ilova kabi ochiladi", "iosHint": "«Ulashish» tugmasini bosing, soʻng «Bosh ekranga qoʻshish»ni tanlang", "offline": "Internet yoʻq. Ulanib, «Qayta urinish»ni bosing", "retry": "Qayta urinish", "later": "Hozir emas"},
   "nav": {
-    "contexts": "Kontekstlar",
+    "home": "Bosh sahifa",
     "add": "Qo‘shish",
     "search": "Qidiruv",
     "cards": "Kartochkalar",

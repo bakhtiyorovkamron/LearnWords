@@ -12,5 +12,5 @@ export function ProtectedRoute() {
 export function GuestRoute() {
   const { isAuthenticated, isLoading } = useAuth()
   if (isLoading) return null
-  return isAuthenticated ? <Navigate to="/contexts" replace /> : <Outlet />
+  return isAuthenticated ? <Navigate to="/" replace /> : <Outlet />
 }

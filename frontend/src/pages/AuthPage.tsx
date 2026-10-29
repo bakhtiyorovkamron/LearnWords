@@ -23,7 +23,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const location = useLocation()
   // Where to go after signing in (e.g. a shared-folder link /s/:token); kept when switching login ↔ register.
   const fromLoc = (location.state as { from?: { pathname: string; search?: string } } | null)?.from
-  const from = fromLoc ? fromLoc.pathname + (fromLoc.search ?? '') : '/contexts'
+  const from = fromLoc ? fromLoc.pathname + (fromLoc.search ?? '') : '/'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

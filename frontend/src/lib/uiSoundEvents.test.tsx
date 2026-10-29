@@ -86,9 +86,18 @@ describe('pageSoundFor', () => {
   it('sections follow ORDER; going down the list turns forward, up turns back', () => {
     expect(pageSoundFor('/cards', '/search', NavigationType.Push)).toBe('pageForward')
     expect(pageSoundFor('/search', '/cards', NavigationType.Push)).toBe('pageBack')
-    expect(pageSoundFor('/contexts', '/contexts/new', NavigationType.Push)).toBe('pageBack') // /contexts is later in ORDER
+    expect(pageSoundFor('/stats', '/contexts/new', NavigationType.Push)).toBe('pageBack') // /stats is later in ORDER
     expect(pageSoundFor('/contexts/new', '/stats', NavigationType.Push)).toBe('pageForward')
-    expect(ORDER[0]).toBe('/cards')
+    expect(ORDER).toEqual(['/', '/cards', '/contexts/new', '/search', '/story', '/stats', '/admin'])
+  })
+  it('"/" is the first section: home → cards turns forward, cards → home back; it is never a parent path', () => {
+    expect(pageSoundFor('/', '/cards', NavigationType.Push)).toBe('pageForward')
+    expect(pageSoundFor('/cards', '/', NavigationType.Push)).toBe('pageBack')
+    expect(pageSoundFor('/', '/admin', NavigationType.Push)).toBe('pageForward')
+    expect(pageSoundFor('/story', '/', NavigationType.Push)).toBe('pageBack')
+    // an unlisted path is not "deeper than /": it is just an unrelated push
+    expect(pageSoundFor('/', '/somewhere', NavigationType.Push)).toBe('pageForward')
+    expect(pageSoundFor('/somewhere', '/', NavigationType.Push)).toBe('pageForward')
   })
   it('deeper pages turn forward, back up turns back', () => {
     expect(pageSoundFor('/contexts', '/contexts/abc', NavigationType.Push)).toBe('pageForward')

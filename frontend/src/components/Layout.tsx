@@ -93,8 +93,7 @@ export function Layout() {
   }, [moreOpen])
 
   // Pages that live under "More" on phones (everything except the four bottom tabs).
-  const inMore = (pathname.startsWith('/contexts') && pathname !== '/contexts/new') ||
-    pathname.startsWith('/stats') || pathname.startsWith('/admin')
+  const inMore = ['/search', '/stats', '/admin'].some((p) => pathname === p || pathname.startsWith(p + '/'))
 
   async function logout() {
     await authApi.logout()
@@ -113,13 +112,13 @@ export function Layout() {
       {/* Top menu: tablets and desktops. Phones get the bottom navigation below instead. */}
       <header className="sticky top-0 z-20 hidden border-b border-emerald-400/10 bg-emerald-950/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:block">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
-          <NavLink to="/contexts" className="mr-4"><Logo /></NavLink>
-          <NavLink to="/contexts" end className={link}>📚 {t('nav.contexts')}</NavLink>
-          <NavLink to="/contexts/new" className={link}>✨ {t('nav.add')}</NavLink>
-          {searchOn && <NavLink to="/search" className={link}>🔍 {t('nav.search')}</NavLink>}
+          <NavLink to="/" className="mr-4"><Logo /></NavLink>
+          <NavLink to="/" end className={link}>🏠 {t('nav.home')}</NavLink>
           <NavLink to="/cards" className={link}>🃏 {t('nav.cards')}</NavLink>
-          <NavLink to="/stats" className={link}>📈 {t('nav.stats')}</NavLink>
+          <NavLink to="/contexts/new" className={link}>➕ {t('nav.add')}</NavLink>
+          {searchOn && <NavLink to="/search" className={link}>🔍 {t('nav.search')}</NavLink>}
           <NavLink to="/story" className={link}>📖 {t('nav.dailyStory')}</NavLink>
+          <NavLink to="/stats" className={link}>📈 {t('nav.stats')}</NavLink>
           {isAdmin && <NavLink to="/admin" className={link}>🛡 {t('nav.admin')}</NavLink>}
           <div className="ml-auto flex items-center gap-2">
             {learningBadge}
@@ -144,7 +143,7 @@ export function Layout() {
             className="animate-rise absolute inset-x-0 bottom-[var(--nav-h)] max-h-[calc(100dvh-var(--nav-h)-env(safe-area-inset-top))] space-y-1 overflow-y-auto rounded-t-3xl border-t border-emerald-400/20 bg-emerald-950 p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <NavLink to="/contexts" end className={sheetLink}>📚 {t('nav.contexts')}</NavLink>
+            {searchOn && <NavLink to="/search" className={sheetLink}>🔍 {t('nav.search')}</NavLink>}
             <NavLink to="/stats" className={sheetLink}>📈 {t('nav.stats')}</NavLink>
             {isAdmin && <NavLink to="/admin" className={sheetLink}>🛡 {t('nav.admin')}</NavLink>}
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -162,17 +161,15 @@ export function Layout() {
 
       {/* Bottom navigation: phones only. Padded for the iPhone home indicator (safe area). */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[var(--nav-h)] border-t border-emerald-400/15 bg-emerald-950/90 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+        <NavLink to="/" end className={({ isActive }) => tab(isActive && !moreOpen)}>
+          <span className="text-xl">🏠</span>{t('nav.home')}
+        </NavLink>
         <NavLink to="/cards" className={({ isActive }) => tab(isActive && !moreOpen)}>
           <span className="text-xl">🃏</span>{t('nav.cards')}
         </NavLink>
         <NavLink to="/contexts/new" className={({ isActive }) => tab(isActive && !moreOpen)}>
-          <span className="text-xl">✨</span>{t('nav.add')}
+          <span className="text-xl">➕</span>{t('nav.add')}
         </NavLink>
-        {searchOn && (
-          <NavLink to="/search" className={({ isActive }) => tab(isActive && !moreOpen)}>
-            <span className="text-xl">🔍</span>{t('nav.search')}
-          </NavLink>
-        )}
         <NavLink to="/story" className={({ isActive }) => tab(isActive && !moreOpen)}>
           <span className="text-xl">📖</span>{t('nav.dailyStory')}
         </NavLink>
