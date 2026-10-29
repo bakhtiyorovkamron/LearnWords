@@ -12,7 +12,7 @@ import { useMoveWords } from '../lib/moveWords'
 // Pronunciation is available only for German; other languages have no audio.
 export const hasAudio = (lang: string) => lang === 'de'
 
-// Mock storage returns mock:// URLs which browsers can't play — fall back to Web Speech API.
+// Cards have no recorded audio (audio_url is empty): the browser's speech synthesis reads the word.
 function play(card: WordCard) {
   if (!hasAudio(card.language)) return
   if (card.audio_url && /^https?:/.test(card.audio_url)) {
@@ -69,16 +69,11 @@ export function WordCardView({ card, index = 0, meaning, progress, selection }: 
     setPicking(false)
     await moveWords([card.id], folderId, folderName)
   }
-  const regen = useMutation({
-    mutationFn: () => cardsApi.regenerateAudio(card.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cards'] }),
-  })
   const remove = useMutation({
     mutationFn: () => cardsApi.remove(card.id),
     onSuccess: () => {
       // Drop the card from every cached list immediately.
       qc.setQueriesData<WordCard[]>({ queryKey: ['cards'] }, (old) => old?.filter((c) => c.id !== card.id))
-      qc.setQueriesData<WordCard[]>({ queryKey: ['context-words'] }, (old) => old?.filter((c) => c.id !== card.id))
       qc.invalidateQueries({ queryKey: ['collection'] })
     },
   })
@@ -129,14 +124,6 @@ export function WordCardView({ card, index = 0, meaning, progress, selection }: 
           className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-lime-300 to-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/40 transition hover:scale-110 active:scale-95"
         >
           ▶
-        </button>
-        <button
-          onClick={() => regen.mutate()}
-          disabled={regen.isPending}
-          title={t('wordCard.regenAudio')}
-          className={`grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300 disabled:opacity-50 ${regen.isPending ? 'animate-spin' : ''}`}
-        >
-          ↻
         </button>
         </>)}
         {!selection && (<>

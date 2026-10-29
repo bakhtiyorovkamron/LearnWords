@@ -1,7 +1,7 @@
 import { api, tokenStore } from './client'
 import type {
   AuthResponse, CollectionCard, CollectionPeriod, CollectionSort, CollectionStatus,
-  Context, ContextWithCards, DueCard, Folder, FolderList, FolderSelection, Page, Progress, SharedFolder, Stats, WordCard,
+  ContextWithCards, DueCard, Folder, FolderList, FolderSelection, Page, Progress, SharedFolder, Stats, WordCard,
 } from './types'
 
 export interface Credentials {
@@ -85,9 +85,6 @@ export const wordFixesApi = {
 }
 
 export const contextsApi = {
-  list: () => api.get<Page<Context>>('/contexts').then((r) => r.data.items),
-  words: (id: string) => api.get<Page<WordCard>>(`/contexts/${id}/words`).then((r) => r.data.items),
-  remove: (id: string) => api.delete(`/contexts/${id}`),
   create(input: {
     text: string; meaning?: string; pronunciation?: string; language?: string
     exampleSentence?: string; exampleTranslation?: string; folderId?: string
@@ -230,10 +227,8 @@ export const storiesApi = {
       })
       .then((r) => r.data),
   // Archive list: metadata + learning-language text only (no translation — resolving it for
-  // the whole archive up front could mean hundreds of AI calls). Open a date via byDate().
+  // the whole archive up front could mean hundreds of AI calls). Open one story via byId().
   list: () => api.get<{ stories: DailyStory[] }>('/stories').then((r) => r.data.stories),
-  byDate: (date: string, nativeLanguage: string) =>
-    api.get<DailyStory>(`/stories/${date}`, { params: { native_language: nativeLanguage } }).then((r) => r.data),
   // The backend retries the AI call up to 3 times, so allow several minutes.
   generate: (genre: string, nativeLanguage: string) =>
     api
@@ -410,7 +405,6 @@ export const translationsApi = {
 
 export const cardsApi = {
   list: () => api.get<Page<WordCard>>('/word-cards', { params: { limit: 100 } }).then((r) => r.data.items),
-  regenerateAudio: (id: string) => api.post<WordCard>(`/word-cards/${id}/audio`).then((r) => r.data),
   remove: (id: string) => api.delete(`/word-cards/${id}`),
 }
 

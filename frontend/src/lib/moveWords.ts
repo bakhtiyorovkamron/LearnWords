@@ -25,7 +25,7 @@ export function useMoveWords() {
 
   const refresh = useCallback(() => {
     // Folder counters, due-today and every word list depend on the folder.
-    for (const key of ['collection', 'folders', 'review-due', 'cards', 'context-words']) {
+    for (const key of ['collection', 'folders', 'review-due', 'cards']) {
       void qc.invalidateQueries({ queryKey: [key] })
     }
   }, [qc])

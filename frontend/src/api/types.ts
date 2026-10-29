@@ -13,8 +13,6 @@ export interface AuthResponse {
 export interface Context {
   id: string
   user_id: string
-  image_url?: string
-  photo_credit?: string
   source_text: string
   meaning?: string
   language: string

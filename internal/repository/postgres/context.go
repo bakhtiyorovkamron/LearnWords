@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -18,20 +16,14 @@ func NewContextRepository(pool *pgxpool.Pool) *ContextRepository {
 	return &ContextRepository{pool: pool}
 }
 
-const contextCols = `id, user_id, image_url, photo_credit, source_text, language, created_at, meaning`
-
-func scanContext(row pgx.Row) (domain.Context, error) {
-	var c domain.Context
-	err := row.Scan(&c.ID, &c.UserID, &c.ImageURL, &c.PhotoCredit, &c.SourceText, &c.Language, &c.CreatedAt, &c.Meaning)
-	return c, err
-}
+const contextCols = `id, user_id, source_text, language, created_at, meaning`
 
 // CreateWithCards stores a context and its word cards atomically.
 func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO contexts (`+contextCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			c.ID, c.UserID, c.ImageURL, c.PhotoCredit, c.SourceText, c.Language, c.CreatedAt, c.Meaning); err != nil {
+			`INSERT INTO contexts (`+contextCols+`) VALUES ($1, $2, $3, $4, $5, $6)`,
+			c.ID, c.UserID, c.SourceText, c.Language, c.CreatedAt, c.Meaning); err != nil {
 			return err
 		}
 		batch := &pgx.Batch{}
@@ -55,26 +47,4 @@ func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Conte
 		}
 		return tx.SendBatch(ctx, batch).Close()
 	})
-}
-
-func (r *ContextRepository) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.Context, error) {
-	rows, err := r.pool.Query(ctx,
-		`SELECT `+contextCols+` FROM contexts WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-		userID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Context, error) { return scanContext(row) })
-}
-
-func (r *ContextRepository) GetByID(ctx context.Context, userID, id uuid.UUID) (*domain.Context, error) {
-	c, err := scanContext(r.pool.QueryRow(ctx,
-		`SELECT `+contextCols+` FROM contexts WHERE id = $1 AND user_id = $2`, id, userID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, domain.ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
 }

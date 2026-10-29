@@ -17,7 +17,7 @@ type ContextHandler struct{ svc *service.ContextService }
 func NewContextHandler(svc *service.ContextService) *ContextHandler { return &ContextHandler{svc: svc} }
 
 type createContextJSON struct {
-	Text               string `json:"text" binding:"required,max=2000"`
+	Text               string `json:"text" binding:"required,max=100"`
 	Meaning            string `json:"meaning" binding:"max=500"`
 	Pronunciation      string `json:"pronunciation" binding:"max=200"`
 	ExampleSentence    string `json:"example_sentence" binding:"max=500"`
@@ -64,7 +64,8 @@ func parseOptionalFolder(s string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
-// Create accepts multipart/form-data (text, meaning, language) or JSON {"text","meaning","language"}.
+// Create accepts multipart/form-data (text, meaning, language) or JSON {"text","meaning","language"}:
+// a word or phrase (up to 100 characters) with its translation → one card.
 func (h *ContextHandler) Create(c *gin.Context) {
 	var in service.CreateContextInput
 	var folder string
@@ -78,14 +79,14 @@ func (h *ContextHandler) Create(c *gin.Context) {
 		folder = c.PostForm("folder_id")
 		in.Grammar = grammarJSON{Lemma: c.PostForm("lemma"), Article: c.PostForm("article"),
 			Plural: c.PostForm("plural"), PartOfSpeech: c.PostForm("part_of_speech")}.grammar()
-		if strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 2000 {
-			badRequest(c, "text is required (max 2000 chars)")
+		if strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 100 {
+			badRequest(c, "text is required (max 100 chars)")
 			return
 		}
 	} else {
 		var req createContextJSON
 		if err := c.ShouldBindJSON(&req); err != nil {
-			badRequest(c, "text is required (max 2000 chars)")
+			badRequest(c, "text is required (max 100 chars)")
 			return
 		}
 		in = service.CreateContextInput{Text: req.Text, Meaning: req.Meaning, Pronunciation: req.Pronunciation,
@@ -108,29 +109,6 @@ func (h *ContextHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 }
 
-func (h *ContextHandler) List(c *gin.Context) {
-	limit, offset := pagination(c)
-	items, err := h.svc.List(c.Request.Context(), userID(c), limit, offset)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "limit": limit, "offset": offset})
-}
-
-func (h *ContextHandler) Words(c *gin.Context) {
-	id, ok := pathUUID(c, "id")
-	if !ok {
-		return
-	}
-	items, err := h.svc.Words(c.Request.Context(), userID(c), id)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
-}
-
 func (h *ContextHandler) WordCards(c *gin.Context) {
 	limit, offset := pagination(c)
 	items, err := h.svc.Cards(c.Request.Context(), userID(c), limit, offset)
@@ -139,17 +117,4 @@ func (h *ContextHandler) WordCards(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "limit": limit, "offset": offset})
-}
-
-func (h *ContextHandler) RegenerateAudio(c *gin.Context) {
-	id, ok := pathUUID(c, "id")
-	if !ok {
-		return
-	}
-	card, err := h.svc.RegenerateAudio(c.Request.Context(), userID(c), id)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, card)
 }

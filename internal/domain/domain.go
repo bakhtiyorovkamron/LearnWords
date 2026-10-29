@@ -41,23 +41,12 @@ type User struct {
 // Context is user-entered text that words are extracted from.
 // ImageURL holds an illustrative photo found for the context.
 type Context struct {
-	ID          uuid.UUID `json:"id"`
-	UserID      uuid.UUID `json:"user_id"`
-	ImageURL    *string   `json:"image_url,omitempty"`
-	PhotoCredit *string   `json:"photo_credit,omitempty"`
-	SourceText  string    `json:"source_text"`
-	Meaning     string    `json:"meaning"`
-	Language    string    `json:"language"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-// Photo is an image search result (licensed for reuse, attribution required).
-// URL is a stable, hotlink-safe display URL; Original points to the full-size file.
-type Photo struct {
-	URL       string `json:"url"`
-	Original  string `json:"original"`
-	Credit    string `json:"credit"`
-	SourceURL string `json:"source_url"`
+	ID         uuid.UUID `json:"id"`
+	UserID     uuid.UUID `json:"user_id"`
+	SourceText string    `json:"source_text"`
+	Meaning    string    `json:"meaning"`
+	Language   string    `json:"language"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type WordCard struct {

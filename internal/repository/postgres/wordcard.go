@@ -31,16 +31,6 @@ func collectCards(rows pgx.Rows) ([]domain.WordCard, error) {
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.WordCard, error) { return scanCard(row) })
 }
 
-func (r *WordCardRepository) ListByContext(ctx context.Context, userID, contextID uuid.UUID) ([]domain.WordCard, error) {
-	rows, err := r.pool.Query(ctx,
-		`SELECT `+cardCols+` FROM word_cards WHERE user_id = $1 AND context_id = $2 ORDER BY created_at`,
-		userID, contextID)
-	if err != nil {
-		return nil, err
-	}
-	return collectCards(rows)
-}
-
 func (r *WordCardRepository) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.WordCard, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+cardCols+` FROM word_cards WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
@@ -61,16 +51,4 @@ func (r *WordCardRepository) GetByID(ctx context.Context, userID, id uuid.UUID) 
 		return nil, err
 	}
 	return &w, nil
-}
-
-func (r *WordCardRepository) UpdateAudioURL(ctx context.Context, userID, id uuid.UUID, url string) error {
-	tag, err := r.pool.Exec(ctx,
-		`UPDATE word_cards SET audio_url = $1 WHERE id = $2 AND user_id = $3`, url, id, userID)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrNotFound
-	}
-	return nil
 }

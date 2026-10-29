@@ -18,7 +18,6 @@ type Config struct {
 	CORSOrigins  []string
 	ServiceName  string
 	OTLPEndpoint string // empty = tracing without export
-	TargetLang   string // language to translate into
 	AutoMigrate  bool
 	CookieSecure bool // set true behind HTTPS
 	// HeroEnabled: FEATURE_HERO_ENABLED (default true). false → GET /api/hero answers 404 for
@@ -38,7 +37,6 @@ func Load() (*Config, error) {
 		CORSOrigins:  strings.Split(env("CORS_ORIGINS", "http://localhost:5173"), ","),
 		ServiceName:  env("SERVICE_NAME", "learnwords-api"),
 		OTLPEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
-		TargetLang:   env("TRANSLATION_TARGET_LANG", "ru"),
 		AutoMigrate:  env("AUTO_MIGRATE", "true") == "true",
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
 		HeroEnabled:  !isOff(env("FEATURE_HERO_ENABLED", "true")),

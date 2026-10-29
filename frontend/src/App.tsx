@@ -4,7 +4,6 @@ import { Layout } from './components/Layout'
 import { AuthPage } from './pages/AuthPage'
 import { ContextsPage } from './pages/ContextsPage'
 import { NewContextPage } from './pages/NewContextPage'
-import { ContextDetailPage } from './pages/ContextDetailPage'
 import { CardsPage } from './pages/CardsPage'
 import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
@@ -25,7 +24,6 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/contexts" element={<ContextsPage />} />
           <Route path="/contexts/new" element={<NewContextPage />} />
-          <Route path="/contexts/:id" element={<ContextDetailPage />} />
           <Route path="/cards" element={<CardsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />

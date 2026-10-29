@@ -38,7 +38,6 @@ function setup() {
   qc.setQueryData(['collection', { folder: 'f-old', status: 'all' }], page([card, other]))
   qc.setQueryData(['collection', { folder: 'f-new', status: 'all' }], page([]))
   qc.setQueryData(['cards'], [card, other])
-  qc.setQueryData(['context-words', 'c1'], [card])
   qc.setQueryData(['translations', 'w1,w2', 'ru'], { w1: { translation: 'ещё', example_translation: '' } }) // what training cached
   const onClose = vi.fn()
   render(<QueryClientProvider client={qc}><EditWordModal card={card} onClose={onClose} /></QueryClientProvider>)

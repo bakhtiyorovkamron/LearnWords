@@ -28,7 +28,6 @@ describe('brand: yodla', () => {
     expect(document.title).toBe('yodla — German words in context')
     await i18n.changeLanguage('uz')
     expect(document.title).toBe('yodla — so‘zlarni kontekst bilan yodla')
-    expect(i18n.t('app.tagline')).toBe('So‘zlarni jonli gaplar orqali o‘rgan')
   })
 
   it('install banner texts name yodla in every language', async () => {

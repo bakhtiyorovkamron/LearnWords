@@ -23,7 +23,7 @@ function FixRow({ fix }: { fix: WordFix }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const done = () => {
-    for (const k of ['word-fixes', 'collection', 'cards', 'review-due', 'contexts', 'context-words']) {
+    for (const k of ['word-fixes', 'collection', 'cards', 'review-due', 'contexts']) {
       qc.invalidateQueries({ queryKey: [k] })
     }
   }

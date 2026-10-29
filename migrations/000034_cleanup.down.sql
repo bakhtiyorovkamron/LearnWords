@@ -1,0 +1,3 @@
+ALTER TABLE contexts ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE contexts ADD COLUMN IF NOT EXISTS photo_credit TEXT;
+ALTER TABLE daily_stories ADD COLUMN IF NOT EXISTS story_ru TEXT;

@@ -144,7 +144,6 @@ func (s *SearchService) Add(ctx context.Context, userID uuid.UUID, in AddInput) 
 		ExampleTranslation: in.ExampleTranslation,
 		Language:           domain.LangFrom(ctx),
 		FolderID:           in.FolderID,
-		SingleWord:         true,
 		Grammar:            in.Grammar,
 	})
 }

@@ -29,7 +29,6 @@ function patchCaches(qc: ReturnType<typeof useQueryClient>, updated: CollectionC
   const merge = <T extends WordCard>(c: T): T => (c.id === updated.id ? { ...c, ...updated } : c)
   const mergeList = (old: unknown) => (Array.isArray(old) ? old.map(merge) : old)
   qc.setQueriesData<unknown>({ queryKey: ['cards'] }, mergeList)
-  qc.setQueriesData<unknown>({ queryKey: ['context-words'] }, mergeList)
 
   const folderChanged = (updated.folder_id ?? null) !== oldFolder
   qc.setQueriesData<unknown>({ queryKey: ['collection'] }, (old: unknown) => {
@@ -99,7 +98,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
       try {
         if (updated?.id) patchCaches(qc, updated, oldFolder)
         else { // no card in the response: re-read the lists instead of guessing
-          for (const key of ['cards', 'context-words', 'collection']) qc.invalidateQueries({ queryKey: [key] })
+          for (const key of ['cards', 'collection']) qc.invalidateQueries({ queryKey: [key] })
         }
         refreshLists(qc, folderChanged)
       } catch (e) {

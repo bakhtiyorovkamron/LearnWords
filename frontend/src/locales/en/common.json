@@ -52,17 +52,10 @@
     "banned": "Your account has been banned"
   },
   "home": {
-    "greeting": "Hallo!",
-    "greetingAccent": "Was lernen wir heute?",
     "subtitle": "Each phrase is a set of new words in a living context.",
-    "newPhrase": "✨ New phrase",
-    "myContexts": "My contexts",
+    "newPhrase": "✨ Add a word",
     "empty": "Nothing here yet. Add your first {{langName}} phrase!",
-    "start": "Start",
-    "open": "Open →",
-    "deleteConfirm": "Delete this context?",
-    "deleteTitle": "Delete context",
-    "deleteFailed": "Could not delete: {{error}}"
+    "start": "Start"
   },
   "stats": {
     "wordsAdded": "Words added",
@@ -90,12 +83,11 @@
   },
   "newContext": {
     "titleA": "New ",
-    "titleB": "phrase",
-    "subtitle": "Paste text from a movie, a song or a chat — we'll break down every word.",
+    "titleB": "word",
+    "subtitle": "A word or a whole phrase — saved as one card with your translation.",
     "translation": "Translation *",
     "translationPlaceholder": "What does the word or phrase mean?",
     "pronunciation": "Pronunciation (optional)",
-    "pronunciationPlaceholder": "e.g. [ɪç]",
     "example": "Example sentence",
     "hintNeedTranslation": "Word and translation are required",
     "hintSingleWord": "Available when a single word is entered",
@@ -107,17 +99,12 @@
     "autoExampleHint": "If left empty, an example for a single word will be added automatically after saving.",
     "tryExample": "Or try an example",
     "analyzing": "Analyzing words…",
-    "submit": "Analyze phrase →",
+    "submit": "➕ Add",
     "errTextRequired": "Enter a {{langName}} word or phrase",
     "errTranslationRequired": "Enter a translation",
-    "errPronunciationRequired": "Enter the pronunciation"
-  },
-  "detail": {
-    "back": "← All contexts",
-    "original": "Original · {{langNative}}",
-    "meaning": "Meaning",
-    "added": "Added {{date}}",
-    "words": "Words"
+    "added": "“{{word}}” added",
+    "open": "Open",
+    "tooLong": "Up to {{max}} characters. For a longer text, use a textbook photo."
   },
   "cards": {
     "saved": "Saved",
@@ -143,7 +130,6 @@
     },
     "view": { "list": "List", "flip": "Flashcards" },
     "status": { "new": "new", "learning": "learning", "learned": "learned" },
-    "boxTitle": "Level {{level}} of 5",
     "flipHint": "Click to flip",
     "keysHint": "← → to browse, Space to flip",
     "prev": "Back",
@@ -190,9 +176,6 @@
     "deleted": "Folder deleted",
     "created": "Folder created",
     "saved": "Folder saved",
-    "moveTo": "Folder:",
-    "moved": "Word moved",
-    "moveFailed": "Could not move",
     "trainOn": "Train words from",
     "myFolders": "My folders",
     "open": "Open",
@@ -215,21 +198,17 @@
     "translation": "Translation",
     "pronunciation": "Pronunciation",
     "example": "Example sentence (with a ___ gap)",
-    "examplePlaceholder": "Ich esse eine ___.",
     "exampleTranslation": "Example translation",
     "progressKept": "Learning progress for this word is kept.",
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel",
-    "saved": "Word updated",
-    "saveFailed": "Could not save: {{error}}",
     "errWord": "Enter the {{langName}} word",
     "errTranslation": "Enter a translation"
   },
   "wordCard": {
     "deleteConfirm": "Delete the word “{{word}}”?",
     "listen": "Listen",
-    "regenAudio": "Regenerate audio",
     "delete": "Delete word",
     "deleteFailed": "Could not delete"
   },
@@ -244,7 +223,6 @@
     "sessionLine": "In this session: {{count}}"
   },
   "quiz": {
-    "choose": "Choose the translation",
     "prompt": {
       "de_ru": "Choose the translation",
       "ru_de": "Choose the {{langName}} word",
@@ -351,11 +329,11 @@
   "settings": {"sounds": "Training sounds"},
   "feedback": {"title": "How do you like yodla?", "star": "{{n}} of 5", "placeholder": "What could be better? (optional)", "placeholderLow": "What went wrong? (optional)", "placeholderHigh": "What did you like? (optional)", "send": "Send", "thanks": "Thanks for your feedback! 💚"},
   "errors": {"saveFailed": "Couldn't save. Please try again.", "featureDisabled": "This feature is turned off for your account.", "dailyLimit": "Today's limit is used up — tomorrow you get {{limit}} again."},
-  "photo": {"title": "Words from a photo", "hint": "Take a photo of a textbook page or a word list — we find the words and translate them. You choose which to add.", "choose": "📷 Choose a photo", "another": "📷 Another photo", "reading": "Reading the photo…", "left": "Left today: {{n}} of {{limit}}", "found": "Words found: {{n}}", "noWords": "No words to learn were found in the photo. Try a closer, sharper shot.", "have": "already added", "add": "Add {{count}}", "adding": "Adding…", "added": "Added: {{added}}. Already had: {{skipped}}", "notImage": "Please choose an image: JPEG, PNG, WebP or GIF.", "tooLarge": "The photo is too large (5 MB at most).", "notConfigured": "Reading photos is not available right now.", "failed": "Could not read the photo: {{error}}", "noneLeft": "No photos left today — {{limit}} again tomorrow", "folderNew": "📁 New folder", "folderExisting": "Existing folder", "folderName": "Folder name", "folderDefault": "Lesson — {{date}}", "addedTo": "Added to “{{folder}}”: {{added}}. Already there: {{skipped}}", "openFolder": "Open folder", "errTooSmall": "The photo is too small — take it closer to the page.", "errTooDark": "Too dark — take the photo in good light.", "errBlurry": "The photo is blurry — hold the phone steady and try again.", "errNotDocument": "No study text in this photo — take a picture of a textbook page or a word list.", "errUnreadable": "The text can't be read — take the photo closer and straighter.", "notCharged": "Your daily limit was not used."},
+  "photo": {"title": "Words from a photo", "hint": "Take a photo of a textbook page or a word list — we find the words and translate them. You choose which to add.", "choose": "📷 Choose a photo", "another": "📷 Another photo", "reading": "Reading the photo…", "left": "Left today: {{n}} of {{limit}}", "found": "Words found: {{n}}", "noWords": "No words to learn were found in the photo. Try a closer, sharper shot.", "have": "already added", "add": "Add {{count}}", "adding": "Adding…", "notImage": "Please choose an image: JPEG, PNG, WebP or GIF.", "tooLarge": "The photo is too large (5 MB at most).", "notConfigured": "Reading photos is not available right now.", "failed": "Could not read the photo: {{error}}", "noneLeft": "No photos left today — {{limit}} again tomorrow", "folderNew": "📁 New folder", "folderExisting": "Existing folder", "folderName": "Folder name", "folderDefault": "Lesson — {{date}}", "addedTo": "Added to “{{folder}}”: {{added}}. Already there: {{skipped}}", "openFolder": "Open folder", "errTooSmall": "The photo is too small — take it closer to the page.", "errTooDark": "Too dark — take the photo in good light.", "errBlurry": "The photo is blurry — hold the phone steady and try again.", "errNotDocument": "No study text in this photo — take a picture of a textbook page or a word list.", "errUnreadable": "The text can't be read — take the photo closer and straighter.", "notCharged": "Your daily limit was not used."},
   "features": {"photo_import": "📷 Textbook photo", "daily_story": "📖 Daily story", "word_search": "🔍 AI word search", "story_autotranslate": "✍️ Auto-translation of own stories"},
   "share": {"emptyFolder": "The folder is empty — add words to share it", "isShared": "Shared via link", "title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},
   "shared": {"words": "Words: {{count}}", "add": "Add to my words", "loginToAdd": "Log in to add these words", "added": "Added: {{added}}. Already had: {{skipped}}", "notFound": "This link is invalid or was turned off", "own": "This is your folder", "langMismatch": "This folder is for a different learning language", "empty": "This folder is empty"},
   "contact": {"title": "Contact us", "question": "Questions or problems? Message us:", "loginProblem": "Can't log in? Message us:", "reportProblem": "Report a problem"},
   "errorBoundary": {"title": "Something went wrong", "text": "The page crashed. Reload it — if that doesn't help, message us.", "reload": "Reload"},
-  "app": {"title": "yodla — German words in context", "tagline": "Learn words in real sentences"}
+  "app": {"title": "yodla — German words in context"}
 }

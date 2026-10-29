@@ -2,13 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"testing"
 
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
-	"learnwords/internal/provider/mock"
 	"learnwords/internal/service"
 	"learnwords/migrations"
 )
@@ -69,12 +69,10 @@ func (f trFixture) cached(t *testing.T, word uuid.UUID) map[string]string {
 
 func (f trFixture) createWord(t *testing.T, uiLang, word, meaning string) domain.WordCard {
 	t.Helper()
-	svc := service.NewContextService(f.contexts, f.cards, service.Providers{
-		Translator: mock.Translator{}, Transcriber: mock.Transcriber{}, TTS: mock.TTS{}, Storage: mock.NewStorage(),
-	}, "ru")
+	svc := service.NewContextService(f.contexts, f.cards, service.Providers{})
 	ctx := domain.WithTranslationLang(domain.WithLang(context.Background(), "de"), uiLang)
 	res, err := svc.Create(ctx, f.user, service.CreateContextInput{
-		Text: word, Meaning: meaning, SingleWord: true, ExampleSentence: "Das Kind ist ___.", ExampleTranslation: "Ребёнок спокоен.",
+		Text: word, Meaning: meaning, ExampleSentence: "Das Kind ist ___.", ExampleTranslation: "Ребёнок спокоен.",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -113,25 +111,11 @@ func TestCreate_TranslationLanguageFollowsWhoWroteIt(t *testing.T) {
 	if c := f.createWord(t, "uz", "still", "tinch"); lang(c) != "uz" {
 		t.Errorf("typed by an Uzbek-interface user: %s", lang(c))
 	}
-	// No meaning typed: the translation comes from the translator in the configured target language (ru).
-	svc := service.NewContextService(f.contexts, f.cards, service.Providers{
-		Translator: mock.Translator{}, Transcriber: mock.Transcriber{}, TTS: mock.TTS{}, Storage: mock.NewStorage(),
-	}, "ru")
+	// A card always carries the user's own translation: none typed is refused, nothing is saved.
+	svc := service.NewContextService(f.contexts, f.cards, service.Providers{})
 	ctx := domain.WithTranslationLang(domain.WithLang(context.Background(), "de"), "uz")
-	res, err := svc.Create(ctx, f.user, service.CreateContextInput{Text: "danke", SingleWord: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c := res.Cards[0]; c.Translation != "спасибо" || lang(c) != "ru" {
-		t.Errorf("generated: %q in %s", c.Translation, lang(c))
-	}
-	// Nothing known (the mock has no entry): no translation, no language, no cache row.
-	res, _ = svc.Create(ctx, f.user, service.CreateContextInput{Text: "Wolkenkratzer", SingleWord: true})
-	if c := res.Cards[0]; c.Translation != "" || c.TranslationLanguage != nil {
-		t.Errorf("empty translation got a language: %+v", c)
-	}
-	if got := f.cached(t, res.Cards[0].ID); len(got) != 0 {
-		t.Errorf("cache rows for an empty translation: %v", got)
+	if _, err := svc.Create(ctx, f.user, service.CreateContextInput{Text: "danke"}); !errors.Is(err, domain.ErrValidation) {
+		t.Errorf("no translation: %v", err)
 	}
 }
 

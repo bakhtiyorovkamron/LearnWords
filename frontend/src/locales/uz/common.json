@@ -52,17 +52,10 @@
     "banned": "Hisobingiz bloklangan"
   },
   "home": {
-    "greeting": "Hallo!",
-    "greetingAccent": "Was lernen wir heute?",
     "subtitle": "Har bir ibora — jonli kontekstdagi yangi so‘zlar to‘plami.",
-    "newPhrase": "✨ Yangi ibora",
-    "myContexts": "Mening kontekstlarim",
+    "newPhrase": "✨ So‘z qo‘shish",
     "empty": "Hozircha bo‘sh. {{langUz}} tilidagi birinchi iborani qo‘shing!",
-    "start": "Boshlash",
-    "open": "Ochish →",
-    "deleteConfirm": "Ushbu kontekst o‘chirilsinmi?",
-    "deleteTitle": "Kontekstni o‘chirish",
-    "deleteFailed": "O‘chirib bo‘lmadi: {{error}}"
+    "start": "Boshlash"
   },
   "stats": {
     "wordsAdded": "Qo‘shilgan so‘zlar",
@@ -90,12 +83,11 @@
   },
   "newContext": {
     "titleA": "Yangi ",
-    "titleB": "ibora",
-    "subtitle": "Film, qo‘shiq yoki yozishmadan matnni joylashtiring — har bir so‘zni tahlil qilamiz.",
+    "titleB": "so‘z",
+    "subtitle": "So‘z yoki butun ibora — tarjimangiz bilan bitta kartochka bo‘lib saqlanadi.",
     "translation": "Tarjima *",
     "translationPlaceholder": "So‘z yoki ibora nimani anglatadi?",
     "pronunciation": "Talaffuz (ixtiyoriy)",
-    "pronunciationPlaceholder": "masalan: [ихь]",
     "example": "Misol gap",
     "hintNeedTranslation": "So‘z va tarjima kerak",
     "hintSingleWord": "Bitta so‘z kiritilganda mavjud",
@@ -107,17 +99,12 @@
     "autoExampleHint": "Bo‘sh qoldirilsa, bitta so‘z uchun misol saqlangandan keyin avtomatik qo‘shiladi.",
     "tryExample": "Yoki misolni sinab ko‘ring",
     "analyzing": "So‘zlar tahlil qilinmoqda…",
-    "submit": "Iborani tahlil qilish →",
+    "submit": "➕ Qo‘shish",
     "errTextRequired": "{{langUz}} tilida so‘z yoki ibora kiriting",
     "errTranslationRequired": "Tarjimani kiriting",
-    "errPronunciationRequired": "Talaffuzni kiriting"
-  },
-  "detail": {
-    "back": "← Barcha kontekstlar",
-    "original": "Asl matn · {{langNative}}",
-    "meaning": "Ma’nosi",
-    "added": "Qo‘shilgan: {{date}}",
-    "words": "So‘zlar"
+    "added": "«{{word}}» qo‘shildi",
+    "open": "Ochish",
+    "tooLong": "Ko‘pi bilan {{max}} belgi. Uzun matn uchun darslik suratidan foydalaning."
   },
   "cards": {
     "saved": "Saqlandi",
@@ -143,7 +130,6 @@
     },
     "view": { "list": "Ro‘yxat", "flip": "Flip-kartochkalar" },
     "status": { "new": "yangi", "learning": "o‘rganyapman", "learned": "o‘rganilgan" },
-    "boxTitle": "5 dan {{level}}-daraja",
     "flipHint": "Aylantirish uchun bosing",
     "keysHint": "← → — varaqlash, probel — aylantirish",
     "prev": "Orqaga",
@@ -190,9 +176,6 @@
     "deleted": "Papka o‘chirildi",
     "created": "Papka yaratildi",
     "saved": "Papka saqlandi",
-    "moveTo": "Papka:",
-    "moved": "So‘z ko‘chirildi",
-    "moveFailed": "Ko‘chirib bo‘lmadi",
     "trainOn": "Qaysi so‘zlarni mashq qilish",
     "myFolders": "Mening papkalarim",
     "open": "Ochish",
@@ -215,21 +198,17 @@
     "translation": "Tarjima",
     "pronunciation": "Talaffuz",
     "example": "Misol gap (___ bo‘sh joy bilan)",
-    "examplePlaceholder": "Ich esse eine ___.",
     "exampleTranslation": "Misol tarjimasi",
     "progressKept": "So‘zni o‘rganish natijasi saqlanadi.",
     "save": "Saqlash",
     "saving": "Saqlanmoqda…",
     "cancel": "Bekor qilish",
-    "saved": "So‘z yangilandi",
-    "saveFailed": "Saqlab bo‘lmadi: {{error}}",
     "errWord": "{{langUz}} tilidagi so‘zni kiriting",
     "errTranslation": "Tarjimani kiriting"
   },
   "wordCard": {
     "deleteConfirm": "«{{word}}» so‘zi o‘chirilsinmi?",
     "listen": "Tinglash",
-    "regenAudio": "Ovozni qayta yaratish",
     "delete": "So‘zni o‘chirish",
     "deleteFailed": "O‘chirib bo‘lmadi"
   },
@@ -244,7 +223,6 @@
     "sessionLine": "Shu mashqda: {{count}}"
   },
   "quiz": {
-    "choose": "Tarjimani tanlang",
     "prompt": {
       "de_ru": "Tarjimani tanlang",
       "ru_de": "So‘zni {{langUz}} tilida tanlang",
@@ -351,11 +329,11 @@
   "settings": {"sounds": "Mashqdagi ovozlar"},
   "feedback": {"title": "yodla sizga yoqyaptimi?", "star": "5 dan {{n}}", "placeholder": "Nimani yaxshilash kerak? (ixtiyoriy)", "placeholderLow": "Nima yoqmadi? (ixtiyoriy)", "placeholderHigh": "Sizga nima yoqdi? (ixtiyoriy)", "send": "Yuborish", "thanks": "Fikringiz uchun rahmat! 💚"},
   "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring.", "featureDisabled": "Bu funksiya siz uchun o‘chirilgan.", "dailyLimit": "Bugungi limit tugadi, ertaga yana {{limit}} ta bo‘ladi."},
-  "photo": {"title": "Suratdan so‘zlar", "hint": "Darslik sahifasi yoki so‘zlar ro‘yxatini suratga oling — so‘zlarni topib, tarjima qilamiz. Qaysilarini qo‘shishni o‘zingiz tanlaysiz.", "choose": "📷 Surat tanlash", "another": "📷 Boshqa surat", "reading": "Surat o‘qilmoqda…", "left": "Bugun qoldi: {{limit}} tadan {{n}} ta", "found": "Topilgan so‘zlar: {{n}}", "noWords": "Suratda o‘rganiladigan so‘z topilmadi. Yaqinroq va aniqroq suratga oling.", "have": "allaqachon bor", "add": "{{count}} ta qo‘shish", "adding": "Qo‘shilmoqda…", "added": "Qo‘shildi: {{added}}. Avvaldan bor edi: {{skipped}}", "notImage": "Rasm fayli kerak: JPEG, PNG, WebP yoki GIF.", "tooLarge": "Surat juda katta (ko‘pi bilan 5 MB).", "notConfigured": "Suratni o‘qish hozir mavjud emas.", "failed": "Suratni o‘qib bo‘lmadi: {{error}}", "noneLeft": "Bugungi suratlar tugadi — ertaga yana {{limit}} ta", "folderNew": "📁 Yangi papka", "folderExisting": "Mavjud papka", "folderName": "Papka nomi", "folderDefault": "Dars — {{date}}", "addedTo": "«{{folder}}» papkasiga qo‘shildi: {{added}}. Allaqachon bor edi: {{skipped}}", "openFolder": "Papkani ochish", "errTooSmall": "Surat juda kichik — sahifani yaqinroqdan suratga oling.", "errTooDark": "Juda qorong‘i — yaxshi yorug‘likda suratga oling.", "errBlurry": "Surat xira chiqdi — telefonni qimirlatmasdan qayta suratga oling.", "errNotDocument": "Suratda darslik matni yo‘q — sahifani yoki so‘zlar ro‘yxatini suratga oling.", "errUnreadable": "Matnni o‘qib bo‘lmadi — yaqinroqdan va to‘g‘riroq suratga oling.", "notCharged": "Limit sarflanmadi."},
+  "photo": {"title": "Suratdan so‘zlar", "hint": "Darslik sahifasi yoki so‘zlar ro‘yxatini suratga oling — so‘zlarni topib, tarjima qilamiz. Qaysilarini qo‘shishni o‘zingiz tanlaysiz.", "choose": "📷 Surat tanlash", "another": "📷 Boshqa surat", "reading": "Surat o‘qilmoqda…", "left": "Bugun qoldi: {{limit}} tadan {{n}} ta", "found": "Topilgan so‘zlar: {{n}}", "noWords": "Suratda o‘rganiladigan so‘z topilmadi. Yaqinroq va aniqroq suratga oling.", "have": "allaqachon bor", "add": "{{count}} ta qo‘shish", "adding": "Qo‘shilmoqda…", "notImage": "Rasm fayli kerak: JPEG, PNG, WebP yoki GIF.", "tooLarge": "Surat juda katta (ko‘pi bilan 5 MB).", "notConfigured": "Suratni o‘qish hozir mavjud emas.", "failed": "Suratni o‘qib bo‘lmadi: {{error}}", "noneLeft": "Bugungi suratlar tugadi — ertaga yana {{limit}} ta", "folderNew": "📁 Yangi papka", "folderExisting": "Mavjud papka", "folderName": "Papka nomi", "folderDefault": "Dars — {{date}}", "addedTo": "«{{folder}}» papkasiga qo‘shildi: {{added}}. Allaqachon bor edi: {{skipped}}", "openFolder": "Papkani ochish", "errTooSmall": "Surat juda kichik — sahifani yaqinroqdan suratga oling.", "errTooDark": "Juda qorong‘i — yaxshi yorug‘likda suratga oling.", "errBlurry": "Surat xira chiqdi — telefonni qimirlatmasdan qayta suratga oling.", "errNotDocument": "Suratda darslik matni yo‘q — sahifani yoki so‘zlar ro‘yxatini suratga oling.", "errUnreadable": "Matnni o‘qib bo‘lmadi — yaqinroqdan va to‘g‘riroq suratga oling.", "notCharged": "Limit sarflanmadi."},
   "features": {"photo_import": "📷 Darslik surati", "daily_story": "📖 Kun hikoyasi", "word_search": "🔍 AI orqali so‘z qidirish", "story_autotranslate": "✍️ O‘z hikoyalarini avtomatik tarjima qilish"},
   "share": {"emptyFolder": "Papka bo‘sh — ulashish uchun so‘z qo‘shing", "isShared": "Havola orqali ulashilgan", "title": "«{{name}}» papkasini ulashish", "hint": "Havolasi bor har kim so‘zlarni ko‘rib, o‘ziga qo‘sha oladi. Sizning natijalaringiz ulashilmaydi.", "copy": "Havolani nusxalash", "copied": "Havola nusxalandi", "telegram": "Telegram orqali yuborish", "telegramText": "yodla.fun saytida nemis tilini o‘rganyapman — mana mening «{{name}}» so‘zlarim", "regenerate": "Yangi havola yaratish", "disable": "Havolani o‘chirish", "disabled": "Havola o‘chirildi", "imports": "O‘ziga qo‘shganlar: {{count}}"},
   "shared": {"words": "So‘zlar: {{count}}", "add": "O‘zimga qo‘shish", "loginToAdd": "So‘zlarni qo‘shish uchun kiring", "added": "Qo‘shildi: {{added}}. Avvaldan bor edi: {{skipped}}", "notFound": "Havola noto‘g‘ri yoki o‘chirilgan", "own": "Bu sizning papkangiz", "langMismatch": "Bu papka boshqa o‘rganish tili uchun", "empty": "Bu papkada hali so‘z yo‘q"},
   "contact": {"title": "Biz bilan bog‘lanish", "question": "Savol yoki muammo bormi? Bizga yozing:", "loginProblem": "Kira olmayapsizmi? Bizga yozing:", "reportProblem": "Muammo haqida xabar berish"},
   "errorBoundary": {"title": "Nimadir xato ketdi", "text": "Sahifa xato bilan to‘xtadi. Uni qayta yuklang — yordam bermasa, bizga yozing.", "reload": "Qayta yuklash"},
-  "app": {"title": "yodla — so‘zlarni kontekst bilan yodla", "tagline": "So‘zlarni jonli gaplar orqali o‘rgan"}
+  "app": {"title": "yodla — so‘zlarni kontekst bilan yodla"}
 }

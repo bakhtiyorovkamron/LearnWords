@@ -3,45 +3,39 @@ package service
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
 	"learnwords/internal/domain"
-	"learnwords/internal/provider"
 )
 
 var tracer = otel.Tracer("learnwords/service")
 
-const maxWordsPerCtx = 50
-
+// Providers holds the optional external integrations.
 type Providers struct {
-	OCR         provider.OCR
-	Translator  provider.Translator
-	Transcriber provider.Transcriber
-	TTS         provider.TTS
-	Storage     provider.FileStorage
-	Examples    ExampleGenerator // optional; nil disables AI example generation
+	Examples ExampleGenerator // optional; nil disables AI example generation
 }
 
 type ContextService struct {
-	contexts   ContextRepository
-	cards      WordCardRepository
-	p          Providers
-	targetLang string
+	contexts ContextRepository
+	cards    WordCardRepository
+	p        Providers
 }
 
-func NewContextService(contexts ContextRepository, cards WordCardRepository, p Providers, targetLang string) *ContextService {
-	return &ContextService{contexts: contexts, cards: cards, p: p, targetLang: targetLang}
+func NewContextService(contexts ContextRepository, cards WordCardRepository, p Providers) *ContextService {
+	return &ContextService{contexts: contexts, cards: cards, p: p}
 }
+
+// Limits of a saved word or phrase (in runes). Longer text goes through the photo import.
+const maxWordLen = 100
 
 type CreateContextInput struct {
+	// Text is the word or phrase; Meaning its translation (required). They become exactly ONE card.
 	Text          string
 	Meaning       string
 	Pronunciation string
@@ -49,15 +43,15 @@ type CreateContextInput struct {
 	ExampleSentence    string
 	ExampleTranslation string
 	Language           string
-	// Optional folder for all created cards (ignored if it isn't the user's folder).
+	// Optional folder for the card (ignored if it isn't the user's folder).
 	FolderID *uuid.UUID
-	// SingleWord: save Text as exactly one card (e.g. "der Hund", "sich freuen") without tokenizing.
-	SingleWord bool
 	// Grammar from the word check (lemma, article, plural, part of speech) the user agreed to.
-	// Stored only when the text becomes exactly one card.
 	Grammar *domain.WordGrammar
 }
 
+// Create saves one word or phrase as one card with the user's translation. Nothing is
+// translated, transcribed or synthesized here: what the card says comes from the user (or from the
+// search result they confirmed), and an example sentence is generated in the background if none was given.
 func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in CreateContextInput) (*domain.ContextWithCards, error) {
 	ctx, span := tracer.Start(ctx, "ContextService.Create")
 	defer span.End()
@@ -65,182 +59,69 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 	// The learning language belongs to the account (chosen at registration), not to the request.
 	in.Language = domain.LangFrom(ctx)
 	c := domain.Context{ID: uuid.New(), UserID: userID, Language: in.Language, CreatedAt: time.Now().UTC()}
-	text := strings.TrimSpace(in.Text)
+
+	text := strings.Join(strings.Fields(in.Text), " ")
+	if n := len([]rune(text)); n < 1 || n > maxWordLen {
+		return nil, fmt.Errorf("%w: text must be 1-%d characters", domain.ErrValidation, maxWordLen)
+	}
 	meaning := strings.TrimSpace(in.Meaning)
+	if meaning == "" {
+		return nil, fmt.Errorf("%w: translation is required", domain.ErrValidation)
+	}
 	if len([]rune(meaning)) > 500 {
 		return nil, fmt.Errorf("%w: meaning too long", domain.ErrValidation)
 	}
-	c.Meaning = meaning
 	if err := in.Grammar.Validate(); err != nil {
 		return nil, err
 	}
-
-	if text == "" {
-		return nil, fmt.Errorf("%w: text is required", domain.ErrValidation)
-	}
 	c.SourceText = text
+	c.Meaning = meaning
 
-	// "der Samstag / der Sonnabend": one word with equivalent spellings → one card.
-	// The card keeps both variants; translation/pronunciation come from the user (or the first variant).
-	var variants []string
-	var words []string
-	if in.SingleWord {
-		words = []string{strings.Join(strings.Fields(text), " ")}
-	} else if variants = SplitVariants(text); variants != nil {
-		words = []string{strings.Join(variants, " / ")}
-	} else {
-		words = Tokenize(text, in.Language)
-	}
-	// A single typed word (e.g. "ich") must become a card even if it is a stopword.
-	if len(words) == 0 {
-		if fields := strings.Fields(text); len(fields) == 1 {
-			if w := strings.Trim(fields[0], ".,;:!?\"“„'()-"); w != "" {
-				words = []string{w}
-			}
-		}
-	}
-	if len(words) > maxWordsPerCtx {
-		words = words[:maxWordsPerCtx]
-	}
-	span.SetAttributes(attribute.Int("words.count", len(words)))
-
-	// Sequential for now; can be parallelized (errgroup) or moved to an async worker queue.
-	cards := make([]domain.WordCard, 0, len(words))
-	for _, w := range words {
-		lookup := w
-		if variants != nil {
-			lookup = variants[0] // generate only for the first variant
-		}
-		card := s.buildCard(ctx, c, w, lookup)
-		// The generated translation is in the configured target language.
-		if card.Translation != "" {
-			card.TranslationLanguage = ptrString(domain.NormTranslationLang(s.targetLang))
-		}
-		card.FolderID = in.FolderID
-		// A single-word phrase: the user's meaning is the word's translation.
-		if len(words) == 1 {
-			if meaning != "" {
-				card.Translation = meaning
-				// What the user typed is in the language they use the app in right now.
-				card.TranslationLanguage = ptrString(domain.TranslationLangFrom(ctx))
-			}
-			if p := strings.TrimSpace(in.Pronunciation); p != "" {
-				card.Transcription = p
-			}
-			card.SetGrammar(in.Grammar)
-			card.ExampleSentence = strings.TrimSpace(in.ExampleSentence)
-			card.ExampleTranslation = strings.TrimSpace(in.ExampleTranslation)
-			if len([]rune(card.ExampleSentence)) > 500 || len([]rune(card.ExampleTranslation)) > 500 {
-				return nil, fmt.Errorf("%w: example too long", domain.ErrValidation)
-			}
-		}
-		cards = append(cards, card)
+	// "der Samstag / der Sonnabend": one word with equivalent spellings → one card that keeps both.
+	word := text
+	variants := SplitVariants(text)
+	if variants != nil {
+		word = strings.Join(variants, " / ")
 	}
 
-	if err := s.contexts.CreateWithCards(ctx, &c, cards); err != nil {
+	card := domain.WordCard{
+		ID: uuid.New(), ContextID: c.ID, UserID: userID,
+		Word: word, Language: c.Language, CreatedAt: c.CreatedAt,
+		FolderID:    in.FolderID,
+		Translation: meaning,
+		// What the user typed is in the language they use the app in right now.
+		TranslationLanguage: ptrString(domain.TranslationLangFrom(ctx)),
+		Transcription:       strings.TrimSpace(in.Pronunciation),
+		ExampleSentence:     strings.TrimSpace(in.ExampleSentence),
+		ExampleTranslation:  strings.TrimSpace(in.ExampleTranslation),
+	}
+	card.SetGrammar(in.Grammar)
+	if len([]rune(card.ExampleSentence)) > 500 || len([]rune(card.ExampleTranslation)) > 500 {
+		return nil, fmt.Errorf("%w: example too long", domain.ErrValidation)
+	}
+
+	if err := s.contexts.CreateWithCards(ctx, &c, []domain.WordCard{card}); err != nil {
 		return nil, s.fail(span, "save context", err)
 	}
 	// No example entered manually: generate one in the background after saving.
-	if len(cards) == 1 && cards[0].ExampleSentence == "" && cards[0].Translation != "" {
-		forExample := cards[0]
+	if card.ExampleSentence == "" {
+		forExample := card
 		if variants != nil {
-			forExample.Word = variants[0]
+			forExample.Word = variants[0] // generate only for the first variant
 		}
 		s.generateExampleAsync(userID, forExample)
 	}
-	return &domain.ContextWithCards{Context: c, Cards: cards}, nil
+	return &domain.ContextWithCards{Context: c, Cards: []domain.WordCard{card}}, nil
 }
 
 func ptrString(s string) *string { return &s }
 
-// buildCard creates a card for word. Translation/transcription/audio are generated for lookup
-// (the first spelling variant). Generation failures are logged and the field is left EMPTY —
-// never filled with a placeholder — so the user sees what is missing instead of fake data.
-func (s *ContextService) buildCard(ctx context.Context, c domain.Context, word, lookup string) domain.WordCard {
-	card := domain.WordCard{
-		ID: uuid.New(), ContextID: c.ID, UserID: c.UserID,
-		Word: word, Language: c.Language, CreatedAt: c.CreatedAt,
-	}
-	if tr, err := s.p.Translator.Translate(ctx, lookup, c.Language, s.targetLang); err != nil {
-		slog.WarnContext(ctx, "translation failed", "word", lookup, "err", err)
-	} else {
-		card.Translation = strings.TrimSpace(tr)
-	}
-	if ts, err := s.p.Transcriber.Transcribe(ctx, lookup, c.Language); err != nil {
-		slog.WarnContext(ctx, "transcription failed", "word", lookup, "err", err)
-	} else {
-		card.Transcription = strings.TrimSpace(ts)
-	}
-	if !audioSupported(c.Language) {
-		return card // pronunciation is available only for German
-	}
-	if url, err := s.synthesize(ctx, c.UserID, card.ID, lookup, c.Language); err != nil {
-		slog.WarnContext(ctx, "audio synthesis failed", "word", lookup, "err", err)
-	} else {
-		card.AudioURL = &url
-	}
-	return card
-}
-
-// audioSupported: pronunciation (TTS) is offered only for German; new languages have no audio.
-func audioSupported(lang string) bool { return strings.EqualFold(lang, "de") }
-
-func (s *ContextService) synthesize(ctx context.Context, userID, cardID uuid.UUID, word, lang string) (string, error) {
-	audio, mime, err := s.p.TTS.Synthesize(ctx, word, lang)
-	if err != nil {
-		return "", fmt.Errorf("tts %q: %w", word, err)
-	}
-	return s.p.Storage.Upload(ctx, fmt.Sprintf("audio/%s/%s.mp3", userID, cardID), audio, mime)
-}
-
-func (s *ContextService) List(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.Context, error) {
-	return s.contexts.ListByUser(ctx, userID, limit, offset)
-}
-
-func (s *ContextService) Words(ctx context.Context, userID, contextID uuid.UUID) ([]domain.WordCard, error) {
-	if _, err := s.contexts.GetByID(ctx, userID, contextID); err != nil {
-		return nil, err
-	}
-	return s.cards.ListByContext(ctx, userID, contextID)
-}
-
 func (s *ContextService) Cards(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.WordCard, error) {
 	return s.cards.ListByUser(ctx, userID, limit, offset)
-}
-
-// RegenerateAudio re-synthesizes pronunciation for a card.
-func (s *ContextService) RegenerateAudio(ctx context.Context, userID, cardID uuid.UUID) (*domain.WordCard, error) {
-	ctx, span := tracer.Start(ctx, "ContextService.RegenerateAudio")
-	defer span.End()
-
-	card, err := s.cards.GetByID(ctx, userID, cardID)
-	if err != nil {
-		return nil, err
-	}
-	if !audioSupported(card.Language) {
-		return nil, fmt.Errorf("%w: audio is available only for German", domain.ErrValidation)
-	}
-	url, err := s.synthesize(ctx, userID, card.ID, firstVariant(card.Word), card.Language)
-	if err != nil {
-		return nil, s.fail(span, "synthesize", err)
-	}
-	if err := s.cards.UpdateAudioURL(ctx, userID, card.ID, url); err != nil {
-		return nil, err
-	}
-	card.AudioURL = &url
-	return card, nil
 }
 
 func (s *ContextService) fail(span trace.Span, op string, err error) error {
 	span.RecordError(err)
 	span.SetStatus(codes.Error, op)
 	return fmt.Errorf("%s: %w", op, err)
-}
-
-// firstVariant returns "der Samstag" for "der Samstag / der Sonnabend" (or the word itself).
-func firstVariant(word string) string {
-	if v := SplitVariants(word); v != nil {
-		return v[0]
-	}
-	return word
 }

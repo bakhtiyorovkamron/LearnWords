@@ -18,7 +18,6 @@ import (
 	"learnwords/internal/config"
 	"learnwords/internal/handler"
 	"learnwords/internal/provider/anthropic"
-	"learnwords/internal/provider/mock"
 	"learnwords/internal/repository/postgres"
 	"learnwords/internal/service"
 	"learnwords/internal/telemetry"
@@ -71,14 +70,8 @@ func run() error {
 	contextRepo := postgres.NewContextRepository(pool)
 	cardRepo := postgres.NewWordCardRepository(pool)
 
-	// External integrations — mocks for now; replace with real clients later.
-	providers := service.Providers{
-		OCR:         mock.OCR{},
-		Translator:  mock.Translator{},
-		Transcriber: mock.Transcriber{},
-		TTS:         mock.TTS{},
-		Storage:     mock.NewStorage(),
-	}
+	// External integrations: the Anthropic client below (when ANTHROPIC_API_KEY is set).
+	var providers service.Providers
 	// AI: example sentences + daily stories + word search + on-demand translation, enabled only
 	// when the key is provided via environment.
 	var storyGen service.StoryGenerator
@@ -108,7 +101,7 @@ func run() error {
 	// Services
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
-	contextSvc := service.NewContextService(contextRepo, cardRepo, providers, cfg.TargetLang)
+	contextSvc := service.NewContextService(contextRepo, cardRepo, providers)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)
 	featureSvc := service.NewFeatureService(postgres.NewFeatureRepository(pool))

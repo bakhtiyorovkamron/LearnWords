@@ -19,16 +19,11 @@ type UserRepository interface {
 
 type ContextRepository interface {
 	CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard) error
-	ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.Context, error)
-	GetByID(ctx context.Context, userID, id uuid.UUID) (*domain.Context, error)
-	Delete(ctx context.Context, userID, id uuid.UUID) error
 }
 
 type WordCardRepository interface {
-	ListByContext(ctx context.Context, userID, contextID uuid.UUID) ([]domain.WordCard, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.WordCard, error)
 	GetByID(ctx context.Context, userID, id uuid.UUID) (*domain.WordCard, error)
-	UpdateAudioURL(ctx context.Context, userID, id uuid.UUID, url string) error
 	UpdateExample(ctx context.Context, userID, id uuid.UUID, sentence, translation string) error
 	Delete(ctx context.Context, userID, id uuid.UUID) error
 }

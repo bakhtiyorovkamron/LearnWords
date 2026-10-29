@@ -87,17 +87,6 @@ func (h *StoryHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"stories": list})
 }
 
-// ByDate handles GET /api/stories/:date?native_language=.
-func (h *StoryHandler) ByDate(c *gin.Context) {
-	ctx := domain.WithTranslationLang(c.Request.Context(), c.Query("native_language"))
-	st, err := h.svc.ByDate(ctx, userID(c), c.Param("date"), domain.TranslationLangFrom(ctx))
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, st)
-}
-
 // maxOwnStoryBody caps the request body of an own story (text ≤ 4000 + translation ≤ 8000 characters).
 const maxOwnStoryBody = 64 << 10
 

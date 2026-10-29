@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -9,8 +9,9 @@ import { WordCheckHint } from '../components/WordCheckHint'
 import { collapseSpaces, grammarOf, suggestionOf, useWordCheck } from '../lib/wordCheck'
 import { useLearningLang } from '../lib/learningLang'
 import { PhotoImport } from '../components/PhotoImport'
+import { toast } from '../components/Toaster'
 
-const MAX_LEN = 2000
+const MAX_LEN = 100 // a word or a short phrase; longer text goes through the photo import
 
 export function NewContextPage() {
   const { t } = useTranslation()
@@ -24,6 +25,7 @@ export function NewContextPage() {
   const [exampleSentence, setExampleSentence] = useState('')
   const [exampleTranslation, setExampleTranslation] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
+  const textRef = useRef<HTMLTextAreaElement>(null)
   const [folderId, setFolderId] = useState('') // optional; '' = no folder
   // Word check (German only): texts the user chose to keep despite a suggestion.
   const check = useWordCheck(text, learning.code === 'de')
@@ -56,8 +58,15 @@ export function NewContextPage() {
       qc.invalidateQueries({ queryKey: ['stories'] })
       qc.invalidateQueries({ queryKey: ['folders'] })
       qc.invalidateQueries({ queryKey: ['collection'] })
-      qc.setQueryData(['context-words', res.context.id], res.cards)
-      navigate(`/contexts/${res.context.id}`)
+      // Stay on the page for the next word: clear everything but the chosen folder.
+      const added = folderId
+      setText(''); setMeaning(''); setPronunciation(''); setExampleSentence(''); setExampleTranslation('')
+      setNeedDecision(false)
+      textRef.current?.focus()
+      toast(t('newContext.added', { word: res.cards[0]?.word ?? res.context.source_text }), {
+        action: { label: t('newContext.open'), onClick: () => navigate('/cards?tab=all' + (added ? '&folder=' + added : '')) },
+        ms: 6000,
+      })
     },
   })
 
@@ -112,7 +121,8 @@ export function NewContextPage() {
               setText(e.target.value.slice(0, MAX_LEN))
               setNeedDecision(false)
             }}
-            rows={7}
+            ref={textRef}
+            rows={3}
             autoFocus
             placeholder={learning.phrasePlaceholder}
             lang={learning.code}
@@ -125,6 +135,7 @@ export function NewContextPage() {
             {text.length}/{MAX_LEN}
           </span>
         </div>
+        {text.length >= MAX_LEN && <p className="text-sm text-amber-200">{t('newContext.tooLong', { max: MAX_LEN })}</p>}
         {check.active && (
           <WordCheckHint state={check.state} kept={isKept} highlight={needDecision}
             onUse={useSuggestion} onKeep={keepAsIs} />
