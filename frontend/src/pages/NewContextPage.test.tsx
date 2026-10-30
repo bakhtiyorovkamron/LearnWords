@@ -140,3 +140,20 @@ describe('NewContextPage: generate the example sentence', () => {
     expect(hint()).toBeTruthy()
   })
 })
+
+describe('NewContextPage: the generate button on phones', () => {
+  it.each(['ru', 'en', 'uz'])('%s: label above, full-width button on phones; one row from sm', async (lng) => {
+    await i18n.changeLanguage(lng)
+    renderPage()
+    const button = screen.getByRole('button', { name: i18n.t('newContext.generate') })
+    // jsdom cannot measure a layout: the responsive classes are what is checked.
+    expect(button.className).toContain('w-full')
+    expect(button.className).toContain('sm:w-auto')
+    expect(button.className).toContain('sm:shrink-0')
+    const row = button.parentElement!
+    expect(row.className).toContain('flex-col')
+    expect(row.className).toContain('sm:flex-row')
+    expect(row.className).toContain('sm:justify-between')
+    expect(row.querySelector('label')).toBeTruthy() // the label is its own line, not inside the button
+  })
+})

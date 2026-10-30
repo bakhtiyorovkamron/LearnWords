@@ -162,12 +162,12 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
           <input id="ew-pr" className="field font-mono" value={form.transcription} onChange={set('transcription')} maxLength={200} />
         </div>
         <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label className={`${label} mb-0`} htmlFor="ew-ex">{t('editWord.example')}</label>
             <button type="button" onClick={() => generate.mutate()}
               disabled={generate.isPending || !canGenerate}
               title={canGenerate ? undefined : t('newContext.hintNeedTranslation')}
-              className="btn-ghost shrink-0 !px-3 !py-1 text-xs disabled:opacity-50">
+              className="btn-ghost w-full justify-center text-center sm:w-auto sm:shrink-0 !px-3 !py-1 text-xs disabled:opacity-50">
               {generate.isPending ? (
                 <>
                   <span className="mr-1.5 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />

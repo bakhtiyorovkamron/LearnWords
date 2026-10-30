@@ -118,3 +118,18 @@ describe('EditWordModal save', () => {
     expect(logged).toHaveBeenCalled()
   })
 })
+
+describe('EditWordModal: the generate button on phones', () => {
+  it.each(['ru', 'en', 'uz'])('%s: label above, full-width button on phones; one row from sm', async (lng) => {
+    await i18n.changeLanguage(lng)
+    setup()
+    const button = screen.getAllByRole('button').find((b) => b.className.includes('btn-ghost') && b.className.includes('disabled:opacity-50'))!
+    expect(button.className).toContain('w-full')
+    expect(button.className).toContain('sm:w-auto')
+    expect(button.className).toContain('sm:shrink-0')
+    const row = button.parentElement!
+    expect(row.className).toContain('flex-col')
+    expect(row.className).toContain('sm:flex-row')
+    expect(row.querySelector('label')).toBeTruthy()
+  })
+})

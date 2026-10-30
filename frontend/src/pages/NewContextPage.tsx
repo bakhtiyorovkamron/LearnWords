@@ -168,11 +168,12 @@ export function NewContextPage() {
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
+          {/* Phones: label above, button full width (a long translation of the label must not push it out). */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <label className="text-xs uppercase tracking-wider text-emerald-300/60">{t('newContext.example')}</label>
             <button type="button" onClick={() => generate.mutate()}
               disabled={generate.isPending || !canGenerate}
-              className="btn-ghost shrink-0 disabled:opacity-50">
+              className="btn-ghost w-full justify-center text-center sm:w-auto sm:shrink-0 disabled:opacity-50">
               {generate.isPending ? (
                 <>
                   <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />
