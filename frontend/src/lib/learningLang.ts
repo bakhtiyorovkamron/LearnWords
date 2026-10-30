@@ -9,7 +9,6 @@ const CONTENT: Record<LearningLang, {
   greeting: string; greetingAccent: string
   phrasePlaceholder: string; gapPlaceholder: string; pronunciationPlaceholder: string
   tagline: string // footer, e.g. "Deutsch lernen — Wort für Wort 🌿"
-  examples: string[]
   // Every language must define ALL vars, otherwise i18next leaves raw "{{name}}" in the UI.
   // ru: langAdj/langPrep/langAdv · en: langName · uz: langUz ("nemis" → "nemis tilida") · all: langCode
   vars: { langAdj: string; langPrep: string; langAdv: string; langName: string; langCode: string; langUz: string }
@@ -20,12 +19,6 @@ const CONTENT: Record<LearningLang, {
     gapPlaceholder: 'Ich esse eine ___.',
     pronunciationPlaceholder: '[ихь]',
     tagline: 'Deutsch lernen — Wort für Wort 🌿',
-    examples: [
-      'Guten Morgen! Wie geht es dir heute?',
-      'Ich hätte gern einen Kaffee mit Milch, bitte.',
-      'Das Wetter ist heute wunderschön, lass uns spazieren gehen.',
-      'Kannst du mir bitte helfen? Ich habe mich verlaufen.',
-    ],
     vars: { langAdj: 'немецкое', langPrep: 'немецком', langAdv: 'по-немецки', langName: 'German', langCode: 'DE', langUz: 'nemis' },
   },
   en: {
@@ -34,12 +27,6 @@ const CONTENT: Record<LearningLang, {
     gapPlaceholder: 'I eat an ___ every day.',
     pronunciationPlaceholder: '[хэ́лоу]',
     tagline: 'Learning English — word by word 🌿',
-    examples: [
-      'Good morning! How are you today?',
-      'I would like a coffee with milk, please.',
-      'The weather is beautiful today, let’s go for a walk.',
-      'Can you help me, please? I got lost.',
-    ],
     vars: { langAdj: 'английское', langPrep: 'английском', langAdv: 'по-английски', langName: 'English', langCode: 'EN', langUz: 'ingliz' },
   },
   fr: {
@@ -48,12 +35,6 @@ const CONTENT: Record<LearningLang, {
     gapPlaceholder: 'Je mange une ___.',
     pronunciationPlaceholder: '[бонжу́р]',
     tagline: 'Apprendre le français — mot par mot 🌿',
-    examples: [
-      'Bonjour ! Comment ça va aujourd’hui ?',
-      'Je voudrais un café au lait, s’il vous plaît.',
-      'Il fait très beau aujourd’hui, allons nous promener.',
-      'Pouvez-vous m’aider, s’il vous plaît ? Je me suis perdu.',
-    ],
     vars: { langAdj: 'французское', langPrep: 'французском', langAdv: 'по-французски', langName: 'French', langCode: 'FR', langUz: 'fransuz' },
   },
   ko: {
@@ -62,12 +43,6 @@ const CONTENT: Record<LearningLang, {
     gapPlaceholder: '저는 매일 ___을 먹어요.',
     pronunciationPlaceholder: '[аннёнхасэё]',
     tagline: '한국어 배우기 — 한 단어씩 🌿',
-    examples: [
-      '좋은 아침이에요! 오늘 어떻게 지내요?',
-      '우유 넣은 커피 한 잔 주세요.',
-      '오늘 날씨가 정말 좋아요. 산책하러 가요.',
-      '좀 도와주시겠어요? 길을 잃었어요.',
-    ],
     vars: { langAdj: 'корейское', langPrep: 'корейском', langAdv: 'по-корейски', langName: 'Korean', langCode: 'KO', langUz: 'koreys' },
   },
 }

@@ -99,7 +99,6 @@
     "generateNotConfigured": "Avtomatik yaratish serverda sozlanmagan (ANTHROPIC_API_KEY yo‘q)",
     "generateFailed": "Misol yaratib bo‘lmadi, qaytadan urinib ko‘ring",
     "autoExampleHint": "Bo‘sh qoldirilsa, bitta so‘z uchun misol saqlangandan keyin avtomatik qo‘shiladi.",
-    "tryExample": "Yoki misolni sinab ko‘ring",
     "analyzing": "So‘zlar tahlil qilinmoqda…",
     "submit": "➕ Qo‘shish",
     "errTextRequired": "{{langUz}} tilida so‘z yoki ibora kiriting",

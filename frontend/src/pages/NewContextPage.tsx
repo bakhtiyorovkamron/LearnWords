@@ -16,7 +16,6 @@ const MAX_LEN = 100 // a word or a short phrase; longer text goes through the ph
 export function NewContextPage() {
   const { t } = useTranslation()
   const learning = useLearningLang()
-  const examples = learning.examples
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [text, setText] = useState('')
@@ -208,18 +207,6 @@ export function NewContextPage() {
           {!exampleSentence && (
             <p className="text-xs text-emerald-300/50">{t('newContext.autoExampleHint')}</p>
           )}
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs uppercase tracking-wider text-emerald-300/60">{t('newContext.tryExample')}</p>
-          <div className="flex flex-wrap gap-2">
-            {examples.map((ex) => (
-              <button key={ex} type="button" onClick={() => setText(ex)}
-                className="rounded-full border border-emerald-400/20 bg-emerald-950/40 px-4 py-1.5 text-sm text-emerald-100/80 transition hover:border-lime-400/50 hover:bg-lime-400/10 hover:text-lime-200">
-                {ex}
-              </button>
-            ))}
-          </div>
         </div>
 
         {error && (
