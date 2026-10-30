@@ -34,6 +34,7 @@ const features = (wordSearch: boolean) => ({
   daily_story: { enabled: true, daily_limit: null, remaining: null },
   word_search: { enabled: wordSearch, daily_limit: null, remaining: null },
   story_autotranslate: { enabled: true, daily_limit: null, remaining: null },
+  theme_picker: { enabled: false, daily_limit: null, remaining: null },
 })
 const me = (wordSearch = true): Me => ({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de', features: features(wordSearch) })
 

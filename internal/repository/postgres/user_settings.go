@@ -61,3 +61,29 @@ func (r *UserRepository) SetReviewSessionSize(ctx context.Context, id uuid.UUID,
 	}
 	return nil
 }
+
+// Theme returns the user's saved colour theme ("" if never chosen).
+func (r *UserRepository) Theme(ctx context.Context, id uuid.UUID) (string, error) {
+	var theme *string
+	err := r.pool.QueryRow(ctx, `SELECT theme FROM users WHERE id = $1`, id).Scan(&theme)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrNotFound
+	}
+	if err != nil || theme == nil {
+		return "", err
+	}
+	return *theme, nil
+}
+
+// SetTheme stores the user's colour theme (the database accepts only the known names).
+func (r *UserRepository) SetTheme(ctx context.Context, id uuid.UUID, theme string) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE users SET theme = $2, updated_at = now() WHERE id = $1`, id, theme)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}

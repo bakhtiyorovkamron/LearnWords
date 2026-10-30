@@ -206,6 +206,7 @@ describe('StoryPage: daily_story switched off', () => {
       daily_story: { enabled: daily, daily_limit: null, remaining: null },
       word_search: { enabled: true, daily_limit: null, remaining: null },
       story_autotranslate: { enabled: true, daily_limit: null, remaining: null },
+      theme_picker: { enabled: false, daily_limit: null, remaining: null },
     },
   })
   const words = [{ word: 'Hund', translation: 'собака' }] as never

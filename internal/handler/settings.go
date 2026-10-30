@@ -14,6 +14,8 @@ type SettingsStore interface {
 	SetInterfaceLanguage(ctx context.Context, id uuid.UUID, lang string) error
 	ReviewSessionSize(ctx context.Context, id uuid.UUID) (string, error)
 	SetReviewSessionSize(ctx context.Context, id uuid.UUID, size string) error
+	Theme(ctx context.Context, id uuid.UUID) (string, error)
+	SetTheme(ctx context.Context, id uuid.UUID, theme string) error
 }
 
 type SettingsHandler struct{ store SettingsStore }
@@ -22,9 +24,13 @@ func NewSettingsHandler(store SettingsStore) *SettingsHandler { return &Settings
 
 var supportedLanguages = map[string]bool{"ru": true, "en": true, "uz": true}
 
+// supportedThemes: 'auto' follows the system; the rest are colour themes (the same names as in the CSS).
+var supportedThemes = map[string]bool{"auto": true, "night": true, "light": true, "graphite": true, "sand": true, "navy": true}
+
 var supportedReviewSessionSizes = map[string]bool{"10": true, "20": true, "50": true, "all": true}
 
-// Get handles GET /api/me/settings → {"interface_language": "ru"|"en"|"uz"|"", "review_session_size": "10"|"20"|"50"|"all"|""}.
+// Get handles GET /api/me/settings → {"interface_language": "ru"|"en"|"uz"|"", "review_session_size": "10"|"20"|"50"|"all"|"",
+// "theme": "auto"|"night"|"light"|"graphite"|"sand"|"navy"|""}.
 func (h *SettingsHandler) Get(c *gin.Context) {
 	ctx := c.Request.Context()
 	lang, err := h.store.InterfaceLanguage(ctx, userID(c))
@@ -37,16 +43,22 @@ func (h *SettingsHandler) Get(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"interface_language": lang, "review_session_size": size})
+	theme, err := h.store.Theme(ctx, userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"interface_language": lang, "review_session_size": size, "theme": theme})
 }
 
-// Update handles PUT /api/me/settings {"interface_language"?, "review_session_size"?} — each field is
+// Update handles PUT /api/me/settings {"interface_language"?, "review_session_size"?, "theme"?} — each field is
 // independently optional, so one setting can be changed without resending the other. The sound
 // switches no longer exist; an old client that still sends them gets a 200 and nothing is stored.
 func (h *SettingsHandler) Update(c *gin.Context) {
 	var req struct {
 		InterfaceLanguage *string `json:"interface_language"`
 		ReviewSessionSize *string `json:"review_session_size"`
+		Theme             *string `json:"theme"`
 		// Legacy: accepted and ignored (the sound features were removed).
 		SoundsEnabled   *bool `json:"sounds_enabled"`
 		UISoundsEnabled *bool `json:"ui_sounds_enabled"`
@@ -55,7 +67,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		badRequest(c, "invalid JSON body")
 		return
 	}
-	if req.InterfaceLanguage == nil && req.ReviewSessionSize == nil && req.SoundsEnabled == nil && req.UISoundsEnabled == nil {
+	if req.InterfaceLanguage == nil && req.ReviewSessionSize == nil && req.Theme == nil && req.SoundsEnabled == nil && req.UISoundsEnabled == nil {
 		badRequest(c, "nothing to update")
 		return
 	}
@@ -76,6 +88,16 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 			return
 		}
 		if err := h.store.SetReviewSessionSize(ctx, userID(c), *req.ReviewSessionSize); err != nil {
+			writeError(c, err)
+			return
+		}
+	}
+	if req.Theme != nil {
+		if !supportedThemes[*req.Theme] {
+			badRequest(c, "theme must be one of: auto, night, light, graphite, sand, navy")
+			return
+		}
+		if err := h.store.SetTheme(ctx, userID(c), *req.Theme); err != nil {
 			writeError(c, err)
 			return
 		}

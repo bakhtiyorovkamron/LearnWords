@@ -44,7 +44,7 @@ func NewFeatureService(repo FeatureRepository, opts ...FeatureOption) *FeatureSe
 func (s *FeatureService) day() string { return domain.FeatureDay(s.now()) }
 
 func buildState(spec domain.FeatureSpec, ov map[string]domain.FeatureOverride, usage map[string]int) domain.FeatureState {
-	st := domain.FeatureState{Feature: spec.Name, Enabled: true, DefaultLimit: spec.DefaultLimit, DailyLimit: spec.DefaultLimit, UsedToday: usage[spec.Name]}
+	st := domain.FeatureState{Feature: spec.Name, Enabled: !spec.DisabledByDefault, DefaultLimit: spec.DefaultLimit, DailyLimit: spec.DefaultLimit, UsedToday: usage[spec.Name]}
 	if o, ok := ov[spec.Name]; ok {
 		st.Enabled = o.Enabled
 		if o.DailyLimit != nil {
@@ -104,13 +104,15 @@ func (s *FeatureService) effective(ctx context.Context, userID uuid.UUID, featur
 		return nil, err
 	}
 	limit = spec.DefaultLimit
+	enabled := !spec.DisabledByDefault
 	if o, ok := ov[feature]; ok {
-		if !o.Enabled {
-			return nil, domain.ErrFeatureDisabled
-		}
+		enabled = o.Enabled
 		if o.DailyLimit != nil {
 			limit = o.DailyLimit
 		}
+	}
+	if !enabled {
+		return nil, domain.ErrFeatureDisabled
 	}
 	return limit, nil
 }

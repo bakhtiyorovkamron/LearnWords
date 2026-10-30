@@ -1,8 +1,153 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Unbounded", "Inter", ui-sans-serif, sans-serif;
+/* Colour themes: semantic tokens on <html data-theme="…">. No attribute = night (the default).
+   The themes' names and values are tested against lib/theme.ts and index.html. */
+:root,
+:root[data-theme="night"] {
+  color-scheme: dark;
+  --bg: #0E1512;
+  --surface: #151F1B;
+  --surface-2: #18241C;
+  --line: #26352F;
+  --divider: #22302A;
+  --fg: #EAF2EC;
+  --muted: #9DB0A5;
+  --faint: #6F847A;
+  --track: #22302A;
+  --dot-off: #2C3B34;
+  --accent: #C8F25C;
+  --accent-text: #C8F25C;
+  --on-accent: #0E1A10;
+  --danger: #FF8A7A;
+  --streak: #F2A65A;
+  --der: #7DD3FC;
+  --die: #FDA4AF;
+  --das: #6EE7B7;
+  --shadow-card: none;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23C8F25C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F6F7F3;
+  --surface: #FFFFFF;
+  --surface-2: #EDF7F1;
+  --line: #E1E6DF;
+  --divider: #ECEFEA;
+  --fg: #13201A;
+  --muted: #5B6B62;
+  --faint: #8A968F;
+  --track: #E1E6DF;
+  --dot-off: #DCE3DC;
+  --accent: #0E8A5F;
+  --accent-text: #0B7A54;
+  --on-accent: #FFFFFF;
+  --danger: #C0392B;
+  --streak: #D9822B;
+  --der: #0369A1;
+  --die: #BE123C;
+  --das: #047857;
+  --shadow-card: 0 1px 2px rgb(19 32 26 / 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%230B7A54' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="graphite"] {
+  color-scheme: dark;
+  --bg: #121314;
+  --surface: #1B1C1E;
+  --surface-2: #1C2924;
+  --line: #2A2C2F;
+  --divider: #26282B;
+  --fg: #EDEEF0;
+  --muted: #A1A5AB;
+  --faint: #73777D;
+  --track: #2A2C2F;
+  --dot-off: #34373B;
+  --accent: #5EE0A8;
+  --accent-text: #5EE0A8;
+  --on-accent: #08140F;
+  --danger: #FF8A7A;
+  --streak: #F2A65A;
+  --der: #7DD3FC;
+  --die: #FDA4AF;
+  --das: #6EE7B7;
+  --shadow-card: none;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%235EE0A8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="sand"] {
+  color-scheme: light;
+  --bg: #F4EFE6;
+  --surface: #FBF8F2;
+  --surface-2: #E9F0E3;
+  --line: #E3DACB;
+  --divider: #ECE5D8;
+  --fg: #1E2420;
+  --muted: #6B655B;
+  --faint: #9A9284;
+  --track: #E3DACB;
+  --dot-off: #DDD3C2;
+  --accent: #1F5A3A;
+  --accent-text: #1F5A3A;
+  --on-accent: #FFFFFF;
+  --danger: #B4432A;
+  --streak: #C0652A;
+  --der: #0369A1;
+  --die: #BE123C;
+  --das: #047857;
+  --shadow-card: 0 1px 2px rgb(19 32 26 / 0.06);
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%231F5A3A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="navy"] {
+  color-scheme: dark;
+  --bg: #0D1220;
+  --surface: #141B2D;
+  --surface-2: #18263A;
+  --line: #232D45;
+  --divider: #1E2840;
+  --fg: #E8ECF5;
+  --muted: #9AA6BF;
+  --faint: #6C7893;
+  --track: #232D45;
+  --dot-off: #2A3550;
+  --accent: #C8F25C;
+  --accent-text: #C8F25C;
+  --on-accent: #10180A;
+  --danger: #FF8A7A;
+  --streak: #F2A65A;
+  --der: #7DD3FC;
+  --die: #FDA4AF;
+  --das: #6EE7B7;
+  --shadow-card: none;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23C8F25C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* The tokens as Tailwind colours: bg-surface, text-muted, border-line, text-der, … `inline` keeps
+   them as var(--token), so a theme switch needs no rebuild and no re-render. */
+@theme inline {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader", ui-serif, Georgia, serif; /* learning-language text */
+  --font-display: "Unbounded", "Geist", ui-sans-serif, sans-serif; /* the logo wordmark only */
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-divider: var(--divider);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-track: var(--track);
+  --color-dot-off: var(--dot-off);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-streak: var(--streak);
+  --color-der: var(--der);
+  --color-die: var(--die);
+  --color-das: var(--das);
 }
 
 /* Height of the mobile bottom navigation (Layout.tsx), incl. the iPhone home-indicator area.
@@ -16,36 +161,33 @@
 
 @layer base {
   body {
-    @apply bg-emerald-950 text-emerald-50 antialiased;
-    background-image:
-      radial-gradient(60rem 40rem at 10% -10%, rgb(16 185 129 / 0.35), transparent 60%),
-      radial-gradient(50rem 35rem at 110% 10%, rgb(132 204 22 / 0.25), transparent 60%),
-      radial-gradient(40rem 30rem at 50% 120%, rgb(20 184 166 / 0.25), transparent 60%);
-    background-attachment: fixed;
+    @apply bg-bg text-fg antialiased;
     min-height: 100vh;
   }
 }
 
 @layer components {
+  /* A flat card: surface, hairline border, a whisper of shadow on the light themes. */
   .glass {
-    @apply rounded-3xl border border-emerald-400/15 bg-emerald-900/40 shadow-xl shadow-emerald-950/50 backdrop-blur-xl;
+    @apply rounded-2xl border border-line bg-surface shadow-[var(--shadow-card)];
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lime-400 via-emerald-400 to-teal-400 px-6 py-3 font-semibold text-emerald-950 shadow-lg shadow-emerald-500/30 transition hover:scale-[1.02] hover:shadow-emerald-400/50 active:scale-95 disabled:opacity-60 disabled:hover:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 font-semibold text-on-accent transition hover:opacity-90 disabled:opacity-60;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/10;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm font-medium text-fg transition hover:bg-surface-2;
   }
   .field {
-    @apply w-full rounded-2xl border border-emerald-400/20 bg-emerald-950/60 px-4 py-3 text-emerald-50 placeholder:text-emerald-300/40 outline-none transition focus:border-lime-400 focus:ring-4 focus:ring-lime-400/20;
+    @apply w-full rounded-xl border border-line bg-surface px-4 py-3 text-fg placeholder:text-faint outline-none transition focus:border-accent focus:ring-4 focus:ring-accent/25;
   }
-  /* Native select arrows sit at the very edge and poke out of the rounded-2xl border.
-     Replace with our own arrow at a fixed 1rem inset; text never runs under it. */
+  /* Native select arrows sit at the very edge and poke out of the rounded border.
+     Replace with our own arrow at a fixed 1rem inset; text never runs under it. The arrow is
+     drawn in the theme's accent-text colour (--select-arrow, one per theme). */
   select.field {
     appearance: none;
     -webkit-appearance: none;
     padding-right: 2.75rem !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23bef264' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: var(--select-arrow);
     background-repeat: no-repeat;
     background-position: right 1rem center;
     background-size: 0.75rem 0.5rem;
@@ -54,9 +196,10 @@
     overflow: hidden;
   }
   select.field option {
-    background-color: #022c22;
-    color: #ecfdf5;
+    background-color: var(--surface);
+    color: var(--fg);
   }
+  /* The logo wordmark (Unbounded). Nothing else uses it. */
   .display {
     font-family: var(--font-display);
   }
@@ -119,22 +262,22 @@
 .hero-svg:focus-visible { outline: 2px solid #CFFA4D; outline-offset: 4px; border-radius: 16px; }
 
 /* Speech bubble */
-.hero-bubble { background: #1E4A35; border: 1.5px solid #CFFA4D; border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.25); text-align: center; }
+.hero-bubble { background: var(--surface-2); border: 1.5px solid var(--accent); border-radius: 20px; box-shadow: var(--shadow-card); text-align: center; }
 .hero-bubble .de { font-style: italic; font-weight: 600; }
-.hero-bubble .tr { color: #A9C4B3; }
+.hero-bubble .tr { color: var(--muted); }
 .hero-bubble-up { position: absolute; left: 50%; transform: translateX(-50%); padding: 10px 16px; max-width: 86%; z-index: 1; }
 .hero-bubble-up .de { font-size: 17px; }
 .hero-bubble-up .tr { font-size: 13px; margin-top: 3px; }
-.hero-bubble-up::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; background: #1E4A35; border-right: 1.5px solid #CFFA4D; border-bottom: 1.5px solid #CFFA4D; transform: translateX(-50%) rotate(45deg); }
+.hero-bubble-up::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; background: var(--surface-2); border-right: 1.5px solid var(--accent); border-bottom: 1.5px solid var(--accent); transform: translateX(-50%) rotate(45deg); }
 .hero-bubble-up.pop { animation: hero-pop .35s cubic-bezier(.3,1.6,.5,1); }
 @keyframes hero-pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
 /* small hero: the bubble sits beside the figure */
 .hero-bubble-side { padding: 8px 12px; } /* position (relative/absolute) is set where it is used */
 .hero-bubble-side .de { font-size: 14px; }
 .hero-bubble-side .tr { font-size: 12px; margin-top: 2px; }
-.hero-bubble-side::after { content: ""; position: absolute; top: 50%; width: 12px; height: 12px; background: #1E4A35; transform: translateY(-50%) rotate(45deg); }
-.hero-bubble-side.tail-left::after { left: -7px; border-left: 1.5px solid #CFFA4D; border-bottom: 1.5px solid #CFFA4D; }
-.hero-bubble-side.tail-right::after { right: -7px; border-right: 1.5px solid #CFFA4D; border-top: 1.5px solid #CFFA4D; }
+.hero-bubble-side::after { content: ""; position: absolute; top: 50%; width: 12px; height: 12px; background: var(--surface-2); transform: translateY(-50%) rotate(45deg); }
+.hero-bubble-side.tail-left::after { left: -7px; border-left: 1.5px solid var(--accent); border-bottom: 1.5px solid var(--accent); }
+.hero-bubble-side.tail-right::after { right: -7px; border-right: 1.5px solid var(--accent); border-top: 1.5px solid var(--accent); }
 .hero-bubble-side.pop { animation: hero-pop-side .35s cubic-bezier(.3,1.6,.5,1); }
 @keyframes hero-pop-side { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 

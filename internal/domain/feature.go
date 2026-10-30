@@ -12,22 +12,26 @@ const (
 	FeatureDailyStory         = "daily_story"
 	FeatureWordSearch         = "word_search"
 	FeatureStoryAutotranslate = "story_autotranslate"
+	FeatureThemePicker        = "theme_picker"
 )
 
 // FeatureSpec describes a feature in the catalog. DefaultLimit nil = unlimited.
 type FeatureSpec struct {
 	Name         string
 	DefaultLimit *int
+	// DisabledByDefault: off until the admin turns it on for a user (an unfinished feature in testing).
+	DisabledByDefault bool
 }
 
 func intp(n int) *int { return &n }
 
-// FeatureCatalog is the ordered list of features; all are enabled by default.
+// FeatureCatalog is the ordered list of features; all are enabled by default except the ones marked.
 var FeatureCatalog = []FeatureSpec{
 	{Name: FeaturePhotoImport, DefaultLimit: intp(10)},
 	{Name: FeatureDailyStory},
 	{Name: FeatureWordSearch},
 	{Name: FeatureStoryAutotranslate},
+	{Name: FeatureThemePicker, DisabledByDefault: true},
 }
 
 // FeatureByName looks a feature up in the catalog.

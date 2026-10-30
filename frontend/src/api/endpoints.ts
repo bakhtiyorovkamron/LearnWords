@@ -255,12 +255,14 @@ export const isSessionSize = (v: unknown): v is SessionSize =>
 
 export const settingsApi = {
   get: () =>
-    api.get<{ interface_language: string; review_session_size: string }>('/me/settings').then((r) => r.data),
+    api.get<{ interface_language: string; review_session_size: string; theme: string }>('/me/settings').then((r) => r.data),
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
   setReviewSessionSize: (size: SessionSize) => api.put('/me/settings', { review_session_size: size }),
+  /** auto | night | light | graphite | sand | navy */
+  setTheme: (theme: string) => api.put('/me/settings', { theme }),
 }
 
-export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate'
+export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker'
 
 /** A feature as the admin sees it for one user. daily_limit is the effective limit (null = unlimited). */
 export interface FeatureState {

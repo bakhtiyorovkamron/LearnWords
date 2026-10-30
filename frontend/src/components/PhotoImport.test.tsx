@@ -32,7 +32,7 @@ const me = (photoOn: boolean, remaining = LIMIT, limit = LIMIT): Me => ({
   id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de',
   features: {
     photo_import: feature(photoOn, limit, remaining), daily_story: feature(true),
-    word_search: feature(true), story_autotranslate: feature(true),
+    word_search: feature(true), story_autotranslate: feature(true), theme_picker: feature(false),
   },
 })
 const word = (over: Partial<PhotoWord>): PhotoWord => ({

@@ -164,8 +164,11 @@ func TestMe_ContainsFeatures(t *testing.T) {
 		t.Fatal(w.Code, w.Body)
 	}
 	f, _ := decode(t, w)["features"].(map[string]any)
-	if len(f) != 4 {
+	if len(f) != 5 {
 		t.Fatalf("features: %v", f)
+	}
+	if f["theme_picker"].(map[string]any)["enabled"] != false {
+		t.Errorf("theme_picker is off by default: %v", f["theme_picker"])
 	}
 	p := f["photo_import"].(map[string]any)
 	if p["enabled"] != true || p["daily_limit"] != float64(defaultPhotoLimit) || p["remaining"] != float64(defaultPhotoLimit) {
@@ -212,7 +215,7 @@ func TestAdminSetFeature(t *testing.T) {
 
 	w = httptest.NewRecorder()
 	e.r.ServeHTTP(w, httptest.NewRequest("GET", "/admin/users/"+e.user.String()+"/features", nil))
-	if fs, _ := decode(t, w)["features"].([]any); w.Code != 200 || len(fs) != 4 {
+	if fs, _ := decode(t, w)["features"].([]any); w.Code != 200 || len(fs) != 5 {
 		t.Errorf("list: %d %s", w.Code, w.Body)
 	}
 }

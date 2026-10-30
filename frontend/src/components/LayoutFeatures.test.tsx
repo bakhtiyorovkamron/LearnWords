@@ -21,7 +21,7 @@ const me = (wordSearch: boolean): Me => ({
   id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de',
   features: {
     photo_import: feature(true), daily_story: feature(true),
-    word_search: feature(wordSearch), story_autotranslate: feature(true),
+    word_search: feature(wordSearch), story_autotranslate: feature(true), theme_picker: feature(false),
   },
 })
 

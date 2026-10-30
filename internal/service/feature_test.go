@@ -82,17 +82,21 @@ func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(states) != 4 || states[0].Feature != domain.FeaturePhotoImport || states[3].Feature != domain.FeatureStoryAutotranslate {
+	if len(states) != 5 || states[0].Feature != domain.FeaturePhotoImport || states[3].Feature != domain.FeatureStoryAutotranslate ||
+		states[4].Feature != domain.FeatureThemePicker {
 		t.Fatalf("catalog order: %+v", states)
 	}
 	p := states[0]
 	if !p.Enabled || p.DailyLimit == nil || *p.DailyLimit != defaultPhotoLimit || *p.DefaultLimit != defaultPhotoLimit || p.LimitOverride != nil || *p.Remaining != defaultPhotoLimit {
 		t.Errorf("photo_import: %+v", p)
 	}
-	for _, st := range states[1:] {
+	for _, st := range states[1:4] {
 		if !st.Enabled || st.DailyLimit != nil || st.Remaining != nil {
 			t.Errorf("%s must be on and unlimited: %+v", st.Feature, st)
 		}
+	}
+	if tp := states[4]; tp.Enabled || tp.DailyLimit != nil || tp.Remaining != nil {
+		t.Errorf("theme_picker must be OFF by default (and unlimited): %+v", tp)
 	}
 }
 
@@ -214,5 +218,40 @@ func TestFeatures_SetValidation(t *testing.T) {
 	}
 	if _, err := s.Consume(ctx, u, domain.FeaturePhotoImport, 1); !errors.Is(err, domain.ErrDailyLimit) {
 		t.Errorf("limit 0 blocks: %v", err)
+	}
+}
+
+// theme_picker is off for everybody until the admin turns it on for a user.
+func TestFeatures_ThemePickerIsOffByDefault_AdminTurnsItOn(t *testing.T) {
+	ctx, u := context.Background(), uuid.New()
+	s := NewFeatureService(newMemFeatureRepo())
+
+	st, err := s.State(ctx, u, domain.FeatureThemePicker)
+	if err != nil || st.Enabled || st.DailyLimit != nil || st.LimitOverride != nil {
+		t.Fatalf("default: %+v %v", st, err)
+	}
+	if err := s.Require(ctx, u, domain.FeatureThemePicker); !errors.Is(err, domain.ErrFeatureDisabled) {
+		t.Errorf("Require without an override: %v", err)
+	}
+	// the other features are still on by default
+	for _, f := range []string{domain.FeatureDailyStory, domain.FeatureWordSearch, domain.FeatureStoryAutotranslate, domain.FeaturePhotoImport} {
+		if err := s.Require(ctx, u, f); err != nil {
+			t.Errorf("%s must stay on by default: %v", f, err)
+		}
+	}
+
+	if err := s.Set(ctx, u, domain.FeatureThemePicker, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ = s.State(ctx, u, domain.FeatureThemePicker); !st.Enabled {
+		t.Errorf("after the admin enabled it: %+v", st)
+	}
+	if err := s.Require(ctx, u, domain.FeatureThemePicker); err != nil {
+		t.Errorf("Require after enabling: %v", err)
+	}
+	// and the admin can switch it off again
+	_ = s.Set(ctx, u, domain.FeatureThemePicker, false, nil)
+	if err := s.Require(ctx, u, domain.FeatureThemePicker); !errors.Is(err, domain.ErrFeatureDisabled) {
+		t.Errorf("after disabling: %v", err)
 	}
 }

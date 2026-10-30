@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0B2B1C" />
+    <meta name="theme-color" content="#0E1512" />
+    <!-- Before anything is painted: the saved theme (localStorage "theme") goes on <html data-theme>,
+         so a light theme never flashes dark first. The same names/colours as src/lib/theme.ts (tested). -->
+    <script id="theme-boot">
+      (function () {
+        var BG = { night: '#0E1512', light: '#F6F7F3', graphite: '#121314', sand: '#F4EFE6', navy: '#0D1220' };
+        try {
+          var t = localStorage.getItem('theme');
+          if (t === 'auto') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'night';
+          if (!Object.prototype.hasOwnProperty.call(BG, t)) t = 'night';
+          var root = document.documentElement;
+          if (t === 'night') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', BG[t]);
+        } catch (e) { /* storage or matchMedia unavailable: night */ }
+      })();
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,7 +37,7 @@
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@600;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;500;600&family=Unbounded:wght@600;800&display=swap" rel="stylesheet" />
     <title>yodla — so‘zlarni kontekst bilan yodla</title>
   </head>
   <body>

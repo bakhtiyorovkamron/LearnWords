@@ -16,6 +16,8 @@ import { isTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
 import { InAppBanner } from './InAppBanner'
 import { PushToggle } from './PushToggle'
+import { ThemePicker } from './ThemePicker'
+import { useThemeSync } from '../lib/theme'
 
 export const FEEDBACK_DELAY_MS = 3000
 
@@ -62,6 +64,7 @@ export function Layout() {
   const learning = useLearningLang()
   const { isOn } = useFeatures()
   const searchOn = isOn('word_search')
+  useThemeSync(isOn('theme_picker'), me.isSuccess) // night without the picker; the server's theme with it
   const [moreOpen, setMoreOpen] = useState(false)
 
   // The one-time rating window: 3 seconds after the page loads, and never in the middle of a training.
@@ -117,6 +120,7 @@ export function Layout() {
           <div className="ml-auto flex items-center gap-2">
             {learningBadge}
             <LanguageSwitcher />
+            <ThemePicker variant="menu" />
             <PushToggle variant="icon" />
             <InstallMenuItem />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
@@ -145,6 +149,7 @@ export function Layout() {
               {learningBadge}
               <LanguageSwitcher />
             </div>
+            <ThemePicker variant="row" />
             <PushToggle variant="row" />
             <InstallMenuItem className="btn-ghost w-full py-3" />
             <button onClick={logout} className="btn-ghost mt-2 w-full py-3">{t('nav.logout')}</button>
