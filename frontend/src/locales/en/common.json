@@ -241,17 +241,12 @@
     },
     "typePlaceholder": "{{langName}} word (with article, if any)",
     "check": "Check",
-    "almostArticle": "≈ Almost! With the right article: {{answer}}",
-    "almostTypo": "≈ Accepted — check the typo: {{answer}}",
-    "listen": "▶ Listen",
     "listenTitle": "Listen",
-    "correct": "✓ Correct!",
-    "correctAnswer": "✗ Correct answer: {{answer}}",
     "lacking": "Add more words so the quiz has real answer options.",
     "saveFailed": "Could not save the answer: {{error}}",
-    "finish": "Finish",
-    "next": "Next →"
+    "finish": "Finish"
   },
+  "training": {"exit": "End training", "correct": "Correct!", "wrong": "Not quite", "almost": "Almost", "hintArticle": "Counted, mind the article: {{answer}}", "hintTypo": "Counted, check the spelling: {{answer}}", "box": "Box {{box}} · next review {{when}}", "continue": "Continue"},
   "result": {
     "done": "Training complete",
     "correct": "correct",

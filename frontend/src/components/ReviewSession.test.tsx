@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { cardsApi, foldersApi, heroApi, meApi, practiceApi, reviewApi, settingsApi, translationsApi } from '../api/endpoints'
@@ -28,12 +28,14 @@ const due = (n: number): DueCard => ({
 } as DueCard)
 const card = (n: number): WordCard => ({ ...due(n) } as unknown as WordCard)
 
+const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
 function renderSession(url: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalidate = vi.spyOn(qc, 'invalidateQueries')
-  render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[url]}><ReviewSession /></MemoryRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[url]}><Where /><ReviewSession /></MemoryRouter></QueryClientProvider>)
   return { invalidate }
 }
+const where = () => screen.getByTestId('where').textContent
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
@@ -85,5 +87,58 @@ describe('ReviewSession: Home shows a fresh due count', () => {
     await waitFor(() => expect(reviewApi.answer).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['folders'] }))
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['stats'] })
+  })
+})
+
+describe('ReviewSession: ?start=1 (Home → Start training)', () => {
+  it('with due words the session starts at once — no start screen — and the parameter is dropped', async () => {
+    renderSession('/cards?start=1')
+    // straight into the first question
+    expect(await screen.findByRole('progressbar')).toBeTruthy()
+    expect(screen.getByText('1/1')).toBeTruthy()
+    expect(screen.queryByText(/Words to review today/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Start training' })).toBeNull()
+    await waitFor(() => expect(where()).toBe('/cards'))
+  })
+
+  it('it starts once: finishing the session does not start another', async () => {
+    renderSession('/cards?start=1')
+    await screen.findByRole('progressbar')
+    await waitFor(() => expect(where()).toBe('/cards'))
+    expect(reviewApi.due).toHaveBeenCalled()
+    const asks = vi.mocked(reviewApi.due).mock.calls.length
+    await new Promise((r) => setTimeout(r, 30))
+    expect(vi.mocked(reviewApi.due).mock.calls.length).toBe(asks)
+  })
+
+  it('with nothing due: the normal "nothing to review" screen (and no session)', async () => {
+    vi.mocked(reviewApi.due).mockResolvedValue({ cards: [], total: 0 })
+    renderSession('/cards?start=1')
+    expect(await screen.findByText('No words to review today 🎉')).toBeTruthy()
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    await waitFor(() => expect(where()).toBe('/cards'))
+  })
+
+  it('without the parameter the start screen is shown as before', async () => {
+    renderSession('/cards')
+    expect(await screen.findByRole('button', { name: 'Start training' })).toBeTruthy()
+    expect(screen.queryByRole('progressbar')).toBeNull()
+  })
+
+  it('while the session is on, the app knows it (the shell steps aside) and knows again when it is over', async () => {
+    const { isTrainingOpen } = await import('../lib/trainingState')
+    renderSession('/cards?start=1')
+    await screen.findByRole('progressbar')
+    await waitFor(() => expect(isTrainingOpen()).toBe(true))
+    cleanup()
+    expect(isTrainingOpen()).toBe(false)
+  })
+})
+
+describe('ReviewSession: the screens use icons, not emoji', () => {
+  it('the start screen has an icon', async () => {
+    renderSession('/cards')
+    await screen.findByRole('button', { name: 'Start training' })
+    expect(document.querySelector('svg.text-accent-text')).not.toBeNull()
   })
 })

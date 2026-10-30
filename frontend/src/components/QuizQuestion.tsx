@@ -1,8 +1,12 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { Check, CircleCheck, CircleX, Lock, Volume2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { translationsApi } from '../api/endpoints'
-import type { WordCard } from '../api/types'
+import type { Progress, WordCard } from '../api/types'
+import { whenLabel } from '../lib/boxInfo'
+import { dateLocale } from '../i18n'
 import {
   buildOptions, checkTyped, countsAsCorrect, firstVariant, pickDistractors,
   type QuizItem, type Verdict,
@@ -27,7 +31,23 @@ interface Props {
   error?: string | null
   onAnswer: (correct: boolean) => void // sent to the backend right after the answer
   onNext: () => void
-  corner?: ReactNode // e.g. the training hero, at the right end of the progress row
+  corner?: ReactNode // the training hero, left of the question label
+  practice?: boolean // extra practice: no box line, the schedule does not change
+  progress?: Progress | null // the server's answer to this question (box and next review); review mode
+}
+
+const BOX_SEGMENTS = 5
+
+/** The sentence with its "___" turned into a blank — or, after the answer, the answer in the blank. */
+function GapSentence({ sentence, answered, answer }: { sentence: string; answered: boolean; answer: string }) {
+  const at = sentence.indexOf('___')
+  if (at < 0) return <>{sentence}</>
+  const blank = answered ? (
+    <span data-testid="gap-answer" className="text-accent-text underline decoration-accent underline-offset-4">{answer}</span>
+  ) : (
+    <span data-testid="gap-blank" aria-hidden="true" className="inline-block min-w-[4ch] border-b-2 border-faint">&nbsp;</span>
+  )
+  return <>{sentence.slice(0, at)}{blank}{sentence.slice(at + 3)}</>
 }
 
 // One training question in one of 4 formats. Choice formats (de_ru, ru_de, gap) share the
@@ -39,7 +59,8 @@ interface Props {
 // it up via /api/translations, which returns a cached value or generates+caches one via AI. The
 // 'gap' format needs no blocking lookup — its prompt is the learning-language sentence itself;
 // the native-language hint underneath it just appears once (if) the lookup resolves.
-export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner }: Props) {
+export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner, practice = false, progress }: Props) {
+  const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const { card, format } = item
@@ -99,84 +120,87 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
     onAnswer(countsAsCorrect(v)) // "almost" (article/typo) counts as correct for box_level
   }
 
-  function style(i: number) {
-    const base = 'w-full rounded-2xl border px-4 py-3 text-left text-base font-semibold transition sm:px-5 sm:py-4 sm:text-lg '
-    if (!answered) return base + 'border-emerald-400/20 bg-emerald-900/40 text-white hover:border-lime-400/60 hover:bg-lime-400/10'
-    if (options[i].correct) return base + 'border-lime-400 bg-lime-400/20 text-lime-100'
-    if (i === picked) return base + 'border-red-400 bg-red-500/20 text-red-100'
-    return base + 'border-emerald-400/10 bg-emerald-900/20 text-emerald-100/40'
+  // German (learning-language) option text is set in the serif face; translations stay sans.
+  const germanOptions = format === 'ru_de' || format === 'gap'
+
+  function optionClass(i: number) {
+    const base = 'flex min-h-14 w-full items-center justify-between gap-3 rounded-[14px] border px-4 py-3 text-left text-[17px] font-medium transition '
+    if (!answered) return base + 'border-line bg-surface text-fg hover:bg-surface-2'
+    if (options[i].correct) return base + 'border-accent bg-surface-2 text-fg'
+    if (i === picked) return base + 'border-danger bg-surface text-fg'
+    return base + 'border-divider bg-surface text-faint'
   }
 
-  const typedStyle =
-    verdict === 'correct' ? 'border-lime-400 bg-lime-400/15'
-      : verdict === 'almost_article' || verdict === 'almost_typo' ? 'border-amber-400 bg-amber-400/15'
-        : verdict === 'wrong' ? 'border-red-400 bg-red-500/15' : ''
+  const typedBorder =
+    verdict === 'correct' ? '!border-accent'
+      : verdict === 'almost_article' || verdict === 'almost_typo' ? '!border-streak'
+        : verdict === 'wrong' ? '!border-danger' : ''
 
   // Waiting only for formats whose prompt/options need translated text; 'gap' renders right away.
   if (needsTranslation && translationsQuery.isLoading) {
     return (
       <div className="mx-auto max-w-xl">
-        <div className="glass flex h-64 items-center justify-center p-8 text-emerald-100/60">{t('common.loading')}</div>
+        <div className="glass flex h-64 items-center justify-center p-8 text-muted">{t('common.loading')}</div>
       </div>
     )
   }
 
-  // What the question shows and what the right answer is, per format.
-  const prompt = format === 'de_ru' ? card.word : format === 'gap' ? card.example_sentence ?? '' : translatedSelf
-  const answerText = format === 'de_ru' ? translatedSelf : card.word
-
-  const feedback = () => {
-    switch (verdict) {
-      case 'correct': return <span className="text-lime-300">{t('quiz.correct')}</span>
-      case 'almost_article': return <span className="text-amber-300">{t('quiz.almostArticle', { answer: card.word })}</span>
-      case 'almost_typo': return <span className="text-amber-300">{t('quiz.almostTypo', { answer: card.word })}</span>
-      default: return <span className="text-red-300">{t('quiz.correctAnswer', { answer: answerText })}</span>
-    }
-  }
+  const almost = verdict === 'almost_article' || verdict === 'almost_typo'
+  const correctOption = options.find((o) => o.correct)?.text ?? card.word
+  const doneShare = ((position - (answered ? 0 : 1)) / total) * 100
+  const listenable = card.language === 'de' && (format === 'de_ru' || answered) // listening would give the answer away otherwise
 
   return (
-    <div className="mx-auto max-w-xl space-y-3 sm:space-y-5">
-      <div className="flex items-center justify-between text-sm text-emerald-100/70">
-        <span>{position} / {total}</span>
-        <div className="mx-4 h-2 flex-1 overflow-hidden rounded-full bg-emerald-900/60">
-          <div className="h-full bg-lime-400 transition-all" style={{ width: `${((position - (answered ? 0 : 1)) / total) * 100}%` }} />
+    <div className={`mx-auto max-w-xl ${answered ? 'pb-72' : ''}`}>
+      <div className="flex h-11 items-center gap-3">
+        <button type="button" onClick={() => navigate('/')} aria-label={t('training.exit')} title={t('training.exit')}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted transition hover:bg-surface-2">
+          <X size={22} aria-hidden="true" />
+        </button>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-track" role="progressbar"
+          aria-valuemin={0} aria-valuemax={total} aria-valuenow={position - (answered ? 0 : 1)}>
+          <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${doneShare}%` }} />
         </div>
+        <span className="text-sm tabular-nums text-muted">{position}/{total}</span>
+      </div>
+      {practice && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-faint"><Lock size={14} aria-hidden="true" />{t('practice.note')}</p>
+      )}
+
+      <div className="mt-4 flex items-center gap-3">
         {corner}
+        <p className="text-[15px] text-muted">{t(`quiz.prompt.${format}`, learning.vars)}</p>
       </div>
 
-      <div className="glass p-5 text-center sm:p-8">
-        <p className="text-xs uppercase tracking-widest text-lime-300/80">{t(`quiz.prompt.${format}`, learning.vars)}</p>
-        <div className={`display mt-3 font-extrabold text-white ${format === 'gap' ? 'text-xl leading-snug sm:text-2xl' : 'text-3xl sm:text-4xl'}`}>
-          {prompt}
-        </div>
-        {format === 'gap' && translatedExample && (
-          <div className="mt-2 text-sm text-emerald-100/60">{translatedExample}</div>
+      <div className="mt-6">
+        {format === 'de_ru' && <p className="font-serif text-[34px] leading-tight text-fg" lang={learning.code}>{card.word}</p>}
+        {(format === 'ru_de' || format === 'ru_de_type') && <p className="text-[26px] font-semibold text-fg">{translatedSelf}</p>}
+        {format === 'gap' && (
+          <p className="font-serif text-[28px] leading-snug text-fg" lang={learning.code}>
+            <GapSentence sentence={card.example_sentence ?? ''} answered={answered} answer={correctOption} />
+          </p>
         )}
-        {/* Listening would give the answer away in the reverse formats — only after answering there. */}
-        {card.language === 'de' && (format === 'de_ru' || answered) && (
-          <button type="button" onClick={() => speak(card)} className="btn-ghost mt-2" title={t('quiz.listenTitle')}>{t('quiz.listen')}</button>
-        )}
-
-        {answered && (
-          <div className="mt-3 space-y-1 sm:mt-4">
-            {format !== 'de_ru' && <div className="text-lg font-bold text-white">{card.word}</div>}
-            <div className="font-mono text-sm text-lime-300/90">{card.transcription || '—'}</div>
-            {format !== 'de_ru' && translatedSelf && <div className="text-sm text-emerald-100/70">{translatedSelf}</div>}
-            <div className="text-sm">{feedback()}</div>
-          </div>
+        {format === 'gap' && translatedExample && <p className="mt-2 text-[15px] text-muted">{translatedExample}</p>}
+        {listenable && (
+          <button type="button" onClick={() => speak(card)} aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')}
+            className="mt-4 grid h-11 w-11 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
+            <Volume2 size={20} aria-hidden="true" />
+          </button>
         )}
       </div>
 
       {isChoice ? (
-        <div className="space-y-2 sm:space-y-3">
+        <div className="mt-8 space-y-2.5">
           {options.map((o, i) => (
-            <button key={i} type="button" disabled={answered} onClick={() => choose(i)} className={style(i)}>
-              {o.text}
+            <button key={i} type="button" disabled={answered} onClick={() => choose(i)} className={optionClass(i)}>
+              <span className={germanOptions ? 'font-serif text-[19px]' : ''} lang={germanOptions ? learning.code : undefined}>{o.text}</span>
+              {answered && o.correct && <Check size={20} aria-hidden="true" className="shrink-0 text-accent-text" />}
+              {answered && !o.correct && i === picked && <X size={20} aria-hidden="true" className="shrink-0 text-danger" />}
             </button>
           ))}
         </div>
       ) : (
-        <form onSubmit={submitTyped} className="flex gap-3">
+        <form onSubmit={submitTyped} className="mt-8 flex gap-3">
           <input
             autoFocus
             value={typed}
@@ -184,25 +208,63 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
             onChange={(e) => setTyped(e.target.value)}
             placeholder={t('quiz.typePlaceholder', learning.vars)}
             autoComplete="off" autoCapitalize="off" spellCheck={false}
-            className={`field flex-1 text-lg ${typedStyle}`}
+            className={`field !h-14 min-w-0 flex-1 font-serif text-[19px] ${typedBorder}`}
             lang={learning.code}
           />
           {!answered && (
-            <button type="submit" disabled={!typed.trim()} className="btn-primary shrink-0">{t('quiz.check')}</button>
+            <button type="submit" disabled={!typed.trim()} className="btn-primary h-14 shrink-0">{t('quiz.check')}</button>
           )}
         </form>
       )}
 
-      {lacking && (
-        <p className="text-center text-xs text-amber-200/80">{t('quiz.lacking')}</p>
-      )}
-      {error && <p className="text-center text-sm text-red-300">{error}</p>}
+      {lacking && <p className="mt-4 text-center text-xs text-faint">{t('quiz.lacking')}</p>}
 
       {answered && (
-        <button type="button" disabled={saving} className="btn-primary w-full text-lg"
-          onClick={onNext}>
-          {position === total ? t('quiz.finish') : t('quiz.next')}
-        </button>
+        <div role="status" aria-live="polite"
+          className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-xl animate-rise rounded-t-[22px] border-t border-line bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[var(--shadow-card)] md:bottom-4 md:rounded-[22px] md:border">
+          <div className="flex items-center gap-2 text-[19px] font-semibold">
+            {verdict === 'correct' && <><CircleCheck size={22} aria-hidden="true" className="text-accent-text" /><span>{t('training.correct')}</span></>}
+            {almost && <><CircleCheck size={22} aria-hidden="true" className="text-streak" /><span>{t('training.almost')}</span></>}
+            {verdict === 'wrong' && <><CircleX size={22} aria-hidden="true" className="text-danger" /><span>{t('training.wrong')}</span></>}
+          </div>
+          <p className="mt-2 text-[15px] text-fg">
+            <span className="font-serif" lang={learning.code}>{card.word}</span>{translatedSelf && <> — {translatedSelf}</>}
+          </p>
+          {card.transcription && <p className="mt-0.5 text-sm text-muted">{card.transcription}</p>}
+          {almost && (
+            <p className="mt-1 text-sm text-streak">
+              {t(verdict === 'almost_article' ? 'training.hintArticle' : 'training.hintTypo', { answer: card.word })}
+            </p>
+          )}
+
+          <div className="mt-3 min-h-[38px]">
+            {practice ? (
+              <p className="text-sm text-muted">{t('summary.practice')}</p>
+            ) : saving ? (
+              <div data-testid="box-saving" className="h-[38px] animate-pulse rounded-lg bg-surface-2" />
+            ) : progress ? (
+              <>
+                <div className="flex gap-1" data-testid="box-bar">
+                  {Array.from({ length: BOX_SEGMENTS }, (_, i) => (
+                    <span key={i} data-filled={i < progress.box_level}
+                      className={`h-1.5 flex-1 rounded-full ${i < progress.box_level ? 'bg-accent' : 'bg-dot-off'}`} />
+                  ))}
+                </div>
+                <p className="mt-1.5 text-sm text-muted">
+                  {progress.is_learned
+                    ? t('box.learned', { when: whenLabel(progress.next_review_at, t, dateLocale()) })
+                    : t('training.box', { box: progress.box_level, when: whenLabel(progress.next_review_at, t, dateLocale()) })}
+                </p>
+              </>
+            ) : null}
+          </div>
+
+          {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+          <button type="button" autoFocus disabled={saving} onClick={onNext} className="btn-primary mt-4 h-[52px] w-full rounded-[14px]">
+            {position === total ? t('quiz.finish') : t('training.continue')}
+          </button>
+        </div>
       )}
     </div>
   )

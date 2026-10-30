@@ -40,7 +40,7 @@ export function ContextsPage() {
 
   function startReview() {
     localStorage.setItem('review-folder', '') // the count is for all words
-    navigate('/cards')
+    navigate('/cards?start=1') // the session starts at once, no second start screen
   }
 
   function onPhoto(file: File | undefined) {

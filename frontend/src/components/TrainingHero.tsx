@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { HeroPhrase } from '../api/endpoints'
 import { onHeroEvent } from '../lib/heroBus'
@@ -42,25 +43,28 @@ export function TrainingHero() {
 
   if (!hero) return null
   return (
-    <div className="pointer-events-none relative h-6 w-14 shrink-0 sm:w-16">
-      <div className="absolute bottom-0 right-0 w-14 sm:w-16" aria-hidden="true">
+    <div className="pointer-events-none relative h-10 w-10 shrink-0">
+      <div className="w-10" aria-hidden="true">
         <Hero stage={stageFromApi(hero.stage)} mood={mood} size="small" bubble={false} gesture={gesture} figureClassName="w-full" />
       </div>
+      {/* The reaction bubble sits to the RIGHT of the hero (the wrapper centres it on the figure). */}
       {phrase && (
-        <div key={phrase.de} className="hero-bubble hero-bubble-side tail-right pop absolute bottom-6 right-full mr-2 w-max whitespace-nowrap" role="status">
-          <div className="de">„{phrase.de}“</div>
-          <div className="tr">{phrase.translation}</div>
+        <div className="absolute left-full top-0 z-10 ml-2 flex h-10 items-center">
+          <div key={phrase.de} className="hero-bubble hero-bubble-side tail-left pop relative w-max max-w-[70vw] whitespace-nowrap" role="status">
+            <div className="de">„{phrase.de}“</div>
+            <div className="tr">{phrase.translation}</div>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-/** Review start screen: the hero with today's mood and phrase (falls back to the emoji). */
-export function ReviewHero({ fallback }: { fallback: string }) {
+/** Review start screen: the hero with today's mood and phrase (falls back to an icon). */
+export function ReviewHero({ icon: Fallback }: { icon: LucideIcon }) {
   const { t } = useTranslation()
   const { data: hero } = useHero()
-  if (!hero) return <div className="text-5xl">{fallback}</div>
+  if (!hero) return <Fallback size={48} aria-hidden="true" className="mx-auto text-accent-text" />
   const stage = stageFromApi(hero.stage)
   return (
     <Hero stage={stage} mood={hero.mood} phrase={hero.phrase} size="small" label={t(`hero.stages.${stage}`)}

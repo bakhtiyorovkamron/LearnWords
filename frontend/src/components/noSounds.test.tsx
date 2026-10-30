@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { meApi, translationsApi } from '../api/endpoints'
@@ -72,13 +73,15 @@ describe('training question', () => {
   async function answerTyped(value: string) {
     const onNext = vi.fn()
     render(wrap(
-      <QuizQuestion item={{ card: due, format: 'ru_de_type' }} pool={[]} position={1} total={2} saving={false}
-        onAnswer={vi.fn()} onNext={onNext} />,
+      <MemoryRouter>
+        <QuizQuestion item={{ card: due, format: 'ru_de_type' }} pool={[]} position={1} total={2} saving={false}
+          onAnswer={vi.fn()} onNext={onNext} />
+      </MemoryRouter>,
     ))
     const input = await screen.findByPlaceholderText(/./)
     fireEvent.change(input, { target: { value } })
     act(() => { fireEvent.submit(input.closest('form')!) })
-    const next = await screen.findByRole('button', { name: /Next|Finish/ })
+    const next = await screen.findByRole('button', { name: /Continue|Finish/ })
     return { onNext, next }
   }
 

@@ -25,12 +25,12 @@ export function DirectionToggle<T extends string>({ value, onChange, options }: 
   const lang = useLearningLang().vars.langCode
   const native = i18n.language.toUpperCase()
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-1"
+    <div className="inline-flex flex-wrap gap-1 rounded-xl border border-line bg-surface-2 p-1"
       role="radiogroup" aria-label={t('direction.label')}>
       {options.map((k) => (
         <button key={k} type="button" role="radio" aria-checked={value === k} onClick={() => onChange(k)}
-          className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
-            value === k ? 'bg-lime-400 text-emerald-950 shadow' : 'text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white'
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+            value === k ? 'bg-accent text-on-accent' : 'text-muted hover:text-fg'
           }`}>
           {t(`direction.${k}`, { lang, native })}
         </button>

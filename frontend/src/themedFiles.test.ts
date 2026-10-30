@@ -9,6 +9,9 @@ const THEMED = [
   'components/LanguageSwitcher.tsx', 'components/PushToggle.tsx', 'components/ThemePicker.tsx',
   'components/InstallPrompt.tsx', 'components/InAppBanner.tsx', 'components/Toaster.tsx',
   'components/ContactLinks.tsx', 'components/ErrorState.tsx',
+  // step 3: training
+  'components/ReviewSession.tsx', 'components/QuizQuestion.tsx', 'components/ReviewResult.tsx',
+  'components/TrainingHero.tsx', 'components/DirectionToggle.tsx',
 ]
 
 const FORBIDDEN = /\b(emerald|lime|teal|red)-\d{2,3}\b|text-white|bg-white/

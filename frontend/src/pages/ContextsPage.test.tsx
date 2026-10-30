@@ -77,12 +77,12 @@ describe('Home: today card', () => {
     expect(screen.getByText('to review today · about 1 minute')).toBeTruthy()
   })
 
-  it('Start training reviews ALL words (review-folder is cleared) and opens /cards', async () => {
+  it('Start training reviews ALL words (review-folder is cleared) and opens the session at once: /cards?start=1', async () => {
     localStorage.setItem('review-folder', 'f1')
     renderHome()
     fireEvent.click(await screen.findByRole('button', { name: /Start training/ }))
     expect(localStorage.getItem('review-folder')).toBe('')
-    expect(where()).toBe('/cards')
+    expect(where()).toBe('/cards?start=1')
   })
 
   it('nothing due, but words → "All done", and Practice more opens the practice picker', async () => {

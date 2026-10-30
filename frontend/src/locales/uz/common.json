@@ -241,17 +241,12 @@
     },
     "typePlaceholder": "So‘z {{langUz}}cha (artikli bo‘lsa, artikl bilan)",
     "check": "Tekshirish",
-    "almostArticle": "≈ Deyarli! Artikl bilan to‘g‘risi: {{answer}}",
-    "almostTypo": "≈ Qabul qilindi, xatoni tekshiring: {{answer}}",
-    "listen": "▶ Tinglash",
     "listenTitle": "Tinglash",
-    "correct": "✓ To‘g‘ri!",
-    "correctAnswer": "✗ To‘g‘ri javob: {{answer}}",
     "lacking": "Testda haqiqiy javob variantlari bo‘lishi uchun ko‘proq so‘z qo‘shing.",
     "saveFailed": "Javobni saqlab bo‘lmadi: {{error}}",
-    "finish": "Yakunlash",
-    "next": "Keyingisi →"
+    "finish": "Yakunlash"
   },
+  "training": {"exit": "Mashqni tugatish", "correct": "To‘g‘ri!", "wrong": "Noto‘g‘ri", "almost": "Deyarli to‘g‘ri", "hintArticle": "Qabul qilindi, artikl bilan: {{answer}}", "hintTypo": "Qabul qilindi, imloni tekshiring: {{answer}}", "box": "{{box}}-quti · keyingi takrorlash {{when}}", "continue": "Davom etish"},
   "result": {
     "done": "Mashq yakunlandi",
     "correct": "to‘g‘ri",

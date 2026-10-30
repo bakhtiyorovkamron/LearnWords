@@ -13,7 +13,7 @@ import { ContactLinks } from './ContactLinks'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
-import { isTrainingOpen } from '../lib/trainingState'
+import { isTrainingOpen, useTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
 import { InAppBanner } from './InAppBanner'
 import { Logo } from './Logo'
@@ -58,6 +58,8 @@ export function Layout() {
   const searchOn = isOn('word_search')
   useThemeSync(isOn('theme_picker'), me.isSuccess) // night without the picker; the server's theme with it
   const [moreOpen, setMoreOpen] = useState(false)
+  // During a training session the shell steps aside: no header, bottom nav or footer.
+  const focus = useTrainingOpen()
 
   // The one-time rating window: 3 seconds after the page loads, and never in the middle of a training.
   const [feedbackDue, setFeedbackDue] = useState(false)
@@ -96,10 +98,11 @@ export function Layout() {
   )
 
   return (
-    <div className="min-h-screen pt-[env(safe-area-inset-top)] pb-[var(--nav-h)] md:pt-0">
+    <div className="min-h-screen pt-[env(safe-area-inset-top)] pb-[var(--nav-h)] md:pt-0"
+      style={focus ? ({ '--nav-h': '0px' } as React.CSSProperties) : undefined}>
       <InAppBanner />
       {/* Top menu: tablets and desktops. Phones get the bottom navigation below instead. */}
-      <header className="sticky top-0 z-20 hidden border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur md:block">
+      {!focus && <header className="sticky top-0 z-20 hidden border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur md:block">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
           <NavLink to="/" className="mr-4" aria-label="yodla"><Logo /></NavLink>
           <NavLink to="/" end className={link}><Icon icon={House} />{t('nav.home')}</NavLink>
@@ -118,16 +121,18 @@ export function Layout() {
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
           </div>
         </nav>
-      </header>
+      </header>}
       <main className="mx-auto max-w-6xl px-4 py-4 md:py-10">
         <Outlet />
       </main>
-      <footer className="space-y-2 py-8 text-center text-xs text-faint">
-        <div>{learning.tagline}</div>
-        <div className="text-muted">{t('contact.question')} <ContactLinks /></div>
-      </footer>
+      {!focus && (
+        <footer className="space-y-2 py-8 text-center text-xs text-faint">
+          <div>{learning.tagline}</div>
+          <div className="text-muted">{t('contact.question')} <ContactLinks /></div>
+        </footer>
+      )}
 
-      {moreOpen && (
+      {moreOpen && !focus && (
         <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setMoreOpen(false)}>
           <div
             id="more-sheet"
@@ -153,7 +158,7 @@ export function Layout() {
       )}
 
       {/* Bottom navigation: phones only. Padded for the iPhone home indicator (safe area). */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[var(--nav-h)] border-t border-line bg-bg/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      {!focus && <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[var(--nav-h)] border-t border-line bg-bg/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <NavLink to="/" end className={({ isActive }) => tab(isActive && !moreOpen)}>
           <Icon icon={House} size={22} stroke={1.75} />{t('nav.home')}
         </NavLink>
@@ -170,7 +175,7 @@ export function Layout() {
           aria-expanded={moreOpen} aria-controls="more-sheet">
           <Icon icon={Menu} size={22} stroke={1.75} />{t('nav.more')}
         </button>
-      </nav>
+      </nav>}
 
       <Toaster />
       {askFeedback && feedbackDue && <FeedbackModal />}

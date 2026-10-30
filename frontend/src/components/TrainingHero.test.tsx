@@ -50,6 +50,19 @@ describe('TrainingHero', () => {
     expect(heroApi.get).toHaveBeenCalledTimes(1) // no server requests during training
   })
 
+  it('is a 40 px hero; its bubble sits to the RIGHT of it (tail on the left)', async () => {
+    const { container } = renderWithClient()
+    await vi.waitFor(() => expect(container.querySelector('svg')).toBeTruthy())
+    expect((container.firstChild as HTMLElement).className).toContain('w-10')
+    act(() => emitHeroEvent({ type: 'answer', correct: true, streak: 1 }))
+    const bubble = container.querySelector('.hero-bubble-side') as HTMLElement
+    expect(bubble).not.toBeNull()
+    expect(bubble.className).toContain('hero-bubble-side')
+    expect(bubble.className).toContain('tail-left')
+    expect(bubble.parentElement!.className).toContain('left-full')
+    expect(bubble.parentElement!.className).toContain('ml-2')
+  })
+
   it('renders nothing for users without the hero (404)', async () => {
     vi.mocked(heroApi.get).mockRejectedValue(new Error('404'))
     const { container } = renderWithClient()

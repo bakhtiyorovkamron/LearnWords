@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Brain, CircleCheck, Layers } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -20,16 +21,16 @@ import { setTrainingOpen } from '../lib/trainingState'
 
 const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
-/** Segmented "10 | 20 | 50 | Все" toggle — same visual style as DirectionToggle. */
+/** Segmented "10 | 20 | 50 | All" toggle — same visual style as DirectionToggle. */
 function SessionSizeToggle({ value, onChange }: { value: SessionSize; onChange: (v: SessionSize) => void }) {
   const { t } = useTranslation()
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-1"
+    <div className="inline-flex flex-wrap gap-1 rounded-xl border border-line bg-surface-2 p-1"
       role="radiogroup" aria-label={t('review.sessionSize')}>
       {SESSION_SIZES.map((k) => (
         <button key={k} type="button" role="radio" aria-checked={value === k} onClick={() => onChange(k)}
-          className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
-            value === k ? 'bg-lime-400 text-emerald-950 shadow' : 'text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white'
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+            value === k ? 'bg-accent text-on-accent' : 'text-muted hover:text-fg'
           }`}>
           {k === 'all' ? t('review.sessionSizeAll') : k}
         </button>
@@ -45,12 +46,12 @@ function PracticeModeToggle({ value, onChange }: { value: PracticeMode; onChange
     hard: t('practice.hard'), random: t('practice.random'), recent: t('practice.recent'),
   }
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-1"
+    <div className="inline-flex flex-wrap gap-1 rounded-xl border border-line bg-surface-2 p-1"
       role="radiogroup" aria-label={t('practice.pick')}>
       {PRACTICE_MODES.map((k) => (
         <button key={k} type="button" role="radio" aria-checked={value === k} onClick={() => onChange(k)}
-          className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
-            value === k ? 'bg-lime-400 text-emerald-950 shadow' : 'text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white'
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+            value === k ? 'bg-accent text-on-accent' : 'text-muted hover:text-fg'
           }`}>
           {labels[k]}
         </button>
@@ -81,7 +82,7 @@ export function ReviewSession() {
 
   const [mode, setMode] = useState<'review' | 'practice'>('review')
   // ?practice=1 (Home → "Practice more") opens the word-selection screen right away.
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const [practiceSetup, setPracticeSetup] = useState(params.get('practice') === '1') // showing the word-selection screen
   const [practiceLoading, setPracticeLoading] = useState(false)
   const [deck, setDeck] = useState<QuizItem[] | null>(null) // null = not started
@@ -118,6 +119,18 @@ export function ReviewSession() {
     setTrainingOpen(inSession)
     return () => setTrainingOpen(false)
   }, [inSession])
+
+  // ?start=1 (Home → "Start training"): once the due words are in, the session begins at once —
+  // no second start screen. Nothing due: the normal "nothing to review" screen. The parameter is
+  // dropped either way, so going back or reloading does not start it again.
+  const startRequested = useRef(params.get('start') === '1')
+  useEffect(() => {
+    if (!startRequested.current || due.isFetching) return // wait for fresh data, not a stale cache
+    startRequested.current = false
+    if ((due.data?.total ?? 0) > 0) start()
+    setParams((p) => { p.delete('start'); return p }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [due.isFetching, due.data])
 
   // Reports exactly once when the deck is exhausted, not on every re-render of the result screen.
   useEffect(() => {
@@ -184,7 +197,7 @@ export function ReviewSession() {
     }
   }
 
-  if (due.isLoading || pool.isLoading) return <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />
+  if (due.isLoading || pool.isLoading) return <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
   if (due.error) return <ErrorState error={due.error} />
 
   const chooseFolder = (v: string) => {
@@ -193,14 +206,14 @@ export function ReviewSession() {
   }
   const folderPicker = (
     <div className="mx-auto mt-5 flex w-full max-w-xs flex-col items-center gap-2">
-      <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('folders.trainOn')}</span>
+      <span className="text-xs uppercase tracking-widest text-faint">{t('folders.trainOn')}</span>
       {/* Fixed width (up to 20rem, full width on narrow screens) so the select doesn't jump with the folder name. */}
       <FolderSelect value={folder} onChange={chooseFolder} includeAll className="w-full" />
     </div>
   )
   const directionPicker = (
     <div className="mt-5 flex flex-col items-center gap-2">
-      <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('direction.label')}</span>
+      <span className="text-xs uppercase tracking-widest text-faint">{t('direction.label')}</span>
       <DirectionToggle value={direction} onChange={setDirection} options={DIRECTIONS} />
     </div>
   )
@@ -210,14 +223,14 @@ export function ReviewSession() {
   if (practiceSetup && !deck) {
     return (
       <div className="glass p-6 text-center sm:p-10">
-        <div className="text-5xl">🧠</div>
-        <p className="mt-3 text-lg font-semibold">{t('practice.pick')}</p>
+        <Brain size={48} aria-hidden="true" className="mx-auto text-accent-text" />
+        <p className="mt-3 text-lg font-semibold text-fg">{t('practice.pick')}</p>
         {folderPicker}
         <div className="mt-5 flex flex-col items-center gap-2">
           <PracticeModeToggle value={practiceMode} onChange={setPracticeMode} />
         </div>
         <div className="mt-5 flex flex-col items-center gap-2">
-          <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('review.sessionSize')}</span>
+          <span className="text-xs uppercase tracking-widest text-faint">{t('review.sessionSize')}</span>
           <SessionSizeToggle value={sessionSize} onChange={setSessionSize} />
         </div>
         {directionPicker}
@@ -239,9 +252,9 @@ export function ReviewSession() {
     if (!total) {
       return (
         <div className="glass p-6 text-center sm:p-10">
-          <ReviewHero fallback="🎉" />
-          <p className="mt-3 text-lg font-semibold">{t('review.nothingToday')}</p>
-          <p className="mt-1 text-sm text-emerald-100/70">{t('review.comeBack')}</p>
+          <ReviewHero icon={CircleCheck} />
+          <p className="mt-3 text-lg font-semibold text-fg">{t('review.nothingToday')}</p>
+          <p className="mt-1 text-sm text-muted">{t('review.comeBack')}</p>
           {folderPicker}
           <button type="button" onClick={() => setPracticeSetup(true)} className="btn-primary mt-6 text-lg">
             {t('practice.start')}
@@ -252,12 +265,12 @@ export function ReviewSession() {
     const sessionCount = due.data?.cards.length ?? 0
     return (
       <div className="glass p-6 text-center sm:p-10">
-        <ReviewHero fallback="🃏" />
-        <p className="mt-3 text-lg font-semibold">{t('review.dueCount', { count: total })}</p>
-        <p className="mt-1 text-xs text-emerald-100/60">{t('review.sessionLine', { count: sessionCount })}</p>
+        <ReviewHero icon={Layers} />
+        <p className="mt-3 text-lg font-semibold text-fg">{t('review.dueCount', { count: total })}</p>
+        <p className="mt-1 text-xs text-muted">{t('review.sessionLine', { count: sessionCount })}</p>
         {folderPicker}
         <div className="mt-5 flex flex-col items-center gap-2">
-          <span className="text-xs uppercase tracking-widest text-emerald-100/50">{t('review.sessionSize')}</span>
+          <span className="text-xs uppercase tracking-widest text-faint">{t('review.sessionSize')}</span>
           <SessionSizeToggle value={sessionSize} onChange={setSessionSize} />
         </div>
         {directionPicker}
@@ -278,35 +291,32 @@ export function ReviewSession() {
 
   const item = deck[index]
   return (
-    <div className="space-y-3">
-      {mode === 'practice' && (
-        <p className="mx-auto max-w-xl text-center text-xs text-emerald-100/50">🔒 {t('practice.note')}</p>
-      )}
-      <QuizQuestion
-        key={item.card.id}
-        corner={<TrainingHero />}
-        item={item}
-        pool={pool.data ?? []}
-        position={index + 1}
-        total={deck.length}
-        saving={answer.isPending}
-        error={answer.error
-          ? isRateLimited(answer.error)
-            ? rateLimitMessage(answer.error)
-            : t('quiz.saveFailed', { error: errorMessage(answer.error) })
-          : null}
-        onAnswer={(ok) => {
-          if (ok) setCorrect((c) => c + 1)
-          const newStreak = ok ? streak + 1 : 0
-          setStreak(newStreak)
-          emitHeroEvent({ type: 'answer', correct: ok, streak: newStreak })
-          answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4, prevBox: item.card.box_level }) // saved immediately, not at the end
-        }}
-        onNext={() => {
-          answer.reset()
-          setIndex((i) => i + 1)
-        }}
-      />
-    </div>
+    <QuizQuestion
+      key={item.card.id}
+      corner={<TrainingHero />}
+      item={item}
+      pool={pool.data ?? []}
+      position={index + 1}
+      total={deck.length}
+      saving={answer.isPending}
+      practice={mode === 'practice'}
+      progress={answer.data ?? null}
+      error={answer.error
+        ? isRateLimited(answer.error)
+          ? rateLimitMessage(answer.error)
+          : t('quiz.saveFailed', { error: errorMessage(answer.error) })
+        : null}
+      onAnswer={(ok) => {
+        if (ok) setCorrect((c) => c + 1)
+        const newStreak = ok ? streak + 1 : 0
+        setStreak(newStreak)
+        emitHeroEvent({ type: 'answer', correct: ok, streak: newStreak })
+        answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4, prevBox: item.card.box_level }) // saved immediately, not at the end
+      }}
+      onNext={() => {
+        answer.reset()
+        setIndex((i) => i + 1)
+      }}
+    />
   )
 }

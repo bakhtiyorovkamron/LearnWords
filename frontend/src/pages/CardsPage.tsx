@@ -14,6 +14,7 @@ import { WordFixes } from '../components/WordFixes'
 import { FolderPicker } from '../components/FolderPicker'
 import { toast } from '../components/Toaster'
 import { useMoveWords } from '../lib/moveWords'
+import { useTrainingOpen } from '../lib/trainingState'
 import { ErrorState } from '../components/ErrorState'
 
 const PAGE = 48
@@ -27,15 +28,16 @@ export function CardsPage() {
   const [params, setParams] = useSearchParams()
   const tab: 'review' | 'all' = params.get('tab') === 'all' ? 'all' : 'review'
   const initialFolder = params.get('folder') ?? ''
+  const training = useTrainingOpen() // a session is on screen: only the questions, no tabs
   const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
   return (
     <div className="space-y-4 md:space-y-8">
-      <div className="flex gap-2">
+      {!training && <div className="flex gap-2">
         {tabs.map(([k, label]) => (
           <button key={k} onClick={() => setParams(k === 'all' ? { tab: 'all' } : {}, { replace: true })}
             className={tab === k ? 'btn-primary' : 'btn-ghost'}>{label}</button>
         ))}
-      </div>
+      </div>}
       {tab === 'review' ? <ReviewSession /> : <Collection initialFolder={initialFolder} />}
     </div>
   )

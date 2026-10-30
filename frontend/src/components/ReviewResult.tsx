@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { CircleCheck, Trophy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface Props {
@@ -22,21 +23,23 @@ export function ReviewResult({ correct, total, onRestart, restartLabel, moreCoun
   const hasMore = moreCount > 0
   return (
     <div className="glass mx-auto max-w-xl p-10 text-center">
-      <div className="text-5xl">{wrong === 0 ? '🏆' : '🎉'}</div>
-      <h2 className="display mt-3 text-2xl font-extrabold">{t('result.done')}</h2>
+      {wrong === 0
+        ? <Trophy size={48} aria-hidden="true" className="mx-auto text-accent-text" />
+        : <CircleCheck size={48} aria-hidden="true" className="mx-auto text-accent-text" />}
+      <h2 className="mt-3 text-2xl font-bold text-fg">{t('result.done')}</h2>
       <div className="mt-6 grid grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-lime-400/30 bg-lime-400/10 p-4">
-          <div className="display text-3xl font-extrabold text-lime-300">{correct}</div>
-          <div className="text-xs text-emerald-100/70">{t('result.correct')}</div>
+        <div className="rounded-2xl bg-surface-2 p-4">
+          <div className="text-3xl font-bold tabular-nums text-accent-text">{correct}</div>
+          <div className="text-xs text-muted">{t('result.correct')}</div>
         </div>
-        <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4">
-          <div className="display text-3xl font-extrabold text-red-300">{wrong}</div>
-          <div className="text-xs text-emerald-100/70">{t('result.wrong')}</div>
+        <div className="rounded-2xl bg-surface-2 p-4">
+          <div className="text-3xl font-bold tabular-nums text-danger">{wrong}</div>
+          <div className="text-xs text-muted">{t('result.wrong')}</div>
         </div>
       </div>
-      <p className="mt-4 text-sm text-emerald-100/70">{t('result.total', { count: total })}</p>
+      <p className="mt-4 text-sm text-muted">{t('result.total', { count: total })}</p>
       {boxes && (
-        <p className="mt-2 text-sm font-semibold text-lime-200">
+        <p className="mt-2 text-sm font-semibold text-muted">
           {boxes === 'practice' ? t('summary.practice') : t('summary.moved', { n: boxes.movedUp })}
         </p>
       )}
