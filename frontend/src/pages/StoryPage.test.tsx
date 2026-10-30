@@ -61,7 +61,8 @@ describe('StoryPage: the archive', () => {
     // AI chips are dates: yesterday's is there, today's is not.
     const labels = within(archive()).getAllByRole('button').map((b) => b.textContent)
     expect(labels.filter((l) => !l?.startsWith('✍️') && l !== 'All' && !/Generated|Mine/.test(l ?? ''))).toHaveLength(1)
-    expect(storiesApi.byId).toHaveBeenCalledWith('own-today') // the newest is selected by default
+    // the newest is selected by default (the story is fetched a tick after the chips appear)
+    await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('own-today'))
   })
 
   it('a long own title is cut to 24 characters in the chip', async () => {

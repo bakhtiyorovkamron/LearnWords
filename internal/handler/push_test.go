@@ -3,9 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
-	"crypto/ecdh"
-	"crypto/rand"
-	"encoding/base64"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
+	"learnwords/internal/pushtest"
 	"learnwords/internal/service"
 )
 
@@ -62,12 +62,14 @@ func (m *memPushRepo) All(context.Context) ([]domain.PushSubscription, error) {
 	}
 	return out, nil
 }
-func (m *memPushRepo) ByUser(ctx context.Context, id uuid.UUID) ([]domain.PushSubscription, error) {
+func (m *memPushRepo) ByUsers(ctx context.Context, ids []uuid.UUID) ([]domain.PushSubscription, error) {
 	all, _ := m.All(ctx)
 	var out []domain.PushSubscription
 	for _, s := range all {
-		if s.UserID == id {
-			out = append(out, s)
+		for _, id := range ids {
+			if s.UserID == id {
+				out = append(out, s)
+			}
 		}
 	}
 	return out, nil
@@ -82,12 +84,13 @@ func (m *memPushRepo) Stats(ctx context.Context) (int, int, error) {
 }
 
 type pushHTTPEnv struct {
-	r     *gin.Engine
-	repo  *memPushRepo
-	srv   *httptest.Server
-	mu    *sync.Mutex
-	paths *[]string
-	known map[uuid.UUID]bool
+	r        *gin.Engine
+	repo     *memPushRepo
+	srv      *httptest.Server
+	mu       *sync.Mutex
+	paths    *[]string
+	bodies   map[string][]byte            // what each device's push service received, by path
+	browsers map[string]*pushtest.Browser // by endpoint
 }
 
 // newPushHTTPEnv: the push routes behind a middleware that takes the user from X-Test-User; a TLS
@@ -97,9 +100,12 @@ func newPushHTTPEnv(t *testing.T, enabled bool) pushHTTPEnv {
 	gin.SetMode(gin.TestMode)
 	var mu sync.Mutex
 	var paths []string
+	bodies := map[string][]byte{}
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
 		mu.Lock()
 		paths = append(paths, r.URL.Path)
+		bodies[r.URL.Path] = body
 		mu.Unlock()
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -114,8 +120,7 @@ func newPushHTTPEnv(t *testing.T, enabled bool) pushHTTPEnv {
 	}
 	repo := newMemPushRepo()
 	svc := service.NewPushService(repo, public, private, "mailto:t@example.com", service.WithPushHTTPClient(srv.Client()))
-	known := map[uuid.UUID]bool{}
-	h := NewPushHandler(svc, pushUsers{known})
+	h := NewPushHandler(svc)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set(userIDKey, uuid.MustParse(c.GetHeader("X-Test-User"))) })
@@ -124,16 +129,7 @@ func newPushHTTPEnv(t *testing.T, enabled bool) pushHTTPEnv {
 	r.DELETE("/push/subscribe", h.Unsubscribe)
 	r.GET("/admin/push", h.AdminStats)
 	r.POST("/admin/push", h.AdminSend)
-	return pushHTTPEnv{r, repo, srv, &mu, &paths, known}
-}
-
-type pushUsers struct{ known map[uuid.UUID]bool }
-
-func (p pushUsers) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
-	if !p.known[id] {
-		return nil, domain.ErrNotFound
-	}
-	return &domain.User{ID: id}, nil
+	return pushHTTPEnv{r, repo, srv, &mu, &paths, bodies, map[string]*pushtest.Browser{}}
 }
 
 func (e pushHTTPEnv) do(user uuid.UUID, method, path, body string) *httptest.ResponseRecorder {
@@ -148,19 +144,21 @@ func (e pushHTTPEnv) do(user uuid.UUID, method, path, body string) *httptest.Res
 
 func browserKeysJSON(t *testing.T) string {
 	t.Helper()
-	k, err := ecdh.P256().GenerateKey(rand.Reader)
+	b, err := pushtest.NewBrowser()
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := make([]byte, 16)
-	_, _ = rand.Read(a)
-	return `{"p256dh":"` + base64.RawURLEncoding.EncodeToString(k.PublicKey().Bytes()) + `","auth":"` + base64.RawURLEncoding.EncodeToString(a) + `"}`
+	return `{"p256dh":"` + b.P256dh + `","auth":"` + b.Auth + `"}`
 }
 
 func (e pushHTTPEnv) subscribe(t *testing.T, user uuid.UUID, endpoint string) {
 	t.Helper()
-	e.known[user] = true
-	w := e.do(user, "POST", "/push/subscribe", `{"endpoint":"`+endpoint+`","keys":`+browserKeysJSON(t)+`}`)
+	b, err := pushtest.NewBrowser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.browsers[endpoint] = b
+	w := e.do(user, "POST", "/push/subscribe", `{"endpoint":"`+endpoint+`","keys":{"p256dh":"`+b.P256dh+`","auth":"`+b.Auth+`"}}`)
 	if w.Code != 204 {
 		t.Fatalf("subscribe %s: %d %s", endpoint, w.Code, w.Body)
 	}
@@ -186,7 +184,6 @@ func TestPushAPI_UnsubscribeOnlyOwn(t *testing.T) {
 	a, b := uuid.New(), uuid.New()
 	ep := e.srv.URL + "/ep/1"
 	e.subscribe(t, a, ep)
-	e.known[b] = true
 
 	if w := e.do(b, "DELETE", "/push/subscribe", `{"endpoint":"`+ep+`"}`); w.Code != 204 || len(e.repo.subs) != 1 {
 		t.Errorf("another user's delete: %d, rows %d (must stay)", w.Code, len(e.repo.subs))
@@ -227,7 +224,6 @@ func TestPushAPI_SubscribeValidation(t *testing.T) {
 func TestPushAPI_WithoutKeys_503AndNothingElseBreaks(t *testing.T) {
 	e := newPushHTTPEnv(t, false)
 	u := uuid.New()
-	e.known[u] = true
 	for name, w := range map[string]*httptest.ResponseRecorder{
 		"public key": e.do(u, "GET", "/push/public-key", ""),
 		"subscribe":  e.do(u, "POST", "/push/subscribe", `{"endpoint":"https://push.example.com/x","keys":`+browserKeysJSON(t)+`}`),
@@ -255,31 +251,83 @@ func TestPushAPI_PublicKey(t *testing.T) {
 	}
 }
 
-func TestPushAPI_AdminSend_OneUserOrEveryone(t *testing.T) {
+func TestPushAPI_AdminSend_Targets(t *testing.T) {
 	e := newPushHTTPEnv(t, true)
-	admin, a, b := uuid.New(), uuid.New(), uuid.New()
+	admin, a, b, c := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	e.subscribe(t, admin, e.srv.URL+"/admin1")
 	e.subscribe(t, a, e.srv.URL+"/a1")
 	e.subscribe(t, a, e.srv.URL+"/a2")
 	e.subscribe(t, b, e.srv.URL+"/b1")
+	e.subscribe(t, c, e.srv.URL+"/c1")
 
 	w := e.do(admin, "GET", "/admin/push", "")
-	if m := decode(t, w); m["devices"] != float64(3) || m["users"] != float64(2) {
+	if m := decode(t, w); m["devices"] != float64(5) || m["users"] != float64(4) {
 		t.Errorf("stats: %s", w.Body)
 	}
 
-	w = e.do(admin, "POST", "/admin/push", `{"target":"`+a.String()+`","title":"Hi","body":"Test"}`)
-	if m := decode(t, w); w.Code != 200 || m["sent"] != float64(2) || m["failed"] != float64(0) || m["removed"] != float64(0) {
-		t.Fatalf("one user: %d %s", w.Code, w.Body)
+	reached := func() string {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		got := strings.Join(*e.paths, " ")
+		*e.paths = nil
+		return got
 	}
-	for _, p := range *e.paths {
-		if p == "/b1" {
-			t.Error("another user's device got the notification")
+	send := func(body string) (int, map[string]any) {
+		w := e.do(admin, "POST", "/admin/push", body)
+		return w.Code, decode(t, w)
+	}
+
+	// "me": only the calling admin's devices
+	code, m := send(`{"target":"me","title":"Hi","body":"Test"}`)
+	if code != 200 || m["sent"] != float64(1) || m["users"] != float64(1) || m["failed"] != float64(0) || m["removed"] != float64(0) {
+		t.Fatalf("me: %d %v", code, m)
+	}
+	if got := reached(); got != "/admin1" {
+		t.Errorf("me reached %q", got)
+	}
+
+	// "users": exactly those users' devices; an unknown id is ignored; a repeated id counts once
+	code, m = send(`{"target":"users","user_ids":["` + a.String() + `","` + c.String() + `","` + a.String() + `","` + uuid.NewString() + `"],"title":"Hi","body":"Test"}`)
+	if code != 200 || m["sent"] != float64(3) || m["users"] != float64(2) {
+		t.Fatalf("users: %d %v", code, m)
+	}
+	got := reached()
+	if strings.Contains(got, "/b1") || strings.Contains(got, "/admin1") || !strings.Contains(got, "/a1") || !strings.Contains(got, "/a2") || !strings.Contains(got, "/c1") {
+		t.Errorf("users reached %q", got)
+	}
+
+	// users that do not exist at all: nothing to send, still a 200
+	if code, m = send(`{"target":"users","user_ids":["` + uuid.NewString() + `"],"title":"Hi","body":"Test"}`); code != 200 || m["sent"] != float64(0) || m["users"] != float64(0) {
+		t.Errorf("unknown users: %d %v", code, m)
+	}
+	reached()
+
+	// "all"
+	if code, m = send(`{"target":"all","title":"Hi","body":"Test"}`); code != 200 || m["sent"] != float64(5) || m["users"] != float64(4) {
+		t.Errorf("all: %d %v", code, m)
+	}
+}
+
+func TestPushAPI_AdminSend_NoUrlFromTheClient_TheTapOpensCards(t *testing.T) {
+	e := newPushHTTPEnv(t, true)
+	admin := uuid.New()
+	ep := e.srv.URL + "/admin1"
+	e.subscribe(t, admin, ep)
+
+	// a client that still sends a url (even an evil one) is not an error — and the url is ignored
+	for _, url := range []string{`"https://evil.example/phish"`, `"/stats"`, `"//evil"`} {
+		w := e.do(admin, "POST", "/admin/push", `{"target":"me","title":"Hi","body":"Test","url":`+url+`}`)
+		if w.Code != 200 {
+			t.Fatalf("url %s: %d %s", url, w.Code, w.Body)
 		}
-	}
-	*e.paths = nil
-	w = e.do(admin, "POST", "/admin/push", `{"target":"all","title":"Hi","body":"Test","url":"/stats"}`)
-	if m := decode(t, w); w.Code != 200 || m["sent"] != float64(3) {
-		t.Errorf("everyone: %d %s", w.Code, w.Body)
+		raw, err := e.browsers[ep].Decrypt(e.bodies["/admin1"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var p domain.PushPayload
+		if err := json.Unmarshal(raw, &p); err != nil || p != (domain.PushPayload{Title: "Hi", Body: "Test", URL: "/cards"}) {
+			t.Errorf("url %s: the device received %s (%v)", url, raw, err)
+		}
 	}
 }
 
@@ -287,25 +335,30 @@ func TestPushAPI_AdminSend_Validation(t *testing.T) {
 	e := newPushHTTPEnv(t, true)
 	admin := uuid.New()
 	e.subscribe(t, admin, e.srv.URL+"/a1")
+	many := make([]string, 201)
+	for i := range many {
+		many[i] = `"` + uuid.NewString() + `"`
+	}
+	ok := uuid.NewString()
 	for name, c := range map[string]struct {
 		body string
 		want int
 	}{
-		"title 61":          {`{"target":"all","title":"` + strings.Repeat("я", 61) + `","body":"b"}`, 400},
-		"empty title":       {`{"target":"all","title":"","body":"b"}`, 400},
-		"body 201":          {`{"target":"all","title":"t","body":"` + strings.Repeat("я", 201) + `"}`, 400},
-		"url with scheme":   {`{"target":"all","title":"t","body":"b","url":"https://evil"}`, 400},
-		"protocol-relative": {`{"target":"all","title":"t","body":"b","url":"//evil"}`, 400},
-		"target garbage":    {`{"target":"everyone","title":"t","body":"b"}`, 400},
-		"no target":         {`{"title":"t","body":"b"}`, 400},
-		"unknown user":      {`{"target":"` + uuid.NewString() + `","title":"t","body":"b"}`, 404},
-		"bad json":          {`{`, 400},
+		"users with no ids":     {`{"target":"users","title":"t","body":"b"}`, 400},
+		"users with empty list": {`{"target":"users","user_ids":[],"title":"t","body":"b"}`, 400},
+		"an invalid id":         {`{"target":"users","user_ids":["` + ok + `","not-a-uuid"],"title":"t","body":"b"}`, 400},
+		"201 ids":               {`{"target":"users","user_ids":[` + strings.Join(many, ",") + `],"title":"t","body":"b"}`, 400},
+		"200 ids are fine":      {`{"target":"users","user_ids":[` + strings.Join(many[:200], ",") + `],"title":"t","body":"b"}`, 200},
+		"title 61":              {`{"target":"all","title":"` + strings.Repeat("я", 61) + `","body":"b"}`, 400},
+		"empty title":           {`{"target":"all","title":"","body":"b"}`, 400},
+		"body 201":              {`{"target":"all","title":"t","body":"` + strings.Repeat("я", 201) + `"}`, 400},
+		"unknown target":        {`{"target":"everyone","title":"t","body":"b"}`, 400},
+		"a user id as target":   {`{"target":"` + ok + `","title":"t","body":"b"}`, 400},
+		"no target":             {`{"title":"t","body":"b"}`, 400},
+		"bad json":              {`{`, 400},
 	} {
 		if w := e.do(admin, "POST", "/admin/push", c.body); w.Code != c.want {
 			t.Errorf("%s: %d, want %d (%s)", name, w.Code, c.want, w.Body)
 		}
-	}
-	if len(*e.paths) != 0 {
-		t.Errorf("a rejected request still reached the push service: %v", *e.paths)
 	}
 }

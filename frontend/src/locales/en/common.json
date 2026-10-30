@@ -323,7 +323,7 @@
     "actionFailed": "Action failed: {{error}}",
     "nothingFound": "No users found",
     "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "usedOf": "Today: {{used}} of {{limit}}", "sourceDefault": "default", "sourceCustom": "custom", "reset": "Reset", "saved": "Saved", "close": "Close", "pushDevices": "Devices with notifications: {{n}}", "sendTest": "Send a test"},
-    "push": {"title": "Notifications", "subscribers": "Subscribed devices: {{n}}", "fieldTitle": "Title", "fieldBody": "Text", "fieldUrl": "Link on tap", "toMe": "Only me (test)", "toAll": "All subscribers", "send": "Send", "confirmAll": "Send to all devices ({{n}})?", "result": "Sent: {{sent}}, failed: {{failed}}, expired removed: {{removed}}"},
+    "push": {"title": "Notifications", "subscribers": "Subscribed devices: {{n}}", "fieldTitle": "Title", "fieldBody": "Text", "toMe": "Only me (test)", "toAll": "All subscribers", "send": "Send", "confirmAll": "Send to all devices ({{n}})?", "result": "Sent: {{sent}}, failed: {{failed}}, expired removed: {{removed}}", "toSelected": "Choose users", "searchUser": "Search by email", "selectedCount": "Selected: {{n}}", "noSubscribers": "Nobody has turned on notifications yet."},
     "feedback": {"tile": "Average rating", "count": "reviews: {{n}}", "title": "Feedback", "noComment": "no comment", "userRating": "Rating: {{rating}} ⭐"}
   },
   "word": {"move": "Move to folder", "more": "Actions"},

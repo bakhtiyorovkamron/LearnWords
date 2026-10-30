@@ -58,8 +58,9 @@ func (r *PushRepository) All(ctx context.Context) ([]domain.PushSubscription, er
 	return pgx.CollectRows(rows, scanPush)
 }
 
-func (r *PushRepository) ByUser(ctx context.Context, userID uuid.UUID) ([]domain.PushSubscription, error) {
-	rows, err := r.pool.Query(ctx, `SELECT `+pushCols+` FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at`, userID)
+// ByUsers returns the devices of the given users (ids that do not exist simply have none).
+func (r *PushRepository) ByUsers(ctx context.Context, userIDs []uuid.UUID) ([]domain.PushSubscription, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+pushCols+` FROM push_subscriptions WHERE user_id = ANY($1) ORDER BY created_at`, userIDs)
 	if err != nil {
 		return nil, err
 	}

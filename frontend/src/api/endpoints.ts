@@ -322,7 +322,7 @@ export interface AdminUser {
 export interface FeedbackItem { email: string; rating: number; comment: string; created_at: string }
 export interface FeedbackSummary { average: number; count: number; items: FeedbackItem[] }
 
-export interface PushResult { sent: number; failed: number; removed: number }
+export interface PushResult { sent: number; failed: number; removed: number; users: number }
 
 // Web Push: the browser subscribes with the server's VAPID public key; the server remembers the device.
 export const pushApi = {
@@ -349,8 +349,8 @@ export const adminApi = {
   stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
   feedback: () => api.get<FeedbackSummary>('/admin/feedback').then((r) => r.data),
   pushStats: () => api.get<{ devices: number; users: number }>('/admin/push').then((r) => r.data),
-  /** target: "all" or a user id. */
-  sendPush: (body: { target: string; title: string; body: string; url: string }) =>
+  /** "me" = the calling admin, "all" = every device, "users" = the devices of user_ids. A tap always opens /cards. */
+  sendPush: (body: { target: 'me' | 'all' | 'users'; user_ids?: string[]; title: string; body: string }) =>
     api.post<PushResult>('/admin/push', body).then((r) => r.data),
   remove: (id: string) => api.delete(`/admin/users/${id}`),
   setBanned: (id: string, banned: boolean) => api.patch(`/admin/users/${id}/ban`, { banned }),

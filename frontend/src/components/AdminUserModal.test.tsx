@@ -192,11 +192,11 @@ describe('AdminUserModal: push devices', () => {
   })
 
   it('"Send a test" sends the fixed test notification to this user only and shows the result', async () => {
-    vi.mocked(adminApi.sendPush).mockResolvedValue({ sent: 2, failed: 0, removed: 0 })
+    vi.mocked(adminApi.sendPush).mockResolvedValue({ sent: 2, failed: 0, removed: 0, users: 1 })
     renderWith(2)
     fireEvent.click(screen.getByRole('button', { name: 'Send a test' }))
     await waitFor(() => expect(adminApi.sendPush).toHaveBeenCalledWith({
-      target: 'u1', title: 'yodla', body: 'Test notification 🔔', url: '/cards',
+      target: 'users', user_ids: ['u1'], title: 'yodla', body: 'Test notification 🔔',
     }))
     await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Sent: 2, failed: 0, expired removed: 0'))
   })

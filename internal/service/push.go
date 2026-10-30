@@ -23,7 +23,7 @@ type PushRepository interface {
 	DeleteEndpoint(ctx context.Context, endpoint string) error
 	MarkSuccess(ctx context.Context, endpoint string) error
 	All(ctx context.Context) ([]domain.PushSubscription, error)
-	ByUser(ctx context.Context, userID uuid.UUID) ([]domain.PushSubscription, error)
+	ByUsers(ctx context.Context, userIDs []uuid.UUID) ([]domain.PushSubscription, error)
 	Stats(ctx context.Context) (devices, users int, err error)
 }
 
@@ -108,29 +108,37 @@ func (s *PushService) Stats(ctx context.Context) (devices, users int, err error)
 	return s.repo.Stats(ctx)
 }
 
-// SendTo validates the notification and sends it to every device (target "all") or to one user's devices.
-func (s *PushService) SendTo(ctx context.Context, target, title, body, link string) (domain.PushResult, error) {
+// PushTarget is who gets a notification: every device, or the devices of the listed users.
+type PushTarget struct {
+	All     bool
+	UserIDs []uuid.UUID
+}
+
+// SendTo validates the notification and sends it. The tap opens the app's cards page.
+func (s *PushService) SendTo(ctx context.Context, target PushTarget, title, body string) (domain.PushResult, error) {
 	if !s.Enabled() {
 		return domain.PushResult{}, domain.ErrPushDisabled
 	}
-	payload, err := domain.NewPushPayload(title, body, link)
+	payload, err := domain.NewPushPayload(title, body)
 	if err != nil {
 		return domain.PushResult{}, err
 	}
 	var subs []domain.PushSubscription
-	if target == "all" {
+	if target.All {
 		subs, err = s.repo.All(ctx)
 	} else {
-		id, perr := uuid.Parse(target)
-		if perr != nil {
-			return domain.PushResult{}, fmt.Errorf("%w: target must be \"all\" or a user id", domain.ErrValidation)
-		}
-		subs, err = s.repo.ByUser(ctx, id)
+		subs, err = s.repo.ByUsers(ctx, target.UserIDs)
 	}
 	if err != nil {
 		return domain.PushResult{}, err
 	}
-	return s.Send(ctx, subs, payload), nil
+	people := map[uuid.UUID]bool{}
+	for _, sub := range subs {
+		people[sub.UserID] = true
+	}
+	res := s.Send(ctx, subs, payload)
+	res.Users = len(people)
+	return res, nil
 }
 
 // Send delivers payload to every subscription, up to 8 at a time. A 404/410 from the push service

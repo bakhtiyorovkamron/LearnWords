@@ -25,7 +25,6 @@ type PushSubscription struct {
 const (
 	PushTitleMax     = 60
 	PushBodyMax      = 200
-	PushURLMax       = 500
 	PushEndpointMax  = 2048
 	PushUserAgentMax = 200
 	PushDefaultURL   = "/cards"
@@ -39,33 +38,24 @@ type PushPayload struct {
 	URL   string `json:"url"`
 }
 
-// NewPushPayload trims and validates a notification. url is optional ("/cards"); when given it must be
-// a path inside the app: it starts with "/" and is neither "//host" nor a scheme.
-func NewPushPayload(title, body, url string) (PushPayload, error) {
-	bad := func(format string, a ...any) (PushPayload, error) {
-		return PushPayload{}, fmt.Errorf("%w: %s", ErrValidation, fmt.Sprintf(format, a...))
-	}
-	p := PushPayload{Title: strings.TrimSpace(title), Body: strings.TrimSpace(body), URL: strings.TrimSpace(url)}
+// NewPushPayload trims and validates a notification. The tap always opens PushDefaultURL: the
+// address is not up to the sender.
+func NewPushPayload(title, body string) (PushPayload, error) {
+	p := PushPayload{Title: strings.TrimSpace(title), Body: strings.TrimSpace(body), URL: PushDefaultURL}
 	if n := utf8.RuneCountInString(p.Title); n < 1 || n > PushTitleMax {
-		return bad("title must be 1-%d characters", PushTitleMax)
+		return PushPayload{}, fmt.Errorf("%w: title must be 1-%d characters", ErrValidation, PushTitleMax)
 	}
 	if n := utf8.RuneCountInString(p.Body); n < 1 || n > PushBodyMax {
-		return bad("body must be 1-%d characters", PushBodyMax)
-	}
-	if p.URL == "" {
-		p.URL = PushDefaultURL
-	}
-	if len(p.URL) > PushURLMax || !strings.HasPrefix(p.URL, "/") ||
-		strings.HasPrefix(p.URL, "//") || strings.HasPrefix(p.URL, `/\`) || strings.ContainsAny(p.URL, "\r\n\t") {
-		return bad("url must be a path inside the app, like /cards")
+		return PushPayload{}, fmt.Errorf("%w: body must be 1-%d characters", ErrValidation, PushBodyMax)
 	}
 	return p, nil
 }
 
 // PushResult is the outcome of one send: delivered, failed (kept for the next time) and removed
-// (the push service said the subscription is gone).
+// (the push service said the subscription is gone). Users is how many distinct people had devices.
 type PushResult struct {
 	Sent    int `json:"sent"`
 	Failed  int `json:"failed"`
 	Removed int `json:"removed"`
+	Users   int `json:"users"`
 }

@@ -2,10 +2,9 @@ package service
 
 import (
 	"context"
-	"crypto/ecdh"
-	"crypto/rand"
-	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
+	"learnwords/internal/pushtest"
 )
 
 // --- fakes ---------------------------------------------------------------------------------
@@ -75,12 +75,14 @@ func (m *memPush) All(context.Context) ([]domain.PushSubscription, error) {
 	}
 	return out, nil
 }
-func (m *memPush) ByUser(_ context.Context, id uuid.UUID) ([]domain.PushSubscription, error) {
+func (m *memPush) ByUsers(_ context.Context, ids []uuid.UUID) ([]domain.PushSubscription, error) {
 	all, _ := m.All(context.Background())
 	var out []domain.PushSubscription
 	for _, s := range all {
-		if s.UserID == id {
-			out = append(out, s)
+		for _, id := range ids {
+			if s.UserID == id {
+				out = append(out, s)
+			}
 		}
 	}
 	return out, nil
@@ -97,32 +99,37 @@ func (m *memPush) Stats(ctx context.Context) (int, int, error) {
 // browserKeys makes a valid subscription key pair, like PushSubscription.getKey() would.
 func browserKeys(t *testing.T) (p256dh, auth string) {
 	t.Helper()
-	k, err := ecdh.P256().GenerateKey(rand.Reader)
+	b, err := pushtest.NewBrowser()
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := make([]byte, 16)
-	_, _ = rand.Read(a)
-	return base64.RawURLEncoding.EncodeToString(k.PublicKey().Bytes()), base64.RawURLEncoding.EncodeToString(a)
+	return b.P256dh, b.Auth
 }
 
 type pushEnv struct {
-	svc  *PushService
-	repo *memPush
-	srv  *httptest.Server
-	hits *hitLog
+	svc      *PushService
+	repo     *memPush
+	srv      *httptest.Server
+	hits     *hitLog
+	browsers map[string]*pushtest.Browser // by endpoint
 }
 
 type hitLog struct {
 	mu      sync.Mutex
 	paths   []string
-	headers http.Header // of the last request
+	bodies  map[string][]byte // request body by path
+	headers http.Header       // of the last request
 }
 
 func (h *hitLog) add(r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.paths = append(h.paths, r.URL.Path)
+	if h.bodies == nil {
+		h.bodies = map[string][]byte{}
+	}
+	h.bodies[r.URL.Path] = body
 	h.headers = r.Header.Clone()
 }
 
@@ -131,6 +138,7 @@ func (h *hitLog) add(r *http.Request) {
 func newPushEnv(t *testing.T, handler http.HandlerFunc) pushEnv {
 	t.Helper()
 	hits := &hitLog{}
+	browsers := map[string]*pushtest.Browser{}
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.add(r)
 		if handler != nil {
@@ -155,14 +163,18 @@ func newPushEnv(t *testing.T, handler http.HandlerFunc) pushEnv {
 	}
 	repo := newMemPush()
 	svc := NewPushService(repo, public, private, "mailto:test@example.com", WithPushHTTPClient(srv.Client()))
-	return pushEnv{svc, repo, srv, hits}
+	return pushEnv{svc, repo, srv, hits, browsers}
 }
 
 func (e pushEnv) device(t *testing.T, user uuid.UUID, path string) domain.PushSubscription {
 	t.Helper()
-	p, a := browserKeys(t)
+	b, err := pushtest.NewBrowser()
+	if err != nil {
+		t.Fatal(err)
+	}
 	endpoint := e.srv.URL + path
-	if err := e.svc.Subscribe(context.Background(), user, endpoint, p, a, "UA"); err != nil {
+	e.browsers[endpoint] = b
+	if err := e.svc.Subscribe(context.Background(), user, endpoint, b.P256dh, b.Auth, "UA"); err != nil {
 		t.Fatal(err)
 	}
 	return e.repo.subs[endpoint]
@@ -255,33 +267,42 @@ func TestPush_Send_AtMostEightAtATime(t *testing.T) {
 	}
 }
 
-func TestPush_SendTo_OnlyThatUsersDevices(t *testing.T) {
+func TestPush_SendTo_OnlyThoseUsersDevices_AndTheTapOpensCards(t *testing.T) {
 	e := newPushEnv(t, nil)
-	a, b := uuid.New(), uuid.New()
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
 	e.device(t, a, "/ok/a1")
 	e.device(t, a, "/ok/a2")
 	e.device(t, b, "/ok/b1")
+	e.device(t, c, "/ok/c1")
+	ctx := context.Background()
 
-	res, err := e.svc.SendTo(context.Background(), a.String(), "Hi", "Test", "")
-	if err != nil || res.Sent != 2 {
+	res, err := e.svc.SendTo(ctx, PushTarget{UserIDs: []uuid.UUID{a, c, uuid.New()}}, "Hi", "Test") // an unknown id is ignored
+	if err != nil || res != (domain.PushResult{Sent: 3, Users: 2}) {
 		t.Fatalf("%+v %v", res, err)
 	}
-	for _, p := range e.hits.paths {
-		if p == "/ok/b1" {
-			t.Error("another user's device was reached")
-		}
+	hit := strings.Join(e.hits.paths, " ")
+	if strings.Contains(hit, "/ok/b1") || !strings.Contains(hit, "/ok/a1") || !strings.Contains(hit, "/ok/c1") {
+		t.Errorf("reached: %v", e.hits.paths)
 	}
+
+	// what the device receives: the title, the body, and a tap that always opens /cards
+	raw, err := e.browsers[e.srv.URL+"/ok/a1"].Decrypt(e.hits.bodies["/ok/a1"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got domain.PushPayload
+	if err := json.Unmarshal(raw, &got); err != nil || got != (domain.PushPayload{Title: "Hi", Body: "Test", URL: "/cards"}) {
+		t.Errorf("payload %s (%v)", raw, err)
+	}
+
 	e.hits.paths = nil
-	if res, _ := e.svc.SendTo(context.Background(), "all", "Hi", "Test", "/stats"); res.Sent != 3 {
+	if res, _ := e.svc.SendTo(ctx, PushTarget{All: true}, "Hi", "Test"); res.Sent != 4 || res.Users != 3 {
 		t.Errorf("all: %+v", res)
 	}
-	if res, err := e.svc.SendTo(context.Background(), uuid.NewString(), "Hi", "Test", ""); err != nil || res != (domain.PushResult{}) {
+	if res, err := e.svc.SendTo(ctx, PushTarget{UserIDs: []uuid.UUID{uuid.New()}}, "Hi", "Test"); err != nil || res != (domain.PushResult{}) {
 		t.Errorf("a user without devices: %+v %v", res, err)
 	}
-	if _, err := e.svc.SendTo(context.Background(), "everyone", "Hi", "Test", ""); !errors.Is(err, domain.ErrValidation) {
-		t.Errorf("bad target: %v", err)
-	}
-	if _, err := e.svc.SendTo(context.Background(), "all", strings.Repeat("x", 61), "Test", ""); !errors.Is(err, domain.ErrValidation) {
+	if _, err := e.svc.SendTo(ctx, PushTarget{All: true}, strings.Repeat("x", 61), "Test"); !errors.Is(err, domain.ErrValidation) {
 		t.Errorf("long title: %v", err)
 	}
 }
@@ -359,7 +380,7 @@ func TestPush_WithoutKeysItIsOff(t *testing.T) {
 		if err := svc.Subscribe(ctx, uuid.New(), "https://push.example.com/x", "p", "a", ""); !errors.Is(err, domain.ErrPushDisabled) {
 			t.Errorf("Subscribe: %v", err)
 		}
-		if _, err := svc.SendTo(ctx, "all", "t", "b", ""); !errors.Is(err, domain.ErrPushDisabled) {
+		if _, err := svc.SendTo(ctx, PushTarget{All: true}, "t", "b"); !errors.Is(err, domain.ErrPushDisabled) {
 			t.Errorf("SendTo: %v", err)
 		}
 		// leaving and the numbers keep working

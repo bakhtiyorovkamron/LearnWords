@@ -6,7 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"learnwords/internal/domain"
 )
+
+func byUser(repo *PushRepository, id uuid.UUID) ([]domain.PushSubscription, error) {
+	return repo.ByUsers(context.Background(), []uuid.UUID{id})
+}
 
 func TestPush_UpsertReassign_DeleteOnlyOwn_Stats(t *testing.T) {
 	f := newMoveFixture(t)
@@ -28,7 +34,7 @@ func TestPush_UpsertReassign_DeleteOnlyOwn_Stats(t *testing.T) {
 	if err := repo.Upsert(ctx, f.user, ep1, "key1b", "auth1b", "UA1b"); err != nil {
 		t.Fatal(err)
 	}
-	mine, _ := repo.ByUser(ctx, f.user)
+	mine, _ := byUser(repo, f.user)
 	if len(mine) != 2 {
 		t.Fatalf("rows %d, want 2", len(mine))
 	}
@@ -36,10 +42,10 @@ func TestPush_UpsertReassign_DeleteOnlyOwn_Stats(t *testing.T) {
 	if err := repo.Upsert(ctx, other, ep1, "key1c", "auth1c", "UA"); err != nil {
 		t.Fatal(err)
 	}
-	if mine, _ = repo.ByUser(ctx, f.user); len(mine) != 1 || mine[0].Endpoint != ep2 {
+	if mine, _ = byUser(repo, f.user); len(mine) != 1 || mine[0].Endpoint != ep2 {
 		t.Errorf("the first user keeps only ep2: %+v", mine)
 	}
-	theirs, _ := repo.ByUser(ctx, other)
+	theirs, _ := byUser(repo, other)
 	if len(theirs) != 1 || theirs[0].Endpoint != ep1 || theirs[0].P256dh != "key1c" {
 		t.Errorf("reassigned row: %+v", theirs)
 	}
@@ -48,13 +54,13 @@ func TestPush_UpsertReassign_DeleteOnlyOwn_Stats(t *testing.T) {
 	if err := repo.DeleteOwn(ctx, f.user, ep1); err != nil {
 		t.Fatal(err)
 	}
-	if theirs, _ = repo.ByUser(ctx, other); len(theirs) != 1 {
+	if theirs, _ = byUser(repo, other); len(theirs) != 1 {
 		t.Error("DeleteOwn removed another user's device")
 	}
 	if err := repo.DeleteOwn(ctx, other, ep1); err != nil {
 		t.Fatal(err)
 	}
-	if theirs, _ = repo.ByUser(ctx, other); len(theirs) != 0 {
+	if theirs, _ = byUser(repo, other); len(theirs) != 0 {
 		t.Error("own device not deleted")
 	}
 
@@ -113,10 +119,33 @@ func TestPush_MarkSuccess_DeleteEndpoint_AndTheUsersList(t *testing.T) {
 	if err := repo.DeleteEndpoint(ctx, ep); err != nil {
 		t.Fatal(err)
 	}
-	if mine, _ := repo.ByUser(ctx, f.user); len(mine) != 0 {
+	if mine, _ := byUser(repo, f.user); len(mine) != 0 {
 		t.Error("DeleteEndpoint left the row")
 	}
 	if err := repo.DeleteEndpoint(ctx, ep); err != nil {
 		t.Errorf("deleting a missing endpoint must not fail: %v", err)
+	}
+}
+
+func TestPush_ByUsers_OnlyThoseUsers(t *testing.T) {
+	f := newMoveFixture(t)
+	repo, ctx := NewPushRepository(f.pool), context.Background()
+	other := uuid.New()
+	f.exec(t, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`, other, other.String()+"@test")
+	t.Cleanup(func() { f.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, other) }) //nolint:errcheck
+	mine, theirs := "https://push.example.com/"+uuid.NewString(), "https://push.example.com/"+uuid.NewString()
+	t.Cleanup(func() { f.pool.Exec(ctx, `DELETE FROM push_subscriptions WHERE endpoint IN ($1, $2)`, mine, theirs) }) //nolint:errcheck
+	_ = repo.Upsert(ctx, f.user, mine, "k", "a", "")
+	_ = repo.Upsert(ctx, other, theirs, "k", "a", "")
+
+	got, err := repo.ByUsers(ctx, []uuid.UUID{f.user, uuid.New()}) // an unknown id is simply ignored
+	if err != nil || len(got) != 1 || got[0].Endpoint != mine {
+		t.Errorf("%+v %v", got, err)
+	}
+	if got, _ = repo.ByUsers(ctx, []uuid.UUID{f.user, other}); len(got) != 2 {
+		t.Errorf("both users: %d", len(got))
+	}
+	if got, _ = repo.ByUsers(ctx, nil); len(got) != 0 {
+		t.Errorf("nobody: %d", len(got))
 	}
 }

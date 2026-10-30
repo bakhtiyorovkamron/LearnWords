@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -11,14 +10,9 @@ import (
 	"learnwords/internal/service"
 )
 
-type PushHandler struct {
-	svc   *service.PushService
-	users UserGetter
-}
+type PushHandler struct{ svc *service.PushService }
 
-func NewPushHandler(svc *service.PushService, users UserGetter) *PushHandler {
-	return &PushHandler{svc: svc, users: users}
-}
+func NewPushHandler(svc *service.PushService) *PushHandler { return &PushHandler{svc: svc} }
 
 const maxPushBody = 8 << 10
 
@@ -90,38 +84,53 @@ func (h *PushHandler) AdminStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"devices": devices, "users": users})
 }
 
-// AdminSend handles POST /api/admin/push {target: "all"|"<user id>", title, body, url?} → {sent, failed, removed}.
+// maxPushUsers caps the "users" target.
+const maxPushUsers = 200
+
+// AdminSend handles POST /api/admin/push {target: "me"|"all"|"users", user_ids?: [...], title, body}
+// → {sent, failed, removed, users}. "me" is the calling admin; "users" takes 1-200 user ids (ids that
+// do not exist are ignored). There is no url: a tap always opens the cards page.
 func (h *PushHandler) AdminSend(c *gin.Context) {
 	var req struct {
-		Target string `json:"target"`
-		Title  string `json:"title"`
-		Body   string `json:"body"`
-		URL    string `json:"url"`
+		Target  string   `json:"target"`
+		UserIDs []string `json:"user_ids"`
+		Title   string   `json:"title"`
+		Body    string   `json:"body"`
 	}
 	if !bindSmallJSON(c, &req) {
 		return
 	}
-	ctx := c.Request.Context()
-	if req.Target != "all" {
-		id, err := uuid.Parse(req.Target)
-		if err != nil {
-			badRequest(c, `target must be "all" or a user id`)
+	var target service.PushTarget
+	switch req.Target {
+	case "me":
+		target.UserIDs = []uuid.UUID{userID(c)}
+	case "all":
+		target.All = true
+	case "users":
+		if len(req.UserIDs) < 1 || len(req.UserIDs) > maxPushUsers {
+			badRequest(c, "user_ids must hold 1-200 user ids")
 			return
 		}
-		if err := h.userExists(ctx, id); err != nil {
-			writeError(c, err)
-			return
+		seen := map[uuid.UUID]bool{}
+		for _, raw := range req.UserIDs {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				badRequest(c, "user_ids must be valid user ids")
+				return
+			}
+			if !seen[id] {
+				seen[id] = true
+				target.UserIDs = append(target.UserIDs, id)
+			}
 		}
+	default:
+		badRequest(c, `target must be "me", "all" or "users"`)
+		return
 	}
-	res, err := h.svc.SendTo(ctx, req.Target, req.Title, req.Body, req.URL)
+	res, err := h.svc.SendTo(c.Request.Context(), target, req.Title, req.Body)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, res)
-}
-
-func (h *PushHandler) userExists(ctx context.Context, id uuid.UUID) error {
-	_, err := h.users.GetByID(ctx, id)
-	return err
 }

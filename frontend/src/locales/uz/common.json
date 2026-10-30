@@ -323,7 +323,7 @@
     "actionFailed": "Amal bajarilmadi: {{error}}",
     "nothingFound": "Hech kim topilmadi",
     "userCard": {"registered": "Ro‘yxatdan o‘tgan: {{date}}", "words": "So‘zlar: {{n}}", "lastActive": "Oxirgi faollik: {{date}}", "never": "hech qachon", "features": "Funksiyalar", "limit": "Kunlik limit", "usedOf": "Bugun: {{limit}} tadan {{used}} ta", "sourceDefault": "standart", "sourceCustom": "maxsus qiymat", "reset": "Tiklash", "saved": "Saqlandi", "close": "Yopish", "pushDevices": "Bildirishnomali qurilmalar: {{n}}", "sendTest": "Test yuborish"},
-    "push": {"title": "Bildirishnomalar", "subscribers": "Obuna bo‘lgan qurilmalar: {{n}}", "fieldTitle": "Sarlavha", "fieldBody": "Matn", "fieldUrl": "Bosilganda ochiladigan havola", "toMe": "Faqat o‘zimga (test)", "toAll": "Barcha obunachilarga", "send": "Yuborish", "confirmAll": "Barcha qurilmalarga ({{n}} ta) yuborilsinmi?", "result": "Yuborildi: {{sent}}, xato: {{failed}}, eskirganlari o‘chirildi: {{removed}}"},
+    "push": {"title": "Bildirishnomalar", "subscribers": "Obuna bo‘lgan qurilmalar: {{n}}", "fieldTitle": "Sarlavha", "fieldBody": "Matn", "toMe": "Faqat o‘zimga (test)", "toAll": "Barcha obunachilarga", "send": "Yuborish", "confirmAll": "Barcha qurilmalarga ({{n}} ta) yuborilsinmi?", "result": "Yuborildi: {{sent}}, xato: {{failed}}, eskirganlari o‘chirildi: {{removed}}", "toSelected": "Foydalanuvchilarni tanlash", "searchUser": "Email bo‘yicha qidirish", "selectedCount": "Tanlandi: {{n}}", "noSubscribers": "Hozircha hech kim bildirishnomalarni yoqmagan."},
     "feedback": {"tile": "O‘rtacha baho", "count": "fikrlar: {{n}}", "title": "Fikrlar", "noComment": "izohsiz", "userRating": "Baho: {{rating}} ⭐"}
   },
   "word": {"move": "Papkaga koʻchirish", "more": "Amallar"},

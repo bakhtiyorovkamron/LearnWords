@@ -154,7 +154,7 @@ func run() error {
 		Shared:       handler.NewSharedHandler(folderRepo),
 		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
 		Feedback:     handler.NewFeedbackHandler(feedbackRepo),
-		Push:         handler.NewPushHandler(pushSvc, userRepo),
+		Push:         handler.NewPushHandler(pushSvc),
 		Photo:        handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
 		Hero:         handler.NewHeroHandler(heroSvc),

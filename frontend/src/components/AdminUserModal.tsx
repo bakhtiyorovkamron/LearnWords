@@ -116,13 +116,13 @@ function FeatureRow({ userId, state }: { userId: string; state: FeatureState }) 
 }
 
 // Fixed test text: only for checking that notifications reach this user's devices.
-const TEST_PUSH = { title: 'yodla', body: 'Test notification 🔔', url: '/cards' }
+const TEST_PUSH = { title: 'yodla', body: 'Test notification 🔔' }
 
 function PushLine({ user }: { user: AdminUser }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const send = useMutation({
-    mutationFn: () => adminApi.sendPush({ target: user.id, ...TEST_PUSH }),
+    mutationFn: () => adminApi.sendPush({ target: 'users', user_ids: [user.id], ...TEST_PUSH }),
     onSuccess: (r) => {
       toast(t('admin.push.result', { ...r }))
       void qc.invalidateQueries({ queryKey: ['admin'] })
