@@ -31,6 +31,7 @@ type RouterDeps struct {
 	Search       *SearchHandler
 	Photo        *PhotoHandler
 	Feedback     *FeedbackHandler
+	Push         *PushHandler
 	Translations *TranslationHandler
 	Hero         *HeroHandler
 	Practice     *PracticeHandler
@@ -50,6 +51,7 @@ const (
 	sharedPerIPPerMin    = 30  // public shared-folder preview, by IP
 	importPerUserPerMin  = 10  // importing a shared folder
 	photoPerUserPerMin   = 5   // photo import (also capped by the daily photo_import quota)
+	adminPushPerMin      = 5   // admin: send a push notification
 	generalPerUserPerMin = 100 // everything else under /api
 )
 
@@ -72,6 +74,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	sharedLimit := RateLimitByIP(NewRateLimiter(ctx, "shared", sharedPerIPPerMin, time.Minute))
 	importLimit := RateLimitByUser(NewRateLimiter(ctx, "shared-import", importPerUserPerMin, time.Minute))
 	photoLimit := RateLimitByUser(NewRateLimiter(ctx, "photo-import", photoPerUserPerMin, time.Minute))
+	adminPushLimit := RateLimitByUser(NewRateLimiter(ctx, "admin-push", adminPushPerMin, time.Minute))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
 		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations", "/api/words/check", "/api/photo-import")
@@ -132,6 +135,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/search-word", searchLimit, d.Search.Search)
 		protected.POST("/search-word/add", d.Search.Add)
 		protected.POST("/photo-import", photoLimit, d.Photo.Import)
+		protected.GET("/push/public-key", d.Push.PublicKey)
+		protected.POST("/push/subscribe", d.Push.Subscribe)
+		protected.DELETE("/push/subscribe", d.Push.Unsubscribe)
 		protected.POST("/feedback", d.Feedback.Submit)
 		protected.POST("/feedback/dismiss", d.Feedback.Dismiss)
 		protected.POST("/words/generate-example", exampleLimit, d.Contexts.GenerateExample)
@@ -166,6 +172,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/users", d.Admin.Users)
 		admin.GET("/stats", d.Admin.Stats)
 		admin.GET("/feedback", d.Admin.Feedback)
+		admin.GET("/push", d.Push.AdminStats)
+		admin.POST("/push", adminPushLimit, d.Push.AdminSend)
 		admin.DELETE("/users/:id", d.Admin.DeleteUser)
 		admin.PATCH("/users/:id/ban", d.Admin.Ban)
 		admin.GET("/users/:id/features", d.Admin.UserFeatures)

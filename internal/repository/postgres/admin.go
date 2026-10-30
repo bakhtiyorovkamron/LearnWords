@@ -36,7 +36,8 @@ func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, er
 		SELECT u.id, u.email, u.role, u.is_banned, u.created_at,
 		       COALESCE(w.cnt, 0),
 		       GREATEST(w.last_at, rl.last_at, s.last_at),
-		       f.rating
+		       f.rating,
+		       COALESCE(pd.cnt, 0)
 		FROM users u
 		LEFT JOIN (SELECT user_id, count(*) AS cnt, max(created_at) AS last_at
 		           FROM word_cards GROUP BY user_id) w ON w.user_id = u.id
@@ -45,13 +46,14 @@ func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, er
 		LEFT JOIN (SELECT user_id, max(created_at) AS last_at
 		           FROM daily_stories GROUP BY user_id) s ON s.user_id = u.id
 		LEFT JOIN feedback f ON f.user_id = u.id
+		LEFT JOIN (SELECT user_id, count(*) AS cnt FROM push_subscriptions GROUP BY user_id) pd ON pd.user_id = u.id
 		ORDER BY u.created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.AdminUser, error) {
 		var u domain.AdminUser
-		err := row.Scan(&u.ID, &u.Email, &u.Role, &u.IsBanned, &u.CreatedAt, &u.WordsCount, &u.LastActivityAt, &u.Rating)
+		err := row.Scan(&u.ID, &u.Email, &u.Role, &u.IsBanned, &u.CreatedAt, &u.WordsCount, &u.LastActivityAt, &u.Rating, &u.PushDevices)
 		return u, err
 	})
 }

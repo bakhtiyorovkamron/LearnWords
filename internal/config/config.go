@@ -23,6 +23,10 @@ type Config struct {
 	// HeroEnabled: FEATURE_HERO_ENABLED (default true). false → GET /api/hero answers 404 for
 	// everyone — a switch to hide the hero quickly without a deploy of code.
 	HeroEnabled bool
+	// Web Push (VAPID). Without both keys push is switched off: subscribe/send answer 503.
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string // e.g. mailto:admin@yodla.fun
 }
 
 func Load() (*Config, error) {
@@ -40,6 +44,10 @@ func Load() (*Config, error) {
 		AutoMigrate:  env("AUTO_MIGRATE", "true") == "true",
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
 		HeroEnabled:  !isOff(env("FEATURE_HERO_ENABLED", "true")),
+
+		VAPIDPublicKey:  strings.TrimSpace(os.Getenv("VAPID_PUBLIC_KEY")),
+		VAPIDPrivateKey: strings.TrimSpace(os.Getenv("VAPID_PRIVATE_KEY")),
+		VAPIDSubject:    env("VAPID_SUBJECT", "mailto:admin@yodla.fun"),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")

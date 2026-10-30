@@ -55,6 +55,9 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrPhotoUnreadable):
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "the text in the photo cannot be read", Code: "photo_unreadable"})
 		return
+	case errors.Is(err, domain.ErrPushDisabled):
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, errorResponse{Error: "push notifications are not configured", Code: "push_disabled"})
+		return
 	case errors.Is(err, domain.ErrFeatureDisabled):
 		c.AbortWithStatusJSON(http.StatusForbidden, errorResponse{Error: "this feature is disabled for your account", Code: "feature_disabled"})
 		return

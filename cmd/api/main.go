@@ -106,6 +106,10 @@ func run() error {
 	adminRepo := postgres.NewAdminRepository(pool)
 	featureSvc := service.NewFeatureService(postgres.NewFeatureRepository(pool))
 	feedbackRepo := postgres.NewFeedbackRepository(pool)
+	pushSvc := service.NewPushService(postgres.NewPushRepository(pool), cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject)
+	if !pushSvc.Enabled() {
+		slog.Warn("VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set: Web Push is disabled (generate keys with `go run ./cmd/vapidkeys`)")
+	}
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
 	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
@@ -150,6 +154,7 @@ func run() error {
 		Shared:       handler.NewSharedHandler(folderRepo),
 		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
 		Feedback:     handler.NewFeedbackHandler(feedbackRepo),
+		Push:         handler.NewPushHandler(pushSvc, userRepo),
 		Photo:        handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
 		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
 		Hero:         handler.NewHeroHandler(heroSvc),

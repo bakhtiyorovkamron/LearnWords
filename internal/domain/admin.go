@@ -15,7 +15,8 @@ type AdminUser struct {
 	CreatedAt      time.Time  `json:"created_at"`
 	WordsCount     int        `json:"words_count"`
 	LastActivityAt *time.Time `json:"last_activity_at"`
-	Rating         *int       `json:"rating"` // the user's feedback rating; nil = none (or dismissed)
+	Rating         *int       `json:"rating"`       // the user's feedback rating; nil = none (or dismissed)
+	PushDevices    int        `json:"push_devices"` // browsers/devices subscribed to Web Push
 }
 
 // AdminStats are service-wide totals for the admin dashboard.
