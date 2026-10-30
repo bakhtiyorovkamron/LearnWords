@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -41,30 +42,63 @@ type CardTranslation struct {
 
 const maxTranslationBatch = 10
 
-// Translate returns wordID's translation in nativeLang. In order:
-//  1. the card's own translation, when it is written in nativeLang (what the user saw and typed —
-//     training must agree with the card; no cache lookup, no AI);
-//  2. the cache;
-//  3. AI, told the card's known meaning so it translates exactly that sense, then cached.
+// Translate returns wordID's translation in nativeLang. The word and its example are decided
+// separately, because they can be written in different languages (examples made before the prompt
+// fix are Russian; imported cards keep theirs):
 //
+//	word:    the card's own translation when it is written in nativeLang (what the user saw and typed —
+//	         training must agree with the card), else the cache, else AI.
+//	example: the card's own example translation only when ITS language is nativeLang (or the card has
+//	         no example), else the cache, else AI.
+//
+// One AI call at most, told the card's known meaning so it translates exactly that sense; the result
+// is cached. A Cyrillic example is never returned for "uz" or "en", whatever the stored language says.
 // Never falls back to a different language silently.
 func (s *TranslationService) Translate(ctx context.Context, userID, wordID uuid.UUID, nativeLang string) (CardTranslation, error) {
 	card, err := s.cards.GetByID(ctx, userID, wordID)
 	if err != nil {
 		return CardTranslation{}, err
 	}
-	nativeLang = domain.NormTranslationLang(nativeLang)
-	if card.TranslationLanguage != nil && *card.TranslationLanguage == nativeLang && strings.TrimSpace(card.Translation) != "" {
-		return CardTranslation{Translation: card.Translation, ExampleTranslation: card.ExampleTranslation}, nil
+	native := domain.NormTranslationLang(nativeLang)
+
+	word := ""
+	if card.TranslationLanguage != nil && *card.TranslationLanguage == native {
+		word = strings.TrimSpace(card.Translation)
 	}
-	if tr, ex, ok, err := s.cache.Get(ctx, wordID, nativeLang); err == nil && ok {
-		return CardTranslation{Translation: tr, ExampleTranslation: ex}, nil
+	hasExample := strings.TrimSpace(card.ExampleSentence) != "" || strings.TrimSpace(card.ExampleTranslation) != ""
+	example, exampleOK := "", !hasExample // nothing to translate when there is no example
+	if hasExample && card.ExampleTranslationLanguage != nil && *card.ExampleTranslationLanguage == native {
+		example = rightLanguageExample(native, card.ExampleTranslation)
+		exampleOK = example != ""
 	}
+	if word != "" && exampleOK {
+		return CardTranslation{Translation: card.Translation, ExampleTranslation: example}, nil
+	}
+
+	if tr, ex, ok, err := s.cache.Get(ctx, wordID, native); err == nil && ok {
+		if word == "" && strings.TrimSpace(tr) != "" {
+			word = tr
+		}
+		if !exampleOK {
+			if cached := rightLanguageExample(native, ex); cached != "" {
+				example, exampleOK = cached, true
+			}
+		}
+	}
+	if word != "" && exampleOK {
+		return CardTranslation{Translation: word, ExampleTranslation: example}, nil
+	}
+
+	// Something is missing. With the word in hand a missing example is not worth failing for: the
+	// word is returned alone (never an example in the wrong language) and the next try asks again.
 	if s.ai == nil {
+		if word != "" {
+			return CardTranslation{Translation: word, ExampleTranslation: example}, nil
+		}
 		return CardTranslation{}, domain.ErrUnavailable
 	}
 	req := domain.TranslateRequest{
-		LearningLang: card.Language, NativeLang: nativeLang,
+		LearningLang: card.Language, NativeLang: native,
 		Word:            firstCardWord(card.Word),
 		ExampleSentence: fillGap(card),
 		KnownMeaning:    strings.TrimSpace(card.Translation),
@@ -74,12 +108,32 @@ func (s *TranslationService) Translate(ctx context.Context, userID, wordID uuid.
 	}
 	tr, ex, err := s.ai.TranslateCard(ctx, req)
 	if err != nil {
+		if word != "" {
+			slog.WarnContext(ctx, "example translation failed; returning the word alone", "word", wordID, "err", err)
+			return CardTranslation{Translation: word, ExampleTranslation: example}, nil
+		}
 		return CardTranslation{}, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
-	if err := s.cache.Put(ctx, wordID, nativeLang, tr, ex); err != nil {
+	if word == "" {
+		word = tr
+	}
+	if !exampleOK {
+		example = rightLanguageExample(native, ex)
+	}
+	if err := s.cache.Put(ctx, wordID, native, word, example); err != nil {
 		return CardTranslation{}, err // cache write is the only persistence here — a failure must surface
 	}
-	return CardTranslation{Translation: tr, ExampleTranslation: ex}, nil
+	return CardTranslation{Translation: word, ExampleTranslation: example}, nil
+}
+
+// rightLanguageExample trims an example translation and drops it when it cannot be in lang:
+// Cyrillic text is never a Uzbek (Latin) or English translation.
+func rightLanguageExample(lang, example string) string {
+	example = strings.TrimSpace(example)
+	if (lang == "uz" || lang == "en") && hasCyrillic(example) {
+		return ""
+	}
+	return example
 }
 
 // TranslateBatch resolves several words at once (e.g. a quiz question's right answer + its

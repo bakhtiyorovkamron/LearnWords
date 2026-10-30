@@ -96,6 +96,9 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 		ExampleTranslation:  strings.TrimSpace(in.ExampleTranslation),
 	}
 	card.SetGrammar(in.Grammar)
+	if card.ExampleTranslation != "" { // typed or generated just now, in the language of this request
+		card.ExampleTranslationLanguage = ptrString(domain.TranslationLangFrom(ctx))
+	}
 	if len([]rune(card.ExampleSentence)) > 500 || len([]rune(card.ExampleTranslation)) > 500 {
 		return nil, fmt.Errorf("%w: example too long", domain.ErrValidation)
 	}

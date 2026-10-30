@@ -25,7 +25,7 @@ type recordingAI struct{ reqs []domain.TranslateRequest }
 
 func (r *recordingAI) TranslateCard(_ context.Context, req domain.TranslateRequest) (string, string, error) {
 	r.reqs = append(r.reqs, req)
-	return "tinch", "", nil
+	return "tinch", "Bola tinch.", nil
 }
 
 type trFixture struct {
@@ -174,8 +174,15 @@ func TestEdit_TranslationChange_TrainingShowsItImmediately_OtherLanguagesDropped
 	if got := f.cached(t, card.ID); len(got) != 1 || got["uz"] != "tinch, xotirjam" {
 		t.Errorf("cache: %v", got)
 	}
-	if got := f.training(t, neverAI{t}, card.ID, "uz"); got.Translation != "tinch, xotirjam" {
+	// The word is Uzbek now, but its example translation is still the Russian one: the example is
+	// translated (one AI call), the edited word is kept — and the Russian text is not shown.
+	n := len(ai.reqs)
+	got := f.training(t, ai, card.ID, "uz")
+	if got.Translation != "tinch, xotirjam" || got.ExampleTranslation != "Bola tinch." {
 		t.Errorf("uz training: %+v", got)
+	}
+	if len(ai.reqs) != n+1 || ai.reqs[n].KnownMeaning != "tinch, xotirjam" {
+		t.Errorf("AI requests %d → %d, last %+v", n, len(ai.reqs), ai.reqs[len(ai.reqs)-1])
 	}
 }
 
@@ -225,7 +232,7 @@ func TestUpdateExample_KeepsTheOwnLanguageCacheInSync(t *testing.T) {
 	card := f.createWord(t, "ru", "still", "тихий")
 	f.exec(t, `INSERT INTO word_translations (word_id, language, translation, example_translation) VALUES ($1, 'en', 'quiet', 'old')`, card.ID)
 
-	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Тише!"); err != nil {
+	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Тише!", "ru"); err != nil {
 		t.Fatal(err)
 	}
 	var ex string
@@ -327,5 +334,179 @@ func TestMigration29_BackfillAndRepair(t *testing.T) {
 	f.pool.QueryRow(ctx, `SELECT example_translation FROM word_translations WHERE word_id = $1 AND language = 'ru'`, cyr).Scan(&ex) //nolint:errcheck
 	if ex != "Ребёнок спокоен." {
 		t.Errorf("example translation repaired: %q", ex)
+	}
+}
+
+// --- the language of the example translation ------------------------------------------------------
+
+func (f trFixture) exampleLang(t *testing.T, card uuid.UUID) *string {
+	t.Helper()
+	var lang *string
+	if err := f.pool.QueryRow(context.Background(), `SELECT example_translation_language FROM word_cards WHERE id = $1`, card).Scan(&lang); err != nil {
+		t.Fatal(err)
+	}
+	return lang
+}
+
+func equalLang(got *string, want string) bool { return got != nil && *got == want }
+
+func TestCreate_StoresTheLanguageTheExampleWasWrittenIn(t *testing.T) {
+	f := newTrFixture(t)
+	create := func(ui, example string) domain.WordCard {
+		svc := service.NewContextService(f.contexts, f.cards, service.Providers{})
+		ctx := domain.WithTranslationLang(domain.WithLang(context.Background(), "de"), ui)
+		res, err := svc.Create(ctx, f.user, service.CreateContextInput{
+			Text: "still" + uuid.NewString()[:4], Meaning: "tinch", ExampleSentence: "Das Kind ist ___.", ExampleTranslation: example,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Cards[0]
+	}
+	if c := create("uz", "Bola tinch."); !equalLang(c.ExampleTranslationLanguage, "uz") || !equalLang(f.exampleLang(t, c.ID), "uz") {
+		t.Errorf("a card added from the Uzbek UI: %v / %v", c.ExampleTranslationLanguage, f.exampleLang(t, c.ID))
+	}
+	if c := create("ru", "Ребёнок спокоен."); !equalLang(f.exampleLang(t, c.ID), "ru") {
+		t.Errorf("a card added from the Russian UI: %v", f.exampleLang(t, c.ID))
+	}
+	if c := create("uz", ""); c.ExampleTranslationLanguage != nil || f.exampleLang(t, c.ID) != nil {
+		t.Errorf("no example translation → no language: %v", f.exampleLang(t, c.ID))
+	}
+}
+
+func TestUpdateExample_StoresItsLanguage_AndKeepsAForeignOneOutOfTheOwnCache(t *testing.T) {
+	f := newTrFixture(t)
+	card := f.createWord(t, "uz", "still", "tinch") // word: uz
+	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Тише!", "ru"); err != nil {
+		t.Fatal(err)
+	}
+	if !equalLang(f.exampleLang(t, card.ID), "ru") {
+		t.Errorf("example language %v", f.exampleLang(t, card.ID))
+	}
+	var ex string
+	f.pool.QueryRow(context.Background(), `SELECT example_translation FROM word_translations WHERE word_id = $1 AND language = 'uz'`, card.ID).Scan(&ex) //nolint:errcheck
+	if ex != "" {
+		t.Errorf("the uz cache entry holds the Russian example %q", ex)
+	}
+	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Jim bo‘l!", "uz"); err != nil {
+		t.Fatal(err)
+	}
+	if !equalLang(f.exampleLang(t, card.ID), "uz") {
+		t.Errorf("example language %v", f.exampleLang(t, card.ID))
+	}
+	f.pool.QueryRow(context.Background(), `SELECT example_translation FROM word_translations WHERE word_id = $1 AND language = 'uz'`, card.ID).Scan(&ex) //nolint:errcheck
+	if ex != "Jim bo‘l!" {
+		t.Errorf("the uz cache entry: %q", ex)
+	}
+}
+
+func TestEdit_ExampleTranslationGetsTheEditorsLanguage_OtherEditsLeaveItAlone(t *testing.T) {
+	f := newTrFixture(t)
+	ctx := context.Background()
+	card := f.createWord(t, "ru", "still", "тихий") // example: ru
+	if !equalLang(f.exampleLang(t, card.ID), "ru") {
+		t.Fatalf("setup: %v", f.exampleLang(t, card.ID))
+	}
+	uz := domain.WithTranslationLang(ctx, "uz")
+
+	// editing only the word's translation under the Uzbek UI: the example is still the Russian one
+	if _, err := f.cards.UpdateContent(uz, f.user, card.ID, domain.WordCardUpdate{Translation: ptr("tinch")}); err != nil {
+		t.Fatal(err)
+	}
+	if !equalLang(f.exampleLang(t, card.ID), "ru") {
+		t.Errorf("example language %v after a word-only edit, want ru", f.exampleLang(t, card.ID))
+	}
+	// the same example text saved again changes nothing
+	if _, err := f.cards.UpdateContent(uz, f.user, card.ID, domain.WordCardUpdate{ExampleTranslation: ptr("Ребёнок спокоен.")}); err != nil {
+		t.Fatal(err)
+	}
+	if !equalLang(f.exampleLang(t, card.ID), "ru") {
+		t.Errorf("an unchanged example was re-labelled: %v", f.exampleLang(t, card.ID))
+	}
+	// a new example translation written under the Uzbek UI is Uzbek
+	if _, err := f.cards.UpdateContent(uz, f.user, card.ID, domain.WordCardUpdate{ExampleTranslation: ptr("Bola tinch.")}); err != nil {
+		t.Fatal(err)
+	}
+	if !equalLang(f.exampleLang(t, card.ID), "uz") {
+		t.Errorf("example language %v, want uz", f.exampleLang(t, card.ID))
+	}
+	// clearing it leaves no language
+	if _, err := f.cards.UpdateContent(uz, f.user, card.ID, domain.WordCardUpdate{ExampleTranslation: ptr("")}); err != nil {
+		t.Fatal(err)
+	}
+	if f.exampleLang(t, card.ID) != nil && !equalLang(f.exampleLang(t, card.ID), "uz") {
+		t.Errorf("after clearing: %v", f.exampleLang(t, card.ID))
+	}
+}
+
+func TestImportShared_CopiesTheExampleLanguage_AndKeepsAForeignExampleOutOfTheCache(t *testing.T) {
+	owner := newShareFixture(t)
+	me := newShareFixture(t)
+	ctx := context.Background()
+	src := owner.folder(t, owner.user)
+	word := owner.sourceWord(t, owner.user, src, "die Angst", "qo‘rquv")
+	// an Uzbek word with the old Russian example
+	owner.exec(t, `UPDATE word_cards SET translation_language = 'uz', example_translation = 'Мне страшно.', example_translation_language = 'ru' WHERE id = $1`, word)
+	owner.exec(t, `DELETE FROM word_translations WHERE word_id = $1`, word)
+	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
+
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	if err != nil || res.Added != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	var id uuid.UUID
+	var exLang, trLang *string
+	if err := me.pool.QueryRow(ctx, `SELECT id, example_translation_language, translation_language FROM word_cards WHERE folder_id = $1 AND user_id = $2`,
+		res.FolderID, me.user).Scan(&id, &exLang, &trLang); err != nil {
+		t.Fatal(err)
+	}
+	if !equalLang(exLang, "ru") || !equalLang(trLang, "uz") {
+		t.Errorf("copied languages: example %v, word %v", exLang, trLang)
+	}
+	var cachedEx string
+	if err := me.pool.QueryRow(ctx, `SELECT example_translation FROM word_translations WHERE word_id = $1 AND language = 'uz'`, id).Scan(&cachedEx); err != nil {
+		t.Fatal(err)
+	}
+	if cachedEx != "" {
+		t.Errorf("the uz cache entry got the Russian example %q", cachedEx)
+	}
+}
+
+// The backfill of migration 000037, run on rows as they were before it.
+func TestMigration37_BackfillsTheExampleLanguage(t *testing.T) {
+	f := newTrFixture(t)
+	ctx := context.Background()
+	mk := func(translationLang, example string) uuid.UUID {
+		ctxID, id := uuid.New(), uuid.New()
+		f.exec(t, `INSERT INTO contexts (id, user_id, source_text) VALUES ($1, $2, 'w')`, ctxID, f.user)
+		f.exec(t, `INSERT INTO word_cards (id, context_id, user_id, word, translation, translation_language, example_translation)
+			VALUES ($1, $2, $3, 'w', 't', NULLIF($4, ''), $5)`, id, ctxID, f.user, translationLang, example)
+		return id
+	}
+	cyrillicEx := mk("uz", "Мне страшно.") // Cyrillic → ru, whatever the word's language
+	latinUz := mk("uz", "Bola tinch.")     // otherwise → the word's language
+	latinEn := mk("en", "The child is quiet.")
+	latinUnknown := mk("", "Das Kind ist still.") // no language at all → stays unknown
+	empty := mk("uz", "   ")                      // nothing to label
+	noExample := mk("ru", "")
+
+	up, err := migrations.FS.ReadFile("000037_example_translation_language.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, string(up)); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		id   uuid.UUID
+		want string // "" = NULL
+	}{
+		"Cyrillic example": {cyrillicEx, "ru"}, "Latin, uz word": {latinUz, "uz"}, "Latin, en word": {latinEn, "en"},
+		"no languages at all": {latinUnknown, ""}, "blank example": {empty, ""}, "no example": {noExample, ""},
+	} {
+		got := f.exampleLang(t, c.id)
+		if (c.want == "" && got != nil) || (c.want != "" && !equalLang(got, c.want)) {
+			t.Errorf("%s: %v, want %q", name, got, c.want)
+		}
 	}
 }

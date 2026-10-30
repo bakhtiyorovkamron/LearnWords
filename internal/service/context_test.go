@@ -103,12 +103,12 @@ func (r recordingExamples) Generate(ctx context.Context, word, translation strin
 }
 
 type exampleCards struct {
-	WordCardRepository // not used
-	saved              chan struct{}
+	WordCardRepository             // not used
+	saved              chan string // the language the example was stored in
 }
 
-func (c exampleCards) UpdateExample(context.Context, uuid.UUID, uuid.UUID, string, string) error {
-	c.saved <- struct{}{}
+func (c exampleCards) UpdateExample(_ context.Context, _, _ uuid.UUID, _, _, lang string) error {
+	c.saved <- lang
 	return nil
 }
 
@@ -117,7 +117,7 @@ func (c exampleCards) UpdateExample(context.Context, uuid.UUID, uuid.UUID, strin
 func TestCreate_BackgroundExampleUsesTheCardsTranslationLanguage(t *testing.T) {
 	for _, ui := range []string{"uz", "en", "ru"} {
 		rec := recordingExamples{got: make(chan [2]string, 1)}
-		cards := exampleCards{saved: make(chan struct{}, 1)}
+		cards := exampleCards{saved: make(chan string, 1)}
 		svc := NewContextService(&fakeContexts{}, cards, Providers{Examples: rec})
 
 		if _, err := svc.Create(ctxFor(ui), uuid.New(), CreateContextInput{Text: "der Tisch", Meaning: "stol"}); err != nil {
@@ -132,7 +132,10 @@ func TestCreate_BackgroundExampleUsesTheCardsTranslationLanguage(t *testing.T) {
 			t.Fatalf("%s: no background generation", ui)
 		}
 		select {
-		case <-cards.saved:
+		case lang := <-cards.saved:
+			if lang != ui {
+				t.Errorf("%s UI: the example was stored as %q", ui, lang)
+			}
 		case <-time.After(5 * time.Second):
 			t.Fatalf("%s: the example was not saved", ui)
 		}

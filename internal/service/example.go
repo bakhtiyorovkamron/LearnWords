@@ -68,7 +68,7 @@ func (s *ContextService) generateExampleAsync(userID uuid.UUID, card domain.Word
 			slog.Warn("background example generation failed", "card", card.ID, "err", err)
 			return
 		}
-		if err := s.cards.UpdateExample(ctx, userID, card.ID, ex.SentenceWithGap, ex.Translation); err != nil {
+		if err := s.cards.UpdateExample(ctx, userID, card.ID, ex.SentenceWithGap, ex.Translation, domain.TranslationLangFrom(ctx)); err != nil {
 			slog.Warn("saving generated example failed", "card", card.ID, "err", err)
 		}
 	}()

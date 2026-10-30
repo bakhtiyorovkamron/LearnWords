@@ -24,7 +24,7 @@ type ContextRepository interface {
 type WordCardRepository interface {
 	ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.WordCard, error)
 	GetByID(ctx context.Context, userID, id uuid.UUID) (*domain.WordCard, error)
-	UpdateExample(ctx context.Context, userID, id uuid.UUID, sentence, translation string) error
+	UpdateExample(ctx context.Context, userID, id uuid.UUID, sentence, translation, translationLang string) error
 	Delete(ctx context.Context, userID, id uuid.UUID) error
 }
 

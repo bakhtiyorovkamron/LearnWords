@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +41,13 @@ func (r *WordCardRepository) UpdateContent(ctx context.Context, userID, id uuid.
 			return err
 		}
 		differs := func(p *string, old string) bool { return p != nil && *p != old }
-		meaningChanged := differs(u.Translation, oldTr) || differs(u.ExampleTranslation, oldExTr)
+		exampleChanged := differs(u.ExampleTranslation, oldExTr)
+		meaningChanged := differs(u.Translation, oldTr) || exampleChanged
+		// A changed example translation was written now, in the current interface language.
+		var newExLang *string
+		if exampleChanged && strings.TrimSpace(*u.ExampleTranslation) != "" {
+			newExLang = &uiLang
+		}
 		textChanged := differs(u.Word, oldWord) || differs(u.ExampleSentence, oldEx)
 
 		err = tx.QueryRow(ctx, `
@@ -54,24 +61,25 @@ func (r *WordCardRepository) UpdateContent(ctx context.Context, userID, id uuid.
 				  -- only a folder of the same user can be assigned (otherwise it becomes NULL)
 				  folder_id           = CASE WHEN $8 THEN (SELECT f.id FROM folders f WHERE f.id = $9 AND f.user_id = $2)
 				                             ELSE folder_id END,
-				  translation_language = CASE WHEN $11 THEN $12 ELSE translation_language END
+				  translation_language = CASE WHEN $11 THEN $12 ELSE translation_language END,
+				  example_translation_language = CASE WHEN $13 THEN $14 ELSE example_translation_language END
 				WHERE id = $1 AND user_id = $2
 				RETURNING id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
 				          example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech,
-				          translation_language
+				          translation_language, example_translation_language
 			)
 			SELECT u.id, u.context_id, u.user_id, u.word, u.translation, u.transcription, u.audio_url, u.language, u.created_at,
 			       COALESCE(u.example_sentence, ''), COALESCE(u.example_translation, ''), u.folder_id,
-			       u.lemma, u.article, u.plural, u.part_of_speech, u.translation_language,
+			       u.lemma, u.article, u.plural, u.part_of_speech, u.translation_language, u.example_translation_language,
 			       COALESCE(p.box_level, 1), COALESCE(p.is_learned, false),
 			       COALESCE(p.next_review_at, $10::date)::timestamp,
 			       COALESCE(p.last_reviewed_at >= $10::date::timestamp AT TIME ZONE 'UTC', false)
 			FROM u LEFT JOIN word_progress p ON p.word_id = u.id`,
 			id, userID, u.Word, u.Translation, u.Transcription, u.ExampleSentence, u.ExampleTranslation,
-			u.SetFolder, u.Folder, today, meaningChanged, uiLang).Scan(
+			u.SetFolder, u.Folder, today, meaningChanged, uiLang, exampleChanged, newExLang).Scan(
 			&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL, &c.Language, &c.CreatedAt,
 			&c.ExampleSentence, &c.ExampleTranslation, &c.FolderID,
-			&c.Lemma, &c.Article, &c.Plural, &c.PartOfSpeech, &c.TranslationLanguage,
+			&c.Lemma, &c.Article, &c.Plural, &c.PartOfSpeech, &c.TranslationLanguage, &c.ExampleTranslationLanguage,
 			&c.BoxLevel, &c.IsLearned, &c.NextReviewAt, &c.ReviewedToday)
 		if err != nil {
 			return err

@@ -17,13 +17,13 @@ func NewWordCardRepository(pool *pgxpool.Pool) *WordCardRepository {
 	return &WordCardRepository{pool: pool}
 }
 
-const cardCols = `id, context_id, user_id, word, translation, transcription, audio_url, language, created_at, example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech, translation_language`
+const cardCols = `id, context_id, user_id, word, translation, transcription, audio_url, language, created_at, example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech, translation_language, example_translation_language`
 
 func scanCard(row pgx.Row) (domain.WordCard, error) {
 	var w domain.WordCard
 	err := row.Scan(&w.ID, &w.ContextID, &w.UserID, &w.Word, &w.Translation,
 		&w.Transcription, &w.AudioURL, &w.Language, &w.CreatedAt, &w.ExampleSentence, &w.ExampleTranslation, &w.FolderID,
-		&w.Lemma, &w.Article, &w.Plural, &w.PartOfSpeech, &w.TranslationLanguage)
+		&w.Lemma, &w.Article, &w.Plural, &w.PartOfSpeech, &w.TranslationLanguage, &w.ExampleTranslationLanguage)
 	return w, err
 }
 

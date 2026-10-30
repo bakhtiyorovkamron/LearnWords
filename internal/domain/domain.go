@@ -61,13 +61,17 @@ type WordCard struct {
 	CreatedAt     time.Time `json:"created_at"`
 
 	ExampleSentence    string `json:"example_sentence"`    // sentence with the word replaced by ___
-	ExampleTranslation string `json:"example_translation"` // Russian translation of the full sentence
+	ExampleTranslation string `json:"example_translation"` // translation of the full sentence (see ExampleTranslationLanguage)
 
 	FolderID *uuid.UUID `json:"folder_id"` // optional grouping; nil = no folder
 
 	// TranslationLanguage: the language Translation / ExampleTranslation are written in (ru | en | uz).
 	// nil = unknown (an old card whose translation isn't Cyrillic).
 	TranslationLanguage *string `json:"translation_language"`
+	// ExampleTranslationLanguage: the language ExampleTranslation is written in. It can differ from
+	// TranslationLanguage (examples made before the prompt fix are Russian; imported cards keep theirs).
+	// nil = no example translation, or unknown.
+	ExampleTranslationLanguage *string `json:"example_translation_language"`
 
 	// Grammar from the word check, stored next to (never instead of) the text the user typed.
 	// nil = not checked (older words, other learning languages, "keep as is").
@@ -75,6 +79,15 @@ type WordCard struct {
 	Article      *string `json:"article"`
 	Plural       *string `json:"plural"`
 	PartOfSpeech *string `json:"part_of_speech"`
+}
+
+// ExampleInLanguage is the example translation if it is written in lang, else "". A card with no
+// recorded example language counts as matching (nothing says otherwise).
+func (w WordCard) ExampleInLanguage(lang string) string {
+	if w.ExampleTranslationLanguage != nil && *w.ExampleTranslationLanguage != lang {
+		return ""
+	}
+	return w.ExampleTranslation
 }
 
 // SetGrammar copies checked grammar onto the card (nil leaves the fields empty).
