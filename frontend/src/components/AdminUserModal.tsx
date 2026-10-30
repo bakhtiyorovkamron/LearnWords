@@ -89,14 +89,25 @@ function FeatureRow({ userId, state }: { userId: string; state: FeatureState }) 
         </button>
       </div>
       {hasLimit && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <input type="number" min={0} step={1} className="field !w-28 !py-1.5" value={draft}
-            aria-label={t('admin.userCard.limit')}
-            placeholder={t('admin.userCard.limitDefault', { n: state.default_limit })}
-            onChange={(e) => setDraft(e.target.value)} onBlur={commitLimit}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-          <span className="text-emerald-100/60">{t('admin.userCard.usedToday', { used: state.used_today })}</span>
-        </div>
+        <>
+          <p data-testid={`usage-${state.feature}`} className="text-sm">
+            <strong>{t('admin.userCard.usedOf', { used: state.used_today, limit: state.daily_limit ?? state.default_limit })}</strong>
+            <span className="text-emerald-100/60"> · {t(state.limit_override === null ? 'admin.userCard.sourceDefault' : 'admin.userCard.sourceCustom')}</span>
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label htmlFor={`limit-${state.feature}`} className="text-emerald-100/70">{t('admin.userCard.limit')}</label>
+            <input id={`limit-${state.feature}`} type="number" min={0} step={1} className="field !w-24 !py-1.5" value={draft}
+              placeholder={String(state.default_limit)}
+              onChange={(e) => setDraft(e.target.value)} onBlur={commitLimit}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+            {state.limit_override !== null && (
+              <button type="button" className="btn-ghost !px-3 !py-1 text-xs" disabled={save.isPending}
+                onClick={() => save.mutate({ enabled: state.enabled, daily_limit: null })}>
+                {t('admin.userCard.reset')}
+              </button>
+            )}
+          </div>
+        </>
       )}
       {save.error && <p role="alert" className="text-sm text-red-300">{errorMessage(save.error)}</p>}
     </div>

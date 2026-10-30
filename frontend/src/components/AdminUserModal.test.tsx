@@ -26,6 +26,13 @@ const features: FeatureState[] = [
   feat({ feature: 'story_autotranslate', enabled: false }),
 ]
 
+/** What the server answers to a PUT: the effective limit and what is left follow the override. */
+function serverState(f: FeatureState, body: { enabled: boolean; daily_limit: number | null }): FeatureState {
+  const limit = body.daily_limit ?? f.default_limit
+  return { ...f, enabled: body.enabled, limit_override: body.daily_limit, daily_limit: limit,
+    remaining: limit === null ? null : Math.max(limit - f.used_today, 0) }
+}
+
 function renderModal(onClose = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(<QueryClientProvider client={qc}><AdminUserModal user={user} onClose={onClose} /></QueryClientProvider>)
@@ -36,7 +43,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.mocked(adminApi.userFeatures).mockResolvedValue(features)
   vi.mocked(adminApi.setUserFeature).mockImplementation(async (_id, feature, body) =>
-    ({ ...features.find((f) => f.feature === feature)!, enabled: body.enabled, limit_override: body.daily_limit }))
+    serverState(features.find((f) => f.feature === feature)!, body))
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
@@ -55,8 +62,8 @@ describe('AdminUserModal', () => {
     const limit = screen.getAllByRole('spinbutton')
     expect(limit).toHaveLength(1)
     expect((limit[0] as HTMLInputElement).value).toBe('6')
-    expect(limit[0].getAttribute('placeholder')).toBe('default: 10')
-    expect(screen.getByText('today: 2')).toBeTruthy()
+    expect(limit[0].getAttribute('placeholder')).toBe('10') // just the default number
+    expect(screen.getByTestId('usage-photo_import').textContent).toBe('Today: 2 of 6 · custom')
   })
 
   it('shows the user\'s feedback rating when there is one', async () => {
@@ -104,3 +111,67 @@ describe('AdminUserModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('AdminUserModal: the effective photo limit', () => {
+  // A user without an override: the default of 10 applies, 1 photo used today.
+  const plain = feat({ feature: 'photo_import', daily_limit: 10, default_limit: 10, limit_override: null, used_today: 1, remaining: 9 })
+  const usage = () => screen.getByTestId('usage-photo_import').textContent
+  const input = async () => (await screen.findByRole('spinbutton')) as HTMLInputElement
+
+  beforeEach(() => {
+    vi.mocked(adminApi.userFeatures).mockResolvedValue([plain, feat({ feature: 'daily_story' })])
+    vi.mocked(adminApi.setUserFeature).mockImplementation(async (_id, _feature, body) => serverState(plain, body))
+  })
+
+  it('without an override: "Today: 1 of 10 · default", an empty input with the placeholder 10, no Reset', async () => {
+    renderModal()
+    const field = await input()
+    expect(usage()).toBe('Today: 1 of 10 · default')
+    expect(field.value).toBe('')
+    expect(field.placeholder).toBe('10')
+    expect(field.className).toContain('w-24')
+    expect(screen.getByLabelText('Daily limit')).toBe(field)
+    expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull()
+  })
+
+  it('typing 15 saves 15; the row reads "of 15 · custom" and a Reset button appears', async () => {
+    renderModal()
+    const field = await input()
+    fireEvent.change(field, { target: { value: '15' } })
+    fireEvent.blur(field)
+    await waitFor(() => expect(adminApi.setUserFeature).toHaveBeenCalledWith('u1', 'photo_import', { enabled: true, daily_limit: 15 }))
+    await waitFor(() => expect(usage()).toBe('Today: 1 of 15 · custom'))
+    expect((await input()).value).toBe('15')
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeTruthy()
+  })
+
+  it('Reset sends null and the row switches back to the default', async () => {
+    vi.mocked(adminApi.userFeatures).mockResolvedValue([{ ...plain, limit_override: 15, daily_limit: 15, remaining: 14 }, feat({ feature: 'daily_story' })])
+    renderModal()
+    await waitFor(() => expect(usage()).toBe('Today: 1 of 15 · custom'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() => expect(adminApi.setUserFeature).toHaveBeenCalledWith('u1', 'photo_import', { enabled: true, daily_limit: null }))
+    await waitFor(() => expect(usage()).toBe('Today: 1 of 10 · default'))
+    expect((await input()).value).toBe('')
+    expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull()
+  })
+
+  it('a failed save puts the old value back and shows the error', async () => {
+    vi.mocked(adminApi.setUserFeature).mockRejectedValue(new Error('boom'))
+    renderModal()
+    const field = await input()
+    fireEvent.change(field, { target: { value: '15' } })
+    fireEvent.blur(field)
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    await waitFor(() => expect(field.value).toBe(''))
+    expect(usage()).toBe('Today: 1 of 10 · default')
+  })
+
+  it('the unlimited features have no usage line and no input', async () => {
+    renderModal()
+    await input()
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
+    expect(screen.queryByTestId('usage-daily_story')).toBeNull()
+  })
+})
+

@@ -322,7 +322,7 @@
     "confirmDelete": "{{email}} va uning BARCHA ma’lumotlari qaytarib bo‘lmaydigan tarzda o‘chirilsinmi?",
     "actionFailed": "Amal bajarilmadi: {{error}}",
     "nothingFound": "Hech kim topilmadi",
-    "userCard": {"registered": "Ro‘yxatdan o‘tgan: {{date}}", "words": "So‘zlar: {{n}}", "lastActive": "Oxirgi faollik: {{date}}", "never": "hech qachon", "features": "Funksiyalar", "limit": "Kunlik limit", "limitDefault": "standart: {{n}}", "usedToday": "bugun: {{used}}", "saved": "Saqlandi", "close": "Yopish"},
+    "userCard": {"registered": "Ro‘yxatdan o‘tgan: {{date}}", "words": "So‘zlar: {{n}}", "lastActive": "Oxirgi faollik: {{date}}", "never": "hech qachon", "features": "Funksiyalar", "limit": "Kunlik limit", "usedOf": "Bugun: {{limit}} tadan {{used}} ta", "sourceDefault": "standart", "sourceCustom": "maxsus qiymat", "reset": "Tiklash", "saved": "Saqlandi", "close": "Yopish"},
     "feedback": {"tile": "O‘rtacha baho", "count": "fikrlar: {{n}}", "title": "Fikrlar", "noComment": "izohsiz", "userRating": "Baho: {{rating}} ⭐"}
   },
   "word": {"move": "Papkaga koʻchirish", "more": "Amallar"},

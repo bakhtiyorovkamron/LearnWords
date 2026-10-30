@@ -328,7 +328,7 @@
     "confirmDelete": "Удалить {{email}} и ВСЕ его данные без возможности восстановления?",
     "actionFailed": "Действие не выполнено: {{error}}",
     "nothingFound": "Никого не найдено",
-    "userCard": {"registered": "Регистрация: {{date}}", "words": "Слов: {{n}}", "lastActive": "Последняя активность: {{date}}", "never": "никогда", "features": "Функции", "limit": "Лимит в день", "limitDefault": "по умолчанию: {{n}}", "usedToday": "сегодня: {{used}}", "saved": "Сохранено", "close": "Закрыть"},
+    "userCard": {"registered": "Регистрация: {{date}}", "words": "Слов: {{n}}", "lastActive": "Последняя активность: {{date}}", "never": "никогда", "features": "Функции", "limit": "Лимит в день", "usedOf": "Сегодня: {{used}} из {{limit}}", "sourceDefault": "по умолчанию", "sourceCustom": "своё значение", "reset": "Сбросить", "saved": "Сохранено", "close": "Закрыть"},
     "feedback": {"tile": "Средняя оценка", "count": "отзывов: {{n}}", "title": "Отзывы", "noComment": "без комментария", "userRating": "Оценка: {{rating}} ⭐"}
   },
   "word": {"move": "Переместить в папку", "more": "Действия"},

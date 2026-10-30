@@ -322,7 +322,7 @@
     "confirmDelete": "Delete {{email}} and ALL their data permanently?",
     "actionFailed": "Action failed: {{error}}",
     "nothingFound": "No users found",
-    "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "limitDefault": "default: {{n}}", "usedToday": "today: {{used}}", "saved": "Saved", "close": "Close"},
+    "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "usedOf": "Today: {{used}} of {{limit}}", "sourceDefault": "default", "sourceCustom": "custom", "reset": "Reset", "saved": "Saved", "close": "Close"},
     "feedback": {"tile": "Average rating", "count": "reviews: {{n}}", "title": "Feedback", "noComment": "no comment", "userRating": "Rating: {{rating}} ⭐"}
   },
   "word": {"move": "Move to folder", "more": "Actions"},
