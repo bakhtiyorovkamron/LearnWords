@@ -27,10 +27,11 @@ vi.mock('../api/endpoints', async (importOriginal) => {
 
 const feature = (enabled: boolean, limit: number | null = null, remaining: number | null = null) =>
   ({ enabled, daily_limit: limit, remaining })
-const me = (photoOn: boolean, remaining = 4): Me => ({
+const LIMIT = 10 // the default daily photo limit
+const me = (photoOn: boolean, remaining = LIMIT, limit = LIMIT): Me => ({
   id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de',
   features: {
-    photo_import: feature(photoOn, 4, remaining), daily_story: feature(true),
+    photo_import: feature(photoOn, limit, remaining), daily_story: feature(true),
     word_search: feature(true), story_autotranslate: feature(true),
   },
 })
@@ -74,10 +75,10 @@ describe('PhotoImport', () => {
 
   it('shows the quota left, lists the found words, and adds only the chosen ones', async () => {
     renderIt()
-    expect(await screen.findByText('Left today: 4 of 4')).toBeTruthy()
+    expect(await screen.findByText('Left today: 10 of 10')).toBeTruthy()
     await pick(png())
     expect(await screen.findByText('Words found: 3')).toBeTruthy()
-    expect(screen.getByText('Left today: 3 of 4')).toBeTruthy()
+    expect(screen.getByText('Left today: 3 of 10')).toBeTruthy()
 
     const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
     expect(boxes.map((b) => b.checked)).toEqual([true, false, true]) // new ones preselected
@@ -102,10 +103,10 @@ describe('PhotoImport', () => {
   })
 
   it('a used-up daily quota shows the daily-limit text, not the rate-limit one', async () => {
-    vi.mocked(photoApi.import).mockRejectedValue(fail(429, { error: 'daily limit reached', code: 'daily_limit', limit: 4 }))
+    vi.mocked(photoApi.import).mockRejectedValue(fail(429, { error: 'daily limit reached', code: 'daily_limit', limit: 10 }))
     renderIt()
     await pick(png())
-    expect((await screen.findByRole('alert')).textContent).toBe("Today's limit is used up — tomorrow you get 4 again.")
+    expect((await screen.findByRole('alert')).textContent).toBe("Today's limit is used up — tomorrow you get 10 again.")
   })
 
   it('refuses a file that is not an image without calling the server', async () => {
@@ -131,20 +132,42 @@ const dd = () => {
 const folder = (id: string, name: string) => ({ id, name, color: 'sky' })
 
 describe('PhotoImport: quota pill', () => {
-  it('shows "3 of 4" with 4 dots, 3 of them filled', async () => {
+  it('shows "3 of 10" with 10 small dots, 3 of them filled', async () => {
     vi.mocked(meApi.get).mockResolvedValue(me(true, 3))
     renderIt()
     const pill = await screen.findByTestId('photo-quota')
-    expect(pill.textContent).toBe('Left today: 3 of 4')
+    expect(pill.textContent).toBe('Left today: 3 of 10')
     const dots = screen.getAllByTestId('photo-dot')
-    expect(dots).toHaveLength(4)
-    expect(dots.map((d) => d.getAttribute('data-filled'))).toEqual(['true', 'true', 'true', 'false'])
+    expect(dots).toHaveLength(10)
+    expect(dots.map((d) => d.getAttribute('data-filled'))).toEqual(
+      ['true', 'true', 'true', ...Array(7).fill('false')])
+    // above 5 the dots are small and tight, so 10 of them fit a 360 px screen
+    for (const d of dots) { expect(d.className).toContain('h-1.5'); expect(d.className).toContain('w-1.5') }
+    expect(dots[0].parentElement!.className).toContain('gap-1')
+    expect(dots[0].parentElement!.className).not.toContain('gap-1.5')
+  })
+
+  it.each([
+    [4, 4, 'h-2', 4],   // up to 5: roomy dots
+    [5, 2, 'h-2', 5],
+    [6, 6, 'h-1.5', 6], // above 5: small ones
+    [12, 7, 'h-1.5', 12],
+    [13, 7, null, 0],   // above 12: the text only
+    [50, 50, null, 0],
+  ])('limit %i (%i left): dot size %s, %i dots', async (limit, left, size, count) => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, left, limit))
+    renderIt()
+    const pill = await screen.findByTestId('photo-quota')
+    expect(pill.textContent).toBe(`Left today: ${left} of ${limit}`)
+    const dots = screen.queryAllByTestId('photo-dot')
+    expect(dots).toHaveLength(count)
+    if (size) for (const d of dots) expect(d.className).toContain(size)
   })
 
   it('with none left the button is disabled and a muted line replaces the pill', async () => {
     vi.mocked(meApi.get).mockResolvedValue(me(true, 0))
     renderIt()
-    expect(await screen.findByText('No photos left today — 4 again tomorrow')).toBeTruthy()
+    expect(await screen.findByText('No photos left today — 10 again tomorrow')).toBeTruthy()
     expect(screen.queryByTestId('photo-quota')).toBeNull()
     expect((screen.getByRole('button', { name: /Choose a photo/ }) as HTMLButtonElement).disabled).toBe(true)
   })
@@ -254,7 +277,7 @@ describe('PhotoImport: rejected photos', () => {
   ])('the server\'s 422 %s gets its text, "not charged", and refreshes the quota', async (code, text) => {
     vi.mocked(photoApi.import).mockRejectedValue(fail(422, { error: 'x', code }))
     renderIt()
-    await screen.findByText('Left today: 4 of 4')
+    await screen.findByText('Left today: 10 of 10')
     vi.mocked(meApi.get).mockClear()
     await pick(png())
     const alert = await screen.findByRole('alert')
@@ -266,7 +289,7 @@ describe('PhotoImport: rejected photos', () => {
   it('a device-side rejection does not re-read /me (nothing was used)', async () => {
     vi.mocked(photoLib.preparePhoto).mockRejectedValueOnce(new photoLib.PhotoQualityError('blurry'))
     renderIt()
-    await screen.findByText('Left today: 4 of 4')
+    await screen.findByText('Left today: 10 of 10')
     vi.mocked(meApi.get).mockClear()
     await pick(png())
     await screen.findByRole('alert')

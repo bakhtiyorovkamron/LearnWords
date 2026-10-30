@@ -58,7 +58,7 @@ func TestPhotoImport_Success(t *testing.T) {
 	w := upload(r, "image", png)
 	m := decode(t, w)
 	words, _ := m["words"].([]any)
-	if w.Code != 200 || len(words) != 1 || m["remaining"] != float64(3) {
+	if w.Code != 200 || len(words) != 1 || m["remaining"] != float64(defaultPhotoLimit-1) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	if first := words[0].(map[string]any); first["full_word"] != "der Hund" || first["already_added"] != false {
@@ -84,14 +84,14 @@ func TestPhotoImport_Errors(t *testing.T) {
 		}
 	}
 
-	// the daily limit: 4 photos, the 5th is a 429 with the limit
-	for i := range 4 {
+	// the daily limit: that many photos, the next one is a 429 with the limit
+	for i := range defaultPhotoLimit {
 		if w := upload(r, "image", png); w.Code != 200 {
 			t.Fatalf("photo %d: %d", i+1, w.Code)
 		}
 	}
 	w := upload(r, "image", png)
-	if m := decode(t, w); w.Code != 429 || m["code"] != "daily_limit" || m["limit"] != float64(4) {
+	if m := decode(t, w); w.Code != 429 || m["code"] != "daily_limit" || m["limit"] != float64(defaultPhotoLimit) {
 		t.Errorf("limit: %d %s", w.Code, w.Body)
 	}
 
@@ -115,14 +115,14 @@ func TestPhotoImport_RejectedPhotoIs422_AndNotCharged(t *testing.T) {
 		r.Use(func(c *gin.Context) { c.Set(userIDKey, user) }, NativeLang())
 		r.POST("/photo-import", NewPhotoHandler(service.NewPhotoImportService(okReader{status: status}, noWords{}, feats)).Import)
 
-		for range 6 { // more than the daily limit of 4: rejected photos never use it up
+		for range defaultPhotoLimit + 2 { // more than the daily limit: rejected photos never use it up
 			w := upload(r, "image", png)
 			if m := decode(t, w); w.Code != 422 || m["code"] != code {
 				t.Fatalf("%s: %d %s", status, w.Code, w.Body)
 			}
 		}
 		st, _ := feats.State(context.Background(), user, domain.FeaturePhotoImport)
-		if st.UsedToday != 0 || *st.Remaining != 4 {
+		if st.UsedToday != 0 || *st.Remaining != defaultPhotoLimit {
 			t.Errorf("%s: %+v", status, st)
 		}
 	}

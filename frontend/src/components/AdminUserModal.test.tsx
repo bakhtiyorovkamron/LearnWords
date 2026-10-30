@@ -20,7 +20,7 @@ const feat = (over: Partial<FeatureState>): FeatureState => ({
   used_today: 0, remaining: null, ...over,
 })
 const features: FeatureState[] = [
-  feat({ feature: 'photo_import', daily_limit: 4, default_limit: 4, limit_override: 6, used_today: 2, remaining: 2 }),
+  feat({ feature: 'photo_import', daily_limit: 6, default_limit: 10, limit_override: 6, used_today: 2, remaining: 4 }),
   feat({ feature: 'daily_story' }),
   feat({ feature: 'word_search' }),
   feat({ feature: 'story_autotranslate', enabled: false }),
@@ -55,7 +55,7 @@ describe('AdminUserModal', () => {
     const limit = screen.getAllByRole('spinbutton')
     expect(limit).toHaveLength(1)
     expect((limit[0] as HTMLInputElement).value).toBe('6')
-    expect(limit[0].getAttribute('placeholder')).toBe('default: 4')
+    expect(limit[0].getAttribute('placeholder')).toBe('default: 10')
     expect(screen.getByText('today: 2')).toBeTruthy()
   })
 

@@ -85,7 +85,7 @@ func TestPhotoImport_OnePhotoOneUnit_ResultCleaned(t *testing.T) {
 	if res.Words[2].FullWord != "laufen" || res.Words[2].Article != nil {
 		t.Errorf("verb: %+v", res.Words[2])
 	}
-	if res.Remaining == nil || *res.Remaining != 3 || e.used(t) != 1 {
+	if res.Remaining == nil || *res.Remaining != defaultPhotoLimit-1 || e.used(t) != 1 {
 		t.Errorf("one photo = one unit: remaining %v, used %d", res.Remaining, e.used(t))
 	}
 }
@@ -104,17 +104,17 @@ func TestPhotoImport_AIFailureRefunds(t *testing.T) {
 func TestPhotoImport_LimitAndSwitch_StopBeforeTheAI(t *testing.T) {
 	ctx := context.Background()
 	e := newPhotoEnv([]domain.PhotoWord{{Word: "Hund", Translation: "собака"}}, nil)
-	for range 4 {
+	for range defaultPhotoLimit {
 		if _, err := e.svc.Import(ctx, e.user, pngBytes); err != nil {
 			t.Fatal(err)
 		}
 	}
 	_, err := e.svc.Import(ctx, e.user, pngBytes)
-	if n, ok := domain.DailyLimitOf(err); !errors.Is(err, domain.ErrDailyLimit) || !ok || n != 4 {
-		t.Fatalf("5th photo: %v", err)
+	if n, ok := domain.DailyLimitOf(err); !errors.Is(err, domain.ErrDailyLimit) || !ok || n != defaultPhotoLimit {
+		t.Fatalf("photo over the limit: %v", err)
 	}
-	if e.ai.calls != 4 {
-		t.Errorf("the AI was called %d times, want 4", e.ai.calls)
+	if e.ai.calls != defaultPhotoLimit {
+		t.Errorf("the AI was called %d times, want %d", e.ai.calls, defaultPhotoLimit)
 	}
 
 	e2 := newPhotoEnv(nil, nil)
@@ -179,8 +179,8 @@ func TestPhotoImport_RejectedPhotoIsRefunded(t *testing.T) {
 			t.Errorf("%s: calls %d, used %d — the rejected photo must not stay charged", status, e.ai.calls, e.used(t))
 		}
 		st, _ := e.feats.State(ctx, e.user, domain.FeaturePhotoImport)
-		if *st.Remaining != 3 {
-			t.Errorf("%s: remaining %d, want 3", status, *st.Remaining)
+		if *st.Remaining != defaultPhotoLimit-1 {
+			t.Errorf("%s: remaining %d, want %d", status, *st.Remaining, defaultPhotoLimit-1)
 		}
 	}
 }

@@ -15,6 +15,9 @@ import (
 	"learnwords/internal/service"
 )
 
+// defaultPhotoLimit mirrors the catalog default of photo_import.
+const defaultPhotoLimit = 10
+
 type memFeatures struct {
 	mu    sync.Mutex
 	ov    map[string]domain.FeatureOverride
@@ -165,7 +168,7 @@ func TestMe_ContainsFeatures(t *testing.T) {
 		t.Fatalf("features: %v", f)
 	}
 	p := f["photo_import"].(map[string]any)
-	if p["enabled"] != true || p["daily_limit"] != float64(4) || p["remaining"] != float64(4) {
+	if p["enabled"] != true || p["daily_limit"] != float64(defaultPhotoLimit) || p["remaining"] != float64(defaultPhotoLimit) {
 		t.Errorf("photo_import: %v", p)
 	}
 	if f["word_search"].(map[string]any)["enabled"] != false {
@@ -182,12 +185,12 @@ func TestAdminSetFeature(t *testing.T) {
 
 	w := sendJSON(e.r, "PUT", base+"photo_import", `{"enabled":true,"daily_limit":7}`)
 	st := decode(t, w)
-	if w.Code != 200 || st["daily_limit"] != float64(7) || st["limit_override"] != float64(7) || st["default_limit"] != float64(4) {
+	if w.Code != 200 || st["daily_limit"] != float64(7) || st["limit_override"] != float64(7) || st["default_limit"] != float64(defaultPhotoLimit) {
 		t.Errorf("set limit: %d %s", w.Code, w.Body)
 	}
 	w = sendJSON(e.r, "PUT", base+"photo_import", `{"enabled":false,"daily_limit":null}`)
 	st = decode(t, w)
-	if w.Code != 200 || st["enabled"] != false || st["daily_limit"] != float64(4) || st["limit_override"] != nil {
+	if w.Code != 200 || st["enabled"] != false || st["daily_limit"] != float64(defaultPhotoLimit) || st["limit_override"] != nil {
 		t.Errorf("null limit = default: %d %s", w.Code, w.Body)
 	}
 

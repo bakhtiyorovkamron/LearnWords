@@ -30,7 +30,7 @@ vi.mock('../pages/SharedFolderPage', () => ({ SharedFolderPage: () => <div>SHARE
 vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div>AUTH PAGE</div> }))
 
 const features = (wordSearch: boolean) => ({
-  photo_import: { enabled: true, daily_limit: 4, remaining: 4 },
+  photo_import: { enabled: true, daily_limit: 10, remaining: 10 },
   daily_story: { enabled: true, daily_limit: null, remaining: null },
   word_search: { enabled: wordSearch, daily_limit: null, remaining: null },
   story_autotranslate: { enabled: true, daily_limit: null, remaining: null },

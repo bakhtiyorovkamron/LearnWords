@@ -22,6 +22,9 @@ const REJECTION_CODES: Record<string, string> = {
   photo_unreadable: 'photo.errUnreadable',
 }
 
+const BIG_DOTS_UP_TO = 5 // quota dots: larger up to this limit, smaller above it
+const MAX_DOTS = 12 // above this the pill shows the text only
+
 /** Today as dd.MM — the default folder is named after the lesson day. */
 function todayLabel(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0')
@@ -173,11 +176,12 @@ export function PhotoImport() {
           : (
             <span data-testid="photo-quota" className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-sm">
               {t('photo.left', { n: left, limit })}
-              {limit <= 20 && (
-                <span className="flex gap-1" aria-hidden="true">
+              {/* Up to 5 photos: roomy dots; up to 12: small ones (10 fit a 360 px screen); more: text only. */}
+              {limit <= MAX_DOTS && (
+                <span className={`flex ${limit > BIG_DOTS_UP_TO ? 'gap-1' : 'gap-1.5'}`} aria-hidden="true">
                   {Array.from({ length: limit }, (_, i) => (
                     <span key={i} data-testid="photo-dot" data-filled={i < left}
-                      className={`h-1.5 w-1.5 rounded-full ${i < left ? 'bg-lime-300' : 'bg-white/15'}`} />
+                      className={`${limit > BIG_DOTS_UP_TO ? 'h-1.5 w-1.5' : 'h-2 w-2'} rounded-full ${i < left ? 'bg-lime-300' : 'bg-white/15'}`} />
                   ))}
                 </span>
               )}

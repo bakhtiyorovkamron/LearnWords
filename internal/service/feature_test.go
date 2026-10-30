@@ -73,6 +73,9 @@ func (r *memFeatureRepo) SetOverride(_ context.Context, _ uuid.UUID, feature str
 
 func ip(n int) *int { return &n }
 
+// defaultPhotoLimit mirrors the catalog default of photo_import.
+const defaultPhotoLimit = 10
+
 func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 	s := NewFeatureService(newMemFeatureRepo())
 	states, err := s.States(context.Background(), uuid.New())
@@ -83,7 +86,7 @@ func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 		t.Fatalf("catalog order: %+v", states)
 	}
 	p := states[0]
-	if !p.Enabled || p.DailyLimit == nil || *p.DailyLimit != 4 || *p.DefaultLimit != 4 || p.LimitOverride != nil || *p.Remaining != 4 {
+	if !p.Enabled || p.DailyLimit == nil || *p.DailyLimit != defaultPhotoLimit || *p.DefaultLimit != defaultPhotoLimit || p.LimitOverride != nil || *p.Remaining != defaultPhotoLimit {
 		t.Errorf("photo_import: %+v", p)
 	}
 	for _, st := range states[1:] {
@@ -110,16 +113,16 @@ func TestFeatures_OverrideDisablesAndChangesLimit(t *testing.T) {
 		t.Errorf("other features stay on: %v", err)
 	}
 
-	if err := s.Set(ctx, u, domain.FeaturePhotoImport, true, ip(10)); err != nil {
+	if err := s.Set(ctx, u, domain.FeaturePhotoImport, true, ip(7)); err != nil {
 		t.Fatal(err)
 	}
 	st, err := s.State(ctx, u, domain.FeaturePhotoImport)
-	if err != nil || *st.DailyLimit != 10 || *st.LimitOverride != 10 || *st.DefaultLimit != 4 {
+	if err != nil || *st.DailyLimit != 7 || *st.LimitOverride != 7 || *st.DefaultLimit != defaultPhotoLimit {
 		t.Errorf("limit override: %+v %v", st, err)
 	}
 	// limit nil again → back to the default
 	_ = s.Set(ctx, u, domain.FeaturePhotoImport, true, nil)
-	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); *st.DailyLimit != 4 || st.LimitOverride != nil {
+	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); *st.DailyLimit != defaultPhotoLimit || st.LimitOverride != nil {
 		t.Errorf("default restored: %+v", st)
 	}
 	// a limit on a feature that has none by default
@@ -133,7 +136,7 @@ func TestFeatures_OverrideDisablesAndChangesLimit(t *testing.T) {
 func TestFeatures_ConsumeUpToLimit(t *testing.T) {
 	ctx, u := context.Background(), uuid.New()
 	s := NewFeatureService(newMemFeatureRepo())
-	for want := 3; want >= 0; want-- {
+	for want := defaultPhotoLimit - 1; want >= 0; want-- {
 		rem, err := s.Consume(ctx, u, domain.FeaturePhotoImport, 1)
 		if err != nil || rem == nil || *rem != want {
 			t.Fatalf("remaining %v (%v), want %d", rem, err, want)
@@ -141,18 +144,18 @@ func TestFeatures_ConsumeUpToLimit(t *testing.T) {
 	}
 	_, err := s.Consume(ctx, u, domain.FeaturePhotoImport, 1)
 	if !errors.Is(err, domain.ErrDailyLimit) {
-		t.Fatalf("5th: %v", err)
+		t.Fatalf("over the limit: %v", err)
 	}
-	if n, ok := domain.DailyLimitOf(err); !ok || n != 4 {
+	if n, ok := domain.DailyLimitOf(err); !ok || n != defaultPhotoLimit {
 		t.Errorf("limit carried: %d %v", n, ok)
 	}
 	// n larger than what is left: nothing is charged
-	_ = s.Refund(ctx, u, domain.FeaturePhotoImport, 2) // used 2
+	_ = s.Refund(ctx, u, domain.FeaturePhotoImport, 2) // 2 left
 	if _, err := s.Consume(ctx, u, domain.FeaturePhotoImport, 3); !errors.Is(err, domain.ErrDailyLimit) {
 		t.Errorf("3 of 2 left: %v", err)
 	}
-	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); st.UsedToday != 2 {
-		t.Errorf("used %d, want 2", st.UsedToday)
+	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); st.UsedToday != defaultPhotoLimit-2 {
+		t.Errorf("used %d, want %d", st.UsedToday, defaultPhotoLimit-2)
 	}
 	// unlimited feature: no usage recorded
 	if rem, err := s.Consume(ctx, u, domain.FeatureWordSearch, 1); rem != nil || err != nil {
@@ -167,7 +170,7 @@ func TestFeatures_UsageResetsOnNextTashkentDay(t *testing.T) {
 	ctx, u := context.Background(), uuid.New()
 	now := time.Date(2026, 10, 29, 18, 0, 0, 0, time.UTC) // 23:00 in Tashkent
 	s := NewFeatureService(newMemFeatureRepo(), WithFeatureClock(func() time.Time { return now }))
-	for range 4 {
+	for range defaultPhotoLimit {
 		if _, err := s.Consume(ctx, u, domain.FeaturePhotoImport, 1); err != nil {
 			t.Fatal(err)
 		}
@@ -178,7 +181,7 @@ func TestFeatures_UsageResetsOnNextTashkentDay(t *testing.T) {
 	}
 	now = now.Add(2 * time.Minute) // 19:01 UTC = 00:01 Tashkent next day (still the same UTC day)
 	rem, err := s.Consume(ctx, u, domain.FeaturePhotoImport, 1)
-	if err != nil || *rem != 3 {
+	if err != nil || *rem != defaultPhotoLimit-1 {
 		t.Fatalf("next Tashkent day: %v %v", rem, err)
 	}
 }
@@ -188,11 +191,11 @@ func TestFeatures_Refund(t *testing.T) {
 	s := NewFeatureService(newMemFeatureRepo())
 	_, _ = s.Consume(ctx, u, domain.FeaturePhotoImport, 3)
 	_ = s.Refund(ctx, u, domain.FeaturePhotoImport, 1)
-	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); st.UsedToday != 2 || *st.Remaining != 2 {
+	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); st.UsedToday != 2 || *st.Remaining != defaultPhotoLimit-2 {
 		t.Errorf("after refund: %+v", st)
 	}
 	_ = s.Refund(ctx, u, domain.FeaturePhotoImport, 10) // never below 0
-	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); st.UsedToday != 0 || *st.Remaining != 4 {
+	if st, _ := s.State(ctx, u, domain.FeaturePhotoImport); st.UsedToday != 0 || *st.Remaining != defaultPhotoLimit {
 		t.Errorf("refund floor: %+v", st)
 	}
 }

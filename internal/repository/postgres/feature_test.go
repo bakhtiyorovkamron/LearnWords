@@ -14,6 +14,9 @@ import (
 	"learnwords/internal/service"
 )
 
+// photoLimit mirrors the catalog default of photo_import.
+const photoLimit = 10
+
 func TestFeatures_ParallelConsumeNeverExceedsLimit(t *testing.T) {
 	f := newMoveFixture(t)
 	svc := service.NewFeatureService(NewFeatureRepository(f.pool))
@@ -21,7 +24,7 @@ func TestFeatures_ParallelConsumeNeverExceedsLimit(t *testing.T) {
 
 	var ok, limited atomic.Int32
 	var wg sync.WaitGroup
-	for range 10 {
+	for range 2*photoLimit + 5 { // far more tries than the limit
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -36,10 +39,10 @@ func TestFeatures_ParallelConsumeNeverExceedsLimit(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	if ok.Load() != 4 || limited.Load() != 6 {
-		t.Fatalf("succeeded %d, limited %d; want 4 and 6", ok.Load(), limited.Load())
+	if ok.Load() != photoLimit || limited.Load() != photoLimit+5 {
+		t.Fatalf("succeeded %d, limited %d; want %d and %d", ok.Load(), limited.Load(), photoLimit, photoLimit+5)
 	}
-	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != 4 || *st.Remaining != 0 {
+	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != photoLimit || *st.Remaining != 0 {
 		t.Errorf("state: %+v", st)
 	}
 }
@@ -51,13 +54,13 @@ func TestFeatures_Postgres_FirstInsertChecksLimit_ResetRefundSet(t *testing.T) {
 	svc := service.NewFeatureService(NewFeatureRepository(f.pool), service.WithFeatureClock(func() time.Time { return now }))
 
 	// the very first insert may not exceed the limit either
-	if _, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 5); !errors.Is(err, domain.ErrDailyLimit) {
-		t.Fatalf("5 > limit 4 on a fresh day: %v", err)
+	if _, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, photoLimit+1); !errors.Is(err, domain.ErrDailyLimit) {
+		t.Fatalf("more than the limit on a fresh day: %v", err)
 	}
 	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != 0 {
 		t.Errorf("nothing may be charged: %+v", st)
 	}
-	if _, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 4); err != nil {
+	if _, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, photoLimit); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 1); !errors.Is(err, domain.ErrDailyLimit) {
@@ -66,7 +69,7 @@ func TestFeatures_Postgres_FirstInsertChecksLimit_ResetRefundSet(t *testing.T) {
 
 	// refund, floor at 0
 	_ = svc.Refund(ctx, f.user, domain.FeaturePhotoImport, 1)
-	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != 3 {
+	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != photoLimit-1 {
 		t.Errorf("after refund: %+v", st)
 	}
 	_ = svc.Refund(ctx, f.user, domain.FeaturePhotoImport, 99)
@@ -75,9 +78,9 @@ func TestFeatures_Postgres_FirstInsertChecksLimit_ResetRefundSet(t *testing.T) {
 	}
 
 	// resets on the next Tashkent day: 19:30 UTC is already the next day there
-	_, _ = svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 4)
+	_, _ = svc.Consume(ctx, f.user, domain.FeaturePhotoImport, photoLimit)
 	now = time.Date(2026, 10, 29, 19, 30, 0, 0, time.UTC)
-	if rem, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 1); err != nil || *rem != 3 {
+	if rem, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 1); err != nil || *rem != photoLimit-1 {
 		t.Errorf("next day: %v %v", rem, err)
 	}
 
