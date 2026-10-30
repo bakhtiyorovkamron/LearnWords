@@ -60,15 +60,22 @@
     "banned": "Your account has been banned"
   },
   "home": {
-    "subtitle": "Each phrase is a set of new words in a living context.",
-    "newPhrase": "✨ Add a word",
     "empty": "Nothing here yet. Add your first {{langName}} phrase!",
-    "start": "Start"
+    "today": "Today, {{date}}",
+    "titleDue": "Time to review",
+    "titleDone": "All done for today",
+    "titleStart": "Welcome!",
+    "doneLine": "Your next review is tomorrow. You can still practice now.",
+    "addWord": "Add a word",
+    "photo": "Textbook photo",
+    "allWords": "All · {{count}}",
+    "dueLine_one": "to review today · about {{count}} minute",
+    "dueLine_other": "to review today · about {{count}} minutes",
+    "moreFolders_one": "{{count}} more folder",
+    "moreFolders_other": "{{count}} more folders"
   },
   "stats": {
-    "wordsAdded": "Words added",
     "streak": "Day streak",
-    "language": "Language",
     "titleA": "My ",
     "titleB": "statistics",
     "subtitle": "Learning progress by day.",
@@ -186,10 +193,7 @@
     "myFolders": "My folders",
     "open": "Open",
     "train": "Train",
-    "learnedOf": "{{learned}} of {{total}} learned",
-    "dueToday": "Review today: {{count}}",
     "createHint": "Create a folder, e.g. \u201cWork\u201d or \u201cLesson 8\u201d, to study words by topic",
-    "menu": "Folder menu",
     "nameLabel": "Name",
     "colorLabel": "Color",
     "nameTaken": "A folder with this name already exists",

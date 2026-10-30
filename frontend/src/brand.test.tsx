@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import i18n from './i18n'
-import { Logo } from './components/Layout'
+import { Logo, LogoMark } from './components/Logo'
 
 const root = join(__dirname, '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
@@ -11,14 +11,24 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8')
 afterEach(cleanup)
 
 describe('brand: yodla', () => {
-  it('the logo is a "y" badge and "yod" + accented "la"', () => {
+  it('the logo is the "y" mark and the wordmark "yodla" (display font, one colour)', () => {
     const { container } = render(<Logo />)
-    const [badge, word] = Array.from(container.querySelectorAll('span.display > span'))
-    expect(badge.textContent).toBe('y')
+    expect(container.querySelector('svg')).not.toBeNull()
+    const word = container.querySelector('span.display')!
     expect(word.textContent).toBe('yodla')
-    const accent = word.querySelector('span')!
-    expect(accent.textContent).toBe('la')
-    expect(accent.className).toContain('text-lime-300')
+    expect(word.children).toHaveLength(0) // no accented "la"
+    expect(word.className).toContain('text-fg')
+  })
+
+  it('every logo mark has its own gradient id (the header copy is display:none on phones)', () => {
+    const { container } = render(<div><LogoMark /><LogoMark /><Logo /></div>)
+    const ids = Array.from(container.querySelectorAll('linearGradient')).map((g) => g.id)
+    expect(ids).toHaveLength(3)
+    expect(new Set(ids).size).toBe(3)
+    for (const svg of Array.from(container.querySelectorAll('svg'))) {
+      const fill = svg.querySelector('rect')!.getAttribute('fill')!
+      expect(svg.querySelector(fill.slice(4, -1))).not.toBeNull() // url(#id) points at its own gradient
+    }
   })
 
   it('the tab title follows the interface language', async () => {

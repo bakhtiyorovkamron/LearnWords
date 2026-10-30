@@ -23,15 +23,16 @@ const FLIP_DIRECTIONS = ['de_ru', 'ru_de'] as const
 export function CardsPage() {
   const { t } = useTranslation()
   // Deep link from a folder card on the Contexts page: ?tab=all&folder=<id|none|''>.
-  const [params] = useSearchParams()
-  const [tab, setTab] = useState<'review' | 'all'>(params.get('tab') === 'all' ? 'all' : 'review')
+  // The tab is in the URL, so /cards always opens Review — also when coming from /cards?tab=all.
+  const [params, setParams] = useSearchParams()
+  const tab: 'review' | 'all' = params.get('tab') === 'all' ? 'all' : 'review'
   const initialFolder = params.get('folder') ?? ''
   const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
   return (
     <div className="space-y-4 md:space-y-8">
       <div className="flex gap-2">
         {tabs.map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
+          <button key={k} onClick={() => setParams(k === 'all' ? { tab: 'all' } : {}, { replace: true })}
             className={tab === k ? 'btn-primary' : 'btn-ghost'}>{label}</button>
         ))}
       </div>

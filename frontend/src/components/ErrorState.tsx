@@ -1,3 +1,4 @@
+import { MessageCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { errorMessage } from '../api/client'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
@@ -7,9 +8,9 @@ export function ErrorState({ error, className = '' }: { error: unknown; classNam
   const { t } = useTranslation()
   return (
     <div className={`space-y-1 ${className}`} role="alert">
-      <p className="text-red-300">{errorMessage(error)}</p>
-      <a href={CONTACT.instagram} {...EXTERNAL_LINK} className="text-sm font-semibold text-lime-300 hover:underline">
-        💬 {t('contact.reportProblem')}
+      <p className="text-danger">{errorMessage(error)}</p>
+      <a href={CONTACT.instagram} {...EXTERNAL_LINK} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-text hover:underline">
+        <MessageCircle size={14} aria-hidden="true" />{t('contact.reportProblem')}
       </a>
     </div>
   )

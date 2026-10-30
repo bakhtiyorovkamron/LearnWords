@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { apiErrorInfo, errorMessage, isFeatureError } from '../api/client'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
 import { PhotoQualityError, isPhotoType, preparePhoto } from '../lib/photo'
+import { takeHandedOffPhoto } from '../lib/photoHandoff'
 import { FOLDER_COLORS, FolderSelect, useFolders } from './Folders'
 import { toast } from './Toaster'
 
@@ -113,6 +114,13 @@ export function PhotoImport() {
     void qc.invalidateQueries({ queryKey: ['folders'] })
     return { id: folder.id, name: folder.name }
   }
+
+  // A photo chosen on the Home page: read it right away, once.
+  useEffect(() => {
+    const file = takeHandedOffPhoto()
+    if (file && isOn('photo_import')) choose(file)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (!isOn('photo_import')) return null
   const left = result ? result.remaining : remaining('photo_import')

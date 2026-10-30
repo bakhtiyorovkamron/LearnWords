@@ -60,15 +60,22 @@
     "banned": "Hisobingiz bloklangan"
   },
   "home": {
-    "subtitle": "Har bir ibora — jonli kontekstdagi yangi so‘zlar to‘plami.",
-    "newPhrase": "✨ So‘z qo‘shish",
     "empty": "Hozircha bo‘sh. {{langUz}} tilidagi birinchi iborani qo‘shing!",
-    "start": "Boshlash"
+    "today": "Bugun, {{date}}",
+    "titleDue": "Takrorlash vaqti",
+    "titleDone": "Bugungi reja bajarildi",
+    "titleStart": "Xush kelibsiz!",
+    "doneLine": "Keyingi takrorlash — ertaga. Xohlasangiz, hozir ham mashq qilishingiz mumkin.",
+    "addWord": "So‘z qo‘shish",
+    "photo": "Darslik surati",
+    "allWords": "Hammasi · {{count}}",
+    "dueLine_one": "bugun takrorlanadi · taxminan {{count}} daqiqa",
+    "dueLine_other": "bugun takrorlanadi · taxminan {{count}} daqiqa",
+    "moreFolders_one": "Yana {{count}} ta papka",
+    "moreFolders_other": "Yana {{count}} ta papka"
   },
   "stats": {
-    "wordsAdded": "Qo‘shilgan so‘zlar",
     "streak": "Ketma-ket kunlar",
-    "language": "Til",
     "titleA": "Mening ",
     "titleB": "statistikam",
     "subtitle": "Kunlar bo‘yicha o‘qish natijalari.",
@@ -186,10 +193,7 @@
     "myFolders": "Mening papkalarim",
     "open": "Ochish",
     "train": "Mashq qilish",
-    "learnedOf": "{{total}} tadan {{learned}} tasi o‘rganildi",
-    "dueToday": "Bugun takrorlash: {{count}}",
     "createHint": "Mavzu bo‘yicha o‘rganish uchun papka yarating, masalan «Ish» yoki «8-dars»",
-    "menu": "Papka menyusi",
     "nameLabel": "Nomi",
     "colorLabel": "Rang",
     "nameTaken": "Bu nomdagi papka allaqachon mavjud",

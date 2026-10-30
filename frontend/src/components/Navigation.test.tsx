@@ -56,7 +56,7 @@ function renderLayout(path: string) {
 }
 const bottomBar = () => screen.getAllByRole('navigation')[1] // [0] is the desktop header
 const moreTab = () => within(bottomBar()).getByRole('button', { name: /More/ })
-const isActive = (el: Element) => el.className.includes('text-lime-300')
+const isActive = (el: Element) => el.className.includes('text-accent-text')
 
 beforeEach(async () => {
   authenticated = true
@@ -72,7 +72,7 @@ describe('bottom navigation', () => {
   it('shows exactly Home, Cards, Add, Story, More — in that order, Home first at "/"', async () => {
     renderLayout('/')
     const items = Array.from(bottomBar().children)
-    expect(items.map((el) => el.textContent)).toEqual(['🏠Home', '🃏Cards', '➕Add', '📖Daily Story', '☰More'])
+    expect(items.map((el) => el.textContent)).toEqual(['Home', 'Cards', 'Add', 'Daily Story', 'More'])
     expect(items.slice(0, 4).map((el) => el.getAttribute('href'))).toEqual(['/', '/cards', '/contexts/new', '/story'])
     expect(isActive(items[0])).toBe(true)
     await waitFor(() => expect(meApi.get).toHaveBeenCalled())
@@ -91,8 +91,8 @@ describe('bottom navigation', () => {
     fireEvent.click(moreTab())
     const sheet = document.getElementById('more-sheet')!
     const links = within(sheet).getAllByRole('link').map((a) => a.textContent)
-    expect(links[0]).toBe('🔍 Search')
-    expect(links[1]).toBe('📈 Statistics')
+    expect(links[0]).toBe('Search')
+    expect(links[1]).toBe('Statistics')
     expect(links.some((l) => /Contexts/.test(l ?? ''))).toBe(false) // the old entry is gone
   })
 
@@ -124,7 +124,7 @@ describe('bottom navigation', () => {
     renderLayout('/')
     const header = screen.getAllByRole('navigation')[0]
     const names = within(header).getAllByRole('link').map((a) => a.textContent)
-    expect(names).toEqual([expect.any(String) /* logo */, '🏠 Home', '🃏 Cards', '➕ Add', '🔍 Search', '📖 Daily Story', '📈 Statistics'])
+    expect(names).toEqual(['yodla' /* the logo */, 'Home', 'Cards', 'Add', 'Search', 'Daily Story', 'Statistics'])
     expect(within(header).getAllByRole('link')[0].getAttribute('href')).toBe('/') // the logo
   })
 })
@@ -155,5 +155,53 @@ describe('routes', () => {
     renderApp('/login')
     expect(await screen.findByText('HOME PAGE')).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/')
+  })
+})
+
+describe('the shell has icons, not emoji', () => {
+  it('every nav item has an svg icon (hidden from screen readers) and no emoji in its name', () => {
+    renderLayout('/')
+    const bar = Array.from(bottomBar().children)
+    expect(bar).toHaveLength(5)
+    for (const item of bar) {
+      const icon = item.querySelector('svg')!
+      expect(icon, item.textContent ?? '').not.toBeNull()
+      expect(icon.getAttribute('aria-hidden')).toBe('true')
+      expect(item.textContent).toMatch(/^[A-Za-z ]+$/)
+    }
+    const header = screen.getAllByRole('navigation')[0]
+    for (const a of Array.from(within(header).getAllByRole('link')).slice(1)) {
+      expect(a.querySelector('svg'), a.textContent ?? '').not.toBeNull()
+      expect(a.textContent).toMatch(/^[A-Za-z ]+$/)
+    }
+  })
+
+  it('the active bottom tab has the accent colour, the others are muted', () => {
+    renderLayout('/story')
+    const [home, cards, add, story, more] = Array.from(bottomBar().children)
+    expect(story.className).toContain('text-accent-text')
+    for (const other of [home, cards, add, more]) {
+      expect(other.className).toContain('text-muted')
+      expect(other.className).not.toContain('text-accent-text')
+    }
+  })
+
+  it('the More sheet rows are icon + label, and the active row is highlighted', () => {
+    renderLayout('/stats')
+    fireEvent.click(moreTab())
+    const sheet = document.getElementById('more-sheet')!
+    const stats = within(sheet).getByRole('link', { name: 'Statistics' })
+    expect(stats.className).toContain('bg-surface-2')
+    expect(stats.className).toContain('text-accent-text')
+    expect(stats.querySelector('svg')).not.toBeNull()
+    expect(within(sheet).getByRole('link', { name: 'Search' }).className).not.toContain('bg-surface-2 text-accent-text')
+    expect(within(sheet).getByRole('button', { name: 'Log out' }).querySelector('svg')).not.toBeNull()
+    expect(within(sheet).getByRole('link', { name: 'Contact us' }).querySelector('svg')).not.toBeNull()
+  })
+
+  it('the logo has one gradient per copy — the desktop header copy is hidden on phones', () => {
+    renderLayout('/')
+    const ids = Array.from(document.querySelectorAll('linearGradient')).map((g) => g.id)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })

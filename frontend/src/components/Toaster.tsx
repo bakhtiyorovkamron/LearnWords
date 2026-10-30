@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 // Minimal global toast: toast('Saved') from anywhere, <Toaster /> renders it (mounted in Layout).
@@ -29,12 +30,13 @@ export function Toaster() {
   return (
     <div className="pointer-events-none fixed bottom-[calc(var(--nav-h)+1.5rem)] left-1/2 z-[60] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
       {items.map((x) => (
-        <div key={x.id} className="animate-rise pointer-events-auto flex items-center gap-3 rounded-2xl border border-lime-400/40 bg-emerald-900/95 px-5 py-3 text-sm font-semibold text-lime-100 shadow-xl">
-          <span className="min-w-0">✓ {x.text}</span>
+        <div key={x.id} className="glass animate-rise pointer-events-auto flex items-center gap-3 px-5 py-3 text-sm font-semibold text-fg">
+          <Check size={16} aria-hidden="true" className="shrink-0 text-accent-text" />
+          <span className="min-w-0">{x.text}</span>
           {x.action && (
             <button type="button"
               onClick={() => { dismiss(x.id); x.action?.onClick() }}
-              className="shrink-0 rounded-lg bg-lime-400 px-3 py-1 text-xs font-bold text-emerald-950 hover:bg-lime-300">
+              className="shrink-0 rounded-lg bg-accent px-3 py-1 text-xs font-bold text-on-accent hover:opacity-90">
               {x.action.label}
             </button>
           )}

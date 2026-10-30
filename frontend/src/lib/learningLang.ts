@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { LEARNING_LANGS, meApi, type LearningLang } from '../api/endpoints'
 
-// Per-language learning content shown in the UI (sample phrases, placeholders, greetings).
+// Per-language learning content shown in the UI (sample phrases, placeholders).
 // This is learning content in the target language, so it is not part of i18n — it is the SAME
 // for every interface language (a Russian-, English- and Uzbek-interface user learning German
 // all see "Hallo! Was lernen wir heute?" and the "Deutsch lernen — Wort für Wort 🌿" footer).
 const CONTENT: Record<LearningLang, {
-  greeting: string; greetingAccent: string
   phrasePlaceholder: string; gapPlaceholder: string; pronunciationPlaceholder: string
   tagline: string // footer, e.g. "Deutsch lernen — Wort für Wort 🌿"
   // Every language must define ALL vars, otherwise i18next leaves raw "{{name}}" in the UI.
@@ -14,7 +13,6 @@ const CONTENT: Record<LearningLang, {
   vars: { langAdj: string; langPrep: string; langAdv: string; langName: string; langCode: string; langUz: string }
 }> = {
   de: {
-    greeting: 'Hallo!', greetingAccent: 'Was lernen wir heute?',
     phrasePlaceholder: 'z. B. „Ich freue mich schon auf das Wochenende!“',
     gapPlaceholder: 'Ich esse eine ___.',
     pronunciationPlaceholder: '[ихь]',
@@ -22,7 +20,6 @@ const CONTENT: Record<LearningLang, {
     vars: { langAdj: 'немецкое', langPrep: 'немецком', langAdv: 'по-немецки', langName: 'German', langCode: 'DE', langUz: 'nemis' },
   },
   en: {
-    greeting: 'Hello!', greetingAccent: 'What are we learning today?',
     phrasePlaceholder: 'e.g. “I’m really looking forward to the weekend!”',
     gapPlaceholder: 'I eat an ___ every day.',
     pronunciationPlaceholder: '[хэ́лоу]',
@@ -30,7 +27,6 @@ const CONTENT: Record<LearningLang, {
     vars: { langAdj: 'английское', langPrep: 'английском', langAdv: 'по-английски', langName: 'English', langCode: 'EN', langUz: 'ingliz' },
   },
   fr: {
-    greeting: 'Bonjour !', greetingAccent: 'Qu’est-ce qu’on apprend aujourd’hui ?',
     phrasePlaceholder: 'p. ex. « J’ai hâte d’être au week-end ! »',
     gapPlaceholder: 'Je mange une ___.',
     pronunciationPlaceholder: '[бонжу́р]',
@@ -38,7 +34,6 @@ const CONTENT: Record<LearningLang, {
     vars: { langAdj: 'французское', langPrep: 'французском', langAdv: 'по-французски', langName: 'French', langCode: 'FR', langUz: 'fransuz' },
   },
   ko: {
-    greeting: '안녕하세요!', greetingAccent: '오늘은 무엇을 배울까요?',
     phrasePlaceholder: '예: “주말이 정말 기다려져요!”',
     gapPlaceholder: '저는 매일 ___을 먹어요.',
     pronunciationPlaceholder: '[аннёнхасэё]',

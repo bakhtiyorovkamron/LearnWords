@@ -45,8 +45,8 @@ export function LanguageSwitcher({ sync = true }: { sync?: boolean }) {
           aria-pressed={i18n.language === lng}
           className={`grid h-9 w-9 place-items-center rounded-xl text-lg transition ${
             i18n.language === lng
-              ? 'bg-lime-400/25 ring-1 ring-lime-300/60'
-              : 'opacity-60 hover:bg-emerald-400/10 hover:opacity-100'
+              ? 'bg-surface-2 ring-1 ring-accent'
+              : 'opacity-60 hover:bg-surface-2 hover:opacity-100'
           }`}
         >
           {FLAGS[lng]}

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { foldersApi, meApi, photoApi, searchApi, type Me, type PhotoWord } from '../api/endpoints'
 import * as photoLib from '../lib/photo'
+import { handOffPhoto, takeHandedOffPhoto } from '../lib/photoHandoff'
 import * as toaster from './Toaster'
 import { PhotoImport } from './PhotoImport'
 
@@ -301,5 +302,52 @@ describe('PhotoImport: rejected photos', () => {
     renderIt()
     await pick(png())
     expect((await screen.findByRole('alert')).textContent).not.toContain(NOT_CHARGED)
+  })
+})
+
+describe('PhotoImport: a photo handed off from the Home page', () => {
+  beforeEach(() => { takeHandedOffPhoto() })
+
+  it('is read once, right on mount', async () => {
+    const file = png()
+    handOffPhoto(file)
+    renderIt()
+    await waitFor(() => expect(photoApi.import).toHaveBeenCalledTimes(1))
+    expect(photoLib.preparePhoto).toHaveBeenCalledWith(file)
+    expect(await screen.findByText('Words found: 3')).toBeTruthy()
+    expect(takeHandedOffPhoto()).toBeNull() // the slot is empty now
+  })
+
+  it('opening the page again does not read it again', async () => {
+    handOffPhoto(png())
+    renderIt()
+    await waitFor(() => expect(photoApi.import).toHaveBeenCalledTimes(1))
+    cleanup()
+    renderIt()
+    await screen.findByText('Left today: 10 of 10')
+    expect(photoApi.import).toHaveBeenCalledTimes(1)
+  })
+
+  it('without a handed-off photo nothing is read', async () => {
+    renderIt()
+    await screen.findByText('Left today: 10 of 10')
+    expect(photoApi.import).not.toHaveBeenCalled()
+  })
+
+  it('goes through the same checks as a chosen file (not an image → the message, no request)', async () => {
+    handOffPhoto(new File(['x'], 'notes.pdf', { type: 'application/pdf' }))
+    renderIt()
+    expect((await screen.findByRole('alert')).textContent).toBe('Please choose an image: JPEG, PNG, WebP or GIF.')
+    expect(photoApi.import).not.toHaveBeenCalled()
+  })
+
+  it('is dropped when the feature is off for the user (/me already known, as after a navigation)', async () => {
+    handOffPhoto(png())
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    qc.setQueryData(['me'], me(false))
+    render(<QueryClientProvider client={qc}><MemoryRouter><PhotoImport /></MemoryRouter></QueryClientProvider>)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(photoApi.import).not.toHaveBeenCalled()
+    expect(takeHandedOffPhoto()).toBeNull() // and it is not kept for later
   })
 })

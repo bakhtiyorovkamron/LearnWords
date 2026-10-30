@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Palette } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useFeatures } from '../lib/features'
 import { THEMES, THEME_ACCENT, THEME_BG, useTheme, type Theme } from '../lib/theme'
@@ -47,7 +48,7 @@ function Swatches() {
 
 /**
  * The theme picker — only for users who have the admin-enabled "theme_picker" feature.
- * `row`: a row of the phone "More" sheet. `menu`: a 🎨 button in the desktop header with a small popover.
+ * `row`: a row of the phone "More" sheet. `menu`: a palette button in the desktop header with a small popover.
  */
 export function ThemePicker({ variant }: { variant: 'row' | 'menu' }) {
   const { t } = useTranslation()
@@ -78,8 +79,8 @@ export function ThemePicker({ variant }: { variant: 'row' | 'menu' }) {
     <div ref={box} className="relative">
       <button type="button" title={t('theme.title')} aria-label={t('theme.title')} aria-haspopup="true" aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="grid h-9 w-9 place-items-center rounded-full text-lg transition hover:bg-surface-2">
-        🎨
+        className="grid h-9 w-9 place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-fg">
+        <Palette size={18} aria-hidden="true" />
       </button>
       {open && (
         <div className="glass absolute right-0 top-full z-30 mt-2 w-max space-y-2 p-3">

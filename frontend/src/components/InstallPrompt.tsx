@@ -1,4 +1,6 @@
+import { Download, Smartphone } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { LogoMark } from './Logo'
 import { dismissBanner, installApp, usePwa } from '../lib/pwa'
 
 // "Install app" entry for a menu: a button on Android/desktop Chrome, the Share → Add to Home
@@ -9,14 +11,14 @@ export function InstallMenuItem({ className = 'btn-ghost' }: { className?: strin
   if (pwa.canInstall) {
     return (
       <button type="button" onClick={() => void installApp()} className={className}>
-        📲 {t('pwa.install')}
+        <Download size={18} aria-hidden="true" />{t('pwa.install')}
       </button>
     )
   }
   if (pwa.iosHint) {
     return (
-      <p className="rounded-2xl border border-emerald-400/20 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-100/80">
-        📲 {t('pwa.iosHint')}
+      <p className="flex items-start gap-2 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-muted">
+        <Smartphone size={16} aria-hidden="true" className="mt-0.5 shrink-0" />{t('pwa.iosHint')}
       </p>
     )
   }
@@ -32,15 +34,13 @@ export function InstallBanner() {
     <div
       role="dialog"
       aria-label={t('pwa.install')}
-      className="animate-rise fixed inset-x-4 bottom-[calc(var(--nav-h)+0.75rem)] z-40 mx-auto max-w-md rounded-3xl border border-lime-400/30 bg-emerald-950/95 p-4 shadow-2xl shadow-emerald-950/60 backdrop-blur-xl md:left-auto md:right-6 md:mx-0"
+      className="glass animate-rise fixed inset-x-4 bottom-[calc(var(--nav-h)+0.75rem)] z-40 mx-auto max-w-md p-4 md:left-auto md:right-6 md:mx-0"
     >
       <div className="flex items-start gap-3">
-        <span className="display grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-lime-300 to-emerald-500 font-extrabold text-emerald-950">
-          W
-        </span>
+        <LogoMark className="h-10 w-10" />
         <div className="text-sm">
-          <p className="font-semibold text-white">{t('pwa.banner')}</p>
-          {!pwa.canInstall && <p className="mt-1 text-emerald-100/70">{t('pwa.iosHint')}</p>}
+          <p className="font-semibold text-fg">{t('pwa.banner')}</p>
+          {!pwa.canInstall && <p className="mt-1 text-muted">{t('pwa.iosHint')}</p>}
         </div>
       </div>
       <div className="mt-3 flex justify-end gap-2">

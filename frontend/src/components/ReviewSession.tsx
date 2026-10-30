@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -79,7 +80,9 @@ export function ReviewSession() {
   const pool = useQuery({ queryKey: ['cards'], queryFn: cardsApi.list })
 
   const [mode, setMode] = useState<'review' | 'practice'>('review')
-  const [practiceSetup, setPracticeSetup] = useState(false) // showing the word-selection screen
+  // ?practice=1 (Home → "Practice more") opens the word-selection screen right away.
+  const [params] = useSearchParams()
+  const [practiceSetup, setPracticeSetup] = useState(params.get('practice') === '1') // showing the word-selection screen
   const [practiceLoading, setPracticeLoading] = useState(false)
   const [deck, setDeck] = useState<QuizItem[] | null>(null) // null = not started
   const [index, setIndex] = useState(0)
@@ -102,6 +105,7 @@ export function ReviewSession() {
     },
     onSuccess: (progress, variables) => {
       qc.invalidateQueries({ queryKey: ['stats'] })
+      qc.invalidateQueries({ queryKey: ['folders'] }) // Home shows a fresh "due today" count
       // null in practice mode — nothing was mutated, so there is nothing to detect here.
       if (progress && progress.box_level >= 4 && !variables.wasLearned) emitHeroEvent({ type: 'word_learned' })
       if (progress && progress.box_level > variables.prevBox) setMovedUp((n) => n + 1)
