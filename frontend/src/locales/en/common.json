@@ -120,21 +120,20 @@
     "tooLong": "Up to {{max}} characters. For a longer text, use a textbook photo."
   },
   "cards": {
+    "title": "My words",
+    "dueToday_one": "{{count}} due today",
+    "dueToday_other": "{{count}} due today",
     "saved": "Saved",
     "tabReview": "Review",
     "tabCollection": "Collection",
-    "titleA": "My ",
-    "titleB": "collection",
-    "count_one": "{{count}} word collected",
-    "count_other": "{{count}} words collected",
-    "allInOnePlace": "All your words in one place",
     "search": "Search by word or translation…",
     "nothingFound": "Nothing found",
     "empty": "The collection is empty"
   },
   "collection": { "found": "Found: {{count}}",
-    "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned" },
+    "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned", "title": "Filter", "reset": "Reset", "done": "Done" },
     "period": { "today": "Today", "week": "This week", "all": "All time" },
+    "sortShort": { "date": "Newest first", "alpha": "A–Z", "progress": "Hardest first" },
     "sortLabel": "Sort",
     "sort": {
       "date": "By date (newest first)",

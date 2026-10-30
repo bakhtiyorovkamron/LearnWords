@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { FolderInput, Pencil, Trash, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
-import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
+import { ARTICLE_COLOR, splitArticle } from '../lib/article'
+import { useMoveWords } from '../lib/moveWords'
 import { EditWordModal } from './EditWordModal'
 import { FolderPicker } from './FolderPicker'
-import { useMoveWords } from '../lib/moveWords'
+import { ProgressDots } from './ProgressDots'
+import { Sheet } from './Sheet'
 
 // Pronunciation is available only for German; other languages have no audio.
 export const hasAudio = (lang: string) => lang === 'de'
@@ -30,39 +32,35 @@ function speak(card: WordCard) {
   window.speechSynthesis.speak(u)
 }
 
-/** The «⋯» menu: a bottom sheet on phones (above the tab bar), a centered dialog on desktop. */
-function WordMenu({ title, onMove, onClose }: { title: string; onMove: () => void; onClose: () => void }) {
-  const { t } = useTranslation()
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm md:items-center md:p-4"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div role="menu" aria-label={title}
-        className="animate-rise glass w-full !rounded-b-none rounded-t-3xl pb-[var(--nav-h)] md:max-w-xs md:!rounded-3xl md:pb-0">
-        <p className="truncate border-b border-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100/70">{title}</p>
-        <div className="p-2">
-          <button type="button" role="menuitem" onClick={onMove}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base transition hover:bg-emerald-400/10">
-            📁 {t('word.move')}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+/** The word with its article in the article's colour (der / die / das); no article → plain. */
+function Word({ card }: { card: WordCard }) {
+  const { article, rest } = splitArticle(card.word, card.article)
+  return (
+    <>
+      {article && <span data-article={article} className={ARTICLE_COLOR[article]}>{article} </span>}
+      {rest}
+    </>
   )
 }
 
-export function WordCardView({ card, index = 0, meaning, progress, selection }: {
-  card: WordCard; index?: number; meaning?: string
-  // When given (Collection page): status colour + 5-dot box_level indicator.
+const sheetAction = 'flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-base font-medium transition hover:bg-surface-2'
+
+/**
+ * One word of the collection, as a row: the word (article coloured) with its translation, the box
+ * indicator and a listen button. A tap opens the word's sheet (details, edit, move, delete); in select
+ * mode it ticks the checkbox instead.
+ */
+export function WordCardView({ card, progress, selection }: {
+  card: WordCard
+  // When given (Collection page): the compact box indicator.
   progress?: { boxLevel: number; isLearned: boolean; nextReviewAt: string; reviewedToday: boolean }
-  // Select mode (Collection, bulk move): a checkbox instead of the action buttons; a tap toggles.
+  // Select mode (Collection, bulk move): a checkbox; a tap toggles.
   selection?: { checked: boolean; onToggle: () => void }
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const [sheet, setSheet] = useState(false)
   const [editing, setEditing] = useState(false)
-  // «⋯» → «Move to folder»: only the grouping changes, progress stays the same.
-  const [menuOpen, setMenuOpen] = useState(false)
   const [picking, setPicking] = useState(false)
   const moveWords = useMoveWords()
   async function moveTo(folderId: string | null, folderName: string) {
@@ -79,89 +77,70 @@ export function WordCardView({ card, index = 0, meaning, progress, selection }: 
   })
 
   function onDelete() {
+    setSheet(false)
     if (window.confirm(t('wordCard.deleteConfirm', { word: card.word }))) remove.mutate()
   }
 
-  const tone = progress
-    ? STATUS_STYLE[knowledgeStatus(progress.boxLevel, progress.isLearned)].card
-    : 'border-emerald-400/15 from-emerald-800/60 to-emerald-900/40'
-
+  // The modals are siblings of the row, not children: a click inside them must not reach the row.
   return (
-    <div
-      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-      onClick={selection?.onToggle}
-      className={`animate-rise group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${tone} p-4 transition hover:-translate-y-1 hover:border-lime-400/40 hover:shadow-xl hover:shadow-emerald-500/20 ${remove.isPending ? 'pointer-events-none opacity-40' : ''} ${selection ? 'cursor-pointer' : ''} ${selection?.checked ? 'ring-2 ring-lime-300' : ''}`}
-    >
-      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-lime-400/10 blur-2xl transition group-hover:bg-lime-400/25" />
-      {progress && (
-        <div className="relative mb-2"><ProgressDots boxLevel={progress.boxLevel} isLearned={progress.isLearned}
-          schedule={{ nextReviewAt: progress.nextReviewAt, reviewedToday: progress.reviewedToday }} /></div>
-      )}
-      <div className="relative flex items-center gap-3">
+    <>
+      <div
+        data-testid="word-row"
+        onClick={() => (selection ? selection.onToggle() : setSheet(true))}
+        className={`flex min-h-16 cursor-pointer items-center gap-3 px-4 py-2.5 transition hover:bg-surface-2 ${
+          selection?.checked ? 'bg-surface-2' : ''} ${remove.isPending ? 'pointer-events-none opacity-40' : ''}`}
+      >
         {selection && (
           <input type="checkbox" checked={selection.checked} onChange={selection.onToggle}
             onClick={(e) => e.stopPropagation()} aria-label={card.word}
-            className="h-5 w-5 shrink-0 accent-lime-400" />
+            className="h-5 w-5 shrink-0 accent-[var(--accent)]" />
         )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-lg font-bold text-white">{card.word}</div>
-          <div className="font-mono text-xs text-lime-300/80">{card.transcription}</div>
-          <div className="mt-1 text-sm text-emerald-100/80">{card.translation}</div>
-          {meaning && meaning !== card.translation && (
-            <div className="mt-1 text-sm font-semibold text-lime-200">— {meaning}</div>
-          )}
-          {card.example_sentence && (
-            <div className="mt-2 border-t border-emerald-400/10 pt-2 text-xs text-emerald-100/70">
-              <div className="italic">{card.example_sentence}</div>
-              {card.example_translation && <div className="text-emerald-100/50">{card.example_translation}</div>}
-            </div>
-          )}
-        </div>
-        {hasAudio(card.language) && (<>
-        <button
-          onClick={() => play(card)}
-          title={t('wordCard.listen')}
-          className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-lime-300 to-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/40 transition hover:scale-110 active:scale-95"
-        >
-          ▶
-        </button>
-        </>)}
-        {!selection && (<>
-        <button
-          onClick={() => setEditing(true)}
-          title={t('editWord.title')}
-          aria-label={t('editWord.title')}
-          className="grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300"
-        >
-          ✏️
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={remove.isPending}
-          title={t('wordCard.delete')}
-          className="grid h-9 w-9 place-items-center rounded-full text-emerald-300/60 transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
-        >
-          🗑
+        <button type="button" aria-haspopup="dialog" className="min-w-0 flex-1 text-left">
+          <span className="block truncate font-serif text-[18px] font-medium text-fg" lang={card.language}><Word card={card} /></span>
+          <span className="block truncate text-sm text-muted">{card.translation}</span>
+          {remove.error && <span className="block text-xs text-danger">{t('wordCard.deleteFailed')}</span>}
         </button>
         {progress && (
-          <button
-            onClick={() => setMenuOpen(true)}
-            title={t('word.more')}
-            aria-label={t('word.more')}
-            aria-haspopup="menu"
-            className="grid h-9 w-9 place-items-center rounded-full text-lg font-bold text-emerald-300/60 transition hover:bg-emerald-400/10 hover:text-lime-300"
-          >
-            ⋯
+          <ProgressDots compact boxLevel={progress.boxLevel} isLearned={progress.isLearned}
+            schedule={{ nextReviewAt: progress.nextReviewAt, reviewedToday: progress.reviewedToday }} />
+        )}
+        {hasAudio(card.language) && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); play(card) }} aria-label={t('wordCard.listen')} title={t('wordCard.listen')}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
+            <Volume2 size={18} aria-hidden="true" />
           </button>
         )}
-        </>)}
       </div>
-      {remove.error && <p className="relative mt-2 text-xs text-red-300">{t('wordCard.deleteFailed')}</p>}
+
+      {sheet && (
+        <Sheet label={card.word} onClose={() => setSheet(false)}>
+          <div className="space-y-1">
+            <p className="font-serif text-[22px] leading-tight text-fg" lang={card.language}><Word card={card} /></p>
+            {card.transcription && <p className="text-sm text-muted">{card.transcription}</p>}
+            {card.translation && <p className="text-fg">{card.translation}</p>}
+          </div>
+          {card.example_sentence && (
+            <div className="mt-4 space-y-0.5 border-t border-divider pt-3">
+              <p className="font-serif italic text-fg" lang={card.language}>{card.example_sentence}</p>
+              {card.example_translation && <p className="text-sm text-muted">{card.example_translation}</p>}
+            </div>
+          )}
+          <div className="mt-4 space-y-1 border-t border-divider pt-3">
+            <button type="button" className={`${sheetAction} text-fg`} onClick={() => { setSheet(false); setEditing(true) }}>
+              <Pencil size={18} aria-hidden="true" />{t('editWord.title')}
+            </button>
+            <button type="button" className={`${sheetAction} text-fg`} onClick={() => { setSheet(false); setPicking(true) }}>
+              <FolderInput size={18} aria-hidden="true" />{t('word.move')}
+            </button>
+            <button type="button" className={`${sheetAction} text-danger`} disabled={remove.isPending} onClick={onDelete}>
+              <Trash size={18} aria-hidden="true" />{t('wordCard.delete')}
+            </button>
+          </div>
+        </Sheet>
+      )}
       {editing && <EditWordModal card={card} onClose={() => setEditing(false)} />}
-      {menuOpen && <WordMenu title={card.word} onClose={() => setMenuOpen(false)}
-        onMove={() => { setMenuOpen(false); setPicking(true) }} />}
       {picking && <FolderPicker title={t('word.move')} current={card.folder_id ?? ''}
         onPick={moveTo} onClose={() => setPicking(false)} />}
-    </div>
+    </>
   )
 }

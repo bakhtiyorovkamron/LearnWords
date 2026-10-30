@@ -15,13 +15,13 @@ const folder = (id: string, name: string, total: number) =>
   ({ id, name, color: 'sky', created_at: '', total, new_count: 0, learning_count: 0, learned_count: 0, due_today: 0 })
 
 const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
-function renderBar(value: string) {
+function renderBar(value: string, onChange: (v: string) => void = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={['/cards?tab=all']}>
         <Where />
-        <Routes><Route path="*" element={<FolderBar value={value} onChange={vi.fn()} />} /></Routes>
+        <Routes><Route path="*" element={<FolderBar value={value} onChange={onChange} />} /></Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -69,5 +69,37 @@ describe('FolderBar: Train', () => {
     await screen.findByRole('button', { name: /Tiere/ })
     expect(screen.queryByRole('button', { name: 'Train' })).toBeNull()
     await waitFor(() => expect(foldersApi.list).toHaveBeenCalled())
+  })
+})
+
+describe('FolderBar: chips and actions', () => {
+  it('chips switch the folder', async () => {
+    const onChange = vi.fn()
+    renderBar('', onChange)
+    fireEvent.click(await screen.findByRole('button', { name: /Tiere/ }))
+    expect(onChange).toHaveBeenCalledWith('f1')
+    fireEvent.click(screen.getByRole('button', { name: 'All words' }))
+    expect(onChange).toHaveBeenCalledWith('')
+  })
+
+  it('the active folder has Train, Share, Rename and Delete; Share is disabled for an empty one', async () => {
+    renderBar('f1')
+    for (const n of ['Train', 'Share', 'Edit folder', 'Delete']) expect(await screen.findByRole('button', { name: new RegExp(n) })).toBeTruthy()
+    expect((screen.getByRole('button', { name: /Share/ }) as HTMLButtonElement).disabled).toBe(false)
+    cleanup()
+    renderBar('f2')
+    const share = (await screen.findByRole('button', { name: /Share/ })) as HTMLButtonElement
+    expect(share.disabled).toBe(true)
+    expect(share.title).toBeTruthy()
+  })
+
+  it('Delete asks to confirm and removes the folder', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(foldersApi.remove).mockResolvedValue(undefined as never)
+    const onChange = vi.fn()
+    renderBar('f1', onChange)
+    fireEvent.click(await screen.findByRole('button', { name: /Delete/ }))
+    await waitFor(() => expect(foldersApi.remove).toHaveBeenCalledWith('f1'))
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(''))
   })
 })

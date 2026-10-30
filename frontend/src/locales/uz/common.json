@@ -120,21 +120,20 @@
     "tooLong": "Ko‘pi bilan {{max}} belgi. Uzun matn uchun darslik suratidan foydalaning."
   },
   "cards": {
+    "title": "So‘zlarim",
+    "dueToday_one": "{{count}} tasi bugun takrorlanadi",
+    "dueToday_other": "{{count}} tasi bugun takrorlanadi",
     "saved": "Saqlandi",
     "tabReview": "Takrorlash",
     "tabCollection": "To‘plam",
-    "titleA": "Mening ",
-    "titleB": "to‘plamim",
-    "count_one": "To‘plamda {{count}} ta so‘z",
-    "count_other": "To‘plamda {{count}} ta so‘z",
-    "allInOnePlace": "Barcha so‘zlaringiz bir joyda",
     "search": "So‘z yoki tarjima bo‘yicha qidirish…",
     "nothingFound": "Hech narsa topilmadi",
     "empty": "To‘plam hozircha bo‘sh"
   },
   "collection": { "found": "Topildi: {{count}}",
-    "filter": { "all": "Hammasi", "new": "Yangi", "learning": "O‘rganyapman", "learned": "O‘rganilgan" },
+    "filter": { "all": "Hammasi", "new": "Yangi", "learning": "O‘rganyapman", "learned": "O‘rganilgan", "title": "Filtr", "reset": "Tozalash", "done": "Tayyor" },
     "period": { "today": "Bugun", "week": "Hafta davomida", "all": "Butun vaqt" },
+    "sortShort": { "date": "Yangilari tepada", "alpha": "Alifbo bo‘yicha", "progress": "Avval qiyinlari" },
     "sortLabel": "Saralash",
     "sort": {
       "date": "Sana bo‘yicha (yangilari tepada)",

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { wordsApi, type WordUpdate } from '../api/endpoints'
 import { isRateLimited, rateLimitMessage } from '../api/client'
@@ -139,15 +140,15 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
 
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }))
-  const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-emerald-100/60'
+  const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-muted'
 
   // Portal: the modal must not live inside the flip card (3D transform / click-to-flip).
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="edit-word-title"
         className="glass max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto p-6 text-left">
-        <h2 id="edit-word-title" className="display text-2xl font-extrabold">✏️ {t('editWord.title')}</h2>
+        <h2 id="edit-word-title" className="flex items-center gap-2 text-2xl font-bold text-fg"><Pencil size={22} aria-hidden="true" />{t('editWord.title')}</h2>
 
         <div>
           <label className={label} htmlFor="ew-word">{t('editWord.word', learning.vars)} *</label>
@@ -170,7 +171,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
               className="btn-ghost w-full justify-center text-center sm:w-auto sm:shrink-0 !px-3 !py-1 text-xs disabled:opacity-50">
               {generate.isPending ? (
                 <>
-                  <span className="mr-1.5 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />
+                  <span className="mr-1.5 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
                   {t('newContext.generating')}
                 </>
               ) : (
@@ -181,7 +182,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
           <textarea id="ew-ex" rows={2} className="field" value={form.example_sentence} onChange={set('example_sentence')}
             placeholder={learning.gapPlaceholder} maxLength={500} />
           {generate.error && (
-            <p className="mt-1 text-xs text-red-300">
+            <p className="mt-1 text-xs text-danger">
               {isRateLimited(generate.error)
                 ? rateLimitMessage(generate.error)
                 : (generate.error as { response?: { status?: number } }).response?.status === 503
@@ -200,9 +201,9 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
           <FolderSelect value={folderId} onChange={setFolderId} className="w-full" />
         </div>
 
-        <p className="text-xs text-emerald-100/50">{t('editWord.progressKept')}</p>
+        <p className="text-xs text-faint">{t('editWord.progressKept')}</p>
         {(localError || save.error) && (
-          <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
+          <p className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">
             {localError ?? t('errors.saveFailed')}
           </p>
         )}

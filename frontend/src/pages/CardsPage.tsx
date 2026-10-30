@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { Leaf, Search, SearchX, SlidersHorizontal, SquareCheck, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { collectionApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -9,7 +10,9 @@ import { WordCardView } from '../components/WordCard'
 import { ReviewSession } from '../components/ReviewSession'
 import { FlipCards } from '../components/FlipCards'
 import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
-import { FolderBar } from '../components/Folders'
+import { FilterSheet } from '../components/FilterSheet'
+import { FolderBar, useFolderList } from '../components/Folders'
+import { Segmented } from '../components/Segmented'
 import { WordFixes } from '../components/WordFixes'
 import { FolderPicker } from '../components/FolderPicker'
 import { toast } from '../components/Toaster'
@@ -31,13 +34,10 @@ export function CardsPage() {
   const training = useTrainingOpen() // a session is on screen: only the questions, no tabs
   const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
   return (
-    <div className="space-y-4 md:space-y-8">
-      {!training && <div className="flex gap-2">
-        {tabs.map(([k, label]) => (
-          <button key={k} onClick={() => setParams(k === 'all' ? { tab: 'all' } : {}, { replace: true })}
-            className={tab === k ? 'btn-primary' : 'btn-ghost'}>{label}</button>
-        ))}
-      </div>}
+    <div className="space-y-4 md:space-y-6">
+      {!training && (
+        <Segmented value={tab} onChange={(k) => setParams(k === 'all' ? { tab: 'all' } : {}, { replace: true })} options={tabs} />
+      )}
       {tab === 'review' ? <ReviewSession /> : <Collection initialFolder={initialFolder} />}
     </div>
   )
@@ -52,24 +52,6 @@ function useDebounced<T>(value: T, ms: number): T {
   return v
 }
 
-// Tab-style button group, same look as "Повторение / Коллекция".
-function Segmented<T extends string>({ value, onChange, options }: {
-  value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[]
-}) {
-  return (
-    <div className="flex flex-wrap gap-1 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-1">
-      {options.map(([k, label]) => (
-        <button key={k} type="button" onClick={() => onChange(k)}
-          className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
-            value === k ? 'bg-lime-400 text-emerald-950 shadow' : 'text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white'
-          }`}>
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   const { t } = useTranslation()
   const [q, setQ] = useState('')
@@ -77,6 +59,8 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   const [period, setPeriod] = useState<CollectionPeriod>('all')
   const [sort, setSort] = useState<CollectionSort>('date')
   const [folder, setFolder] = useState(initialFolder) // '' = all words (default, as before)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [view, setView] = useState<'list' | 'flip'>(() =>
     localStorage.getItem(VIEW_KEY) === 'flip' ? 'flip' : 'list')
   const search = useDebounced(q.trim(), 300)
@@ -134,102 +118,100 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   }
 
   const filtersActive = status !== 'all' || period !== 'all' || !!search || !!folder
+  const filterCount = (status !== 'all' ? 1 : 0) + (period !== 'all' ? 1 : 0) + (sort !== 'date' ? 1 : 0)
+  const resetFilters = () => { setStatus('all'); setPeriod('all'); setSort('date') }
 
   // The heading always shows the TRUE total word count, independent of any filter — a separate
-  // line shows how many match the current filter (see cards.count / collection.found below).
-  // No filters → the same number as filteredTotal, so the list just fetches it once itself.
+  // line shows how many match the current filter (collection.found below).
   const grandTotal = useQuery({
     queryKey: ['collection', 'grand-total'],
     queryFn: () =>
       collectionApi.list({ status: 'all', period: 'all', sort: 'date', q: '', limit: 1, offset: 0 }).then((r) => r.total),
     staleTime: 30_000,
   })
+  const due = useFolderList().data?.all.due_today ?? 0
 
   return (
-    <div className={`space-y-6 ${selecting ? 'pb-24' : ''}`}>
-      <div className="animate-rise flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="display text-3xl font-extrabold md:text-4xl">
-            {t('cards.titleA')}<span className="text-lime-300">{t('cards.titleB')}</span> 🃏
-          </h1>
-          <p className="mt-2 text-emerald-100/70">
-            {grandTotal.data !== undefined ? t('cards.count', { count: grandTotal.data }) : t('cards.allInOnePlace')}
+    <div className={`mx-auto max-w-3xl space-y-4 ${selecting ? 'pb-24' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('cards.title')}</h1>
+          <p className="mt-1 text-[15px] text-muted">
+            {grandTotal.data !== undefined && t('folders.wordsCount', { count: grandTotal.data })}
+            {grandTotal.data !== undefined && due > 0 && ` · ${t('cards.dueToday', { count: due })}`}
           </p>
-          {filtersActive && (
-            <p className="text-sm text-lime-300/80">{t('collection.found', { count: filteredTotal ?? 0 })}</p>
+          {filtersActive && <p className="text-sm text-accent-text">{t('collection.found', { count: filteredTotal ?? 0 })}</p>}
+        </div>
+        <button type="button" onClick={() => setSearchOpen((o) => !o)} aria-label={t('cards.search')} title={t('cards.search')}
+          aria-expanded={searchOpen || q !== ''}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
+          <Search size={20} aria-hidden="true" />
+        </button>
+      </div>
+
+      {(searchOpen || q !== '') && (
+        <div className="relative">
+          <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-faint" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('cards.search')}
+            aria-label={t('cards.search')} className="field pl-11 pr-11" />
+          {q !== '' && (
+            <button type="button" onClick={() => setQ('')} aria-label={t('folders.close')}
+              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-2">
+              <X size={16} aria-hidden="true" />
+            </button>
           )}
         </div>
-        <div className="relative w-full md:w-80">
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-emerald-300/60">🔍</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('cards.search')}
-            className="field pl-11" />
-        </div>
-      </div>
+      )}
 
       <WordFixes />
 
+      <Segmented value={view} onChange={setView} options={[
+        ['list', t('collection.view.list')],
+        ['flip', t('collection.view.flip')],
+      ] as const} />
+
       <FolderBar value={folder} onChange={setFolder} />
 
-      <div className="glass flex flex-col gap-3 p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-          <Segmented value={status} onChange={setStatus} options={[
-            ['all', t('collection.filter.all')],
-            ['new', t('collection.filter.new')],
-            ['learning', t('collection.filter.learning')],
-            ['learned', t('collection.filter.learned')],
-          ] as const} />
-          <Segmented value={period} onChange={setPeriod} options={[
-            ['today', t('collection.period.today')],
-            ['week', t('collection.period.week')],
-            ['all', t('collection.period.all')],
-          ] as const} />
-          <select value={sort} onChange={(e) => setSort(e.target.value as CollectionSort)}
-            className="field w-auto py-2 text-sm" aria-label={t('collection.sortLabel')}>
-            <option value="date">{t('collection.sort.date')}</option>
-            <option value="alpha">{t('collection.sort.alpha')}</option>
-            <option value="progress">{t('collection.sort.progress')}</option>
-          </select>
-        </div>
-        <Segmented value={view} onChange={setView} options={[
-          ['list', `☰ ${t('collection.view.list')}`],
-          ['flip', `🂠 ${t('collection.view.flip')}`],
-        ] as const} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setFilterOpen(true)} aria-haspopup="dialog" className="btn-ghost h-10">
+          <SlidersHorizontal size={16} aria-hidden="true" />{t('collection.filter.title')}
+          {filterCount > 0 && (
+            <span data-testid="filter-badge" className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-bold text-on-accent">{filterCount}</span>
+          )}
+        </button>
+        {view === 'list' && cards.length > 0 && (
+          <>
+            <button type="button" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+              className={selecting ? 'btn-primary h-10' : 'btn-ghost h-10'}>
+              <SquareCheck size={16} aria-hidden="true" />{selecting ? t('select.cancel') : t('select.start')}
+            </button>
+            {selecting && (
+              <button type="button" onClick={() => void selectAll()} disabled={selectingAll} className="btn-ghost h-10 disabled:opacity-50">
+                {t('select.all')}
+              </button>
+            )}
+          </>
+        )}
+        <span className="ml-auto text-sm text-muted">{t(`collection.sortShort.${sort}`)}</span>
       </div>
 
-      {query.isLoading && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-emerald-800/30" />
-          ))}
-        </div>
-      )}
       {query.error && <ErrorState error={query.error} />}
 
       <div className={`transition-opacity ${query.isPlaceholderData ? 'opacity-50' : ''}`}>
-        {view === 'list' ? (
-          <div className="space-y-3">
-            {cards.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
-                  className={selecting ? 'btn-primary !px-4 !py-2 text-sm' : 'btn-ghost !px-4 !py-2 text-sm'}>
-                  {selecting ? t('select.cancel') : `☑ ${t('select.start')}`}
-                </button>
-                {selecting && (
-                  <button type="button" onClick={() => void selectAll()} disabled={selectingAll}
-                    className="btn-ghost !px-4 !py-2 text-sm disabled:opacity-50">
-                    {t('select.all')}
-                  </button>
-                )}
-              </div>
-            )}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {cards.map((c, i) => (
-                <WordCardView key={c.id} card={c} index={i}
+        {query.isLoading ? (
+          <div className="glass divide-y divide-divider overflow-hidden" aria-busy="true">
+            {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-16 animate-pulse bg-surface-2" />)}
+          </div>
+        ) : view === 'list' ? (
+          cards.length > 0 && (
+            <div className="glass divide-y divide-divider overflow-hidden">
+              {cards.map((c) => (
+                <WordCardView key={c.id} card={c}
                   progress={{ boxLevel: c.box_level, isLearned: c.is_learned, nextReviewAt: c.next_review_at, reviewedToday: c.reviewed_today }}
                   selection={selecting ? { checked: selected.has(c.id), onToggle: () => toggle(c.id) } : undefined} />
               ))}
             </div>
-          </div>
+          )
         ) : (
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -258,16 +240,18 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
 
       {query.data && !cards.length && (
         <div className="glass p-10 text-center">
-          <div className="text-5xl">🍃</div>
-          <p className="mt-3 text-emerald-100/70">{filtersActive ? t('cards.nothingFound') : t('cards.empty')}</p>
+          {filtersActive
+            ? <SearchX size={40} aria-hidden="true" className="mx-auto text-faint" />
+            : <Leaf size={40} aria-hidden="true" className="mx-auto text-faint" />}
+          <p className="mt-3 text-muted">{filtersActive ? t('cards.nothingFound') : t('cards.empty')}</p>
         </div>
       )}
 
       {selecting && (
         // Above the tab bar on phones (--nav-h), at the very bottom on desktop (--nav-h is 0 there).
-        <div className="fixed inset-x-0 bottom-[var(--nav-h)] z-30 border-t border-emerald-400/20 bg-emerald-950/95 px-4 py-3 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-            <span className="text-sm font-semibold text-white">{t('select.count', { n: selected.size })}</span>
+        <div className="fixed inset-x-0 bottom-[var(--nav-h)] z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-fg">{t('select.count', { n: selected.size })}</span>
             <button type="button" disabled={!selected.size} onClick={() => setPicking(true)}
               className="btn-primary disabled:opacity-50">
               {t('move.button', { n: selected.size })}
@@ -277,6 +261,10 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
       )}
       {picking && <FolderPicker title={t('move.button', { n: selected.size })} current={folder === 'none' ? '' : folder || undefined}
         onPick={(id, name) => void moveSelected(id, name)} onClose={() => setPicking(false)} />}
+      {filterOpen && (
+        <FilterSheet status={status} period={period} sort={sort} onStatus={setStatus} onPeriod={setPeriod} onSort={setSort}
+          onReset={resetFilters} onClose={() => setFilterOpen(false)} />
+      )}
     </div>
   )
 }

@@ -12,6 +12,11 @@ const THEMED = [
   // step 3: training
   'components/ReviewSession.tsx', 'components/QuizQuestion.tsx', 'components/ReviewResult.tsx',
   'components/TrainingHero.tsx', 'components/DirectionToggle.tsx',
+  // step 4: collection
+  'pages/CardsPage.tsx', 'components/WordCard.tsx', 'components/ProgressDots.tsx', 'components/Folders.tsx',
+  'components/FlipCards.tsx', 'components/EditWordModal.tsx', 'components/FolderPicker.tsx',
+  'components/ShareFolderModal.tsx', 'components/WordFixes.tsx', 'components/FilterSheet.tsx',
+  'components/Sheet.tsx', 'components/Segmented.tsx',
 ]
 
 const FORBIDDEN = /\b(emerald|lime|teal|red)-\d{2,3}\b|text-white|bg-white/

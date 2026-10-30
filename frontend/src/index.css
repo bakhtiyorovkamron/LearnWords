@@ -150,6 +150,12 @@
   --color-das: var(--das);
 }
 
+/* Horizontal strips (folder chips) scroll without a visible bar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
 /* Height of the mobile bottom navigation (Layout.tsx), incl. the iPhone home-indicator area.
    Fixed bottom elements (toasts, hero, install banner) sit above it. 0 from md (768px) up. */
 :root {

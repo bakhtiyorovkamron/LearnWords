@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Ban, Check, Folder as FolderIcon, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Folder } from '../api/types'
 import { FolderDot, FolderFormModal, shortFolderName, useFolders } from './Folders'
@@ -26,8 +27,8 @@ export function FolderPicker({ title, current, onPick, onClose }: {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose, creating])
 
-  const row = 'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base transition hover:bg-emerald-400/10'
-  const mark = (active: boolean) => (active ? <span className="ml-auto text-lime-300">✓</span> : null)
+  const row = 'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base transition hover:bg-surface-2'
+  const mark = (active: boolean) => (active ? <Check size={18} aria-hidden="true" className="ml-auto text-accent-text" /> : null)
 
   if (creating) {
     return <FolderFormModal folder={null} onClose={() => setCreating(false)}
@@ -37,11 +38,11 @@ export function FolderPicker({ title, current, onPick, onClose }: {
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm md:items-center md:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div role="dialog" aria-modal="true" aria-label={title}
-        className="animate-rise glass flex max-h-[calc(100dvh-var(--nav-h)-env(safe-area-inset-top)-1rem)] w-full flex-col overflow-hidden !rounded-b-none rounded-t-3xl pb-[var(--nav-h)] md:max-h-[80vh] md:max-w-sm md:!rounded-3xl md:pb-0">
-        <h2 className="display border-b border-emerald-400/10 px-5 py-4 text-lg font-extrabold">📁 {title}</h2>
+        className="animate-rise flex max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] w-full flex-col overflow-hidden rounded-t-[22px] border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:max-h-[80vh] md:max-w-sm md:rounded-[22px] md:border md:pb-0">
+        <h2 className="flex items-center gap-2 border-b border-divider px-5 py-4 text-lg font-bold text-fg"><FolderIcon size={20} aria-hidden="true" />{title}</h2>
         <div className="space-y-1 overflow-y-auto p-2">
           <button type="button" className={row} onClick={() => onPick(null, t('folder.none'))}>
-            <span className="text-emerald-300/60">∅</span>{t('folder.none')}{mark(current === '')}
+            <Ban size={14} aria-hidden="true" className="text-faint" />{t('folder.none')}{mark(current === '')}
           </button>
           {folders.data?.map((f) => (
             <button key={f.id} type="button" className={row} title={f.name} onClick={() => onPick(f.id, f.name)}>
@@ -50,8 +51,8 @@ export function FolderPicker({ title, current, onPick, onClose }: {
               {mark(current === f.id)}
             </button>
           ))}
-          <button type="button" className={`${row} font-semibold text-lime-300`} onClick={() => setCreating(true)}>
-            {t('folder.new')}
+          <button type="button" className={`${row} font-semibold text-accent-text`} onClick={() => setCreating(true)}>
+            <Plus size={16} aria-hidden="true" />{t('folder.new')}
           </button>
         </div>
       </div>

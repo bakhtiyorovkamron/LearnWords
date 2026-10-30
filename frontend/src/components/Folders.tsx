@@ -2,23 +2,20 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Folder as FolderIcon, X } from 'lucide-react'
+import { Check, Folder as FolderIcon, Pencil, Play, Plus, Share2, Trash, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { foldersApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { Folder, FolderSelection } from '../api/types'
+import { FOLDER_COLORS, FOLDER_DOT } from '../lib/folderColors'
 import { toast } from './Toaster'
 import { ShareFolderModal } from './ShareFolderModal'
 
-export const FOLDER_COLORS = ['lime', 'amber', 'sky', 'rose', 'violet', 'slate'] as const
-
-const DOT: Record<string, string> = {
-  lime: 'bg-lime-400', amber: 'bg-amber-400', sky: 'bg-sky-400',
-  rose: 'bg-rose-400', violet: 'bg-violet-400', slate: 'bg-slate-400',
-}
+export { FOLDER_COLORS }
+const DOT = FOLDER_DOT
 
 export function FolderDot({ color }: { color: string }) {
-  return <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${DOT[color] ?? 'bg-emerald-300'}`} />
+  return <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${DOT[color] ?? 'bg-faint'}`} />
 }
 
 export function useFolderList() {
@@ -57,7 +54,7 @@ export function FolderSelect({ value, onChange, includeAll = false, withoutNone 
       title={selected?.name}
       aria-label={t('folders.label')}
       // min-w-0/max-w-full: may shrink inside flex parents and never overflow the card;
-      // nowrap + ellipsis: long text is cut instead of wrapping; leading-normal + items-center keeps 📁, text and ▼ on one line.
+      // nowrap + ellipsis: long text is cut instead of wrapping.
       className={`field block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap py-2 text-sm leading-normal ${className}`}
     >
       {withoutNone ? null : includeAll ? (
@@ -69,18 +66,21 @@ export function FolderSelect({ value, onChange, includeAll = false, withoutNone 
         <option value="">{t('folders.none')}</option>
       )}
       {folders.data?.map((f) => (
-        <option key={f.id} value={f.id} title={f.name}>📁 {shortFolderName(f.name)}</option>
+        <option key={f.id} value={f.id} title={f.name}>{shortFolderName(f.name)}</option>
       ))}
     </select>
   )
 }
 
-/** Chips row for the Collection: All words / each folder / + New folder; rename/delete the active one. */
+// A small ghost action under the chips.
+const action = 'inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent'
+
+/** Chips row for the Collection: All words / each folder / + Folder; actions for the active folder. */
 export function FolderBar({ value, onChange }: { value: FolderSelection; onChange: (v: FolderSelection) => void }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const folders = useFolders()
   const navigate = useNavigate()
+  const folders = useFolders()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Folder | null>(null)
   const [sharing, setSharing] = useState<Folder | null>(null)
@@ -103,49 +103,47 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
 
   const active = folders.data?.find((f) => f.id === value)
   const chip = (on: boolean) =>
-    `flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
-      on ? 'border-lime-400 bg-lime-400 text-emerald-950'
-        : 'border-emerald-400/20 bg-emerald-950/40 text-emerald-100/80 hover:border-lime-400/50 hover:text-white'
+    `flex h-9 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition ${
+      on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-muted hover:text-fg'
     }`
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={chip(value === '')} onClick={() => onChange('')}>📚 {t('folders.all')}</button>
+      <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
+        <button type="button" className={chip(value === '')} onClick={() => onChange('')}>{t('folders.all')}</button>
         {folders.data?.map((f) => (
           <button key={f.id} type="button" className={chip(value === f.id)} onClick={() => onChange(f.id)} title={f.name}>
             <FolderDot color={f.color} /> <span className="max-w-[12rem] truncate">{shortFolderName(f.name)}</span>
-            <span className="text-xs opacity-60">{f.total}</span>
+            <span className="text-xs opacity-70">{f.total}</span>
           </button>
         ))}
         <button type="button" className={chip(value === 'none')} onClick={() => onChange('none')}>{t('folders.none')}</button>
         <button type="button" onClick={() => setCreating(true)}
-          className="rounded-full border border-dashed border-lime-400/50 px-4 py-1.5 text-sm font-semibold text-lime-300 hover:bg-lime-400/10">
-          + {t('folders.new')}
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-line px-4 text-sm font-semibold text-accent-text transition hover:bg-surface-2">
+          <Plus size={16} aria-hidden="true" />{t('folders.new')}
         </button>
       </div>
       {active && (
-        <div className="flex gap-3 text-xs">
+        <div className="flex flex-wrap gap-1">
           {active.total > 0 && (
-            <button type="button" className="font-semibold text-accent-text hover:underline" onClick={() => train(active.id)}>
-              {t('folders.train')}
+            <button type="button" className={`${action} font-semibold text-accent-text`} onClick={() => train(active.id)}>
+              <Play size={16} aria-hidden="true" />{t('folders.train')}
             </button>
           )}
-          <button type="button" className="text-emerald-100/60 hover:text-lime-300" onClick={() => setEditing(active)}>
-            ✏️ {t('folders.rename')}
+          <button type="button" className={`${action} text-muted`} disabled={active.total === 0}
+            title={active.total === 0 ? t('share.emptyFolder') : undefined} onClick={() => setSharing(active)}>
+            <Share2 size={16} aria-hidden="true" />{t('folders.share')}
           </button>
-          <button type="button" className="text-emerald-100/60 hover:text-lime-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-emerald-100/60"
-            disabled={active.total === 0} title={active.total === 0 ? t('share.emptyFolder') : undefined}
-            onClick={() => setSharing(active)}>
-            🔗 {t('folders.share')}
+          <button type="button" className={`${action} text-muted`} onClick={() => setEditing(active)}>
+            <Pencil size={16} aria-hidden="true" />{t('folders.rename')}
           </button>
-          <button type="button" className="text-emerald-100/60 hover:text-red-300" disabled={remove.isPending}
+          <button type="button" className={`${action} text-danger`} disabled={remove.isPending}
             onClick={() => { if (window.confirm(t('folders.deleteConfirm', { name: active.name }))) remove.mutate(active.id) }}>
-            🗑 {t('folders.delete')}
+            <Trash size={16} aria-hidden="true" />{t('folders.delete')}
           </button>
         </div>
       )}
-      {remove.error && <p className="text-xs text-red-300">{errorMessage(remove.error)}</p>}
+      {remove.error && <p className="text-xs text-danger">{errorMessage(remove.error)}</p>}
       {sharing && <ShareFolderModal folder={sharing} onClose={() => setSharing(null)} />}
       {(creating || editing) && (
         <FolderFormModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }}

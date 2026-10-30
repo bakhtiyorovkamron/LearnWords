@@ -36,7 +36,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   localStorage.clear()
   vi.mocked(collectionApi.list).mockResolvedValue({ items: [], total: 0 })
-  vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 0 }, folders: [{ id: 'f1', name: 'Tiere', color: 'sky', total: 3 }] } as never)
+  vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 0, due_today: 0 }, folders: [{ id: 'f1', name: 'Tiere', color: 'sky', total: 3 }] } as never)
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
@@ -75,7 +75,53 @@ describe('CardsPage: the tab lives in the URL', () => {
 
   it('the active tab is the primary button', () => {
     renderCards('/cards?tab=all')
-    expect(screen.getByRole('button', { name: 'Collection' }).className).toContain('btn-primary')
-    expect(screen.getByRole('button', { name: 'Review' }).className).toContain('btn-ghost')
+    expect(screen.getByRole('button', { name: 'Collection' }).className).toContain('bg-accent')
+    expect(screen.getByRole('button', { name: 'Review' }).className).not.toContain('bg-accent')
   })
 })
+
+describe('Collection: filter sheet and search', () => {
+  const lastParams = () => vi.mocked(collectionApi.list).mock.calls.at(-1)![0]
+  const open = async () => {
+    renderCards('/cards?tab=all')
+    fireEvent.click(await screen.findByRole('button', { name: /Filter/ }))
+    return screen.getByRole('dialog')
+  }
+
+  it('changing status/period/sort refetches with the new params and the badge counts them', async () => {
+    await open()
+    expect(screen.queryByTestId('filter-badge')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Learned' }))
+    await waitFor(() => expect(lastParams().status).toBe('learned'))
+    fireEvent.click(screen.getByRole('button', { name: 'This week' }))
+    await waitFor(() => expect(lastParams().period).toBe('week'))
+    fireEvent.click(screen.getByRole('radio', { name: 'Alphabetically' }))
+    await waitFor(() => expect(lastParams().sort).toBe('alpha'))
+    expect(screen.getByTestId('filter-badge').textContent).toBe('3')
+  })
+
+  it('Reset puts all three back; Esc closes', async () => {
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Learned' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Alphabetically' }))
+    await waitFor(() => expect(screen.getByTestId('filter-badge').textContent).toBe('2'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() => expect(lastParams()).toMatchObject({ status: 'all', period: 'all', sort: 'date' }))
+    expect(screen.queryByTestId('filter-badge')).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('the search icon opens the field; typing filters (debounced); clear empties it', async () => {
+    renderCards('/cards?tab=all')
+    expect(screen.queryByRole('textbox')).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: 'Search by word or translation…' }))
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'hund' } })
+    await waitFor(() => expect(lastParams().q).toBe('hund'))
+    fireEvent.click(screen.getByRole('button', { name: /Close|×|Закрыть/ }))
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('')
+    await waitFor(() => expect(lastParams().q).toBe(''))
+  })
+})
+

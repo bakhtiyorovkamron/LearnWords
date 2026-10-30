@@ -1,28 +1,109 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
+import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
+import { splitArticle } from '../lib/article'
 import { WordCardView } from './WordCard'
 
+vi.mock('./EditWordModal', () => ({ EditWordModal: () => <div>EDIT MODAL</div> }))
+vi.mock('./FolderPicker', () => ({ FolderPicker: () => <div>FOLDER PICKER</div> }))
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, foldersApi: { list: vi.fn().mockResolvedValue({ all: {}, folders: [] }) } }
+  return { ...mod, cardsApi: { remove: vi.fn().mockResolvedValue(undefined) } }
 })
 
 const card: WordCard = {
-  id: 'c1', context_id: 'x', word: 'der Hund', translation: 'собака', transcription: '', language: 'de', created_at: '',
+  id: 'c1', context_id: 'x', word: 'Hund', article: 'der', translation: 'собака', transcription: '[hʊnt]',
+  example_sentence: 'Der Hund bellt.', example_translation: 'Собака лает.', language: 'de', created_at: '',
+}
+const progress = { boxLevel: 3, isLearned: false, nextReviewAt: new Date().toISOString(), reviewedToday: false }
+
+function view(c: WordCard, props: Partial<Parameters<typeof WordCardView>[0]> = {}) {
+  return render(<QueryClientProvider client={new QueryClient()}><WordCardView card={c} progress={progress} {...props} /></QueryClientProvider>)
 }
 
 beforeEach(async () => { await i18n.changeLanguage('en') })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-describe('WordCardView', () => {
-  it('has the listen button but no regenerate-audio button', () => {
-    render(<QueryClientProvider client={new QueryClient()}><WordCardView card={card} /></QueryClientProvider>)
-    expect(screen.getByTitle('Listen')).toBeTruthy()
-    expect(screen.queryByText('↻')).toBeNull()
-    expect(screen.queryByTitle(/audio/i)).toBeNull()
-    expect(screen.getByTitle('Edit')).toBeTruthy() // the other actions are still there
+describe('splitArticle', () => {
+  it('uses card.article, else a leading article of the word (any case), else none', () => {
+    expect(splitArticle('Hund', 'der')).toEqual({ article: 'der', rest: 'Hund' })
+    expect(splitArticle('die Katze', null)).toEqual({ article: 'die', rest: 'Katze' })
+    expect(splitArticle('Das Haus')).toEqual({ article: 'das', rest: 'Haus' })
+    expect(splitArticle('die Katze', 'die')).toEqual({ article: 'die', rest: 'Katze' })
+    expect(splitArticle('laufen')).toEqual({ article: null, rest: 'laufen' })
+  })
+})
+
+describe('WordCardView row', () => {
+  it('colours the article from card.article and from a "die …" word; no article → plain', () => {
+    const { container, rerender } = view(card)
+    expect(container.querySelector('[data-article="der"]')?.className).toContain('text-der')
+    const qc = new QueryClient()
+    rerender(<QueryClientProvider client={qc}><WordCardView card={{ ...card, article: undefined, word: 'die Katze' }} progress={progress} /></QueryClientProvider>)
+    expect(container.querySelector('[data-article="die"]')?.className).toContain('text-die')
+    rerender(<QueryClientProvider client={qc}><WordCardView card={{ ...card, article: undefined, word: 'laufen' }} progress={progress} /></QueryClientProvider>)
+    expect(container.querySelector('[data-article]')).toBeNull()
+    expect(screen.getByText('laufen').className).toContain('text-fg')
+  })
+
+  it('shows the translation, 5 box bars and a listen button only for German', () => {
+    const { container, rerender } = view(card)
+    expect(screen.getByText('собака')).toBeTruthy()
+    expect(container.querySelectorAll('[data-testid="box-bars"] span').length).toBe(5)
+    expect(screen.getByLabelText('Listen')).toBeTruthy()
+    rerender(<QueryClientProvider client={new QueryClient()}><WordCardView card={{ ...card, language: 'en' }} progress={progress} /></QueryClientProvider>)
+    expect(screen.queryByLabelText('Listen')).toBeNull()
+  })
+
+  it('a click opens the sheet with the example; Edit and Move open their dialogs', () => {
+    view(card)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByTestId('word-row'))
+    const sheet = screen.getByRole('dialog')
+    expect(sheet.textContent).toContain('Der Hund bellt.')
+    expect(sheet.textContent).toContain('Собака лает.')
+    expect(sheet.textContent).toContain('[hʊnt]')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getByText('EDIT MODAL')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('Move to folder opens the picker', () => {
+    view(card)
+    fireEvent.click(screen.getByTestId('word-row'))
+    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }))
+    expect(screen.getByText('FOLDER PICKER')).toBeTruthy()
+  })
+
+  it('Delete asks to confirm, then deletes; cancel does nothing', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    view(card)
+    fireEvent.click(screen.getByTestId('word-row'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete word' }))
+    expect(cardsApi.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('word-row'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete word' }))
+    await waitFor(() => expect(cardsApi.remove).toHaveBeenCalledWith('c1'))
+    expect(confirm).toHaveBeenCalledTimes(2)
+  })
+
+  it('Esc closes the sheet', () => {
+    view(card)
+    fireEvent.click(screen.getByTestId('word-row'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('in select mode a click toggles and no sheet opens', () => {
+    const onToggle = vi.fn()
+    view(card, { selection: { checked: false, onToggle } })
+    fireEvent.click(screen.getByTestId('word-row'))
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(onToggle).toHaveBeenCalledTimes(2) // the checkbox itself toggles once, not twice
   })
 })

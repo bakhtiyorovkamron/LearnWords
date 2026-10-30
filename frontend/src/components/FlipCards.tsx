@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Pencil, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
-import { knowledgeStatus, ProgressDots, STATUS_STYLE } from './ProgressDots'
+import { ProgressDots } from './ProgressDots'
 import { EditWordModal } from './EditWordModal'
 
 function speak(card: CollectionCard) {
@@ -67,21 +68,20 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
 
   if (!cards.length) return null
   const card = cards[Math.min(index, cards.length - 1)]
-  const tone = STATUS_STYLE[knowledgeStatus(card.box_level, card.is_learned)].card
-  const face = `absolute inset-0 flex flex-col items-center justify-center rounded-3xl border bg-gradient-to-br ${tone} p-8 text-center shadow-2xl [backface-visibility:hidden]`
+  const face = `absolute inset-0 flex flex-col items-center justify-center rounded-3xl border border-line bg-surface p-8 text-center shadow-[var(--shadow-card)] [backface-visibility:hidden]`
   const ruFirst = direction === 'ru_de'
 
   // German side: word + pronunciation + example. Russian side: translation only.
   const germanSide = (
     <>
-      <div className={ruFirst ? 'display text-4xl font-extrabold text-white' : 'text-lg font-bold text-white'}>{card.word}</div>
-      <div className="mt-1 font-mono text-sm text-lime-300/90">{card.transcription || '—'}</div>
-      {!ruFirst && <div className="display mt-4 text-3xl font-extrabold text-lime-200">{card.translation || '—'}</div>}
-      {ruFirst && card.translation && <div className="mt-3 text-sm text-emerald-100/70">{card.translation}</div>}
+      <div className={ruFirst ? 'font-serif text-4xl font-medium text-fg' : 'font-serif text-lg font-medium text-fg'} lang={card.language}>{card.word}</div>
+      <div className="mt-1 font-mono text-sm text-muted">{card.transcription || '—'}</div>
+      {!ruFirst && <div className="mt-4 text-3xl font-bold text-accent-text">{card.translation || '—'}</div>}
+      {ruFirst && card.translation && <div className="mt-3 text-sm text-muted">{card.translation}</div>}
       {card.example_sentence && (
-        <div className="mt-5 border-t border-white/10 pt-3 text-sm text-emerald-100/80">
-          <div className="italic">{card.example_sentence}</div>
-          {card.example_translation && <div className="text-emerald-100/50">{card.example_translation}</div>}
+        <div className="mt-5 border-t border-divider pt-3 text-sm text-fg">
+          <div className="font-serif italic" lang={card.language}>{card.example_sentence}</div>
+          {card.example_translation && <div className="text-muted">{card.example_translation}</div>}
         </div>
       )}
     </>
@@ -89,10 +89,10 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <div className="flex items-center justify-between text-sm text-emerald-100/70">
+      <div className="flex items-center justify-between text-sm text-muted">
         <span>{index + 1} / {cards.length}</span>
-        <div className="mx-4 h-2 flex-1 overflow-hidden rounded-full bg-emerald-900/60">
-          <div className="h-full bg-lime-400 transition-all" style={{ width: `${((index + 1) / cards.length) * 100}%` }} />
+        <div className="mx-4 h-2 flex-1 overflow-hidden rounded-full bg-track">
+          <div className="h-full bg-accent transition-all" style={{ width: `${((index + 1) / cards.length) * 100}%` }} />
         </div>
       </div>
 
@@ -103,9 +103,9 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
           onClick={(e) => { e.stopPropagation(); setEditing(true) }}
           title={t('editWord.title')}
           aria-label={t('editWord.title')}
-          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/20 text-emerald-100/80 transition hover:bg-lime-400/20 hover:text-lime-200"
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-line bg-surface text-muted transition hover:bg-surface-2"
         >
-          ✏️
+          <Pencil size={16} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -117,10 +117,10 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
           <div className={face}>
             <div className="absolute left-5 top-5"><ProgressDots boxLevel={card.box_level} isLearned={card.is_learned}
               schedule={{ nextReviewAt: card.next_review_at, reviewedToday: card.reviewed_today }} /></div>
-            <div className="display text-4xl font-extrabold text-white">
+            <div className={`text-4xl font-medium text-fg ${ruFirst ? 'font-bold' : 'font-serif'}`}>
               {ruFirst ? (card.translation || '—') : card.word}
             </div>
-            <div className="absolute bottom-5 text-xs text-emerald-100/50">{t('collection.flipHint')}</div>
+            <div className="absolute bottom-5 text-xs text-faint">{t('collection.flipHint')}</div>
           </div>
           {/* Back: the answer + pronunciation + example */}
           <div className={`${face} [transform:rotateY(180deg)]`}>
@@ -131,17 +131,17 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
 
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={() => go(-1)} disabled={index === 0} className="btn-ghost disabled:opacity-30">
-          ← {t('collection.prev')}
+          <ChevronLeft size={18} aria-hidden="true" />{t('collection.prev')}
         </button>
         {/* In RU → DE, listening before flipping would give the answer away. */}
         {card.language === 'de' && (!ruFirst || flipped) ? (
-          <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')}>▶</button>
+          <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')} aria-label={t('quiz.listenTitle')}><Volume2 size={18} aria-hidden="true" /></button>
         ) : <span />}
         <button type="button" onClick={() => go(1)} disabled={index >= cards.length - 1} className="btn-ghost disabled:opacity-30">
-          {t('collection.next')} →
+          {t('collection.next')}<ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
-      <p className="text-center text-xs text-emerald-100/40">{t('collection.keysHint')}</p>
+      <p className="text-center text-xs text-faint">{t('collection.keysHint')}</p>
       {editing && <EditWordModal card={card} onClose={() => setEditing(false)} />}
     </div>
   )

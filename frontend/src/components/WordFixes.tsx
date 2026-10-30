@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowRight, TriangleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { wordFixesApi, type WordFix } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -10,8 +11,8 @@ export function WordFixes() {
   const fixes = useQuery({ queryKey: ['word-fixes'], queryFn: wordFixesApi.list, staleTime: 60_000 })
   if (!fixes.data?.length) return null
   return (
-    <section className="glass space-y-3 border-amber-400/30 p-5">
-      <h2 className="display text-lg font-bold text-amber-200">⚠️ {t('review.title')}</h2>
+    <section className="glass space-y-3 p-5">
+      <h2 className="flex items-center gap-2 text-lg font-bold text-streak"><TriangleAlert size={20} aria-hidden="true" />{t('review.title')}</h2>
       <ul className="space-y-2">
         {fixes.data.map((f) => <FixRow key={f.id} fix={f} />)}
       </ul>
@@ -33,19 +34,19 @@ function FixRow({ fix }: { fix: WordFix }) {
   const error = accept.error ?? reject.error
 
   return (
-    <li className="flex flex-col gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 space-y-1 text-sm">
         <p className="text-base">
-          <s className="text-red-300/80">{fix.original_word}</s>
-          <span className="mx-2 text-emerald-100/50">→</span>
-          <b className="text-lime-300">{fix.suggested_word}</b>
-          {fix.translation && <span className="text-emerald-100/60"> — {fix.translation}</span>}
+          <s className="text-danger">{fix.original_word}</s>
+          <ArrowRight size={14} aria-hidden="true" className="mx-2 inline text-faint" />
+          <b className="font-serif font-medium text-accent-text">{fix.suggested_word}</b>
+          {fix.translation && <span className="text-muted"> — {fix.translation}</span>}
         </p>
-        <p className="flex flex-wrap gap-x-4 text-emerald-100/60">
+        <p className="flex flex-wrap gap-x-4 text-muted">
           {fix.plural && <span>{t('check.plural', { plural: fix.plural })}</span>}
           {fix.reason && <span className="italic">{fix.reason}</span>}
         </p>
-        {error && <p className="text-red-300">{errorMessage(error)}</p>}
+        {error && <p className="text-danger">{errorMessage(error)}</p>}
       </div>
       <div className="flex shrink-0 gap-2">
         <button type="button" disabled={busy} onClick={() => accept.mutate()} className="btn-primary px-4 py-2 text-sm">

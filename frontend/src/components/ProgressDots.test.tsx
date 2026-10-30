@@ -52,6 +52,26 @@ describe('ProgressDots box tooltip', () => {
   })
 })
 
+describe('ProgressDots compact', () => {
+  const sched = { nextReviewAt: inDays(2), reviewedToday: false }
+  const filled = (c: HTMLElement) => Array.from(c.querySelectorAll('[data-testid="box-bars"] span')).map((s) => s.getAttribute('data-filled'))
+
+  it('5 bars filled up to box_level, no status text', () => {
+    const { container } = render(<ProgressDots compact boxLevel={3} isLearned={false} schedule={sched} />)
+    expect(filled(container)).toEqual(['true', 'true', 'true', 'false', 'false'])
+    expect(container.textContent).toBe('')
+  })
+  it('all filled when learned', () => {
+    const { container } = render(<ProgressDots compact boxLevel={2} isLearned schedule={sched} />)
+    expect(filled(container)).toEqual(['true', 'true', 'true', 'true', 'true'])
+  })
+  it('still opens the box explanation', () => {
+    render(<ProgressDots compact boxLevel={3} isLearned={false} schedule={sched} />)
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByRole('dialog').textContent).toContain('Коробка 3 из 5')
+  })
+})
+
 describe('ReviewResult box line', () => {
   const noop = vi.fn()
   const renderResult = (boxes: 'practice' | { movedUp: number }) =>
