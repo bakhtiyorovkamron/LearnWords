@@ -33,24 +33,49 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Single in-flight refresh shared by concurrent 401s.
-let refreshing: Promise<string | null> | null = null
+// What the refresh cookie says about the session. Only a 401/403 from /auth/refresh means "logged
+// out"; a network error, a timeout, a 5xx or a 429 means we simply don't know yet ("offline").
+export type SessionResult = { status: 'authenticated'; token: string } | { status: 'anonymous' } | { status: 'offline' }
 
-export function refreshAccessToken(): Promise<string | null> {
-  refreshing ??= axios
-    .post<AuthResponse>(`${api.defaults.baseURL}/auth/refresh`, null, { withCredentials: true })
-    .then((r) => {
+/** Waits before retry 1, 2 and 3 of a refresh that failed for a transient reason. */
+export const REFRESH_BACKOFF_MS = [500, 1500, 4000]
+
+const isLoggedOutResponse = (err: unknown) => {
+  const status = axios.isAxiosError(err) ? err.response?.status : undefined
+  return status === 401 || status === 403
+}
+
+async function restoreSession(backoff: readonly number[]): Promise<SessionResult> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await axios.post<AuthResponse>(`${api.defaults.baseURL}/auth/refresh`, null, { withCredentials: true })
       tokenStore.set(r.data.access_token)
-      return r.data.access_token
-    })
-    .catch(() => {
-      tokenStore.set(null)
-      return null
-    })
-    .finally(() => {
-      refreshing = null
-    })
+      return { status: 'authenticated', token: r.data.access_token }
+    } catch (err) {
+      if (isLoggedOutResponse(err)) {
+        tokenStore.set(null)
+        return { status: 'anonymous' }
+      }
+      if (attempt >= backoff.length) return { status: 'offline' } // keep what we have; do not log out
+      await new Promise((resolve) => setTimeout(resolve, backoff[attempt]))
+    }
+  }
+}
+
+// Single in-flight refresh shared by concurrent 401s and the restore on page load.
+let refreshing: Promise<SessionResult> | null = null
+
+export function refreshSession(backoff: readonly number[] = REFRESH_BACKOFF_MS): Promise<SessionResult> {
+  refreshing ??= restoreSession(backoff).finally(() => {
+    refreshing = null
+  })
   return refreshing
+}
+
+/** The new access token, or null (logged out, or the server could not be reached). */
+export async function refreshAccessToken(): Promise<string | null> {
+  const r = await refreshSession()
+  return r.status === 'authenticated' ? r.token : null
 }
 
 api.interceptors.response.use(undefined, async (error: AxiosError) => {

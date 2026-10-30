@@ -14,6 +14,7 @@ import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
 import { isTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
+import { InAppBanner } from './InAppBanner'
 
 export const FEEDBACK_DELAY_MS = 3000
 
@@ -100,6 +101,7 @@ export function Layout() {
 
   return (
     <div className="min-h-screen pt-[env(safe-area-inset-top)] pb-[var(--nav-h)] md:pt-0">
+      <InAppBanner />
       {/* Top menu: tablets and desktops. Phones get the bottom navigation below instead. */}
       <header className="sticky top-0 z-20 hidden border-b border-emerald-400/10 bg-emerald-950/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:block">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">

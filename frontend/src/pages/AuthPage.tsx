@@ -8,6 +8,7 @@ import { Logo } from '../components/Layout'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { ContactLinks } from '../components/ContactLinks'
 import { PasswordField } from '../components/PasswordField'
+import { InAppBanner } from '../components/InAppBanner'
 
 // German words are learning content (not translated); only their glosses come from i18n.
 const floating = [
@@ -54,6 +55,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     : null)
 
   return (
+    <>
+    <InAppBanner />
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
       <div className="absolute right-4 top-4 z-10"><LanguageSwitcher sync={false} /></div>
       {floating.map((f) => (
@@ -128,5 +131,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
       </div>
     </div>
+    </>
   )
 }
