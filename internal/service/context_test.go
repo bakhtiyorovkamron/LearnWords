@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -90,5 +91,61 @@ func TestCreate_VariantsStayOneCard(t *testing.T) {
 	}
 	if len(res.Cards) != 1 || res.Cards[0].Word != "der Samstag / der Sonnabend" {
 		t.Errorf("%+v", res.Cards)
+	}
+}
+
+// recordingExamples remembers which languages the generator was called with.
+type recordingExamples struct{ got chan [2]string }
+
+func (r recordingExamples) Generate(ctx context.Context, word, translation string) (domain.Example, error) {
+	r.got <- [2]string{domain.LangFrom(ctx), domain.TranslationLangFrom(ctx)}
+	return domain.Example{SentenceWithGap: "___", Translation: "t"}, nil
+}
+
+type exampleCards struct {
+	WordCardRepository // not used
+	saved              chan struct{}
+}
+
+func (c exampleCards) UpdateExample(context.Context, uuid.UUID, uuid.UUID, string, string) error {
+	c.saved <- struct{}{}
+	return nil
+}
+
+// The example of a card saved from the Uzbek UI is generated in Uzbek (the request is over by then,
+// so the language must come from the card, not from a default).
+func TestCreate_BackgroundExampleUsesTheCardsTranslationLanguage(t *testing.T) {
+	for _, ui := range []string{"uz", "en", "ru"} {
+		rec := recordingExamples{got: make(chan [2]string, 1)}
+		cards := exampleCards{saved: make(chan struct{}, 1)}
+		svc := NewContextService(&fakeContexts{}, cards, Providers{Examples: rec})
+
+		if _, err := svc.Create(ctxFor(ui), uuid.New(), CreateContextInput{Text: "der Tisch", Meaning: "stol"}); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case got := <-rec.got:
+			if got != [2]string{"de", ui} {
+				t.Errorf("%s UI: generated with %v, want [de %s]", ui, got, ui)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: no background generation", ui)
+		}
+		select {
+		case <-cards.saved:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: the example was not saved", ui)
+		}
+	}
+}
+
+func TestGenerateExample_UsesTheRequestsLanguage(t *testing.T) {
+	rec := recordingExamples{got: make(chan [2]string, 1)}
+	svc := NewContextService(&fakeContexts{}, nil, Providers{Examples: rec})
+	if _, err := svc.GenerateExample(ctxFor("uz"), "sich freuen", "xursand bo‘lmoq"); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-rec.got; got != [2]string{"de", "uz"} {
+		t.Errorf("%v", got)
 	}
 }

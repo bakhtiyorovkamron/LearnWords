@@ -94,7 +94,6 @@
     "pronunciation": "Произношение (необязательно)",
     "example": "Пример предложения",
     "hintNeedTranslation": "Нужны слово и перевод",
-    "hintSingleWord": "Доступно, когда введено одно слово",
     "generating": "Генерируем…",
     "generate": "✨ Сгенерировать автоматически",
     "exampleTranslationPlaceholder": "Перевод примера",

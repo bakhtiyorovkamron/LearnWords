@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { contextsApi, foldersApi, meApi, wordCheckApi } from '../api/endpoints'
+import { contextsApi, foldersApi, meApi, wordCheckApi, wordsApi } from '../api/endpoints'
 import * as toaster from '../components/Toaster'
 import { NewContextPage } from './NewContextPage'
 
@@ -16,6 +16,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     foldersApi: { list: vi.fn(), create: vi.fn() },
     photoApi: { import: vi.fn() },
     wordCheckApi: { check: vi.fn() },
+    wordsApi: { generateExample: vi.fn() },
   }
 })
 const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
@@ -94,5 +95,48 @@ describe('NewContextPage', () => {
     fireEvent.change(textbox(), { target: { value: 'a'.repeat(150) } })
     expect(textbox().value).toHaveLength(100)
     expect(screen.getByText('Up to 100 characters. For a longer text, use a textbook photo.')).toBeTruthy()
+  })
+})
+
+describe('NewContextPage: generate the example sentence', () => {
+  const generateButton = () => screen.getByRole('button', { name: /Generate automatically/ }) as HTMLButtonElement
+  const hint = () => screen.queryByText('Word and translation are required')
+
+  it('is enabled for a noun with its article and a translation — not only for a single word', async () => {
+    vi.mocked(wordsApi.generateExample).mockResolvedValue({
+      example_sentence: 'Ich sehe ___.', example_translation: 'Men stolni ko‘ryapman.', full_sentence: 'Ich sehe den Tisch.',
+    } as never)
+    renderPage()
+    fireEvent.change(textbox(), { target: { value: 'der Tisch' } })
+    fireEvent.change(field(/mean/i), { target: { value: 'stol' } })
+    expect(generateButton().disabled).toBe(false)
+    expect(hint()).toBeNull()
+
+    fireEvent.click(generateButton())
+    await waitFor(() => expect(wordsApi.generateExample).toHaveBeenCalledWith('der Tisch', 'stol'))
+    await waitFor(() => expect(screen.getByDisplayValue('Ich sehe ___.')).toBeTruthy())
+    expect(screen.getByDisplayValue('Men stolni ko‘ryapman.')).toBeTruthy()
+  })
+
+  it('is enabled for a phrase of several words as well', () => {
+    renderPage()
+    fireEvent.change(textbox(), { target: { value: 'sich freuen auf' } })
+    fireEvent.change(field(/mean/i), { target: { value: 'радоваться' } })
+    expect(generateButton().disabled).toBe(false)
+  })
+
+  it('without a translation it is disabled and says why in plain sight', () => {
+    renderPage()
+    fireEvent.change(textbox(), { target: { value: 'der Tisch' } })
+    expect(generateButton().disabled).toBe(true)
+    expect(hint()).toBeTruthy() // a visible line, not only a title tooltip
+    expect(generateButton().getAttribute('title')).toBeNull()
+  })
+
+  it('without a text it is disabled with the hint too', () => {
+    renderPage()
+    fireEvent.change(field(/mean/i), { target: { value: 'stol' } })
+    expect(generateButton().disabled).toBe(true)
+    expect(hint()).toBeTruthy()
   })
 })

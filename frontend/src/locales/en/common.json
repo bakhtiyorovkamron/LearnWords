@@ -92,7 +92,6 @@
     "pronunciation": "Pronunciation (optional)",
     "example": "Example sentence",
     "hintNeedTranslation": "Word and translation are required",
-    "hintSingleWord": "Available when a single word is entered",
     "generating": "Generating…",
     "generate": "✨ Generate automatically",
     "exampleTranslationPlaceholder": "Example translation",

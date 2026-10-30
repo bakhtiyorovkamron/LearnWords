@@ -33,8 +33,9 @@ export function NewContextPage() {
   const [checkingOnSave, setCheckingOnSave] = useState(false)
   const isKept = kept.has(collapseSpaces(text))
 
-  // AI example generation works for a single word (the word is replaced by ___ in the sentence).
-  const singleWord = text.trim() !== '' && !/\s/.test(text.trim())
+  // AI example generation works for any word or short phrase ("der Tisch", "sich freuen"): it needs
+  // the text and its translation.
+  const canGenerate = text.trim() !== '' && meaning.trim() !== ''
   const generate = useMutation({
     mutationFn: () => wordsApi.generateExample(text.trim(), meaning.trim()),
     onSuccess: (r) => {
@@ -170,8 +171,7 @@ export function NewContextPage() {
           <div className="flex items-center justify-between gap-3">
             <label className="text-xs uppercase tracking-wider text-emerald-300/60">{t('newContext.example')}</label>
             <button type="button" onClick={() => generate.mutate()}
-              disabled={generate.isPending || !singleWord || !meaning.trim()}
-              title={singleWord ? t('newContext.hintNeedTranslation') : t('newContext.hintSingleWord')}
+              disabled={generate.isPending || !canGenerate}
               className="btn-ghost shrink-0 disabled:opacity-50">
               {generate.isPending ? (
                 <>
@@ -183,6 +183,8 @@ export function NewContextPage() {
               )}
             </button>
           </div>
+          {/* Visible, not a tooltip: phones have no hover. */}
+          {!canGenerate && <p className="text-xs text-emerald-100/60">{t('newContext.hintNeedTranslation')}</p>}
           <input
             value={exampleSentence}
             onChange={(e) => setExampleSentence(e.target.value.slice(0, 500))}

@@ -37,28 +37,16 @@ func New(apiKey, model string) *Client {
 	return &Client{apiKey: apiKey, model: model, http: &http.Client{Timeout: 30 * time.Second}}
 }
 
-const promptTemplate = `Создай одно простое предложение на {{lang}} языке (уровень A1-A2) с использованием слова "{{word}}" (перевод: "{{translation}}").
-В предложении замени само слово "{{word}}" на три подчёркивания: ___
-Дай также перевод полного предложения на русский язык — ТОЛЬКО сам перевод, без пояснений в скобках, без грамматических комментариев.
-Ответь ТОЛЬКО в формате JSON, без markdown и пояснений:
+const promptTemplate = `Write one simple sentence in {{lang}} (level A1-A2) that uses the word or phrase "{{word}}" (meaning: "{{translation}}").
+In "sentence_with_gap" replace the word or phrase with three underscores: ___ — exactly as it appears in the sentence. If it is inflected or has an article (for example "den Tisch" for "der Tisch"), the whole phrase as written in the sentence, article included, becomes ___.
+"full_sentence" is the same sentence with the word or phrase filled in.
+"translation" is the translation of the full sentence in {{native}} — ONLY the translation, with no explanations in brackets and no grammar comments.
+Return ONLY this JSON, without markdown or other text:
 {
   "sentence_with_gap": "...",
   "full_sentence": "...",
   "translation": "..."
 }`
-
-// langPrepositional: "немецком", "английском"... for "на {{lang}} языке".
-func langPrepositional(code string) string {
-	switch domain.Lang(code).Code {
-	case "en":
-		return "английском"
-	case "fr":
-		return "французском"
-	case "ko":
-		return "корейском (хангыль)"
-	}
-	return "немецком"
-}
 
 // clean strips characters that could break out of the quoted prompt placeholders.
 func clean(s string) string {
@@ -66,9 +54,11 @@ func clean(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func buildPrompt(lang, word, translation string) string {
+// buildPrompt: lang is the learning language of the word, nativeLang the language the sentence's
+// translation is written in (the user's interface language).
+func buildPrompt(lang, nativeLang, word, translation string) string {
 	return strings.NewReplacer("{{word}}", clean(word), "{{translation}}", clean(translation),
-		"{{lang}}", langPrepositional(lang)).Replace(promptTemplate)
+		"{{lang}}", domain.Lang(lang).NameEN, "{{native}}", domain.TranslationLangName(nativeLang)).Replace(promptTemplate)
 }
 
 type request struct {
@@ -95,12 +85,14 @@ type response struct {
 	} `json:"error"`
 }
 
-// Generate asks the model for an A1-A2 example sentence containing the word.
+// Generate asks the model for an A1-A2 example sentence containing the word (a word or a short
+// phrase). The sentence is in the learning language domain.LangFrom(ctx), its translation in the
+// interface language domain.TranslationLangFrom(ctx).
 func (c *Client) Generate(ctx context.Context, word, translation string) (domain.Example, error) {
 	body, err := json.Marshal(request{
 		Model:     c.model,
 		MaxTokens: 400,
-		Messages:  []message{{Role: "user", Content: buildPrompt(domain.LangFrom(ctx), word, translation)}},
+		Messages:  []message{{Role: "user", Content: buildPrompt(domain.LangFrom(ctx), domain.TranslationLangFrom(ctx), word, translation)}},
 	})
 	if err != nil {
 		return domain.Example{}, err

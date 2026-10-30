@@ -52,9 +52,16 @@ func (s *ContextService) generateExampleAsync(userID uuid.UUID, card domain.Word
 	if s.p.Examples == nil {
 		return
 	}
+	// The request is over when this runs, so the languages are taken from the card: the sentence
+	// translation goes into the language the card's own translation is written in — never a default.
+	learning, native := card.Language, ""
+	if card.TranslationLanguage != nil {
+		native = *card.TranslationLanguage
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(domain.WithLang(context.Background(), card.Language), bgExampleTimeout)
+		ctx, cancel := context.WithTimeout(domain.WithLang(context.Background(), learning), bgExampleTimeout)
 		defer cancel()
+		ctx = domain.WithTranslationLang(ctx, native)
 		time.Sleep(time.Second) // let the create request finish first
 		ex, err := s.p.Examples.Generate(ctx, card.Word, card.Translation)
 		if err != nil {
