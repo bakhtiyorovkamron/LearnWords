@@ -8,8 +8,6 @@ import {
   type QuizItem, type Verdict,
 } from '../lib/quiz'
 import { useLearningLang } from '../lib/learningLang'
-import { afterSounds } from '../lib/sounds'
-import { playUi } from '../lib/uiSounds'
 
 function speak(card: WordCard) {
   // Pronunciation is available only for German.
@@ -17,8 +15,7 @@ function speak(card: WordCard) {
   // "der Samstag / der Sonnabend" → pronounce only the first variant.
   const u = new SpeechSynthesisUtterance(firstVariant(card.word))
   u.lang = 'de-DE'
-  // The answer sound plays first; the word is spoken once it has finished.
-  afterSounds(() => window.speechSynthesis.speak(u))
+  window.speechSynthesis.speak(u)
 }
 
 interface Props {
@@ -30,7 +27,6 @@ interface Props {
   error?: string | null
   onAnswer: (correct: boolean) => void // sent to the backend right after the answer
   onNext: () => void
-  isLast?: boolean // the last card of the session: no card sound (the result screen plays its own)
   corner?: ReactNode // e.g. the training hero, at the right end of the progress row
 }
 
@@ -43,7 +39,7 @@ interface Props {
 // it up via /api/translations, which returns a cached value or generates+caches one via AI. The
 // 'gap' format needs no blocking lookup — its prompt is the learning-language sentence itself;
 // the native-language hint underneath it just appears once (if) the lookup resolves.
-export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, isLast = false, corner }: Props) {
+export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner }: Props) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const { card, format } = item
@@ -174,7 +170,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       {isChoice ? (
         <div className="space-y-2 sm:space-y-3">
           {options.map((o, i) => (
-            <button key={i} type="button" data-no-ui-sound disabled={answered} onClick={() => choose(i)} className={style(i)}>
+            <button key={i} type="button" disabled={answered} onClick={() => choose(i)} className={style(i)}>
               {o.text}
             </button>
           ))}
@@ -192,7 +188,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
             lang={learning.code}
           />
           {!answered && (
-            <button type="submit" data-no-ui-sound disabled={!typed.trim()} className="btn-primary shrink-0">{t('quiz.check')}</button>
+            <button type="submit" disabled={!typed.trim()} className="btn-primary shrink-0">{t('quiz.check')}</button>
           )}
         </form>
       )}
@@ -203,8 +199,8 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       {error && <p className="text-center text-sm text-red-300">{error}</p>}
 
       {answered && (
-        <button type="button" data-no-ui-sound disabled={saving} className="btn-primary w-full text-lg"
-          onClick={() => { if (!isLast) playUi('cardNext'); onNext() }}>
+        <button type="button" disabled={saving} className="btn-primary w-full text-lg"
+          onClick={onNext}>
           {position === total ? t('quiz.finish') : t('quiz.next')}
         </button>
       )}

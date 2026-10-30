@@ -14,10 +14,8 @@ import { ReviewResult } from './ReviewResult'
 import { DirectionToggle, useStoredChoice } from './DirectionToggle'
 import { FolderSelect } from './Folders'
 import { ReviewHero, TrainingHero } from './TrainingHero'
-import { SoundToggle } from './SoundToggle'
 import { ErrorState } from './ErrorState'
-import { playAnswer, playSound } from '../lib/sounds'
-import { setTrainingOpen } from '../lib/pageSounds'
+import { setTrainingOpen } from '../lib/trainingState'
 
 const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
@@ -110,7 +108,7 @@ export function ReviewSession() {
     },
   })
 
-  // No page-turn rustle while questions are on screen.
+  // Tell the rest of the UI that questions are on screen (e.g. the feedback window waits).
   const inSession = !!deck && index < deck.length
   useEffect(() => {
     setTrainingOpen(inSession)
@@ -121,7 +119,6 @@ export function ReviewSession() {
   useEffect(() => {
     if (deck && index >= deck.length) {
       emitHeroEvent({ type: 'session_finished', correctCount: correct, total: deck.length })
-      playSound('sessionDone')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deck, index])
@@ -278,7 +275,6 @@ export function ReviewSession() {
   const item = deck[index]
   return (
     <div className="space-y-3">
-      <div className="mx-auto flex max-w-xl justify-end"><SoundToggle /></div>
       {mode === 'practice' && (
         <p className="mx-auto max-w-xl text-center text-xs text-emerald-100/50">🔒 {t('practice.note')}</p>
       )}
@@ -289,7 +285,6 @@ export function ReviewSession() {
         pool={pool.data ?? []}
         position={index + 1}
         total={deck.length}
-        isLast={index === deck.length - 1}
         saving={answer.isPending}
         error={answer.error
           ? isRateLimited(answer.error)
@@ -297,7 +292,6 @@ export function ReviewSession() {
             : t('quiz.saveFailed', { error: errorMessage(answer.error) })
           : null}
         onAnswer={(ok) => {
-          playAnswer(ok) // every mode: review and practice
           if (ok) setCorrect((c) => c + 1)
           const newStreak = ok ? streak + 1 : 0
           setStreak(newStreak)

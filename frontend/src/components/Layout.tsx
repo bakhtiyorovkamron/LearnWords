@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { authApi, meApi, settingsApi } from '../api/endpoints'
+import { authApi, meApi } from '../api/endpoints'
 import { StageUpOverlay } from './StageUpOverlay'
 import { HeroIntroOverlay } from './HeroIntroOverlay'
 import { InstallBanner, InstallMenuItem } from './InstallPrompt'
@@ -10,11 +10,9 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
 import { ContactLinks } from './ContactLinks'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
-import { adoptServerSounds, adoptServerUiSounds } from '../lib/sounds'
-import { usePageSounds } from '../lib/pageSounds'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
-import { isTrainingOpen } from '../lib/pageSounds'
+import { isTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
 
 export const FEEDBACK_DELAY_MS = 3000
@@ -63,13 +61,6 @@ export function Layout() {
   const { isOn } = useFeatures()
   const searchOn = isOn('word_search')
   const [moreOpen, setMoreOpen] = useState(false)
-
-  // Training sounds: the profile's value wins over this device's localStorage once it loads.
-  useEffect(() => {
-    settingsApi.get().then((s) => { adoptServerSounds(s.sounds_enabled); adoptServerUiSounds(s.ui_sounds_enabled) }).catch(() => undefined)
-  }, [])
-
-  usePageSounds() // page-turn rustle between sections
 
   // The one-time rating window: 3 seconds after the page loads, and never in the middle of a training.
   const [feedbackDue, setFeedbackDue] = useState(false)

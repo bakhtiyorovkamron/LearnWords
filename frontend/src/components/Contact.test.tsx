@@ -15,7 +15,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   return {
     ...mod,
     meApi: { get: vi.fn().mockResolvedValue({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de' }) },
-    settingsApi: { get: vi.fn().mockResolvedValue({ sounds_enabled: true }), setLanguage: vi.fn() },
+    settingsApi: { get: vi.fn().mockResolvedValue({}), setLanguage: vi.fn() },
     heroApi: { get: vi.fn().mockRejectedValue({ response: { status: 404 } }) },
     authApi: { login: vi.fn(), register: vi.fn(), logout: vi.fn() },
   }

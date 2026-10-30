@@ -6,7 +6,6 @@ import { errorMessage } from '../api/client'
 import { stageFromApi } from '../lib/heroStages'
 import { shareHeroCard } from '../lib/heroShare'
 import { useHero } from '../lib/useHero'
-import { playSound } from '../lib/sounds'
 import { Hero } from './Hero'
 
 /**
@@ -26,7 +25,6 @@ export function StageUpOverlay() {
     mutationFn: ({ stage, name }: { stage: number; name: string }) => shareHeroCard(stage, name),
   })
   const open = !!hero?.stage_up && !closed
-  useEffect(() => { if (open) playSound('stageUp') }, [open]) // the hero's congratulation
 
   function close() {
     setClosed(true)

@@ -12,11 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type memSettings struct {
-	lang, size string
-	sounds     bool
-	uiSounds   bool
-}
+type memSettings struct{ lang, size string }
 
 func (m *memSettings) InterfaceLanguage(context.Context, uuid.UUID) (string, error) {
 	return m.lang, nil
@@ -32,12 +28,6 @@ func (m *memSettings) SetReviewSessionSize(_ context.Context, _ uuid.UUID, s str
 	m.size = s
 	return nil
 }
-func (m *memSettings) SoundsEnabled(context.Context, uuid.UUID) (bool, error) { return m.sounds, nil }
-func (m *memSettings) SetSoundsEnabled(_ context.Context, _ uuid.UUID, on bool) error {
-	m.sounds = on
-	return nil
-}
-
 func settingsRouter(m *memSettings) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -48,60 +38,50 @@ func settingsRouter(m *memSettings) *gin.Engine {
 	return r
 }
 
-func TestSettings_SoundsEnabled(t *testing.T) {
-	m := &memSettings{sounds: true, uiSounds: true}
+func TestSettings_NoSoundFields_AndOldClientsStillGet200(t *testing.T) {
+	m := &memSettings{lang: "ru", size: "20"}
 	r := settingsRouter(m)
-	do := func(method, body string) map[string]any {
+	do := func(method, body string) (int, map[string]any) {
 		t.Helper()
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(method, "/me/settings", bytes.NewBufferString(body))
 		req.Header.Set("Content-Type", "application/json")
 		r.ServeHTTP(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("%s %s: %d %s", method, body, w.Code, w.Body)
-		}
 		var out map[string]any
-		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-			t.Fatal(err)
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+
+	code, out := do(http.MethodGet, "")
+	if code != 200 || out["interface_language"] != "ru" || out["review_session_size"] != "20" {
+		t.Fatalf("GET: %d %v", code, out)
+	}
+	for _, gone := range []string{"sounds_enabled", "ui_sounds_enabled"} {
+		if _, ok := out[gone]; ok {
+			t.Errorf("GET still has %s", gone)
 		}
-		return out
 	}
 
-	if got := do(http.MethodGet, "")["sounds_enabled"]; got != true {
-		t.Errorf("default: %v, want true", got)
+	// An old client that still sends the sound switches (alone, or with a real setting): 200, ignored.
+	for _, body := range []string{
+		`{"sounds_enabled":false}`,
+		`{"ui_sounds_enabled":false}`,
+		`{"sounds_enabled":false,"ui_sounds_enabled":false,"review_session_size":"50"}`,
+	} {
+		code, out := do(http.MethodPut, body)
+		if code != 200 {
+			t.Errorf("PUT %s: %d", body, code)
+		}
+		for _, gone := range []string{"sounds_enabled", "ui_sounds_enabled"} {
+			if _, ok := out[gone]; ok {
+				t.Errorf("PUT %s: response has %s", body, gone)
+			}
+		}
 	}
-	if got := do(http.MethodPut, `{"sounds_enabled":false}`)["sounds_enabled"]; got != false || m.sounds {
-		t.Errorf("off: %v stored=%v", got, m.sounds)
+	if m.size != "50" || m.lang != "ru" {
+		t.Errorf("real settings: lang %q size %q", m.lang, m.size)
 	}
-	// Changing another setting must not touch the sounds switch.
-	if got := do(http.MethodPut, `{"review_session_size":"50"}`)["sounds_enabled"]; got != false {
-		t.Errorf("unrelated update changed sounds: %v", got)
+	if code, _ := do(http.MethodPut, `{}`); code != http.StatusBadRequest {
+		t.Errorf("an empty update is still a 400: %d", code)
 	}
-	if got := do(http.MethodPut, `{"sounds_enabled":true}`)["sounds_enabled"]; got != true {
-		t.Errorf("on: %v", got)
-	}
-
-	// The interface-sounds switch is independent of the training-sounds one.
-	if got := do(http.MethodGet, "")["ui_sounds_enabled"]; got != true {
-		t.Errorf("ui default: %v, want true", got)
-	}
-	out := do(http.MethodPut, `{"ui_sounds_enabled":false}`)
-	if out["ui_sounds_enabled"] != false || out["sounds_enabled"] != true || m.uiSounds || !m.sounds {
-		t.Errorf("ui off: %v (sounds %v, ui %v)", out, m.sounds, m.uiSounds)
-	}
-	out = do(http.MethodPut, `{"sounds_enabled":false}`)
-	if out["ui_sounds_enabled"] != false || out["sounds_enabled"] != false {
-		t.Errorf("master off must not flip the ui preference: %v", out)
-	}
-	if got := do(http.MethodPut, `{"ui_sounds_enabled":true}`)["ui_sounds_enabled"]; got != true {
-		t.Errorf("ui on: %v", got)
-	}
-}
-
-func (m *memSettings) UISoundsEnabled(context.Context, uuid.UUID) (bool, error) {
-	return m.uiSounds, nil
-}
-func (m *memSettings) SetUISoundsEnabled(_ context.Context, _ uuid.UUID, on bool) error {
-	m.uiSounds = on
-	return nil
 }
