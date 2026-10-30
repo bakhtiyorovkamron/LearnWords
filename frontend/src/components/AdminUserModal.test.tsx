@@ -8,7 +8,7 @@ import { AdminUserModal } from './AdminUserModal'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, adminApi: { userFeatures: vi.fn(), setUserFeature: vi.fn() } }
+  return { ...mod, adminApi: { userFeatures: vi.fn(), setUserFeature: vi.fn(), sendPush: vi.fn() } }
 })
 
 const user: AdminUser = {
@@ -175,3 +175,29 @@ describe('AdminUserModal: the effective photo limit', () => {
   })
 })
 
+describe('AdminUserModal: push devices', () => {
+  const renderWith = (push_devices: number) => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(<QueryClientProvider client={qc}><AdminUserModal user={{ ...user, push_devices }} onClose={vi.fn()} /></QueryClientProvider>)
+  }
+
+  it('shows the device count, and a test button only when there are devices', () => {
+    renderWith(0)
+    expect(screen.getByText('Devices with notifications: 0')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Send a test' })).toBeNull()
+    cleanup()
+    renderWith(2)
+    expect(screen.getByText('Devices with notifications: 2')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Send a test' })).toBeTruthy()
+  })
+
+  it('"Send a test" sends the fixed test notification to this user only and shows the result', async () => {
+    vi.mocked(adminApi.sendPush).mockResolvedValue({ sent: 2, failed: 0, removed: 0 })
+    renderWith(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Send a test' }))
+    await waitFor(() => expect(adminApi.sendPush).toHaveBeenCalledWith({
+      target: 'u1', title: 'yodla', body: 'Test notification 🔔', url: '/cards',
+    }))
+    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Sent: 2, failed: 0, expired removed: 0'))
+  })
+})

@@ -22,7 +22,7 @@ export function isStandalone(): boolean {
 }
 
 // iPhone/iPad Safari: no beforeinstallprompt there, the user adds the app via Share → Add to Home Screen.
-function isIosSafari(): boolean {
+export function isIosSafari(): boolean {
   const ua = navigator.userAgent
   const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   return ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser/.test(ua)

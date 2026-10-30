@@ -316,10 +316,20 @@ export interface AdminUser {
   id: string; email: string; role: 'user' | 'admin'; is_banned: boolean
   created_at: string; words_count: number; last_activity_at: string | null
   rating?: number | null // the user's feedback rating
+  push_devices?: number // browsers/devices subscribed to Web Push
 }
 
 export interface FeedbackItem { email: string; rating: number; comment: string; created_at: string }
 export interface FeedbackSummary { average: number; count: number; items: FeedbackItem[] }
+
+export interface PushResult { sent: number; failed: number; removed: number }
+
+// Web Push: the browser subscribes with the server's VAPID public key; the server remembers the device.
+export const pushApi = {
+  publicKey: () => api.get<{ key: string }>('/push/public-key').then((r) => r.data.key),
+  subscribe: (sub: PushSubscriptionJSON) => api.post('/push/subscribe', sub),
+  unsubscribe: (endpoint: string) => api.delete('/push/subscribe', { data: { endpoint } }),
+}
 
 export const feedbackApi = {
   // Only the first answer counts on the server.
@@ -338,6 +348,10 @@ export const adminApi = {
   users: () => api.get<{ users: AdminUser[] }>('/admin/users').then((r) => r.data.users),
   stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
   feedback: () => api.get<FeedbackSummary>('/admin/feedback').then((r) => r.data),
+  pushStats: () => api.get<{ devices: number; users: number }>('/admin/push').then((r) => r.data),
+  /** target: "all" or a user id. */
+  sendPush: (body: { target: string; title: string; body: string; url: string }) =>
+    api.post<PushResult>('/admin/push', body).then((r) => r.data),
   remove: (id: string) => api.delete(`/admin/users/${id}`),
   setBanned: (id: string, banned: boolean) => api.patch(`/admin/users/${id}/ban`, { banned }),
   userFeatures: (id: string) =>

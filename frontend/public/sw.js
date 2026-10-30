@@ -1,4 +1,4 @@
-// Service worker for the installable app (PWA).
+// Service worker for the installable app (PWA) and Web Push.
 //   /api/*                       → never touched: straight to the network, nothing cached
 //   page navigations (index.html) → network-first; offline.html when there is no network
 //   hashed /assets/*, icons, fonts → cache-first
@@ -65,4 +65,45 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(request))
   }
   // Anything else (sw.js, manifest, …) goes to the network as usual.
+})
+
+// ---- Web Push ---------------------------------------------------------------------------------
+// The server sends {title, body, url}. Show it; a tap opens the app at url.
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { body: event.data ? event.data.text() : '' }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'yodla', {
+      body: data.body || '',
+      icon: '/android-chrome-192x192.png',
+      badge: '/android-chrome-192x192.png',
+      data: { url: data.url || '/cards' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = new URL((event.notification.data && event.notification.data.url) || '/cards', self.location.origin)
+  if (url.origin !== self.location.origin) return // only ever open our own pages
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const open = windows.find((c) => new URL(c.url).origin === self.location.origin)
+      if (open) {
+        try {
+          await open.focus()
+          await open.navigate(url.href)
+          return
+        } catch {
+          /* a window we cannot navigate: open a new one below */
+        }
+      }
+      await self.clients.openWindow(url.href)
+    })(),
+  )
 })

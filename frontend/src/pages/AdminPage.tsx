@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { adminApi, meApi, type AdminUser, type FeedbackSummary } from '../api/endpoints'
+import { adminApi, meApi, type AdminUser, type FeedbackSummary, type PushResult } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
 import { AdminUserModal } from '../components/AdminUserModal'
@@ -29,6 +29,7 @@ export function AdminPage() {
       </div>
       <StatsBlock />
       <FeedbackBlock />
+      <PushPanel myId={me.data!.id} />
       <WordCheckJobPanel />
       <UsersTable myId={me.data!.id} />
     </div>
@@ -101,6 +102,77 @@ function StatsBlock() {
           </div>
         ))}
       </div>
+    </section>
+  )
+}
+
+const PUSH_TITLE_MAX = 60
+const PUSH_BODY_MAX = 200
+
+/** Send a push notification: to yourself (a test) or to every subscribed device. */
+function PushPanel({ myId }: { myId: string }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const stats = useQuery({ queryKey: ['admin', 'push'], queryFn: adminApi.pushStats })
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [url, setUrl] = useState('/cards')
+  const [toAll, setToAll] = useState(false)
+  const [result, setResult] = useState<PushResult | null>(null)
+
+  const send = useMutation({
+    mutationFn: () => adminApi.sendPush({ target: toAll ? 'all' : myId, title: title.trim(), body: body.trim(), url: url.trim() || '/cards' }),
+    onSuccess: (r) => {
+      setResult(r)
+      void qc.invalidateQueries({ queryKey: ['admin'] }) // expired devices were removed
+    },
+  })
+
+  // The same rules as the server: a path inside the app, nothing else.
+  const urlOk = url.trim() === '' || (url.trim().startsWith('/') && !url.trim().startsWith('//') && !url.trim().startsWith('/\\'))
+  const valid = title.trim().length > 0 && body.trim().length > 0 && urlOk
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!valid || send.isPending) return
+    if (toAll && !window.confirm(t('admin.push.confirmAll', { n: stats.data?.devices ?? 0 }))) return
+    setResult(null)
+    send.mutate()
+  }
+
+  const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-emerald-100/60'
+  return (
+    <section className="glass space-y-4 p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="display text-xl font-bold">🔔 {t('admin.push.title')}</h2>
+        {stats.data && <span className="text-sm text-emerald-100/60">{t('admin.push.subscribers', { n: stats.data.devices })}</span>}
+      </div>
+      <form onSubmit={submit} className="space-y-3">
+        <div>
+          <label className={label} htmlFor="push-title">{t('admin.push.fieldTitle')}</label>
+          <input id="push-title" className="field" value={title} onChange={(e) => setTitle(e.target.value.slice(0, PUSH_TITLE_MAX))} />
+          <span className="text-xs text-emerald-100/40">{title.length}/{PUSH_TITLE_MAX}</span>
+        </div>
+        <div>
+          <label className={label} htmlFor="push-body">{t('admin.push.fieldBody')}</label>
+          <textarea id="push-body" rows={2} className="field" value={body} onChange={(e) => setBody(e.target.value.slice(0, PUSH_BODY_MAX))} />
+          <span className="text-xs text-emerald-100/40">{body.length}/{PUSH_BODY_MAX}</span>
+        </div>
+        <div>
+          <label className={label} htmlFor="push-url">{t('admin.push.fieldUrl')}</label>
+          <input id="push-url" className="field" value={url} onChange={(e) => setUrl(e.target.value)} aria-invalid={!urlOk} />
+          {!urlOk && <p role="alert" className="mt-1 text-xs text-red-300">/…</p>}
+        </div>
+        <div role="radiogroup" className="flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-2"><input type="radio" name="push-target" checked={!toAll} onChange={() => setToAll(false)} />{t('admin.push.toMe')}</label>
+          <label className="flex items-center gap-2"><input type="radio" name="push-target" checked={toAll} onChange={() => setToAll(true)} />{t('admin.push.toAll')}</label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="submit" className="btn-primary" disabled={!valid || send.isPending}>{t('admin.push.send')}</button>
+          {result && <span className="text-sm text-lime-200">{t('admin.push.result', { ...result })}</span>}
+        </div>
+        {send.error && <p role="alert" className="text-sm text-red-300">{errorMessage(send.error)}</p>}
+      </form>
     </section>
   )
 }

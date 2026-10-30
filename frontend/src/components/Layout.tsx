@@ -15,6 +15,7 @@ import { useFeatures } from '../lib/features'
 import { isTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
 import { InAppBanner } from './InAppBanner'
+import { PushToggle } from './PushToggle'
 
 export const FEEDBACK_DELAY_MS = 3000
 
@@ -116,6 +117,7 @@ export function Layout() {
           <div className="ml-auto flex items-center gap-2">
             {learningBadge}
             <LanguageSwitcher />
+            <PushToggle variant="icon" />
             <InstallMenuItem />
             <button onClick={logout} className="btn-ghost">{t('nav.logout')}</button>
           </div>
@@ -143,6 +145,7 @@ export function Layout() {
               {learningBadge}
               <LanguageSwitcher />
             </div>
+            <PushToggle variant="row" />
             <InstallMenuItem className="btn-ghost w-full py-3" />
             <button onClick={logout} className="btn-ghost mt-2 w-full py-3">{t('nav.logout')}</button>
             <a href={CONTACT.instagram} {...EXTERNAL_LINK} className="mt-1 flex items-center justify-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-emerald-100/70 hover:bg-emerald-400/10 hover:text-white">

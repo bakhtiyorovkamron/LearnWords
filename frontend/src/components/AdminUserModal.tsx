@@ -30,6 +30,7 @@ export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: ()
             <p>{t('admin.userCard.registered', { date: date(user.created_at) })}</p>
             <p>{t('admin.userCard.words', { n: user.words_count })}</p>
             {user.rating ? <p>{t('admin.feedback.userRating', { rating: user.rating })}</p> : null}
+            <PushLine user={user} />
             <p>{t('admin.userCard.lastActive', { date: user.last_activity_at ? date(user.last_activity_at) : t('admin.userCard.never') })}</p>
           </div>
         </div>
@@ -110,6 +111,33 @@ function FeatureRow({ userId, state }: { userId: string; state: FeatureState }) 
         </>
       )}
       {save.error && <p role="alert" className="text-sm text-red-300">{errorMessage(save.error)}</p>}
+    </div>
+  )
+}
+
+// Fixed test text: only for checking that notifications reach this user's devices.
+const TEST_PUSH = { title: 'yodla', body: 'Test notification 🔔', url: '/cards' }
+
+function PushLine({ user }: { user: AdminUser }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const send = useMutation({
+    mutationFn: () => adminApi.sendPush({ target: user.id, ...TEST_PUSH }),
+    onSuccess: (r) => {
+      toast(t('admin.push.result', { ...r }))
+      void qc.invalidateQueries({ queryKey: ['admin'] })
+    },
+  })
+  const n = user.push_devices ?? 0
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <p>{t('admin.userCard.pushDevices', { n })}</p>
+      {n > 0 && (
+        <button type="button" className="btn-ghost !px-3 !py-1 text-xs" disabled={send.isPending} onClick={() => send.mutate()}>
+          {t('admin.userCard.sendTest')}
+        </button>
+      )}
+      {send.error && <span role="alert" className="text-xs text-red-300">{errorMessage(send.error)}</span>}
     </div>
   )
 }
