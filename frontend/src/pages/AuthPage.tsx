@@ -7,6 +7,7 @@ import { errorMessage } from '../api/client'
 import { Logo } from '../components/Layout'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { ContactLinks } from '../components/ContactLinks'
+import { PasswordField } from '../components/PasswordField'
 
 // German words are learning content (not translated); only their glosses come from i18n.
 const floating = [
@@ -85,12 +86,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </p>
           <input className="field" type="email" placeholder={t('auth.email')} autoComplete="email" required
             value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="field" type="password" placeholder={t('auth.password')} required
-            autoComplete={isLogin ? 'current-password' : 'new-password'}
-            value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordField placeholder={t('auth.password')} autoComplete={isLogin ? 'current-password' : 'new-password'}
+            value={password} onChange={setPassword} />
           {!isLogin && (
-            <input className="field" type="password" placeholder={t('auth.confirmPassword')} required
-              autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <PasswordField placeholder={t('auth.confirmPassword')} autoComplete="new-password"
+              value={confirm} onChange={setConfirm} />
           )}
           {!isLogin && (
             <fieldset className="space-y-2">
