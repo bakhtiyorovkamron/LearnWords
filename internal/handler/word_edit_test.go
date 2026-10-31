@@ -62,3 +62,21 @@ func TestWordEdit_EmptyExampleAndFolder(t *testing.T) {
 		t.Errorf("empty example must reach the store as an empty string: %+v", f.got.ExampleSentence)
 	}
 }
+
+// A card can never be saved without a translation: the training question would have no prompt.
+func TestWordEdit_EmptyTranslationIsRejected(t *testing.T) {
+	for _, body := range []string{`{"translation":""}`, `{"translation":"   "}`, `{"word":"Süden","translation":"\n"}`} {
+		f := &fakeUpdater{}
+		w := patchWord(f, body)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("%s → %d, want 400", body, w.Code)
+		}
+		if f.got.Translation != nil || f.got.Word != nil {
+			t.Errorf("%s reached the store: %+v", body, f.got)
+		}
+	}
+	// Leaving the translation out (an edit of other fields) is fine.
+	if w := patchWord(&fakeUpdater{}, `{"transcription":"[x]"}`); w.Code != http.StatusOK {
+		t.Errorf("edit without a translation field: %d", w.Code)
+	}
+}

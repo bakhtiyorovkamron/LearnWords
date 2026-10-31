@@ -4,13 +4,13 @@ import { Brain, CircleCheck, Layers } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
-  cardsApi, practiceApi, reviewApi, PRACTICE_MODES, SESSION_SIZES,
+  cardsApi, isSessionSize, practiceApi, reviewApi, PRACTICE_MODES, SESSION_SIZES,
   type PracticeMode, type SessionSize,
 } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { emitHeroEvent } from '../lib/heroBus'
 import { buildQueue, type Direction, type QuizItem } from '../lib/quiz'
-import { useReviewSessionSize } from '../lib/reviewSessionSize'
+import { HOME_SESSION, useReviewSessionSize } from '../lib/reviewSessionSize'
 import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
 import { DirectionToggle, useStoredChoice } from './DirectionToggle'
@@ -70,7 +70,17 @@ export function ReviewSession() {
   const qc = useQueryClient()
   // '' = all words (default). Only narrows which words are asked; progress is per word.
   const [folder, setFolder] = useState(() => localStorage.getItem('review-folder') ?? '')
-  const [sessionSize, setSessionSize] = useReviewSessionSize()
+  const [savedSize, setSavedSize] = useReviewSessionSize()
+  const [params, setParams] = useSearchParams()
+  // ?start=1&size=N (Home): this session uses the size from the URL (HOME_SESSION without one);
+  // the saved setting is not touched. Any other way in uses the saved size.
+  const [override, setOverride] = useState<SessionSize | null>(() => {
+    if (params.get('start') !== '1') return null
+    const s = params.get('size')
+    return isSessionSize(s) ? s : (String(HOME_SESSION) as SessionSize)
+  })
+  const sessionSize = override ?? savedSize
+  const setSessionSize = (v: SessionSize) => { setOverride(null); setSavedSize(v) }
   const [practiceMode, setPracticeMode] = useStoredChoice<PracticeMode>('practice-mode', PRACTICE_MODES, 'hard')
   const due = useQuery({
     queryKey: ['review-due', folder, sessionSize],
@@ -82,7 +92,6 @@ export function ReviewSession() {
 
   const [mode, setMode] = useState<'review' | 'practice'>('review')
   // ?practice=1 (Home → "Practice more") opens the word-selection screen right away.
-  const [params, setParams] = useSearchParams()
   const [practiceSetup, setPracticeSetup] = useState(params.get('practice') === '1') // showing the word-selection screen
   const [practiceLoading, setPracticeLoading] = useState(false)
   const [deck, setDeck] = useState<QuizItem[] | null>(null) // null = not started
@@ -128,7 +137,7 @@ export function ReviewSession() {
     if (!startRequested.current || due.isFetching) return // wait for fresh data, not a stale cache
     startRequested.current = false
     if ((due.data?.total ?? 0) > 0) start()
-    setParams((p) => { p.delete('start'); return p }, { replace: true })
+    setParams((p) => { p.delete('start'); p.delete('size'); return p }, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [due.isFetching, due.data])
 
@@ -155,6 +164,7 @@ export function ReviewSession() {
   // "Пройти ещё раз" / "Тренироваться ещё": always leads into the practice word-selection
   // screen — the words just reviewed are no longer due, so a literal restart has nothing to do.
   function restart() {
+    setOverride(null) // the pickers show the saved size again
     setDeck(null)
     setPracticeSetup(true)
     qc.invalidateQueries({ queryKey: ['review-due'] })

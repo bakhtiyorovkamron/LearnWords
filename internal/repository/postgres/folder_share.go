@@ -271,7 +271,8 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 		now := time.Now().UTC()
 		for i, s := range words {
 			forms := spellings(s.word)
-			dup := len(forms) == 0
+			// A source card with no translation (old data) is not copied: it could not be asked as a question.
+			dup := len(forms) == 0 || strings.TrimSpace(s.translation) == ""
 			for _, f := range forms {
 				dup = dup || have[f]
 			}

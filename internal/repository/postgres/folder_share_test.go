@@ -345,3 +345,26 @@ func TestImportShared_RollsBackOnError(t *testing.T) {
 		}
 	}
 }
+
+// A source card without a translation (old data) is not copied: it would be an empty question.
+func TestImportShared_SkipsCardsWithoutATranslation(t *testing.T) {
+	owner := newShareFixture(t)
+	me := newShareFixture(t)
+	ctx := context.Background()
+	src := owner.folder(t, owner.user)
+	owner.sourceWord(t, owner.user, src, "Katze", "кошка")
+	owner.sourceWord(t, owner.user, src, "Baum", "")
+	owner.sourceWord(t, owner.user, src, "Haus", "   ")
+	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
+
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Added != 1 || res.Skipped != 2 {
+		t.Fatalf("added %d skipped %d, want 1/2", res.Added, res.Skipped)
+	}
+	if n := me.count(t, `SELECT count(*) FROM word_cards WHERE user_id = $1 AND btrim(translation) = ''`, me.user); n != 0 {
+		t.Errorf("%d cards without a translation were copied", n)
+	}
+}

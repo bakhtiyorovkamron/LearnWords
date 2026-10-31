@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react'
 import { isSessionSize, SESSION_SIZES, settingsApi, type SessionSize } from '../api/endpoints'
 import { useStoredChoice } from '../components/DirectionToggle'
 
+/** Home "Start training" always runs a short session of this many words, whatever size is saved. */
+export const HOME_SESSION = 20
+
 /**
  * The chosen training-session size: localStorage first (instant, survives a reload with no
  * network round-trip), then adopted from the user's profile once it loads — so it follows the

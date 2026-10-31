@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { cardsApi, foldersApi, heroApi, meApi, practiceApi, reviewApi, settingsApi } from '../api/endpoints'
+import { cardsApi, foldersApi, heroApi, meApi, practiceApi, reviewApi, settingsApi, statsApi } from '../api/endpoints'
 import type { DueCard, WordCard } from '../api/types'
+import { ContextsPage } from '../pages/ContextsPage'
 import { ReviewSession } from './ReviewSession'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -18,6 +19,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     foldersApi: { list: vi.fn() },
     heroApi: { ...mod.heroApi, get: vi.fn() },
     settingsApi: { get: vi.fn(), setReviewSessionSize: vi.fn() },
+    statsApi: { get: vi.fn() },
   }
 })
 
@@ -129,6 +131,64 @@ describe('ReviewSession: ?start=1 (Home → Start training)', () => {
     await waitFor(() => expect(isTrainingOpen()).toBe(true))
     cleanup()
     expect(isTrainingOpen()).toBe(false)
+  })
+})
+
+describe('ReviewSession: Home always starts a short session', () => {
+  // The server hands out at most `limit` cards but reports the real total.
+  const serve = (total: number) =>
+    vi.mocked(reviewApi.due).mockImplementation(async (_folder, limit) => {
+      const n = limit === 'all' ? total : Math.min(Number(limit), total)
+      return { cards: Array.from({ length: n }, (_, i) => due(i + 1)), total }
+    })
+
+  it('?start=1&size=20 with the saved size "all": 20 questions, the saved size untouched', async () => {
+    localStorage.setItem('review-session-size', 'all')
+    serve(408)
+    renderSession('/cards?start=1&size=20')
+    expect(await screen.findByText('1/20')).toBeTruthy()
+    expect(reviewApi.due).toHaveBeenCalledWith('', '20')
+    expect(reviewApi.due).not.toHaveBeenCalledWith('', 'all')
+    expect(localStorage.getItem('review-session-size')).toBe('all')
+    expect(settingsApi.setReviewSessionSize).not.toHaveBeenCalled()
+    await waitFor(() => expect(where()).toBe('/cards')) // both parameters are dropped
+  })
+
+  it('?start=1 without a size falls back to 20', async () => {
+    localStorage.setItem('review-session-size', 'all')
+    serve(408)
+    renderSession('/cards?start=1')
+    expect(await screen.findByText('1/20')).toBeTruthy()
+  })
+
+  it('Home → the button → a 20-question session; the saved size stays "all"', async () => {
+    localStorage.setItem('review-session-size', 'all')
+    serve(408)
+    vi.mocked(foldersApi.list).mockResolvedValue({
+      all: { total: 500, new_count: 0, learning_count: 0, learned_count: 0, due_today: 408 }, folders: [],
+    } as never)
+    vi.mocked(statsApi.get).mockResolvedValue({ totals: { current_streak_days: 1, longest_streak_days: 1 } } as never)
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes><Route path="/" element={<ContextsPage />} /><Route path="/cards" element={<ReviewSession />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText('20 words')).toBeTruthy()
+    expect(screen.getByText('408 due in total')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Start training/ }))
+    expect(await screen.findByText('1/20')).toBeTruthy()
+    expect(localStorage.getItem('review-session-size')).toBe('all')
+  })
+
+  it('without ?start the saved size is used as before', async () => {
+    localStorage.setItem('review-session-size', 'all')
+    serve(408)
+    renderSession('/cards')
+    await screen.findByRole('button', { name: 'Start training' })
+    expect(reviewApi.due).toHaveBeenCalledWith('', 'all')
   })
 })
 

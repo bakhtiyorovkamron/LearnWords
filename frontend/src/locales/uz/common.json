@@ -69,8 +69,10 @@
     "addWord": "So‘z qo‘shish",
     "photo": "Darslik surati",
     "allWords": "Hammasi · {{count}}",
-    "dueLine_one": "bugun takrorlanadi · taxminan {{count}} daqiqa",
-    "dueLine_other": "bugun takrorlanadi · taxminan {{count}} daqiqa",
+    "sessionLine_one": "bu mashqda · taxminan {{count}} daqiqa",
+    "sessionLine_other": "bu mashqda · taxminan {{count}} daqiqa",
+    "dueTotal": "jami {{count}} ta so‘z takrorlashni kutmoqda",
+    "customize": "Mashqni sozlash",
     "moreFolders_one": "Yana {{count}} ta papka",
     "moreFolders_other": "Yana {{count}} ta papka"
   },

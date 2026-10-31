@@ -69,8 +69,10 @@
     "addWord": "Add a word",
     "photo": "Textbook photo",
     "allWords": "All · {{count}}",
-    "dueLine_one": "to review today · about {{count}} minute",
-    "dueLine_other": "to review today · about {{count}} minutes",
+    "sessionLine_one": "in this session · about {{count}} minute",
+    "sessionLine_other": "in this session · about {{count}} minutes",
+    "dueTotal": "{{count}} due in total",
+    "customize": "Customize training",
     "moreFolders_one": "{{count}} more folder",
     "moreFolders_other": "{{count}} more folders"
   },

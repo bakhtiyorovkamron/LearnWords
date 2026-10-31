@@ -11,6 +11,7 @@ import { Logo } from '../components/Logo'
 import { useFeatures } from '../lib/features'
 import { stageFromApi } from '../lib/heroStages'
 import { useLearningLang } from '../lib/learningLang'
+import { HOME_SESSION } from '../lib/reviewSessionSize'
 import { handOffPhoto } from '../lib/photoHandoff'
 import { useHero } from '../lib/useHero'
 
@@ -34,13 +35,15 @@ export function ContextsPage() {
   const words = all?.total ?? 0
   const due = all?.due_today ?? 0
   const streak = week.data?.totals.current_streak_days
-  const minutes = Math.max(1, Math.ceil((due * SECONDS_PER_WORD) / 60))
+  // Home always starts a short session; the rest of the due words wait for the next one.
+  const inSession = Math.min(due, HOME_SESSION)
+  const minutes = Math.max(1, Math.ceil((inSession * SECONDS_PER_WORD) / 60))
   const date = new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'long' }).format(new Date())
   const photoOn = isOn('photo_import')
 
   function startReview() {
     localStorage.setItem('review-folder', '') // the count is for all words
-    navigate('/cards?start=1') // the session starts at once, no second start screen
+    navigate(`/cards?start=1&size=${HOME_SESSION}`) // a short session starts at once, no second start screen
   }
 
   function onPhoto(file: File | undefined) {
@@ -78,9 +81,10 @@ export function ContextsPage() {
               {due > 0 ? (
                 <>
                   <p className="text-[40px] font-bold leading-none tracking-[-0.03em] tabular-nums text-fg">
-                    {t('folders.wordsCount', { count: due })}
+                    {t('folders.wordsCount', { count: inSession })}
                   </p>
-                  <p className="mt-2 text-[15px] text-muted">{t('home.dueLine', { count: minutes })}</p>
+                  <p className="mt-2 text-[15px] text-muted">{t('home.sessionLine', { count: minutes })}</p>
+                  {due > HOME_SESSION && <p className="mt-1 text-sm text-faint">{t('home.dueTotal', { count: due })}</p>}
                 </>
               ) : words > 0 ? (
                 <>
@@ -97,9 +101,13 @@ export function ContextsPage() {
             )}
           </div>
           {due > 0 && (
-            <button type="button" onClick={startReview} className="btn-primary mt-5 h-[52px] w-full rounded-[14px]">
-              {t('review.start')}<ArrowRight size={18} aria-hidden="true" />
-            </button>
+            <>
+              <button type="button" onClick={startReview} className="btn-primary mt-5 h-[52px] w-full rounded-[14px]">
+                {t('review.start')}<ArrowRight size={18} aria-hidden="true" />
+              </button>
+              <Link to="/cards" className="mt-3 block text-center text-sm text-muted hover:text-fg"
+                onClick={() => localStorage.setItem('review-folder', '')}>{t('home.customize')}</Link>
+            </>
           )}
           {due === 0 && words > 0 && (
             <button type="button" onClick={() => navigate('/cards?practice=1')} className="btn-ghost mt-5 h-12 w-full">

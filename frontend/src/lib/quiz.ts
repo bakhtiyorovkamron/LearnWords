@@ -47,7 +47,8 @@ export type Direction = 'de_ru' | 'ru_de' | 'mixed'
  */
 export function availableFormats(card: DueCard, direction: Direction = 'mixed'): QuizFormat[] {
   const dir = direction === 'mixed' ? (Math.random() < 0.5 ? 'de_ru' : 'ru_de') : direction
-  const hasTranslation = card.translation.trim() !== ''
+  // Every format that shows or asks for the translation needs one: an empty prompt is not a question.
+  const hasTranslation = (card.translation ?? '').trim() !== ''
   const out: QuizFormat[] = []
   if (hasTranslation) {
     if (dir === 'de_ru') {
@@ -57,7 +58,7 @@ export function availableFormats(card: DueCard, direction: Direction = 'mixed'):
       if (card.box_level >= 3) out.push('ru_de_type')
     }
   }
-  if (card.has_example) out.push('gap')
+  if (card.has_example) out.push('gap') // the example with a ___ blank; it needs no translation
   return out
 }
 

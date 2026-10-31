@@ -65,7 +65,7 @@ describe('Home: today card', () => {
   it('words due → the count, the time estimate and a start button', async () => {
     renderHome()
     expect(await screen.findByText('12 words')).toBeTruthy()
-    expect(screen.getByText('to review today · about 3 minutes')).toBeTruthy() // 12 × 15 s
+    expect(screen.getByText('in this session · about 3 minutes')).toBeTruthy() // 12 × 15 s
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Time to review')
     expect(screen.getByText(/^Today, /)).toBeTruthy()
   })
@@ -74,15 +74,35 @@ describe('Home: today card', () => {
     vi.mocked(foldersApi.list).mockResolvedValue(list(3, 1))
     renderHome()
     expect(await screen.findByText('1 word')).toBeTruthy()
-    expect(screen.getByText('to review today · about 1 minute')).toBeTruthy()
+    expect(screen.getByText('in this session · about 1 minute')).toBeTruthy()
   })
 
-  it('Start training reviews ALL words (review-folder is cleared) and opens the session at once: /cards?start=1', async () => {
+  it('Start training reviews ALL words (review-folder is cleared) and opens a short session at once: /cards?start=1&size=20', async () => {
     localStorage.setItem('review-folder', 'f1')
     renderHome()
     fireEvent.click(await screen.findByRole('button', { name: /Start training/ }))
     expect(localStorage.getItem('review-folder')).toBe('')
-    expect(where()).toBe('/cards?start=1')
+    expect(where()).toBe('/cards?start=1&size=20')
+  })
+
+  it('408 due, saved size "all": Home still says 20 words, about 5 minutes, 408 in total — and keeps the saved size', async () => {
+    localStorage.setItem('review-session-size', 'all')
+    vi.mocked(foldersApi.list).mockResolvedValue(list(500, 408))
+    renderHome()
+    expect(await screen.findByText('20 words')).toBeTruthy()
+    expect(screen.getByText('in this session · about 5 minutes')).toBeTruthy() // 20 × 15 s
+    expect(screen.getByText('408 due in total')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Start training/ }))
+    expect(where()).toBe('/cards?start=1&size=20')
+    expect(localStorage.getItem('review-session-size')).toBe('all') // the setting is not changed
+  })
+
+  it('20 or fewer due: no "in total" line; "Customize training" opens /cards without starting', async () => {
+    renderHome()
+    await screen.findByText('12 words')
+    expect(screen.queryByText(/due in total/)).toBeNull()
+    fireEvent.click(screen.getByRole('link', { name: 'Customize training' }))
+    expect(where()).toBe('/cards')
   })
 
   it('nothing due, but words → "All done", and Practice more opens the practice picker', async () => {

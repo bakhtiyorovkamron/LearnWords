@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DueCard, WordCard } from '../api/types'
-import { buildOptions, pickDistractors, type QuizFormat, type QuizItem } from './quiz'
+import { availableFormats, buildOptions, buildQueue, pickDistractors, type QuizFormat, type QuizItem } from './quiz'
 
 const w = (n: number, lang: string | null | undefined, over: Partial<WordCard> = {}): WordCard => ({
   id: `c${n}`, context_id: 'x', word: `Wort${n}`, translation: `перевод${n}`, transcription: '', language: 'de',
@@ -72,5 +72,41 @@ describe('buildOptions', () => {
     const { options, lacking } = buildOptions(item(w(1, 'ru'), 'ru_de'), [w(2, 'ru')])
     expect(lacking).toBe(true)
     expect(options.find((o) => o.correct)?.text).toBe('Wort1')
+  })
+})
+
+describe('availableFormats: an empty translation', () => {
+  const due = (over: Partial<DueCard>): DueCard => ({ ...w(1, 'ru'), box_level: 4, has_example: false, ...over } as DueCard)
+  const dirs = ['de_ru', 'ru_de', 'mixed'] as const
+
+  it('never gets de_ru / ru_de / ru_de_type', () => {
+    for (const translation of ['', '   ', '\n']) {
+      for (const direction of dirs) {
+        for (let i = 0; i < 20; i++) {
+          expect(availableFormats(due({ translation, has_example: true }), direction)).toEqual(['gap'])
+          expect(availableFormats(due({ translation }), direction)).toEqual([])
+        }
+      }
+    }
+  })
+
+  it('with an example it gets gap; with nothing at all it is skipped from the queue', () => {
+    const withExample = due({ id: 'a', translation: '', has_example: true })
+    const nothing = due({ id: 'b', translation: '' })
+    const queue = buildQueue([withExample, nothing], 'mixed')
+    expect(queue.map((q) => [q.card.id, q.format])).toEqual([['a', 'gap']])
+  })
+
+  it('a card with a translation still gets its formats (typing from box 3)', () => {
+    expect(availableFormats(due({ translation: 'собака' }), 'de_ru')).toEqual(['de_ru'])
+    expect(availableFormats(due({ translation: 'собака' }), 'ru_de')).toEqual(['ru_de', 'ru_de_type'])
+    expect(availableFormats(due({ translation: 'собака', box_level: 2 }), 'ru_de')).toEqual(['ru_de'])
+  })
+
+  it('de_ru distractors never have an empty translation', () => {
+    const pool = [w(2, 'ru', { translation: '' }), w(3, 'ru', { translation: '  ' }), w(4, 'ru')]
+    const r = pickDistractors(item(w(1, 'ru'), 'de_ru'), pool)
+    expect(r.cards.map((c) => c.id)).toEqual(['c4'])
+    expect(r.lacking).toBe(true)
   })
 })
