@@ -57,7 +57,7 @@ describe('StoryFormModal: create', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }))
     expect(toast).toHaveBeenCalledWith('Story saved')
-    expect(qc.getQueryData(['stories', 'by-id', 's1', 'en'])).toBeTruthy() // opens without another request
+    expect(qc.getQueryData(['stories', 'by-id', 's1'])).toBeTruthy() // opens without another request
   })
 
   it('auto mode (the default) hides the translation field and sends translation_mode auto', async () => {

@@ -45,6 +45,9 @@ type StoryRepository interface {
 	GetTranslation(ctx context.Context, storyID uuid.UUID, lang string) (domain.StoryTranslation, bool, error)
 	PutTranslation(ctx context.Context, storyID uuid.UUID, lang string, tr domain.StoryTranslation) error
 	DeleteTranslation(ctx context.Context, storyID uuid.UUID, lang string) error
+	// FixTranslationLang sets the story's translation language when it has none (conditional: the first
+	// caller wins) and returns the language in force.
+	FixTranslationLang(ctx context.Context, storyID uuid.UUID, lang string) (string, error)
 	// Own stories (source 'user'): written or pasted by the user.
 	ByID(ctx context.Context, userID, id uuid.UUID) (domain.DailyStory, error)
 	CreateOwn(ctx context.Context, s domain.DailyStory) (domain.DailyStory, error)
@@ -83,7 +86,7 @@ func (s *StoryService) TodayWords(ctx context.Context, userID uuid.UUID) ([]doma
 // GenerateDailyStory builds a story from today's words and resolves it for display in
 // nativeLang. Returns (nil, nil) when no words were added today.
 func (s *StoryService) GenerateDailyStory(ctx context.Context, userID uuid.UUID, genre, nativeLang string) (*domain.DailyStory, error) {
-	st, err := s.generateFor(ctx, userID, s.today(), genre)
+	st, err := s.generateFor(ctx, userID, s.today(), genre, domain.NormTranslationLang(nativeLang))
 	if err != nil || st == nil {
 		return st, err
 	}
@@ -94,7 +97,7 @@ func (s *StoryService) GenerateDailyStory(ctx context.Context, userID uuid.UUID,
 // generateFor is the raw learning-language generation step, shared by the HTTP-facing
 // GenerateDailyStory and the daily cron (generateForAll) — neither the cron nor this helper
 // resolves a translation: nobody is viewing the story the moment the cron creates it.
-func (s *StoryService) generateFor(ctx context.Context, userID uuid.UUID, day, genre string) (*domain.DailyStory, error) {
+func (s *StoryService) generateFor(ctx context.Context, userID uuid.UUID, day, genre, translationLang string) (*domain.DailyStory, error) {
 	if s.gen == nil {
 		return nil, domain.ErrUnavailable
 	}
@@ -122,7 +125,7 @@ func (s *StoryService) generateFor(ctx context.Context, userID uuid.UUID, day, g
 		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
 	// Proofread BEFORE saving: what is stored (and later translated) is the corrected text.
-	st := domain.DailyStory{UserID: userID, Date: day, Genre: genre, Title: g.Title, StoryDE: g.StoryDE, WordsUsed: words}
+	st := domain.DailyStory{UserID: userID, Date: day, Genre: genre, Title: g.Title, StoryDE: g.StoryDE, WordsUsed: words, TranslationLang: translationLang}
 	corrections := s.proofread(ctx, &st)
 	saved, err := s.repo.Upsert(ctx, st)
 	if err != nil {
@@ -249,12 +252,24 @@ func (s *StoryService) ByDate(ctx context.Context, userID uuid.UUID, day, native
 	return &st, nil
 }
 
-// resolveTranslation fills st.StoryTranslation and each WordsUsed[].Translation for nativeLang:
-// a cached translation if one exists, generated via AI and cached otherwise. A cache miss with
+// resolveTranslation fills st.StoryTranslation and each WordsUsed[].Translation in the story's ONE
+// translation language: st.TranslationLang when it is set, otherwise the requested language — which
+// is then fixed on the story (first open), so later requests for another interface language neither
+// change it nor trigger a new translation. A cached translation is used if one exists, otherwise it
+// is generated via AI and cached. A cache miss with
 // no translator configured, or a failed generation, just leaves the translation empty — the
 // German text is still shown; it is never silently replaced with the wrong language.
-func (s *StoryService) resolveTranslation(ctx context.Context, st *domain.DailyStory, nativeLang string) {
-	nativeLang = domain.NormTranslationLang(nativeLang)
+func (s *StoryService) resolveTranslation(ctx context.Context, st *domain.DailyStory, requested string) {
+	nativeLang := st.TranslationLang
+	if nativeLang == "" {
+		nativeLang = domain.NormTranslationLang(requested)
+		if fixed, err := s.repo.FixTranslationLang(ctx, st.ID, nativeLang); err == nil && fixed != "" {
+			nativeLang = fixed // a parallel first open may have fixed another language: it wins
+		} else if err != nil {
+			slog.WarnContext(ctx, "story translation language not saved", "story", st.ID, "err", err)
+		}
+		st.TranslationLang = nativeLang
+	}
 	st.Language = nativeLang
 	st.TranslationSource = ""
 	// WordsUsed is stored with whatever language was active when the words were first added —
@@ -358,7 +373,7 @@ func (s *StoryService) generateForAll(ctx context.Context, day string) {
 		c = domain.WithLang(c, lang)
 		// No translation here: nobody is viewing the story the moment the cron creates it —
 		// resolveTranslation runs lazily the first time a user actually opens it.
-		if _, err := s.generateFor(c, uid, day, ""); err != nil {
+		if _, err := s.generateFor(c, uid, day, "", ""); err != nil {
 			slog.Warn("daily story cron: generation failed", "user", uid, "err", err)
 		}
 		cancel()

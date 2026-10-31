@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
+	"learnwords/migrations"
 )
 
 type storyFixture struct {
@@ -270,5 +271,88 @@ func TestStories_ListIsNewestFirstWithoutText_AndStatsCountOnlyAI(t *testing.T) 
 	f.pool.QueryRow(ctx, `SELECT count(*) FROM daily_stories WHERE source = 'ai'`).Scan(&ai1) //nolint:errcheck
 	if st.TotalStories != ai1 {
 		t.Errorf("TotalStories %d counts own stories (AI: %d)", st.TotalStories, ai1)
+	}
+}
+
+func TestStories_TranslationLang_SetAtCreationAndFixedOnce(t *testing.T) {
+	f := newStoryFixture(t)
+	ctx := context.Background()
+
+	// A generated story carries the language from the request; a cron story has none.
+	withLang, err := f.repo.Upsert(ctx, domain.DailyStory{UserID: f.user, Date: day, StoryDE: "Text.", TranslationLang: "uz"})
+	if err != nil || withLang.TranslationLang != "uz" {
+		t.Fatalf("upsert: %+v %v", withLang, err)
+	}
+	cron, err := f.repo.Upsert(ctx, domain.DailyStory{UserID: f.user, Date: "2026-10-17", StoryDE: "Text zwei."})
+	if err != nil || cron.TranslationLang != "" {
+		t.Fatalf("cron story: %+v %v", cron, err)
+	}
+	// Own stories get it at creation too.
+	mine, err := f.repo.CreateOwn(ctx, domain.DailyStory{UserID: f.user, Date: day, Title: "Mein", StoryDE: "Mein Text.", TranslationLang: "en"})
+	if err != nil || mine.TranslationLang != "en" {
+		t.Fatalf("own: %+v %v", mine, err)
+	}
+
+	// The first caller fixes the language; the second one gets the winner's.
+	first, err := f.repo.FixTranslationLang(ctx, cron.ID, "uz")
+	if err != nil || first != "uz" {
+		t.Fatalf("first fix: %q %v", first, err)
+	}
+	second, err := f.repo.FixTranslationLang(ctx, cron.ID, "ru")
+	if err != nil || second != "uz" {
+		t.Fatalf("second fix must return the winner uz: %q %v", second, err)
+	}
+	got, _ := f.repo.ByID(ctx, f.user, cron.ID)
+	if got.TranslationLang != "uz" {
+		t.Errorf("stored: %q", got.TranslationLang)
+	}
+	// Editing an own story keeps the language.
+	upd, err := f.repo.UpdateOwn(ctx, f.user, mine.ID, "Neu", "Neuer Text.")
+	if err != nil || upd.TranslationLang != "en" {
+		t.Errorf("update: %+v %v", upd, err)
+	}
+	if _, err := f.repo.FixTranslationLang(ctx, uuid.New(), "ru"); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown story: %v", err)
+	}
+}
+
+// The migration's backfill takes the language of the EARLIEST translation row (a tie → ru); a story
+// without translation rows stays NULL.
+func TestMigration39_BackfillPicksTheEarliestTranslation(t *testing.T) {
+	f := newStoryFixture(t)
+	ctx := context.Background()
+	mk := func(d string) uuid.UUID { return f.ai(t, d, "Text für "+d).ID }
+	early, tie, none := mk("2026-09-01"), mk("2026-09-02"), mk("2026-09-03")
+	put := func(id uuid.UUID, lang, at string) {
+		f.exec(t, `INSERT INTO story_translations (story_id, lang, translation_text, created_at) VALUES ($1, $2, 'x', $3::timestamptz)`, id, lang, at)
+	}
+	put(early, "ru", "2026-09-05T10:00:00Z")
+	put(early, "uz", "2026-09-04T10:00:00Z") // earlier than ru
+	put(early, "en", "2026-09-06T10:00:00Z")
+	put(tie, "uz", "2026-09-05T10:00:00Z")
+	put(tie, "ru", "2026-09-05T10:00:00Z") // same time → ru
+	f.exec(t, `UPDATE daily_stories SET translation_lang = NULL WHERE id = ANY($1)`, []uuid.UUID{early, tie, none})
+
+	sqlBytes, err := migrations.FS.ReadFile("000039_story_translation_lang.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, string(sqlBytes)) // idempotent: ADD COLUMN IF NOT EXISTS, then the backfill
+
+	lang := func(id uuid.UUID) string {
+		s, err := f.repo.ByID(ctx, f.user, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s.TranslationLang
+	}
+	if got := lang(early); got != "uz" {
+		t.Errorf("earliest row: %q, want uz", got)
+	}
+	if got := lang(tie); got != "ru" {
+		t.Errorf("tie: %q, want ru", got)
+	}
+	if got := lang(none); got != "" {
+		t.Errorf("no rows: %q, want NULL", got)
 	}
 }

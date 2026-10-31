@@ -20,7 +20,8 @@ type fakeStoryRepo struct {
 	saved       []domain.DailyStory
 	corrections []domain.StoryCorrection
 
-	own map[uuid.UUID]domain.DailyStory // own and AI stories by id (ByID, CreateOwn, ...)
+	own   map[uuid.UUID]domain.DailyStory // own and AI stories by id (ByID, CreateOwn, ...)
+	langs map[uuid.UUID]string            // translation_lang of stories that are not in `own`
 }
 
 func newFakeStoryRepo() *fakeStoryRepo {
@@ -44,6 +45,24 @@ func (r *fakeStoryRepo) PutTranslation(_ context.Context, storyID uuid.UUID, lan
 func (r *fakeStoryRepo) DeleteTranslation(_ context.Context, storyID uuid.UUID, lang string) error {
 	delete(r.cache, r.key(storyID, lang))
 	return nil
+}
+
+// FixTranslationLang mimics the conditional UPDATE: the first caller wins.
+func (r *fakeStoryRepo) FixTranslationLang(_ context.Context, storyID uuid.UUID, lang string) (string, error) {
+	if r.langs == nil {
+		r.langs = map[uuid.UUID]string{}
+	}
+	if st, ok := r.own[storyID]; ok {
+		if st.TranslationLang == "" {
+			st.TranslationLang = lang
+			r.own[storyID] = st
+		}
+		return st.TranslationLang, nil
+	}
+	if _, ok := r.langs[storyID]; !ok {
+		r.langs[storyID] = lang
+	}
+	return r.langs[storyID], nil
 }
 
 func (r *fakeStoryRepo) ByID(_ context.Context, userID, id uuid.UUID) (domain.DailyStory, error) {
@@ -136,23 +155,90 @@ func newStory(id uuid.UUID) domain.DailyStory {
 	}
 }
 
-// Same story_id, three native languages → three independent, correctly-tagged translations
-// (no cross-language bleed, each generated once).
-func TestResolveTranslation_PerLanguage(t *testing.T) {
+// A story has ONE translation language: the first open fixes it, later requests for other
+// languages get the same translation and never call the model again.
+func TestResolveTranslation_FirstLanguageWins(t *testing.T) {
 	repo := newFakeStoryRepo()
 	tr := newFakeTranslator()
 	s := &StoryService{repo: repo, translator: tr}
 	id := uuid.New()
 
 	for _, lang := range []string{"uz", "en", "ru"} {
-		st := newStory(id)
+		st := newStory(id) // re-read: the repository knows the fixed language, the struct may not
 		s.resolveTranslation(context.Background(), &st, lang)
-		if want := lang + ":Der Hund läuft."; st.StoryTranslation != want {
-			t.Errorf("lang %s: story translation = %q, want %q", lang, st.StoryTranslation, want)
+		if want := "uz:Der Hund läuft."; st.StoryTranslation != want {
+			t.Errorf("requested %s: story translation = %q, want %q", lang, st.StoryTranslation, want)
 		}
-		if want := lang + ":Hund"; st.WordsUsed[0].Translation != want {
-			t.Errorf("lang %s: word gloss = %q, want %q", lang, st.WordsUsed[0].Translation, want)
+		if want := "uz:Hund"; st.WordsUsed[0].Translation != want {
+			t.Errorf("requested %s: word gloss = %q, want %q", lang, st.WordsUsed[0].Translation, want)
 		}
+		if st.TranslationLang != "uz" || st.Language != "uz" {
+			t.Errorf("requested %s: lang = %q / %q, want uz", lang, st.TranslationLang, st.Language)
+		}
+	}
+	if n := len(tr.calls); n != 1 {
+		t.Errorf("model calls: %v, want exactly one (story, uz)", tr.calls)
+	}
+}
+
+// A story that already has translation_lang 'ru' asked in 'uz': the ru translation, no AI call.
+func TestResolveTranslation_FixedLangIgnoresRequest(t *testing.T) {
+	repo := newFakeStoryRepo()
+	tr := newFakeTranslator()
+	s := &StoryService{repo: repo, translator: tr}
+	st := newStory(uuid.New())
+	st.TranslationLang = "ru"
+	repo.cache[repo.key(st.ID, "ru")] = domain.StoryTranslation{Translation: "russisch", WordGlosses: map[string]string{"Hund": "собака"}}
+	s.resolveTranslation(context.Background(), &st, "uz")
+	if st.StoryTranslation != "russisch" || st.WordsUsed[0].Translation != "собака" || st.TranslationLang != "ru" {
+		t.Errorf("got %+v", st)
+	}
+	if len(tr.calls) != 0 {
+		t.Errorf("AI called: %v", tr.calls)
+	}
+}
+
+// A story with no language yet, first opened in 'uz': translated to uz once, translation_lang saved;
+// a later 'ru' request returns uz without an AI call.
+func TestResolveTranslation_NullStoryIsFixedByFirstOpen(t *testing.T) {
+	repo := newFakeStoryRepo()
+	tr := newFakeTranslator()
+	s := &StoryService{repo: repo, translator: tr}
+	st := newStory(uuid.New())
+	repo.own[st.ID] = st // stored with translation_lang NULL
+	first := repo.own[st.ID]
+	s.resolveTranslation(context.Background(), &first, "uz")
+	if first.TranslationLang != "uz" || first.StoryTranslation != "uz:Der Hund läuft." {
+		t.Fatalf("first open: %+v", first)
+	}
+	if repo.own[st.ID].TranslationLang != "uz" {
+		t.Errorf("translation_lang not saved: %+v", repo.own[st.ID])
+	}
+	later := repo.own[st.ID]
+	s.resolveTranslation(context.Background(), &later, "ru")
+	if later.StoryTranslation != "uz:Der Hund läuft." || later.TranslationLang != "uz" {
+		t.Errorf("later ru request: %+v", later)
+	}
+	if n := tr.calls["Der Hund läuft.:uz"]; n != 1 || len(tr.calls) != 1 {
+		t.Errorf("AI calls: %v", tr.calls)
+	}
+}
+
+// Generation fixes the language from the request; the cron leaves it empty.
+func TestGenerate_SetsTranslationLangFromNativeLanguage(t *testing.T) {
+	repo := newFakeStoryRepo()
+	repo.words = append([]domain.StoryWord(nil), storyWords...)
+	s := NewStoryService(repo, &fakeStoryGen{story: rawStory}, newFakeTranslator(), nil)
+	st, err := s.GenerateDailyStory(deCtx(), uuid.New(), "", "uz")
+	if err != nil || st == nil {
+		t.Fatal(st, err)
+	}
+	if repo.saved[0].TranslationLang != "uz" || st.TranslationLang != "uz" {
+		t.Errorf("saved %q, returned %q, want uz", repo.saved[0].TranslationLang, st.TranslationLang)
+	}
+	cron, err := s.generateFor(deCtx(), uuid.New(), "2026-10-14", "", "")
+	if err != nil || cron == nil || repo.saved[1].TranslationLang != "" {
+		t.Errorf("cron story must stay NULL: %+v %v", repo.saved, err)
 	}
 }
 

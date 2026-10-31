@@ -67,6 +67,9 @@ type DailyStory struct {
 	Source string `json:"source"`
 	// TranslationSource: who wrote StoryTranslation — "ai", "user", or "" while there is none yet.
 	TranslationSource string `json:"translation_source"`
+	// TranslationLang: the one language this story is translated into (ru|en|uz). Fixed by the first
+	// open (or at creation) and never changed by the interface language afterwards; "" = not fixed yet.
+	TranslationLang string `json:"translation_lang"`
 }
 
 // Proofread outcome stored in daily_stories.proofread_status.

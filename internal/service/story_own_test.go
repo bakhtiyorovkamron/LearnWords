@@ -69,9 +69,12 @@ func TestCreateOwn_Auto_TranslatedOnce_ThenByIDUsesTheCache(t *testing.T) {
 	if n := tr.calls[goodText+":uz"]; n != 1 {
 		t.Errorf("translator called %d times, want 1", n)
 	}
-	// Another language is a separate translation.
-	if other, _ := s.ByID(context.Background(), uid, st.ID, "en"); other.StoryTranslation != "en:"+goodText {
+	// The story's language is fixed: another interface language gets the same translation, no AI call.
+	if other, _ := s.ByID(context.Background(), uid, st.ID, "en"); other.StoryTranslation != "uz:"+goodText || other.TranslationLang != "uz" {
 		t.Errorf("en: %+v", other)
+	}
+	if n := tr.calls[goodText+":en"]; n != 0 {
+		t.Errorf("en translator calls: %d, want 0", n)
 	}
 }
 
@@ -199,7 +202,7 @@ func TestUpdateOwn_TextChange_DropsCachedTranslations(t *testing.T) {
 	s, repo := ownService(tr)
 	uid := uuid.New()
 	st, _ := s.CreateOwnStory(context.Background(), uid, auto(goodText), "ru")
-	s.ByID(context.Background(), uid, st.ID, "en") // a second language is cached too
+	repo.cache[repo.key(st.ID, "en")] = domain.StoryTranslation{Translation: "old en"} // a row of another language left from before
 	if len(repo.cache) != 2 {
 		t.Fatalf("setup: %d cached", len(repo.cache))
 	}
@@ -323,5 +326,36 @@ func TestOwnStories_AIStoriesAreUntouchable(t *testing.T) {
 	// An AI story can be read by id (the archive opens it that way).
 	if got, err := s.ByID(context.Background(), uid, ai.ID, "ru"); err != nil || got.Source != domain.StorySourceAI {
 		t.Errorf("by id of an AI story: %+v %v", got, err)
+	}
+}
+
+// An own story gets its translation language at creation (manual: the language of the translation the
+// user wrote; auto: the request's), editing keeps it, and another interface language changes nothing.
+func TestOwnStory_TranslationLangIsSetAtCreationAndKeptOnEdit(t *testing.T) {
+	tr := newFakeTranslator()
+	s, repo := ownService(tr)
+	uid := uuid.New()
+
+	manual, err := s.CreateOwnStory(context.Background(), uid, domain.OwnStoryInput{Text: goodText, TranslationMode: "manual", Translation: "Mening tarjimam"}, "uz")
+	if err != nil || manual.TranslationLang != "uz" || repo.own[manual.ID].TranslationLang != "uz" || manual.StoryTranslation != "Mening tarjimam" {
+		t.Fatalf("manual: %+v %v", manual, err)
+	}
+	auto, err := s.CreateOwnStory(context.Background(), uid, auto(goodText), "en")
+	if err != nil || auto.TranslationLang != "en" || repo.own[auto.ID].TranslationLang != "en" {
+		t.Fatalf("auto: %+v %v", auto, err)
+	}
+
+	// Editing from a UI in another language keeps the story's language and the user's translation.
+	upd, err := s.UpdateOwnStory(context.Background(), uid, manual.ID,
+		domain.OwnStoryInput{Title: "Neu", Text: goodText, TranslationMode: "manual", Translation: "Yangi tarjima"}, "ru")
+	if err != nil || upd.TranslationLang != "uz" || upd.StoryTranslation != "Yangi tarjima" {
+		t.Fatalf("edit: %+v %v", upd, err)
+	}
+	if _, ok := repo.cache[repo.key(manual.ID, "ru")]; ok {
+		t.Error("a ru row appeared for a uz story")
+	}
+	// Viewing in ru returns the uz translation.
+	if got, _ := s.ByID(context.Background(), uid, manual.ID, "ru"); got.StoryTranslation != "Yangi tarjima" || got.TranslationLang != "uz" {
+		t.Errorf("view: %+v", got)
 	}
 }

@@ -67,7 +67,7 @@ func TestStory_ProofreadTextIsSaved(t *testing.T) {
 	p := &fakeProofreader{answers: []any{fixed}}
 	svc, repo, gen := newProofStory(p)
 
-	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "сказка")
+	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "сказка", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestStory_ProofreadTextIsSaved(t *testing.T) {
 func TestStory_ProofreadRetriedOnce(t *testing.T) {
 	p := &fakeProofreader{answers: []any{errors.New("timeout"), fixed}}
 	svc, _, _ := newProofStory(p)
-	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "")
+	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestStory_ProofreadRetriedOnce(t *testing.T) {
 func TestStory_ProofreadFailsTwice_OriginalShown(t *testing.T) {
 	p := &fakeProofreader{answers: []any{errors.New("invalid JSON")}}
 	svc, repo, _ := newProofStory(p)
-	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "")
+	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestStory_SuspiciousProofreadRejected(t *testing.T) {
 	for name, bad := range map[string]domain.ProofreadStory{"too short": short, "bold dropped": lostBold} {
 		p := &fakeProofreader{answers: []any{bad}}
 		svc, _, _ := newProofStory(p)
-		st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "")
+		st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +139,7 @@ func TestStory_SuspiciousProofreadRejected(t *testing.T) {
 
 func TestStory_NoProofreader(t *testing.T) {
 	svc, _, _ := newProofStory(nil)
-	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "")
+	st, err := svc.generateFor(deCtx(), uuid.New(), "2026-10-14", "", "")
 	if err != nil || st.StoryDE != rawStory.StoryDE || st.ProofreadStatus != domain.ProofreadNone {
 		t.Fatalf("got %+v %v", st, err)
 	}

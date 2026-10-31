@@ -54,7 +54,7 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
   onClose: () => void
   onSaved?: (story: DailyStory) => void
 }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const learning = useLearningLang()
   const qc = useQueryClient()
 
@@ -69,7 +69,7 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
   const save = useMutation({
     mutationFn: (body: OwnStoryInput) => (story ? storiesApi.updateOwn(story.id, body) : storiesApi.createOwn(body)),
     onSuccess: (saved) => {
-      qc.setQueryData(['stories', 'by-id', saved.id, i18n.language], saved)
+      qc.setQueryData(['stories', 'by-id', saved.id], saved)
       void qc.invalidateQueries({ queryKey: ['stories'] })
       toast(t('story.own.saved'))
       onSaved?.(saved)

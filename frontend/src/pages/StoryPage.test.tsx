@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
@@ -241,6 +241,21 @@ describe('StoryPage: the text', () => {
     expect(hl[0].textContent).toBe('Hund')
     expect(hl[0].className).toContain('underline')
     expect(hl[0].parentElement?.className).toContain('font-serif')
+  })
+})
+
+describe('StoryPage: the interface language does not change the story', () => {
+  it('switching the language refetches nothing: the story and the archive are requested once', async () => {
+    renderPage()
+    await waitFor(() => expect(storiesApi.today).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledTimes(1))
+    await screen.findByText('KI heute')
+    await act(async () => { await i18n.changeLanguage('uz') })
+    await act(async () => { await i18n.changeLanguage('ru') })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(storiesApi.today).toHaveBeenCalledTimes(1)
+    expect(storiesApi.byId).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('KI heute')).toBeTruthy() // the same story is still on screen
   })
 })
 

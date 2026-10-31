@@ -129,7 +129,9 @@ export function StoryPage() {
   const { isOn } = useFeatures()
   const qc = useQueryClient()
   const today = useQuery({
-    queryKey: ['stories', 'today', i18n.language],
+    // No interface language in the keys: a story has ONE translation language, fixed by its first open,
+    // so switching the UI language must not refetch (the language is only sent for that first open).
+    queryKey: ['stories', 'today'],
     queryFn: () => storiesApi.today(i18n.language),
   })
   const archive = useQuery({ queryKey: ['stories', 'list'], queryFn: storiesApi.list })
@@ -175,7 +177,7 @@ export function StoryPage() {
   // The archive list has no text or translation — the selected story is fetched by id, resolved
   // for the current interface language, same as today's story.
   const selectedQuery = useQuery({
-    queryKey: ['stories', 'by-id', selectedId, i18n.language],
+    queryKey: ['stories', 'by-id', selectedId],
     queryFn: () => storiesApi.byId(selectedId),
     enabled: !!selectedId,
   })

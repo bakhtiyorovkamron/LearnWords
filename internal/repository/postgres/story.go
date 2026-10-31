@@ -61,7 +61,7 @@ func (r *StoryRepository) LearningLanguage(ctx context.Context, userID uuid.UUID
 	return lang, err
 }
 
-const storyCols = `id, user_id, date, genre, title, story_de, words_used, created_at, proofread_status, source`
+const storyCols = `id, user_id, date, genre, title, story_de, words_used, created_at, proofread_status, source, COALESCE(translation_lang, '')`
 
 // listStoryCols is storyCols with the text left out: the archive lists metadata, the page loads a
 // story's text by id.
@@ -73,7 +73,7 @@ func scanStory(row pgx.Row) (domain.DailyStory, error) {
 		day   time.Time
 		words []byte
 	)
-	if err := row.Scan(&s.ID, &s.UserID, &day, &s.Genre, &s.Title, &s.StoryDE, &words, &s.CreatedAt, &s.ProofreadStatus, &s.Source); err != nil {
+	if err := row.Scan(&s.ID, &s.UserID, &day, &s.Genre, &s.Title, &s.StoryDE, &words, &s.CreatedAt, &s.ProofreadStatus, &s.Source, &s.TranslationLang); err != nil {
 		return s, err
 	}
 	s.Date = day.Format("2006-01-02")
@@ -100,13 +100,14 @@ func (r *StoryRepository) Upsert(ctx context.Context, s domain.DailyStory) (doma
 	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var err error
 		saved, err = scanStory(tx.QueryRow(ctx, `
-			INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used, proofread_status, source)
-			VALUES ($1, $2::date, $3, $4, $5, $6::jsonb, $7, 'ai')
+			INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used, proofread_status, source, translation_lang)
+			VALUES ($1, $2::date, $3, $4, $5, $6::jsonb, $7, 'ai', NULLIF($8, ''))
 			ON CONFLICT (user_id, date) WHERE source = 'ai' DO UPDATE
 			SET genre = EXCLUDED.genre, title = EXCLUDED.title, story_de = EXCLUDED.story_de,
-			    words_used = EXCLUDED.words_used, proofread_status = EXCLUDED.proofread_status, created_at = now()
+			    words_used = EXCLUDED.words_used, proofread_status = EXCLUDED.proofread_status, created_at = now(),
+			    translation_lang = EXCLUDED.translation_lang
 			RETURNING `+storyCols,
-			s.UserID, s.Date, s.Genre, s.Title, s.StoryDE, string(words), s.ProofreadStatus))
+			s.UserID, s.Date, s.Genre, s.Title, s.StoryDE, string(words), s.ProofreadStatus, s.TranslationLang))
 		if err != nil {
 			return err
 		}
@@ -127,6 +128,20 @@ func (r *StoryRepository) SaveCorrections(ctx context.Context, storyID, userID u
 			storyID, userID, c.From, c.To, c.Why)
 	}
 	return r.pool.SendBatch(ctx, batch).Close()
+}
+
+// FixTranslationLang fixes the story's translation language if it has none yet and returns the
+// language that is in force: the conditional UPDATE means two parallel first opens cannot fight —
+// the first wins, the second gets the winner's language.
+func (r *StoryRepository) FixTranslationLang(ctx context.Context, storyID uuid.UUID, lang string) (string, error) {
+	var fixed string
+	err := r.pool.QueryRow(ctx, `
+		UPDATE daily_stories SET translation_lang = COALESCE(translation_lang, $2)
+		WHERE id = $1 RETURNING translation_lang`, storyID, lang).Scan(&fixed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrNotFound
+	}
+	return fixed, err
 }
 
 // GetTranslation returns a cached story translation; ok=false on a miss.
@@ -212,9 +227,9 @@ func (r *StoryRepository) ByID(ctx context.Context, userID, id uuid.UUID) (domai
 // CreateOwn saves a story the user wrote (source 'user'): no genre, no words, not proofread.
 func (r *StoryRepository) CreateOwn(ctx context.Context, s domain.DailyStory) (domain.DailyStory, error) {
 	return scanStory(r.pool.QueryRow(ctx, `
-		INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used, proofread_status, source)
-		VALUES ($1, $2::date, '', $3, $4, '[]'::jsonb, 'none', 'user')
-		RETURNING `+storyCols, s.UserID, s.Date, s.Title, s.StoryDE))
+		INSERT INTO daily_stories (user_id, date, genre, title, story_de, words_used, proofread_status, source, translation_lang)
+		VALUES ($1, $2::date, '', $3, $4, '[]'::jsonb, 'none', 'user', NULLIF($5, ''))
+		RETURNING `+storyCols, s.UserID, s.Date, s.Title, s.StoryDE, s.TranslationLang))
 }
 
 // UpdateOwn changes the title and text of the user's own story; the cached translations of the

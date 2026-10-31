@@ -202,13 +202,15 @@ export interface StoryWord {
 export interface DailyStory {
   id: string; date: string; genre: string; title: string
   story_de: string
-  // Translation of story_de and each word's gloss, in `language` — resolved (generated + cached
-  // on first view) for whichever native_language was requested. Empty if translation generation
+  // Translation of story_de and each word's gloss, in `language` (= translation_lang) — resolved (generated + cached
+  // on the FIRST view) for the native_language of that request. Empty if translation generation
   // is unavailable or failed — never a guess in the wrong language.
   story_translation: string; language: string
   words_used: StoryWord[]; created_at: string
   source: 'ai' | 'user' // generated from the day's words, or written / pasted by the user
   translation_source: 'ai' | 'user' | '' // who wrote story_translation ('' = there is none yet)
+  // The one language this story is translated into (fixed by its first open); '' while not fixed yet.
+  translation_lang?: string
 }
 
 /** Body of creating / editing an own story. `translation` only counts for translation_mode 'manual'. */

@@ -130,7 +130,7 @@ func (s *StoryService) CreateOwnStory(ctx context.Context, userID uuid.UUID, in 
 	if in.TranslationMode == domain.TranslationAuto && s.translator == nil {
 		return nil, domain.ErrUnavailable
 	}
-	st, err := s.repo.CreateOwn(ctx, domain.DailyStory{UserID: userID, Date: s.today(), Title: in.Title, StoryDE: in.Text})
+	st, err := s.repo.CreateOwn(ctx, domain.DailyStory{UserID: userID, Date: s.today(), Title: in.Title, StoryDE: in.Text, TranslationLang: nativeLang})
 	if err != nil {
 		return nil, fmt.Errorf("save story: %w", err)
 	}
@@ -169,6 +169,9 @@ func (s *StoryService) UpdateOwnStory(ctx context.Context, userID, id uuid.UUID,
 	}
 	if cur.Source != domain.StorySourceUser {
 		return nil, domain.ErrNotFound
+	}
+	if cur.TranslationLang != "" { // editing keeps the story's language, whatever the interface language is
+		nativeLang = cur.TranslationLang
 	}
 	textChanged := cur.StoryDE != in.Text
 	var cached domain.StoryTranslation
