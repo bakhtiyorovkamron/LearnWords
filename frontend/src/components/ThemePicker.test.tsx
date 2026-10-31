@@ -90,13 +90,22 @@ describe('ThemePicker (row)', () => {
     expect(html().getAttribute('data-theme')).toBe('navy')
   })
 
-  it('is hidden without the theme_picker feature — and while /me is still loading', async () => {
+  it('is hidden only when the feature is switched off for the user (enabled:false)', async () => {
     vi.mocked(meApi.get).mockResolvedValue(me(false))
     wrap(<ThemePicker variant="row" />)
-    expect(screen.queryByRole('radiogroup')).toBeNull() // loading: the feature counts as OFF
     await waitFor(() => expect(meApi.get).toHaveBeenCalled())
-    await new Promise((r) => setTimeout(r, 20))
-    expect(screen.queryByRole('radiogroup')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('radiogroup')).toBeNull())
+  })
+
+  it('is visible for enabled:true and for an old server that sends no theme_picker entry', async () => {
+    wrap(<ThemePicker variant="row" />)
+    expect(await screen.findByRole('radiogroup', { name: 'Theme' })).toBeTruthy()
+    cleanup()
+    const { theme_picker: _unused, ...rest } = features(true)
+    const old = { ...me(true), features: rest } as unknown as Me
+    vi.mocked(meApi.get).mockResolvedValue(old)
+    wrap(<ThemePicker variant="row" />)
+    expect(await screen.findByRole('radiogroup', { name: 'Theme' })).toBeTruthy()
   })
 })
 

@@ -11,12 +11,10 @@ function strings(o: unknown, path = ''): [string, string][] {
   return []
 }
 
-// The admin screens (admin.*, features.*) are migrated in the next step.
 describe('locales: no emoji in the user-facing texts', () => {
   for (const [name, data] of [['ru', ru], ['en', en], ['uz', uz]] as const) {
     it(name, () => {
       const bad = strings(data)
-        .filter(([p]) => !/^(admin|features)\./.test(p))
         .filter(([, v]) => PICTOGRAPH.test(v))
         .map(([p, v]) => `${p}: ${v}`)
       expect(bad).toEqual([])

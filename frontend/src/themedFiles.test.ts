@@ -1,31 +1,22 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Files already moved to the theme tokens: they must not use the old palette classes again.
-// (Steps 3–5 of the migration add their files here.)
-const THEMED = [
-  'components/Layout.tsx', 'components/Logo.tsx', 'pages/ContextsPage.tsx', 'components/FolderList.tsx',
-  'components/LanguageSwitcher.tsx', 'components/PushToggle.tsx', 'components/ThemePicker.tsx',
-  'components/InstallPrompt.tsx', 'components/InAppBanner.tsx', 'components/Toaster.tsx',
-  'components/ContactLinks.tsx', 'components/ErrorState.tsx',
-  // step 3: training
-  'components/ReviewSession.tsx', 'components/QuizQuestion.tsx', 'components/ReviewResult.tsx',
-  'components/TrainingHero.tsx', 'components/DirectionToggle.tsx',
-  // step 4: collection
-  'pages/CardsPage.tsx', 'components/WordCard.tsx', 'components/ProgressDots.tsx', 'components/Folders.tsx',
-  'components/FlipCards.tsx', 'components/EditWordModal.tsx', 'components/FolderPicker.tsx',
-  'components/ShareFolderModal.tsx', 'components/WordFixes.tsx', 'components/FilterSheet.tsx',
-  'components/Sheet.tsx', 'components/Segmented.tsx',
-  // step 5a: the rest of the user screens
-  'pages/NewContextPage.tsx', 'components/PhotoImport.tsx', 'components/WordCheckHint.tsx', 'pages/SearchPage.tsx',
-  'pages/StoryPage.tsx', 'components/StoryFormModal.tsx', 'pages/StatsPage.tsx', 'components/ReviewsChart.tsx',
-  'components/HeroPanel.tsx', 'pages/AuthPage.tsx', 'components/PasswordField.tsx', 'pages/SharedFolderPage.tsx',
-  'components/FeedbackModal.tsx', 'components/StageUpOverlay.tsx', 'components/HeroIntroOverlay.tsx',
-  'components/ErrorBoundary.tsx', 'auth/ProtectedRoute.tsx',
-]
+// Every source file (tests and the users' own folder colours excepted) must use only the theme tokens.
+const SRC = __dirname
+const SKIP = new Set(['lib/folderColors.ts'])
 
-const FORBIDDEN = /\b(emerald|lime|teal|red)-\d{2,3}\b|text-white|bg-white/
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = join(dir, e.name)
+    if (e.isDirectory()) return e.name === 'locales' ? [] : sources(full)
+    const rel = relative(SRC, full).split(sep).join('/')
+    return /\.tsx?$/.test(e.name) && !/\.test\./.test(e.name) && !SKIP.has(rel) ? [rel] : []
+  })
+}
+const THEMED = sources(SRC)
+
+const FORBIDDEN = /\b(emerald|lime|teal|red|amber|sky|rose|violet|slate)-\d{2,3}\b|text-white|bg-white/
 
 describe('migrated files use only theme tokens', () => {
   for (const file of THEMED) {
@@ -35,6 +26,12 @@ describe('migrated files use only theme tokens', () => {
       expect(hit ? `${file}:${hit.n}: ${hit.line.trim()}` : null).toBeNull()
     })
   }
+
+  it('scans the whole source tree', () => {
+    expect(THEMED.length).toBeGreaterThan(60)
+    expect(THEMED).toContain('pages/AdminPage.tsx')
+    expect(THEMED).not.toContain('lib/folderColors.ts')
+  })
 
   it('the guard itself catches what it should', () => {
     for (const bad of ['text-emerald-100/70', 'bg-lime-400', 'border-teal-300', 'text-red-300', 'text-white', 'bg-white/5', 'hover:bg-emerald-400/10']) {

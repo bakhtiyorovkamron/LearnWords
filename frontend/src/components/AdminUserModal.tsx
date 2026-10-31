@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { BookOpen, Camera, Languages, Palette, Search, Send, Star, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { adminApi, type AdminUser, type FeatureState } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -20,25 +21,25 @@ export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: ()
   }, [onClose])
 
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div role="dialog" aria-modal="true" aria-labelledby="admin-user-title"
         className="glass max-h-[90vh] w-full max-w-xl space-y-5 overflow-y-auto p-6 text-left">
         <div>
-          <h2 id="admin-user-title" className="display break-all text-xl font-extrabold">{user.email}</h2>
-          <div className="mt-2 space-y-0.5 text-sm text-emerald-100/70">
+          <h2 id="admin-user-title" className="break-all text-xl font-bold text-fg">{user.email}</h2>
+          <div className="mt-2 space-y-0.5 text-sm text-muted">
             <p>{t('admin.userCard.registered', { date: date(user.created_at) })}</p>
             <p>{t('admin.userCard.words', { n: user.words_count })}</p>
-            {user.rating ? <p>{t('admin.feedback.userRating', { rating: user.rating })}</p> : null}
+            {user.rating ? <p className="flex items-center gap-1.5">{t('admin.feedback.userRating', { rating: user.rating })}<Stars rating={user.rating} /></p> : null}
             <PushLine user={user} />
             <p>{t('admin.userCard.lastActive', { date: user.last_activity_at ? date(user.last_activity_at) : t('admin.userCard.never') })}</p>
           </div>
         </div>
 
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-100/60">{t('admin.userCard.features')}</h3>
-          {features.isLoading && <div className="h-24 animate-pulse rounded-2xl bg-emerald-800/30" />}
-          {features.error && <p className="text-sm text-red-300">{errorMessage(features.error)}</p>}
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">{t('admin.userCard.features')}</h3>
+          {features.isLoading && <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />}
+          {features.error && <p className="text-sm text-danger">{errorMessage(features.error)}</p>}
           {features.data?.map((f) => <FeatureRow key={f.feature} userId={user.id} state={f} />)}
         </section>
 
@@ -48,6 +49,21 @@ export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: ()
       </div>
     </div>,
     document.body,
+  )
+}
+
+const FEATURE_ICON: Record<string, LucideIcon> = {
+  photo_import: Camera, daily_story: BookOpen, word_search: Search, story_autotranslate: Languages, theme_picker: Palette,
+}
+
+/** Five stars, `rating` of them filled; the number is in the aria-label. */
+export function Stars({ rating }: { rating: number }) {
+  return (
+    <span role="img" aria-label={`${rating} / 5`} className="inline-flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} size={14} aria-hidden="true" data-filled={n <= rating} className={n <= rating ? 'fill-current text-streak' : 'text-dot-off'} />
+      ))}
+    </span>
   )
 }
 
@@ -79,24 +95,27 @@ function FeatureRow({ userId, state }: { userId: string; state: FeatureState }) 
   }
 
   return (
-    <div className="space-y-1 rounded-2xl bg-emerald-900/30 p-3">
+    <div className="space-y-1 rounded-2xl bg-surface-2 p-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold">{t(`features.${state.feature}`)}</span>
+        <span className="flex min-w-0 items-center gap-2 font-semibold text-fg">
+          {(() => { const I = FEATURE_ICON[state.feature]; return I ? <I size={18} aria-hidden="true" className="shrink-0 text-accent-text" /> : null })()}
+          {t(`features.${state.feature}`)}
+        </span>
         <button type="button" role="switch" aria-checked={state.enabled} aria-label={t(`features.${state.feature}`)}
           disabled={save.isPending}
           onClick={() => save.mutate({ enabled: !state.enabled, daily_limit: state.limit_override })}
-          className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${state.enabled ? 'bg-lime-400' : 'bg-emerald-950/80 ring-1 ring-emerald-400/30'}`}>
-          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${state.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+          className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${state.enabled ? 'bg-accent' : 'bg-dot-off'}`}>
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full transition-all ${state.enabled ? 'left-[22px] bg-on-accent' : 'left-0.5 bg-surface'}`} />
         </button>
       </div>
       {hasLimit && (
         <>
-          <p data-testid={`usage-${state.feature}`} className="text-sm">
+          <p data-testid={`usage-${state.feature}`} className="text-sm text-fg">
             <strong>{t('admin.userCard.usedOf', { used: state.used_today, limit: state.daily_limit ?? state.default_limit })}</strong>
-            <span className="text-emerald-100/60"> · {t(state.limit_override === null ? 'admin.userCard.sourceDefault' : 'admin.userCard.sourceCustom')}</span>
+            <span className="text-muted"> · {t(state.limit_override === null ? 'admin.userCard.sourceDefault' : 'admin.userCard.sourceCustom')}</span>
           </p>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <label htmlFor={`limit-${state.feature}`} className="text-emerald-100/70">{t('admin.userCard.limit')}</label>
+            <label htmlFor={`limit-${state.feature}`} className="text-muted">{t('admin.userCard.limit')}</label>
             <input id={`limit-${state.feature}`} type="number" min={0} step={1} className="field !w-24 !py-1.5" value={draft}
               placeholder={String(state.default_limit)}
               onChange={(e) => setDraft(e.target.value)} onBlur={commitLimit}
@@ -110,13 +129,13 @@ function FeatureRow({ userId, state }: { userId: string; state: FeatureState }) 
           </div>
         </>
       )}
-      {save.error && <p role="alert" className="text-sm text-red-300">{errorMessage(save.error)}</p>}
+      {save.error && <p role="alert" className="text-sm text-danger">{errorMessage(save.error)}</p>}
     </div>
   )
 }
 
 // Fixed test text: only for checking that notifications reach this user's devices.
-const TEST_PUSH = { title: 'yodla', body: 'Test notification 🔔' }
+const TEST_PUSH = { title: 'yodla', body: 'Test notification' }
 
 function PushLine({ user }: { user: AdminUser }) {
   const { t } = useTranslation()
@@ -134,10 +153,10 @@ function PushLine({ user }: { user: AdminUser }) {
       <p>{t('admin.userCard.pushDevices', { n })}</p>
       {n > 0 && (
         <button type="button" className="btn-ghost !px-3 !py-1 text-xs" disabled={send.isPending} onClick={() => send.mutate()}>
-          {t('admin.userCard.sendTest')}
+          <Send size={12} aria-hidden="true" />{t('admin.userCard.sendTest')}
         </button>
       )}
-      {send.error && <span role="alert" className="text-xs text-red-300">{errorMessage(send.error)}</span>}
+      {send.error && <span role="alert" className="text-xs text-danger">{errorMessage(send.error)}</span>}
     </div>
   )
 }

@@ -20,7 +20,7 @@ export function InAppBanner() {
         <a href={androidIntentUrl(pathname)} className="btn-primary mt-2 !py-1.5 text-sm">{t('auth.openInBrowser')}</a>
       )}
       {app.platform === 'ios' && <p className="mt-1 text-muted">{t('auth.inAppIos')}</p>}
-      <button type="button" aria-label="✕" onClick={() => { dismissBanner(); setHidden(true) }}
+      <button type="button" aria-label={t('folders.close')} onClick={() => { dismissBanner(); setHidden(true) }}
         className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-surface hover:text-fg">
         <X size={18} aria-hidden="true" />
       </button>

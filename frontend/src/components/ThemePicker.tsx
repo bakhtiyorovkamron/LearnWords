@@ -47,7 +47,7 @@ function Swatches() {
 }
 
 /**
- * The theme picker — only for users who have the admin-enabled "theme_picker" feature.
+ * The theme picker — for everyone, unless an admin switched the "theme_picker" feature off for the user.
  * `row`: a row of the phone "More" sheet. `menu`: a palette button in the desktop header with a small popover.
  */
 export function ThemePicker({ variant }: { variant: 'row' | 'menu' }) {

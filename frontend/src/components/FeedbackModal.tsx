@@ -10,7 +10,7 @@ const STARS = [1, 2, 3, 4, 5]
 
 /**
  * The one-time "how do you like yodla?" window: a 1-5 star rating and an optional comment.
- * Sending or closing (✕ / Esc / outside click) both answer it for good — ask_feedback goes false in
+ * Sending or closing (close button / Esc / outside click) both answer it for good — ask_feedback goes false in
  * the ['me'] cache so it never comes back (the server also remembers).
  */
 export function FeedbackModal() {

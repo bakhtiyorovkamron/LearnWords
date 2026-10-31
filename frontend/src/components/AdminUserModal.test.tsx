@@ -56,8 +56,8 @@ describe('AdminUserModal', () => {
     expect(screen.getByText('Last active: never')).toBeTruthy()
     expect(screen.getByText(/^Registered: /)).toBeTruthy()
     expect(await screen.findAllByRole('switch')).toHaveLength(4)
-    expect(screen.getByRole('switch', { name: '📷 Textbook photo' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('switch', { name: '✍️ Auto-translation of own stories' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('switch', { name: 'Textbook photo' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('switch', { name: 'Auto-translation of own stories' }).getAttribute('aria-checked')).toBe('false')
     // only the feature with a default limit has the number input
     const limit = screen.getAllByRole('spinbutton')
     expect(limit).toHaveLength(1)
@@ -69,17 +69,17 @@ describe('AdminUserModal', () => {
   it('shows the user\'s feedback rating when there is one', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(<QueryClientProvider client={qc}><AdminUserModal user={{ ...user, rating: 4 }} onClose={vi.fn()} /></QueryClientProvider>)
-    expect(screen.getByText('Rating: 4 ⭐')).toBeTruthy()
+    expect(screen.getByText('Rating: 4')).toBeTruthy()
   })
 
   it('toggling a feature saves at once, keeping the limit override', async () => {
     renderModal()
-    fireEvent.click(await screen.findByRole('switch', { name: '📖 Daily story' }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'Daily story' }))
     await waitFor(() => expect(adminApi.setUserFeature).toHaveBeenCalledWith('u1', 'daily_story', { enabled: false, daily_limit: null }))
-    await waitFor(() => expect(screen.getByRole('switch', { name: '📖 Daily story' }).getAttribute('aria-checked')).toBe('false'))
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Daily story' }).getAttribute('aria-checked')).toBe('false'))
     expect(toaster.toast).toHaveBeenCalledWith('Saved')
 
-    fireEvent.click(screen.getByRole('switch', { name: '📷 Textbook photo' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Textbook photo' }))
     await waitFor(() => expect(adminApi.setUserFeature).toHaveBeenCalledWith('u1', 'photo_import', { enabled: false, daily_limit: 6 }))
   })
 
@@ -98,9 +98,9 @@ describe('AdminUserModal', () => {
   it('a failed save shows the error and keeps the old state', async () => {
     vi.mocked(adminApi.setUserFeature).mockRejectedValue(new Error('boom'))
     renderModal()
-    fireEvent.click(await screen.findByRole('switch', { name: '📖 Daily story' }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'Daily story' }))
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByRole('switch', { name: '📖 Daily story' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('switch', { name: 'Daily story' }).getAttribute('aria-checked')).toBe('true')
   })
 
   it('closes with the button and with Esc', async () => {
@@ -196,7 +196,7 @@ describe('AdminUserModal: push devices', () => {
     renderWith(2)
     fireEvent.click(screen.getByRole('button', { name: 'Send a test' }))
     await waitFor(() => expect(adminApi.sendPush).toHaveBeenCalledWith({
-      target: 'users', user_ids: ['u1'], title: 'yodla', body: 'Test notification 🔔',
+      target: 'users', user_ids: ['u1'], title: 'yodla', body: 'Test notification',
     }))
     await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Sent: 2, failed: 0, expired removed: 0'))
   })

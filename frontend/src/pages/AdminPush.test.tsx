@@ -127,8 +127,8 @@ describe('AdminPage: push to chosen users', () => {
     expect(list.getByText('bob@x.co')).toBeTruthy()
     expect(list.queryByText('carol@x.co')).toBeNull() // 0 devices
     expect(list.queryByText('dave@x.co')).toBeNull() // no count at all
-    expect(list.getByText('📱 2')).toBeTruthy()
-    expect(list.getByText('📱 1')).toBeTruthy()
+    expect(list.getByText('2')).toBeTruthy()
+    expect(list.getByText('1')).toBeTruthy()
   })
 
   it('Send is disabled until someone is selected', async () => {

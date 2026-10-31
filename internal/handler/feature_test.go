@@ -167,8 +167,8 @@ func TestMe_ContainsFeatures(t *testing.T) {
 	if len(f) != 5 {
 		t.Fatalf("features: %v", f)
 	}
-	if f["theme_picker"].(map[string]any)["enabled"] != false {
-		t.Errorf("theme_picker is off by default: %v", f["theme_picker"])
+	if f["theme_picker"].(map[string]any)["enabled"] != true {
+		t.Errorf("theme_picker is on by default: %v", f["theme_picker"])
 	}
 	p := f["photo_import"].(map[string]any)
 	if p["enabled"] != true || p["daily_limit"] != float64(defaultPhotoLimit) || p["remaining"] != float64(defaultPhotoLimit) {

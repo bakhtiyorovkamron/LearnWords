@@ -31,7 +31,7 @@ var FeatureCatalog = []FeatureSpec{
 	{Name: FeatureDailyStory},
 	{Name: FeatureWordSearch},
 	{Name: FeatureStoryAutotranslate},
-	{Name: FeatureThemePicker, DisabledByDefault: true},
+	{Name: FeatureThemePicker},
 }
 
 // FeatureByName looks a feature up in the catalog.

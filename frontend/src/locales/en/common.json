@@ -279,8 +279,7 @@
   },
   "admin": {
     "wordCheck": {"title": "Check existing words", "hint": "AI checks every saved German word. Nothing is fixed automatically — users accept or reject each suggestion themselves.", "run": "Run check", "running": "Checking…", "progress": "Checked {{processed}} of {{total}}", "result": "suggestions: {{suggestions}}, correct: {{confirmed}}, unrecognized: {{unknown}}, errors: {{failed}}"},
-    "titleA": "Admin ",
-    "titleB": "panel",
+    "title": "Admin panel",
     "subtitle": "Users and service statistics.",
     "stats": {
       "users": "Users",
@@ -315,7 +314,7 @@
     "nothingFound": "No users found",
     "userCard": {"registered": "Registered: {{date}}", "words": "Words: {{n}}", "lastActive": "Last active: {{date}}", "never": "never", "features": "Features", "limit": "Daily limit", "usedOf": "Today: {{used}} of {{limit}}", "sourceDefault": "default", "sourceCustom": "custom", "reset": "Reset", "saved": "Saved", "close": "Close", "pushDevices": "Devices with notifications: {{n}}", "sendTest": "Send a test"},
     "push": {"title": "Notifications", "subscribers": "Subscribed devices: {{n}}", "fieldTitle": "Title", "fieldBody": "Text", "toMe": "Only me (test)", "toAll": "All subscribers", "send": "Send", "confirmAll": "Send to all devices ({{n}})?", "result": "Sent: {{sent}}, failed: {{failed}}, expired removed: {{removed}}", "toSelected": "Choose users", "searchUser": "Search by email", "selectedCount": "Selected: {{n}}", "noSubscribers": "Nobody has turned on notifications yet."},
-    "feedback": {"tile": "Average rating", "count": "reviews: {{n}}", "title": "Feedback", "noComment": "no comment", "userRating": "Rating: {{rating}} ⭐"}
+    "feedback": {"tile": "Average rating", "count": "reviews: {{n}}", "title": "Feedback", "noComment": "no comment", "userRating": "Rating: {{rating}}"}
   },
   "word": {"move": "Move to folder"},
   "folder": {"none": "No folder", "new": "+ New folder"},
@@ -328,7 +327,7 @@
   "photo": {"title": "Words from a photo", "hint": "Take a photo of a textbook page or a word list — we find the words and translate them. You choose which to add.", "choose": "Choose a photo", "another": "Another photo", "reading": "Reading the photo…", "left": "Left today: {{n}} of {{limit}}", "found": "Words found: {{n}}", "noWords": "No words to learn were found in the photo. Try a closer, sharper shot.", "have": "already added", "add": "Add {{count}}", "adding": "Adding…", "notImage": "Please choose an image: JPEG, PNG, WebP or GIF.", "tooLarge": "The photo is too large (5 MB at most).", "notConfigured": "Reading photos is not available right now.", "failed": "Could not read the photo: {{error}}", "noneLeft": "No photos left today — {{limit}} again tomorrow", "folderNew": "New folder", "folderExisting": "Existing folder", "folderName": "Folder name", "folderDefault": "Lesson — {{date}}", "addedTo": "Added to “{{folder}}”: {{added}}. Already there: {{skipped}}", "openFolder": "Open folder", "errTooSmall": "The photo is too small — take it closer to the page.", "errTooDark": "Too dark — take the photo in good light.", "errBlurry": "The photo is blurry — hold the phone steady and try again.", "errNotDocument": "No study text in this photo — take a picture of a textbook page or a word list.", "errUnreadable": "The text can't be read — take the photo closer and straighter.", "notCharged": "Your daily limit was not used."},
   "push": {"enable": "Turn on notifications", "enabled": "Notifications on", "disable": "Turn off", "denied": "Notifications are blocked in your browser. Allow them in the site settings.", "iosHint": "On iPhone, notifications work after adding yodla to the Home Screen: Share → \"Add to Home Screen\".", "unsupported": "This browser doesn't support notifications."},
   "theme": {"title": "Theme", "auto": "System", "night": "Night green", "light": "Light", "graphite": "Graphite", "sand": "Sand", "navy": "Night blue"},
-  "features": {"photo_import": "📷 Textbook photo", "daily_story": "📖 Daily story", "word_search": "🔍 AI word search", "story_autotranslate": "✍️ Auto-translation of own stories", "theme_picker": "🎨 Theme picker"},
+  "features": {"photo_import": "Textbook photo", "daily_story": "Daily story", "word_search": "AI word search", "story_autotranslate": "Auto-translation of own stories", "theme_picker": "Theme picker"},
   "share": {"emptyFolder": "The folder is empty — add words to share it", "isShared": "Shared via link", "title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},
   "shared": {"words": "Words: {{count}}", "add": "Add to my words", "loginToAdd": "Log in to add these words", "added": "Added: {{added}}. Already had: {{skipped}}", "notFound": "This link is invalid or was turned off", "own": "This is your folder", "langMismatch": "This folder is for a different learning language", "empty": "This folder is empty"},
   "contact": {"title": "Contact us", "question": "Questions or problems? Message us:", "loginProblem": "Can't log in? Message us:", "reportProblem": "Report a problem"},

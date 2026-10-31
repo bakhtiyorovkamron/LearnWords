@@ -40,7 +40,7 @@ describe('InAppBanner', () => {
   it('can be dismissed — for the session only', () => {
     ua(IG_ANDROID)
     renderBanner()
-    fireEvent.click(screen.getByRole('button', { name: '✕' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('alert')).toBeNull()
     expect(sessionStorage.getItem('inapp-banner-dismissed')).toBe('1')
     cleanup()
@@ -57,7 +57,7 @@ describe('InAppBanner', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied') })
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied') })
     renderBanner()
-    fireEvent.click(screen.getByRole('button', { name: '✕' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
