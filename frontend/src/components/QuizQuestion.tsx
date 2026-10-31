@@ -1,9 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { Check, CircleCheck, CircleX, Lock, Volume2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { translationsApi } from '../api/endpoints'
 import type { Progress, WordCard } from '../api/types'
 import { whenLabel } from '../lib/boxInfo'
 import { dateLocale } from '../i18n'
@@ -53,49 +51,25 @@ function GapSentence({ sentence, answered, answer }: { sentence: string; answere
 // One training question in one of 4 formats. Choice formats (de_ru, ru_de, gap) share the
 // option buttons; ru_de_type uses a text field. Progress is updated the same way for all.
 //
-// Cards keep exactly one `translation` — in whatever interface language was active when the
-// word was added. To show the question in the user's CURRENT interface language, every format
-// that needs translated text (the 'de_ru' answer options, the 'ru_de'/'ru_de_type' prompt) looks
-// it up via /api/translations, which returns a cached value or generates+caches one via AI. The
-// 'gap' format needs no blocking lookup — its prompt is the learning-language sentence itself;
-// the native-language hint underneath it just appears once (if) the lookup resolves.
+// Every format uses the card's OWN stored translation (and example translation) — whatever the
+// interface language is now; nothing is looked up or generated at training time.
 export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner, practice = false, progress }: Props) {
   const navigate = useNavigate()
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const learning = useLearningLang()
   const { card, format } = item
   const isChoice = format !== 'ru_de_type'
-  const needsTranslation = format !== 'gap' // de_ru, ru_de, ru_de_type all show translated text up front
 
   // ru_de_type has no options at all; de_ru/ru_de/gap all need 2 distractor cards (ru_de/gap
-  // pick them by their learning-language word — no translation needed for those two formats).
+  // pick them by their learning-language word, de_ru by the stored translation).
   const distractors = useMemo(
     () => (isChoice ? pickDistractors(item, pool) : { cards: [], lacking: false }),
     [item, pool, isChoice],
   )
 
-  // Only 'de_ru' shows translated TEXT for the distractors (its options ARE translations);
-  // 'ru_de'/'gap' show the distractors' own words, so only the current card needs translating.
-  const neededIds = useMemo(() => {
-    const ids = [card.id]
-    if (format === 'de_ru') ids.push(...distractors.cards.map((c) => c.id))
-    return ids
-  }, [card.id, format, distractors.cards])
-
-  const translationsQuery = useQuery({
-    queryKey: ['translations', [...neededIds].sort().join(','), i18n.language],
-    queryFn: () => translationsApi.batch(neededIds, i18n.language),
-    staleTime: Infinity, // a word's translation never changes once generated
-  })
-  const translations = translationsQuery.data ?? {}
-  const translatedSelf = translations[card.id]?.translation ?? ''
-  const translatedExample = translations[card.id]?.example_translation ?? ''
-
   const { options, lacking: optionsLacking } = useMemo(
-    () => (isChoice
-      ? buildOptions(item, distractors.cards, Object.fromEntries(Object.entries(translations).map(([id, v]) => [id, v.translation])))
-      : { options: [], lacking: false }),
-    [item, distractors.cards, translations, isChoice],
+    () => (isChoice ? buildOptions(item, distractors.cards) : { options: [], lacking: false }),
+    [item, distractors.cards, isChoice],
   )
   const lacking = distractors.lacking || optionsLacking
 
@@ -136,15 +110,6 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
       : verdict === 'almost_article' || verdict === 'almost_typo' ? '!border-streak'
         : verdict === 'wrong' ? '!border-danger' : ''
 
-  // Waiting only for formats whose prompt/options need translated text; 'gap' renders right away.
-  if (needsTranslation && translationsQuery.isLoading) {
-    return (
-      <div className="mx-auto max-w-xl">
-        <div className="glass flex h-64 items-center justify-center p-8 text-muted">{t('common.loading')}</div>
-      </div>
-    )
-  }
-
   const almost = verdict === 'almost_article' || verdict === 'almost_typo'
   const correctOption = options.find((o) => o.correct)?.text ?? card.word
   const doneShare = ((position - (answered ? 0 : 1)) / total) * 100
@@ -174,13 +139,13 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
 
       <div className="mt-6">
         {format === 'de_ru' && <p className="font-serif text-[34px] leading-tight text-fg" lang={learning.code}>{card.word}</p>}
-        {(format === 'ru_de' || format === 'ru_de_type') && <p className="text-[26px] font-semibold text-fg">{translatedSelf}</p>}
+        {(format === 'ru_de' || format === 'ru_de_type') && <p className="text-[26px] font-semibold text-fg">{card.translation}</p>}
         {format === 'gap' && (
           <p className="font-serif text-[28px] leading-snug text-fg" lang={learning.code}>
             <GapSentence sentence={card.example_sentence ?? ''} answered={answered} answer={correctOption} />
           </p>
         )}
-        {format === 'gap' && translatedExample && <p className="mt-2 text-[15px] text-muted">{translatedExample}</p>}
+        {format === 'gap' && card.example_translation && <p className="mt-2 text-[15px] text-muted">{card.example_translation}</p>}
         {listenable && (
           <button type="button" onClick={() => speak(card)} aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')}
             className="mt-4 grid h-11 w-11 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
@@ -228,7 +193,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
             {verdict === 'wrong' && <><CircleX size={22} aria-hidden="true" className="text-danger" /><span>{t('training.wrong')}</span></>}
           </div>
           <p className="mt-2 text-[15px] text-fg">
-            <span className="font-serif" lang={learning.code}>{card.word}</span>{translatedSelf && <> — {translatedSelf}</>}
+            <span className="font-serif" lang={learning.code}>{card.word}</span>{card.translation && <> — {card.translation}</>}
           </p>
           {card.transcription && <p className="mt-0.5 text-sm text-muted">{card.transcription}</p>}
           {almost && (

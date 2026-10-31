@@ -72,14 +72,13 @@ func run() error {
 
 	// External integrations: the Anthropic client below (when ANTHROPIC_API_KEY is set).
 	var providers service.Providers
-	// AI: example sentences + daily stories + word search + on-demand translation, enabled only
+	// AI: example sentences + daily stories + word search + word check + photo import, enabled only
 	// when the key is provided via environment.
 	var storyGen service.StoryGenerator
 	var storyTranslator service.StoryTranslator
 	var storyProofreader service.StoryProofreader
 	var wordChecker service.WordChecker
 	var wordLookup service.WordLookup
-	var wordTranslator service.WordTranslator
 	var photoReader service.PhotoReader
 
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
@@ -90,10 +89,9 @@ func run() error {
 		storyProofreader = ai
 		wordChecker = ai
 		wordLookup = ai
-		wordTranslator = ai
 		photoReader = ai
 	} else {
-		slog.Warn("ANTHROPIC_API_KEY is not set: example, story, word search and translation generation are disabled")
+		slog.Warn("ANTHROPIC_API_KEY is not set: example, story, word search and photo import are disabled")
 	}
 
 	folderRepo := postgres.NewFolderRepository(pool)
@@ -135,31 +133,30 @@ func run() error {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := handler.NewRouter(handler.RouterDeps{
-		ServiceName:  cfg.ServiceName,
-		CORSOrigins:  cfg.CORSOrigins,
-		Tokens:       tokens,
-		Auth:         handler.NewAuthHandler(authSvc, cfg.CookieSecure),
-		Contexts:     handler.NewContextHandler(contextSvc),
-		Review:       handler.NewReviewHandler(reviewSvc),
-		Practice:     handler.NewPracticeHandler(reviewSvc),
-		WordCheck:    handler.NewWordCheckHandler(wordCheckSvc, wordFixSvc),
-		Stats:        handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
-		Stories:      handler.NewStoryHandler(storySvc, featureSvc),
-		Settings:     handler.NewSettingsHandler(userRepo),
-		Admin:        handler.NewAdminHandler(adminRepo, userRepo, featureSvc, feedbackRepo),
-		Collection:   handler.NewCollectionHandler(cardRepo),
-		WordEdit:     handler.NewWordEditHandler(cardRepo),
-		WordMove:     handler.NewWordMoveHandler(cardRepo),
-		Folders:      handler.NewFolderHandler(folderRepo),
-		Shared:       handler.NewSharedHandler(folderRepo),
-		Search:       handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
-		Feedback:     handler.NewFeedbackHandler(feedbackRepo),
-		Push:         handler.NewPushHandler(pushSvc),
-		Photo:        handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
-		Translations: handler.NewTranslationHandler(service.NewTranslationService(cardRepo, postgres.NewWordTranslationRepository(pool), wordTranslator)),
-		Hero:         handler.NewHeroHandler(heroSvc),
-		UserStatus:   adminRepo,
-		Ctx:          ctx,
+		ServiceName: cfg.ServiceName,
+		CORSOrigins: cfg.CORSOrigins,
+		Tokens:      tokens,
+		Auth:        handler.NewAuthHandler(authSvc, cfg.CookieSecure),
+		Contexts:    handler.NewContextHandler(contextSvc),
+		Review:      handler.NewReviewHandler(reviewSvc),
+		Practice:    handler.NewPracticeHandler(reviewSvc),
+		WordCheck:   handler.NewWordCheckHandler(wordCheckSvc, wordFixSvc),
+		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
+		Stories:     handler.NewStoryHandler(storySvc, featureSvc),
+		Settings:    handler.NewSettingsHandler(userRepo),
+		Admin:       handler.NewAdminHandler(adminRepo, userRepo, featureSvc, feedbackRepo),
+		Collection:  handler.NewCollectionHandler(cardRepo),
+		WordEdit:    handler.NewWordEditHandler(cardRepo),
+		WordMove:    handler.NewWordMoveHandler(cardRepo),
+		Folders:     handler.NewFolderHandler(folderRepo),
+		Shared:      handler.NewSharedHandler(folderRepo),
+		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
+		Feedback:    handler.NewFeedbackHandler(feedbackRepo),
+		Push:        handler.NewPushHandler(pushSvc),
+		Photo:       handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
+		Hero:        handler.NewHeroHandler(heroSvc),
+		UserStatus:  adminRepo,
+		Ctx:         ctx,
 		HealthCheck: func() error {
 			c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

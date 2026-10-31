@@ -404,21 +404,6 @@ export const practiceApi = {
   answer: (id: string, correct: boolean) => api.post(`/practice/${id}/answer`, { correct }),
 }
 
-export interface CardTranslation { translation: string; example_translation: string }
-
-// Per-word translation cache: shows the quiz in the user's actual interface language instead of
-// whatever language the card happened to be created in. Cached on the backend after the first call.
-export const translationsApi = {
-  batch: (wordIds: string[], nativeLanguage: string) =>
-    api
-      .post<{ translations: Record<string, CardTranslation> }>(
-        '/translations',
-        { word_ids: wordIds, native_language: nativeLanguage },
-        { timeout: 30_000 },
-      )
-      .then((r) => r.data.translations),
-}
-
 export const cardsApi = {
   list: () => api.get<Page<WordCard>>('/word-cards', { params: { limit: 100 } }).then((r) => r.data.items),
   remove: (id: string) => api.delete(`/word-cards/${id}`),

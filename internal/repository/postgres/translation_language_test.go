@@ -13,41 +13,15 @@ import (
 	"learnwords/migrations"
 )
 
-// neverAI fails the test if training ever asks AI.
-type neverAI struct{ t *testing.T }
-
-func (n neverAI) TranslateCard(_ context.Context, req domain.TranslateRequest) (string, string, error) {
-	n.t.Errorf("AI was called for %+v", req)
-	return "AI GUESS", "", nil
-}
-
-type recordingAI struct{ reqs []domain.TranslateRequest }
-
-func (r *recordingAI) TranslateCard(_ context.Context, req domain.TranslateRequest) (string, string, error) {
-	r.reqs = append(r.reqs, req)
-	return "tinch", "Bola tinch.", nil
-}
-
 type trFixture struct {
 	shareFixture
 	contexts *ContextRepository
 	cards    *WordCardRepository
-	cache    *WordTranslationRepository
 }
 
 func newTrFixture(t *testing.T) trFixture {
 	f := newShareFixture(t)
-	return trFixture{f, NewContextRepository(f.pool), NewWordCardRepository(f.pool), NewWordTranslationRepository(f.pool)}
-}
-
-func (f trFixture) training(t *testing.T, ai service.WordTranslator, word uuid.UUID, lang string) service.CardTranslation {
-	t.Helper()
-	svc := service.NewTranslationService(f.cards, f.cache, ai)
-	got, err := svc.Translate(context.Background(), f.user, word, lang)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return got
+	return trFixture{f, NewContextRepository(f.pool), NewWordCardRepository(f.pool)}
 }
 
 func (f trFixture) cached(t *testing.T, word uuid.UUID) map[string]string {
@@ -80,26 +54,6 @@ func (f trFixture) createWord(t *testing.T, uiLang, word, meaning string) domain
 	return res.Cards[0]
 }
 
-// The reported bug: a card added with "тихий, спокойный" must be trained with exactly that.
-func TestTraining_CardAddedInRu_UsesTheCardTranslationWithoutAI(t *testing.T) {
-	f := newTrFixture(t)
-	card := f.createWord(t, "ru", "still", "тихий, спокойный")
-
-	if card.TranslationLanguage == nil || *card.TranslationLanguage != "ru" {
-		t.Fatalf("translation_language: %v", card.TranslationLanguage)
-	}
-	if got := f.cached(t, card.ID); got["ru"] != "тихий, спокойный" {
-		t.Errorf("the translation is also the cache entry of its language: %v", got)
-	}
-	// An older wrong AI answer sits in the cache — it must not be shown.
-	f.exec(t, `UPDATE word_translations SET translation = 'ещё' WHERE word_id = $1`, card.ID)
-
-	got := f.training(t, neverAI{t}, card.ID, "ru")
-	if got.Translation != "тихий, спокойный" || got.ExampleTranslation != "Ребёнок спокоен." {
-		t.Errorf("training shows %+v", got)
-	}
-}
-
 func TestCreate_TranslationLanguageFollowsWhoWroteIt(t *testing.T) {
 	f := newTrFixture(t)
 	lang := func(c domain.WordCard) string {
@@ -119,28 +73,11 @@ func TestCreate_TranslationLanguageFollowsWhoWroteIt(t *testing.T) {
 	}
 }
 
-func TestTraining_OtherLanguage_AiGetsTheMeaningAndTheFilledExample_AndTheAnswerIsCached(t *testing.T) {
-	f := newTrFixture(t)
-	card := f.createWord(t, "ru", "still", "тихий, спокойный")
-	ai := &recordingAI{}
-	if got := f.training(t, ai, card.ID, "uz"); got.Translation != "tinch" {
-		t.Fatalf("%+v", got)
-	}
-	f.training(t, ai, card.ID, "uz")
-	if len(ai.reqs) != 1 {
-		t.Fatalf("AI calls: %d", len(ai.reqs))
-	}
-	if r := ai.reqs[0]; r.KnownMeaning != "тихий, спокойный" || r.KnownMeaningLang != "ru" || r.ExampleSentence != "Das Kind ist still." {
-		t.Errorf("request: %+v", r)
-	}
-}
-
-func TestEdit_TranslationChange_TrainingShowsItImmediately_OtherLanguagesDropped(t *testing.T) {
+func TestEdit_TranslationChange_OtherLanguagesDropped_CardIsRelabelled(t *testing.T) {
 	f := newTrFixture(t)
 	ctx := context.Background()
 	card := f.createWord(t, "ru", "still", "ещё")
-	ai := &recordingAI{}
-	f.training(t, ai, card.ID, "uz") // an uz cache row exists now
+	f.exec(t, `INSERT INTO word_translations (word_id, language, translation) VALUES ($1, 'uz', 'tinch')`, card.ID) // an old cache row of another language
 	if len(f.cached(t, card.ID)) != 2 {
 		t.Fatalf("setup: %v", f.cached(t, card.ID))
 	}
@@ -150,18 +87,9 @@ func TestEdit_TranslationChange_TrainingShowsItImmediately_OtherLanguagesDropped
 	if _, err := f.cards.UpdateContent(edit, f.user, card.ID, domain.WordCardUpdate{Translation: ptr("тихий, спокойный")}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.training(t, neverAI{t}, card.ID, "ru"); got.Translation != "тихий, спокойный" {
-		t.Errorf("training shows %+v right after the edit", got)
-	}
 	if got := f.cached(t, card.ID); len(got) != 1 || got["ru"] != "тихий, спокойный" {
 		t.Errorf("cache after the edit: %v (uz must be dropped, ru replaced)", got)
 	}
-	// uz is regenerated from the NEW meaning.
-	f.training(t, ai, card.ID, "uz")
-	if last := ai.reqs[len(ai.reqs)-1]; last.KnownMeaning != "тихий, спокойный" {
-		t.Errorf("regeneration used %q", last.KnownMeaning)
-	}
-
 	// Editing the translation under another interface language re-labels the card.
 	if _, err := f.cards.UpdateContent(domain.WithTranslationLang(ctx, "uz"), f.user, card.ID, domain.WordCardUpdate{Translation: ptr("tinch, xotirjam")}); err != nil {
 		t.Fatal(err)
@@ -173,16 +101,6 @@ func TestEdit_TranslationChange_TrainingShowsItImmediately_OtherLanguagesDropped
 	}
 	if got := f.cached(t, card.ID); len(got) != 1 || got["uz"] != "tinch, xotirjam" {
 		t.Errorf("cache: %v", got)
-	}
-	// The word is Uzbek now, but its example translation is still the Russian one: the example is
-	// translated (one AI call), the edited word is kept — and the Russian text is not shown.
-	n := len(ai.reqs)
-	got := f.training(t, ai, card.ID, "uz")
-	if got.Translation != "tinch, xotirjam" || got.ExampleTranslation != "Bola tinch." {
-		t.Errorf("uz training: %+v", got)
-	}
-	if len(ai.reqs) != n+1 || ai.reqs[n].KnownMeaning != "tinch, xotirjam" {
-		t.Errorf("AI requests %d → %d, last %+v", n, len(ai.reqs), ai.reqs[len(ai.reqs)-1])
 	}
 }
 
@@ -212,10 +130,6 @@ func TestEdit_WordOrExampleChange_DropsEveryCachedTranslation(t *testing.T) {
 	}
 	if got := f.cached(t, card.ID); len(got) != 0 {
 		t.Errorf("example changed, cache must be empty: %v", got)
-	}
-	// The card's own translation still wins in its language, with no AI.
-	if got := f.training(t, neverAI{t}, card.ID, "ru"); got.Translation != "тихий" {
-		t.Errorf("%+v", got)
 	}
 
 	f.exec(t, `INSERT INTO word_translations (word_id, language, translation) VALUES ($1, 'en', 'quiet')`, card.ID)
@@ -264,9 +178,6 @@ func TestWordFixAccept_DropsCachedTranslationsButTheCardKeepsItsOwn(t *testing.T
 	if tl != "ru" {
 		t.Errorf("accepting a spelling fix must not relabel the translation: %q", tl)
 	}
-	if got := f.training(t, neverAI{t}, card.ID, "ru"); got.Translation != "ручка" {
-		t.Errorf("%+v", got)
-	}
 }
 
 func TestImport_KeepsTheSourceTranslationLanguageAndCache(t *testing.T) {
@@ -291,9 +202,6 @@ func TestImport_KeepsTheSourceTranslationLanguageAndCache(t *testing.T) {
 	}
 	if got := me.cached(t, id); got["ru"] != "тихий" {
 		t.Errorf("cache of the copy: %v", got)
-	}
-	if got := me.training(t, neverAI{t}, id, "ru"); got.Translation != "тихий" {
-		t.Errorf("%+v", got)
 	}
 }
 

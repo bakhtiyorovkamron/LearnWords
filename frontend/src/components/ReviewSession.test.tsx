@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { cardsApi, foldersApi, heroApi, meApi, practiceApi, reviewApi, settingsApi, translationsApi } from '../api/endpoints'
+import { cardsApi, foldersApi, heroApi, meApi, practiceApi, reviewApi, settingsApi } from '../api/endpoints'
 import type { DueCard, WordCard } from '../api/types'
 import { ReviewSession } from './ReviewSession'
 
@@ -16,7 +16,6 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     practiceApi: { words: vi.fn(), answer: vi.fn() },
     cardsApi: { list: vi.fn() },
     foldersApi: { list: vi.fn() },
-    translationsApi: { batch: vi.fn() },
     heroApi: { ...mod.heroApi, get: vi.fn() },
     settingsApi: { get: vi.fn(), setReviewSessionSize: vi.fn() },
   }
@@ -47,8 +46,6 @@ beforeEach(async () => {
   vi.mocked(settingsApi.get).mockResolvedValue({ interface_language: '', review_session_size: '', theme: '' })
   vi.mocked(settingsApi.setReviewSessionSize).mockResolvedValue({} as never)
   vi.mocked(cardsApi.list).mockResolvedValue([1, 2, 3, 4].map(card))
-  vi.mocked(translationsApi.batch).mockImplementation(async (ids: string[]) =>
-    Object.fromEntries(ids.map((id) => [id, { translation: `перевод ${id}`, example_translation: '' }])))
   vi.mocked(reviewApi.due).mockResolvedValue({ cards: [due(1)], total: 1 })
   vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 2, is_learned: false } as never)
   vi.mocked(practiceApi.words).mockResolvedValue([])

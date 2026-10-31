@@ -3,14 +3,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { meApi, translationsApi } from '../api/endpoints'
+import { meApi } from '../api/endpoints'
 import type { DueCard, Progress, WordCard } from '../api/types'
 import type { QuizFormat, QuizItem } from '../lib/quiz'
 import { QuizQuestion } from './QuizQuestion'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, meApi: { get: vi.fn() }, translationsApi: { batch: vi.fn() } }
+  return { ...mod, meApi: { get: vi.fn() } }
 })
 
 const card = (n: number, over: Partial<DueCard> = {}): DueCard => ({
@@ -49,8 +49,6 @@ function setup(o: Over = {}) {
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.mocked(meApi.get).mockResolvedValue({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de' })
-  vi.mocked(translationsApi.batch).mockImplementation(async (ids: string[]) =>
-    Object.fromEntries(ids.map((id) => [id, { translation: `слово ${id}`, example_translation: `Пример ${id}` }])))
 })
 afterEach(() => cleanup())
 
@@ -97,24 +95,43 @@ describe('the question', () => {
 
   it('ru_de: the translation is the prompt, the German options are serif, no listening before the answer', async () => {
     setup({ format: 'ru_de' })
-    const prompt = await screen.findByText('слово c1')
+    const prompt = await screen.findByText('слово1')
     expect(prompt.className).toContain('text-[26px]')
     expect(prompt.className).toContain('font-semibold')
     expect(optionButtons().every((b) => b.querySelector('.font-serif'))).toBe(true)
     expect(screen.queryByRole('button', { name: 'Listen' })).toBeNull()
   })
+})
 
-  it('the loading state is a card with muted text', () => {
-    vi.mocked(translationsApi.batch).mockReturnValue(new Promise(() => undefined))
-    setup({ format: 'de_ru' })
-    expect(screen.getByText('Loading…').className).toContain('text-muted')
+describe('stored translations only', () => {
+  const ruCard = card(1, { word: 'Wann', translation: 'когда', translation_language: 'ru' })
+  const spy = () => vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
+
+  it('UI in Uzbek: ru_de shows the card\'s own "когда" and the sheet shows it too — no request is made', async () => {
+    await i18n.changeLanguage('uz')
+    const fetched = spy()
+    setup({ format: 'ru_de', card: ruCard })
+    expect(await screen.findByText('когда')).toBeTruthy()
+    fireEvent.click(optionByText('Wann'))
+    expect(sheet().textContent).toContain('Wann — когда')
+    expect(fetched).not.toHaveBeenCalled()
+    fetched.mockRestore()
+  })
+
+  it('de_ru options are the cards\' own translations (right answer included), whatever the UI language', async () => {
+    await i18n.changeLanguage('uz')
+    setup({ format: 'de_ru', card: ruCard })
+    await screen.findByText('Wann')
+    const texts = optionButtons().map((b) => b.textContent)
+    expect(texts).toContain('когда')
+    expect(texts.filter((x) => /^слово[234]$/.test(x ?? ''))).toHaveLength(2) // the distractors' own stored translations
   })
 })
 
 describe('answering a choice question', () => {
   it('a right pick: marked with a check, the others dimmed, the sheet says "Correct!" with the word and its translation', async () => {
     const { onAnswer } = setup({ format: 'de_ru', progress: progress(4, 7) })
-    const right = await screen.findByRole('button', { name: 'слово c1' })
+    const right = await screen.findByRole('button', { name: 'слово1' })
     fireEvent.click(right)
     expect(onAnswer).toHaveBeenCalledWith(true)
     expect(right.className).toContain('border-accent')
@@ -126,13 +143,13 @@ describe('answering a choice question', () => {
     }
     const s = sheet()
     expect(within(s).getByText('Correct!')).toBeTruthy()
-    expect(s.textContent).toContain('Wort1 — слово c1')
+    expect(s.textContent).toContain('Wort1 — слово1')
     expect(within(s).getByText('Wort1').className).toContain('font-serif')
   })
 
   it('shows the box: "Box 4 · next review in 7 days" and 4 filled segments of 5', async () => {
     setup({ format: 'de_ru', progress: progress(4, 7) })
-    fireEvent.click(await screen.findByRole('button', { name: 'слово c1' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'слово1' }))
     expect(within(sheet()).getByText('Box 4 · next review in 7 days')).toBeTruthy()
     const segments = Array.from(screen.getByTestId('box-bar').children)
     expect(segments).toHaveLength(5)
@@ -142,7 +159,7 @@ describe('answering a choice question', () => {
 
   it('a learned word says so instead of the box', async () => {
     setup({ format: 'de_ru', progress: progress(5, 14, true) })
-    fireEvent.click(await screen.findByRole('button', { name: 'слово c1' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'слово1' }))
     expect(within(sheet()).getByText(/Word learned\. We'll check it again/)).toBeTruthy()
     expect(within(sheet()).queryByText(/^Box /)).toBeNull()
   })
@@ -150,16 +167,16 @@ describe('answering a choice question', () => {
   it('a wrong pick: "Not quite", the pick has a cross and a danger border, the right option is marked', async () => {
     const { onAnswer } = setup({ format: 'de_ru', progress: progress(1, 1) })
     await screen.findByText('Wort1')
-    const wrong = optionButtons().find((b) => b.textContent !== 'слово c1')!
+    const wrong = optionButtons().find((b) => b.textContent !== 'слово1')!
     fireEvent.click(wrong)
     expect(onAnswer).toHaveBeenCalledWith(false)
     expect(wrong.className).toContain('border-danger')
     expect(wrong.querySelector('svg')!.getAttribute('class')).toContain('text-danger')
-    const right = optionByText('слово c1')
+    const right = optionByText('слово1')
     expect(right.className).toContain('border-accent')
     expect(right.querySelector('svg')!.getAttribute('class')).toContain('text-accent-text')
     expect(within(sheet()).getByText('Not quite')).toBeTruthy()
-    expect(sheet().textContent).toContain('Wort1 — слово c1')
+    expect(sheet().textContent).toContain('Wort1 — слово1')
   })
 
   it('options cannot be answered twice', async () => {
@@ -172,7 +189,7 @@ describe('answering a choice question', () => {
 
   it('the transcription is under the word in the sheet', async () => {
     setup({ format: 'de_ru', card: card(1, { transcription: '[ʃtɪl]' }) })
-    fireEvent.click(await screen.findByRole('button', { name: 'слово c1' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'слово1' }))
     expect(within(sheet()).getByText('[ʃtɪl]').className).toContain('text-muted')
   })
 
@@ -189,7 +206,7 @@ describe('answering a choice question', () => {
 describe('the answer sheet', () => {
   const answerRight = async (o: Over = {}) => {
     const t = setup({ format: 'de_ru', ...o })
-    fireEvent.click(await screen.findByRole('button', { name: 'слово c1' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'слово1' }))
     return t
   }
 
@@ -292,12 +309,12 @@ describe('the typed format', () => {
     expect(onAnswer).toHaveBeenCalledWith(false)
     expect(input.className).toContain('!border-danger')
     expect(within(sheet()).getByText('Not quite')).toBeTruthy()
-    expect(sheet().textContent).toContain('der Hund — слово c1')
+    expect(sheet().textContent).toContain('der Hund — слово1')
   })
 })
 
 describe('the gap format', () => {
-  const gapCard = card(1, { word: 'Hund', example_sentence: 'Der ___ bellt laut.', has_example: true })
+  const gapCard = card(1, { word: 'Hund', example_sentence: 'Der ___ bellt laut.', example_translation: 'Das ist ein Beispiel.', has_example: true })
 
   it('before the answer the blank is empty; after it the correct option fills the blank', async () => {
     setup({ format: 'gap', card: gapCard, progress: progress(2, 3) })
@@ -320,7 +337,7 @@ describe('the gap format', () => {
 
   it('the translation of the sentence is a muted line under it; German options are serif', async () => {
     setup({ format: 'gap', card: gapCard })
-    const translation = await screen.findByText('Пример c1')
+    const translation = await screen.findByText('Das ist ein Beispiel.')
     expect(translation.className).toContain('text-muted')
     expect(optionButtons().every((b) => b.querySelector('.font-serif'))).toBe(true)
   })
@@ -339,7 +356,7 @@ describe('listening', () => {
     vi.stubGlobal('speechSynthesis', { speak })
     vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string }, text: string) { this.text = text })
     setup({ format: 'ru_de' })
-    await screen.findByText('слово c1')
+    await screen.findByText('слово1')
     expect(screen.queryByRole('button', { name: 'Listen' })).toBeNull()
     fireEvent.click(optionByText('Wort1'))
     const listen = screen.getByRole('button', { name: 'Listen' })

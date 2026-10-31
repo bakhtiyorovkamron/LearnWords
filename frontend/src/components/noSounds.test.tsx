@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { meApi, translationsApi } from '../api/endpoints'
+import { meApi } from '../api/endpoints'
 import type { CollectionCard, DueCard } from '../api/types'
 import { FlipCards } from './FlipCards'
 import { QuizQuestion } from './QuizQuestion'
@@ -13,7 +13,6 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   return {
     ...mod,
     meApi: { get: vi.fn() },
-    translationsApi: { batch: vi.fn() },
     foldersApi: { list: vi.fn().mockResolvedValue({ all: {}, folders: [] }) },
   }
 })
@@ -33,7 +32,6 @@ beforeEach(async () => {
   vi.stubGlobal('speechSynthesis', { speak, cancel: vi.fn() })
   vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string; lang: string }, text: string) { this.text = text })
   vi.mocked(meApi.get).mockResolvedValue({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de' })
-  vi.mocked(translationsApi.batch).mockResolvedValue({ c1: { translation: 'юг', example_translation: '' } })
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 

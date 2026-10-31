@@ -57,8 +57,6 @@ function patchCaches(qc: ReturnType<typeof useQueryClient>, updated: CollectionC
 
 /** After any successful save: lists that may now be stale are re-read (and the new folder's view gets the card). */
 function refreshLists(qc: ReturnType<typeof useQueryClient>, folderChanged: boolean) {
-  // Training reads translations from here; the edit may have changed what they must say.
-  qc.invalidateQueries({ queryKey: ['translations'] })
   qc.invalidateQueries({ queryKey: ['review-due'] }) // training queue is re-read next time it starts
   if (folderChanged) {
     qc.invalidateQueries({ queryKey: ['collection'] }) // the card appears in its new folder's view

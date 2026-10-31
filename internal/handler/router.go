@@ -13,31 +13,30 @@ import (
 )
 
 type RouterDeps struct {
-	ServiceName  string
-	CORSOrigins  []string
-	Tokens       service.TokenManager
-	Auth         *AuthHandler
-	Contexts     *ContextHandler
-	Review       *ReviewHandler
-	Stats        *StatsHandler
-	Stories      *StoryHandler
-	Settings     *SettingsHandler
-	Admin        *AdminHandler
-	Collection   *CollectionHandler
-	WordEdit     *WordEditHandler
-	WordMove     *WordMoveHandler
-	Folders      *FolderHandler
-	Shared       *SharedHandler
-	Search       *SearchHandler
-	Photo        *PhotoHandler
-	Feedback     *FeedbackHandler
-	Push         *PushHandler
-	Translations *TranslationHandler
-	Hero         *HeroHandler
-	Practice     *PracticeHandler
-	WordCheck    *WordCheckHandler
-	UserStatus   UserStatusStore
-	HealthCheck  func() error
+	ServiceName string
+	CORSOrigins []string
+	Tokens      service.TokenManager
+	Auth        *AuthHandler
+	Contexts    *ContextHandler
+	Review      *ReviewHandler
+	Stats       *StatsHandler
+	Stories     *StoryHandler
+	Settings    *SettingsHandler
+	Admin       *AdminHandler
+	Collection  *CollectionHandler
+	WordEdit    *WordEditHandler
+	WordMove    *WordMoveHandler
+	Folders     *FolderHandler
+	Shared      *SharedHandler
+	Search      *SearchHandler
+	Photo       *PhotoHandler
+	Feedback    *FeedbackHandler
+	Push        *PushHandler
+	Hero        *HeroHandler
+	Practice    *PracticeHandler
+	WordCheck   *WordCheckHandler
+	UserStatus  UserStatusStore
+	HealthCheck func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
 	Ctx context.Context
 }
@@ -70,14 +69,13 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	searchLimit := RateLimitByUser(NewRateLimiter(ctx, "search", aiPerUserPerMin, time.Minute))
 	exampleLimit := RateLimitByUser(NewRateLimiter(ctx, "example", aiPerUserPerMin, time.Minute))
 	storyLimit := RateLimitByUser(NewRateLimiter(ctx, "story", storyPerUserPerMin, time.Minute))
-	translateLimit := RateLimitByUser(NewRateLimiter(ctx, "translate", aiPerUserPerMin, time.Minute))
 	sharedLimit := RateLimitByIP(NewRateLimiter(ctx, "shared", sharedPerIPPerMin, time.Minute))
 	importLimit := RateLimitByUser(NewRateLimiter(ctx, "shared-import", importPerUserPerMin, time.Minute))
 	photoLimit := RateLimitByUser(NewRateLimiter(ctx, "photo-import", photoPerUserPerMin, time.Minute))
 	adminPushLimit := RateLimitByUser(NewRateLimiter(ctx, "admin-push", adminPushPerMin, time.Minute))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
-		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/translations", "/api/words/check", "/api/photo-import")
+		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/words/check", "/api/photo-import")
 
 	r.Use(
 		Recovery(),
@@ -145,7 +143,6 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/word-fixes", d.WordCheck.ListFixes)
 		protected.POST("/word-fixes/:id/accept", d.WordCheck.AcceptFix)
 		protected.POST("/word-fixes/:id/reject", d.WordCheck.RejectFix)
-		protected.POST("/translations", translateLimit, d.Translations.Batch)
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
 		protected.GET("/practice/words", d.Practice.Words)

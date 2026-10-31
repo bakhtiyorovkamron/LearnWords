@@ -25,6 +25,7 @@ func TestRemovedRoutesAre404(t *testing.T) {
 		{"DELETE", "/api/contexts/" + id},
 		{"POST", "/api/word-cards/" + id + "/audio"},
 		{"GET", "/api/stories/2026-10-29"},
+		{"POST", "/api/translations"}, // training uses the card's own stored translation
 	} {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(c.method, c.path, nil))
