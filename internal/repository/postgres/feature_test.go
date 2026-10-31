@@ -15,7 +15,7 @@ import (
 )
 
 // photoLimit mirrors the catalog default of photo_import.
-const photoLimit = 10
+const photoLimit = 5
 
 func TestFeatures_ParallelConsumeNeverExceedsLimit(t *testing.T) {
 	f := newMoveFixture(t)

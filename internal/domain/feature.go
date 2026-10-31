@@ -27,7 +27,7 @@ func intp(n int) *int { return &n }
 
 // FeatureCatalog is the ordered list of features; all are enabled by default except the ones marked.
 var FeatureCatalog = []FeatureSpec{
-	{Name: FeaturePhotoImport, DefaultLimit: intp(10)},
+	{Name: FeaturePhotoImport, DefaultLimit: intp(5)},
 	{Name: FeatureDailyStory},
 	{Name: FeatureWordSearch},
 	{Name: FeatureStoryAutotranslate},

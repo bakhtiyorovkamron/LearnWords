@@ -20,7 +20,7 @@ const feat = (over: Partial<FeatureState>): FeatureState => ({
   used_today: 0, remaining: null, ...over,
 })
 const features: FeatureState[] = [
-  feat({ feature: 'photo_import', daily_limit: 6, default_limit: 10, limit_override: 6, used_today: 2, remaining: 4 }),
+  feat({ feature: 'photo_import', daily_limit: 6, default_limit: 5, limit_override: 6, used_today: 2, remaining: 4 }),
   feat({ feature: 'daily_story' }),
   feat({ feature: 'word_search' }),
   feat({ feature: 'story_autotranslate', enabled: false }),
@@ -62,7 +62,7 @@ describe('AdminUserModal', () => {
     const limit = screen.getAllByRole('spinbutton')
     expect(limit).toHaveLength(1)
     expect((limit[0] as HTMLInputElement).value).toBe('6')
-    expect(limit[0].getAttribute('placeholder')).toBe('10') // just the default number
+    expect(limit[0].getAttribute('placeholder')).toBe('5') // just the default number
     expect(screen.getByTestId('usage-photo_import').textContent).toBe('Today: 2 of 6 · custom')
   })
 
@@ -113,8 +113,8 @@ describe('AdminUserModal', () => {
 })
 
 describe('AdminUserModal: the effective photo limit', () => {
-  // A user without an override: the default of 10 applies, 1 photo used today.
-  const plain = feat({ feature: 'photo_import', daily_limit: 10, default_limit: 10, limit_override: null, used_today: 1, remaining: 9 })
+  // A user without an override: the default of 5 applies, 1 photo used today.
+  const plain = feat({ feature: 'photo_import', daily_limit: 5, default_limit: 5, limit_override: null, used_today: 1, remaining: 4 })
   const usage = () => screen.getByTestId('usage-photo_import').textContent
   const input = async () => (await screen.findByRole('spinbutton')) as HTMLInputElement
 
@@ -123,12 +123,12 @@ describe('AdminUserModal: the effective photo limit', () => {
     vi.mocked(adminApi.setUserFeature).mockImplementation(async (_id, _feature, body) => serverState(plain, body))
   })
 
-  it('without an override: "Today: 1 of 10 · default", an empty input with the placeholder 10, no Reset', async () => {
+  it('without an override: "Today: 1 of 5 · default", an empty input with the placeholder 5, no Reset', async () => {
     renderModal()
     const field = await input()
-    expect(usage()).toBe('Today: 1 of 10 · default')
+    expect(usage()).toBe('Today: 1 of 5 · default')
     expect(field.value).toBe('')
-    expect(field.placeholder).toBe('10')
+    expect(field.placeholder).toBe('5')
     expect(field.className).toContain('w-24')
     expect(screen.getByLabelText('Daily limit')).toBe(field)
     expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull()
@@ -151,7 +151,7 @@ describe('AdminUserModal: the effective photo limit', () => {
     await waitFor(() => expect(usage()).toBe('Today: 1 of 15 · custom'))
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() => expect(adminApi.setUserFeature).toHaveBeenCalledWith('u1', 'photo_import', { enabled: true, daily_limit: null }))
-    await waitFor(() => expect(usage()).toBe('Today: 1 of 10 · default'))
+    await waitFor(() => expect(usage()).toBe('Today: 1 of 5 · default'))
     expect((await input()).value).toBe('')
     expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull()
   })
@@ -164,7 +164,7 @@ describe('AdminUserModal: the effective photo limit', () => {
     fireEvent.blur(field)
     expect(await screen.findByRole('alert')).toBeTruthy()
     await waitFor(() => expect(field.value).toBe(''))
-    expect(usage()).toBe('Today: 1 of 10 · default')
+    expect(usage()).toBe('Today: 1 of 5 · default')
   })
 
   it('the unlimited features have no usage line and no input', async () => {

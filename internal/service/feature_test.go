@@ -74,7 +74,7 @@ func (r *memFeatureRepo) SetOverride(_ context.Context, _ uuid.UUID, feature str
 func ip(n int) *int { return &n }
 
 // defaultPhotoLimit mirrors the catalog default of photo_import.
-const defaultPhotoLimit = 10
+const defaultPhotoLimit = 5
 
 func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 	s := NewFeatureService(newMemFeatureRepo())

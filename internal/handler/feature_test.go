@@ -16,7 +16,7 @@ import (
 )
 
 // defaultPhotoLimit mirrors the catalog default of photo_import.
-const defaultPhotoLimit = 10
+const defaultPhotoLimit = 5
 
 type memFeatures struct {
 	mu    sync.Mutex
