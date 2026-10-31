@@ -40,13 +40,15 @@ export function HeroIntroOverlay() {
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="hero-intro-title"
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 overflow-y-auto bg-gradient-to-b from-[#14452F] to-[#0B2B1C] px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
-      <Hero stage={stage} mood="happy" phrase={hero.phrase} size="large" label={name} className="w-full max-w-sm" />
-      <div className="max-w-md space-y-2 text-center">
-        <h2 id="hero-intro-title" className="display text-balance text-2xl font-extrabold md:text-3xl">{t('hero.intro')}</h2>
-        <p className="text-emerald-100/80">{t('hero.introText')}</p>
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/60 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+      <div className="glass flex w-full max-w-md flex-col items-center gap-5 p-6">
+        <Hero stage={stage} mood="happy" phrase={hero.phrase} size="large" label={name} className="w-full max-w-sm" />
+        <div className="space-y-2 text-center">
+          <h2 id="hero-intro-title" className="text-balance text-2xl font-bold text-fg">{t('hero.intro')}</h2>
+          <p className="text-muted">{t('hero.introText')}</p>
+        </div>
+        <button type="button" className="btn-primary" onClick={close} autoFocus>{t('hero.introOk')}</button>
       </div>
-      <button type="button" className="btn-primary" onClick={close} autoFocus>{t('hero.introOk')}</button>
     </div>
   )
 }

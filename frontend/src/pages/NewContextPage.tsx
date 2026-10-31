@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus, WandSparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { contextsApi, wordsApi, type WordCheck, type WordGrammar } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
@@ -100,20 +101,18 @@ export function NewContextPage() {
   }
 
   const error = localError ?? (mutation.error ? errorMessage(mutation.error) : null)
-  const labelCls = 'mb-2 block text-xs uppercase tracking-wider text-emerald-300/60'
+  const labelCls = 'mb-2 block text-xs font-semibold uppercase tracking-wider text-faint'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="animate-rise text-center">
-        <h1 className="display text-3xl font-extrabold md:text-4xl">
-          {t('newContext.titleA')}<span className="text-lime-300">{t('newContext.titleB')}</span> ✨
-        </h1>
-        <p className="mt-2 text-emerald-100/70">{t('newContext.subtitle')}</p>
+    <div className="mx-auto max-w-xl space-y-6">
+      <div>
+        <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('newContext.title')}</h1>
+        <p className="mt-1 text-[15px] text-muted">{t('newContext.subtitle')}</p>
       </div>
 
       <PhotoImport />
 
-      <form onSubmit={submit} className="glass animate-rise space-y-5 p-6 md:p-8">
+      <form onSubmit={submit} className="glass space-y-5 p-5 md:p-6">
         <div className="relative">
           <textarea
             value={text}
@@ -129,13 +128,13 @@ export function NewContextPage() {
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            className="field resize-none text-lg leading-relaxed"
+            className="field resize-none font-serif text-[19px] leading-relaxed"
           />
-          <span className="absolute bottom-3 right-4 text-xs text-emerald-300/50">
+          <span className="absolute bottom-3 right-4 text-xs text-faint">
             {text.length}/{MAX_LEN}
           </span>
         </div>
-        {text.length >= MAX_LEN && <p className="text-sm text-amber-200">{t('newContext.tooLong', { max: MAX_LEN })}</p>}
+        {text.length >= MAX_LEN && <p className="text-sm text-streak">{t('newContext.tooLong', { max: MAX_LEN })}</p>}
         {check.active && (
           <WordCheckHint state={check.state} kept={isKept} highlight={needDecision}
             onUse={useSuggestion} onKeep={keepAsIs} />
@@ -170,22 +169,22 @@ export function NewContextPage() {
         <div className="space-y-3">
           {/* Phones: label above, button full width (a long translation of the label must not push it out). */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <label className="text-xs uppercase tracking-wider text-emerald-300/60">{t('newContext.example')}</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-faint">{t('newContext.example')}</label>
             <button type="button" onClick={() => generate.mutate()}
               disabled={generate.isPending || !canGenerate}
               className="btn-ghost w-full justify-center text-center sm:w-auto sm:shrink-0 disabled:opacity-50">
               {generate.isPending ? (
                 <>
-                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-lime-300 border-t-transparent" />
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
                   {t('newContext.generating')}
                 </>
               ) : (
-                t('newContext.generate')
+                <><WandSparkles size={16} aria-hidden="true" />{t('newContext.generate')}</>
               )}
             </button>
           </div>
           {/* Visible, not a tooltip: phones have no hover. */}
-          {!canGenerate && <p className="text-xs text-emerald-100/60">{t('newContext.hintNeedTranslation')}</p>}
+          {!canGenerate && <p className="text-xs text-muted">{t('newContext.hintNeedTranslation')}</p>}
           <input
             value={exampleSentence}
             onChange={(e) => setExampleSentence(e.target.value.slice(0, 500))}
@@ -199,7 +198,7 @@ export function NewContextPage() {
             className="field"
           />
           {generate.error && (
-            <p className="text-sm text-red-300">
+            <p className="text-sm text-danger">
               {isRateLimited(generate.error)
                 ? rateLimitMessage(generate.error)
                 : (generate.error as { response?: { status?: number } }).response?.status === 503
@@ -208,22 +207,22 @@ export function NewContextPage() {
             </p>
           )}
           {!exampleSentence && (
-            <p className="text-xs text-emerald-300/50">{t('newContext.autoExampleHint')}</p>
+            <p className="text-xs text-faint">{t('newContext.autoExampleHint')}</p>
           )}
         </div>
 
         {error && (
-          <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">{error}</p>
+          <p className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">{error}</p>
         )}
 
-        <button type="submit" disabled={mutation.isPending || checkingOnSave} className="btn-primary w-full text-lg">
+        <button type="submit" disabled={mutation.isPending || checkingOnSave} className="btn-primary h-12 w-full text-base">
           {mutation.isPending || checkingOnSave ? (
             <>
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-950 border-t-transparent" />
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-on-accent border-t-transparent" />
               {checkingOnSave ? t('check.checking') : t('newContext.analyzing')}
             </>
           ) : (
-            t('newContext.submit')
+            <><Plus size={20} aria-hidden="true" />{t('newContext.submit')}</>
           )}
         </button>
       </form>

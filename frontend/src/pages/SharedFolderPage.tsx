@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Download, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { sharedApi } from '../api/endpoints'
 import { apiErrorInfo } from '../api/client'
 import type { SharedWord } from '../api/types'
+import { ARTICLE_COLOR, splitArticle } from '../lib/article'
 import { useAuth } from '../auth/AuthContext'
 import { Logo } from '../components/Logo'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
@@ -15,22 +17,10 @@ import { toast } from '../components/Toaster'
 // they come back from /login or /register (a reload or the register redirect must not lose it).
 const PENDING_KEY = 'pending-shared-import'
 
-const ARTICLE_STYLE: Record<string, string> = {
-  der: 'text-sky-300', die: 'text-rose-300', das: 'text-emerald-300',
-}
-
 /** «der Hund» with the article coloured by gender; a stored article is shown if the word lacks it. */
 function WordLabel({ w }: { w: SharedWord }) {
-  const [first, ...rest] = w.word.split(' ')
-  const lead = first.toLowerCase()
-  if (ARTICLE_STYLE[lead] && rest.length) {
-    return <><span className={`font-semibold ${ARTICLE_STYLE[lead]}`}>{first}</span> {rest.join(' ')}</>
-  }
-  const art = w.article?.toLowerCase()
-  if (art && ARTICLE_STYLE[art]) {
-    return <><span className={`font-semibold ${ARTICLE_STYLE[art]}`}>{art}</span> {w.word}</>
-  }
-  return <>{w.word}</>
+  const { article, rest } = splitArticle(w.word, w.article)
+  return <>{article && <span className={ARTICLE_COLOR[article]}>{article} </span>}{rest}</>
 }
 
 /**
@@ -101,32 +91,32 @@ export function SharedFolderPage() {
         <LanguageSwitcher sync={false} />
       </header>
       <main className="mx-auto max-w-2xl space-y-5 px-4 pb-16">
-        {folder.isLoading && <div className="h-40 animate-pulse rounded-3xl bg-emerald-800/30" />}
+        {folder.isLoading && <div className="h-40 animate-pulse rounded-2xl bg-surface-2" />}
 
         {(notFound || (folder.isError && !notFound)) && (
           <div className="glass p-10 text-center">
-            <div className="text-5xl">🔗</div>
-            <p className="mt-3 text-lg font-semibold">{notFound ? t('shared.notFound') : t('errors.saveFailed')}</p>
+            <Link2Off size={40} aria-hidden="true" className="mx-auto text-faint" />
+            <p className="mt-3 text-lg font-semibold text-fg">{notFound ? t('shared.notFound') : t('errors.saveFailed')}</p>
           </div>
         )}
 
         {data && (
           <>
-            <div className="glass animate-rise space-y-3 p-6">
-              <h1 className="display flex items-center gap-2 text-2xl font-extrabold">
+            <div className="glass space-y-3 p-5">
+              <h1 className="flex items-center gap-2 text-[26px] font-bold tracking-[-0.02em] text-fg">
                 <FolderDot color={data.color} /> <span className="min-w-0 break-words">{data.name}</span>
               </h1>
-              <p className="text-sm text-emerald-100/70">{t('shared.words', { count: data.word_count })}</p>
+              <p className="text-[15px] text-muted">{t('shared.words', { count: data.word_count })}</p>
               <button type="button" onClick={add} disabled={importFolder.isPending || authLoading || data.words.length === 0}
-                className="btn-primary w-full text-lg disabled:opacity-60">
+                className="btn-primary h-12 w-full disabled:opacity-60">
                 {importFolder.isPending ? t('common.loading')
-                  : isAuthenticated ? t('shared.add') : t('shared.loginToAdd')}
+                  : <><Download size={18} aria-hidden="true" />{isAuthenticated ? t('shared.add') : t('shared.loginToAdd')}</>}
               </button>
               {failureText && (
-                <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200" role="alert">
+                <div className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger" role="alert">
                   {failureText}
                   {failure?.code === 'own_folder' && failure.folderId && (
-                    <Link to={`/cards?tab=all&folder=${failure.folderId}`} className="ml-3 font-semibold text-lime-300 underline">
+                    <Link to={`/cards?tab=all&folder=${failure.folderId}`} className="ml-3 font-semibold text-accent-text underline">
                       {t('folders.open')}
                     </Link>
                   )}
@@ -135,19 +125,17 @@ export function SharedFolderPage() {
             </div>
 
             {data.words.length === 0 ? (
-              <p className="glass p-8 text-center text-emerald-100/70">{t('shared.empty')}</p>
+              <p className="glass p-8 text-center text-muted">{t('shared.empty')}</p>
             ) : (
-              <ul className="glass divide-y divide-emerald-400/10 p-2">
+              <ul className="glass divide-y divide-divider overflow-hidden">
                 {data.words.map((w, i) => (
-                  <li key={i} className="px-4 py-3">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                      <span className="text-lg font-bold text-white"><WordLabel w={w} /></span>
-                      <span className="text-emerald-100/80">{w.translation}</span>
-                    </div>
-                    {w.transcription && <div className="font-mono text-xs text-lime-300/80">{w.transcription}</div>}
+                  <li key={i} className="min-h-16 px-4 py-2.5">
+                    <div className="font-serif text-[18px] font-medium text-fg"><WordLabel w={w} /></div>
+                    <div className="text-sm text-muted">{w.translation}</div>
+                    {w.transcription && <div className="font-mono text-xs text-faint">{w.transcription}</div>}
                     {w.example_sentence && (
-                      <div className="mt-1 text-xs text-emerald-100/60">
-                        <span className="italic">{w.example_sentence}</span>
+                      <div className="mt-1 text-xs text-muted">
+                        <span className="font-serif italic">{w.example_sentence}</span>
                         {w.example_translation && <span> — {w.example_translation}</span>}
                       </div>
                     )}

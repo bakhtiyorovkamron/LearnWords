@@ -159,7 +159,7 @@ describe('StoryFormModal: server errors keep everything typed', () => {
     setup()
     type(text(), GERMAN)
     submit()
-    expect(await screen.findByRole('button', { name: '⏳ Translating…' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Translating…' })).toBeTruthy()
     finish(saved())
   })
 })

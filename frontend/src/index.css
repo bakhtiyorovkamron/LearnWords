@@ -265,7 +265,7 @@
 .hero-svg .sp2 { animation-delay: .5s; }
 .hero-svg .sp3 { animation-delay: 1s; }
 .hero-svg .h-shadow { transform-box: fill-box; transform-origin: center; animation: hero-shadowPulse 3.2s ease-in-out infinite; }
-.hero-svg:focus-visible { outline: 2px solid #CFFA4D; outline-offset: 4px; border-radius: 16px; }
+.hero-svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 16px; }
 
 /* Speech bubble */
 .hero-bubble { background: var(--surface-2); border: 1.5px solid var(--accent); border-radius: 20px; box-shadow: var(--shadow-card); text-align: center; }
@@ -288,11 +288,11 @@
 @keyframes hero-pop-side { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* Progress bar: learned (solid) + almost learned (hatched) */
-.hero-bar { height: 12px; border-radius: 999px; background: #0A2419; overflow: hidden; display: flex; }
-.hero-bar .learned { background: linear-gradient(90deg, #A8EB12, #12D8B5); transition: width .6s; }
-.hero-bar .almost { background: repeating-linear-gradient(135deg, rgba(207,250,77,.55) 0 6px, rgba(207,250,77,.18) 6px 12px); transition: width .6s; }
-.hero-legend-learned { background: linear-gradient(90deg, #A8EB12, #12D8B5); }
-.hero-legend-almost { background: repeating-linear-gradient(135deg, rgba(207,250,77,.55) 0 3px, rgba(207,250,77,.18) 3px 6px); }
+.hero-bar { height: 12px; border-radius: 999px; background: var(--track); overflow: hidden; display: flex; }
+.hero-bar .learned { background: var(--accent); transition: width .6s; }
+.hero-bar .almost { background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--accent) 55%, transparent) 0 6px, color-mix(in oklab, var(--accent) 18%, transparent) 6px 12px); transition: width .6s; }
+.hero-legend-learned { background: var(--accent); }
+.hero-legend-almost { background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--accent) 55%, transparent) 0 3px, color-mix(in oklab, var(--accent) 18%, transparent) 3px 6px); }
 
 @media (prefers-reduced-motion: reduce) {
   .hero-svg, .hero-svg *, .hero-bubble, .hero-bar * { animation: none !important; transition: none !important; }

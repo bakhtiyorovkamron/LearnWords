@@ -84,7 +84,7 @@ describe('PhotoImport', () => {
     const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
     expect(boxes.map((b) => b.checked)).toEqual([true, false, true]) // new ones preselected
     expect(boxes[1].disabled).toBe(true) // already in the collection
-    expect(screen.getByText('✓ already added')).toBeTruthy()
+    expect(screen.getByText('already added')).toBeTruthy()
 
     fireEvent.click(boxes[2]) // drop "laufen"
     fireEvent.click(screen.getByRole('button', { name: 'Add 1' }))

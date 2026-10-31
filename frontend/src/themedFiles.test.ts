@@ -17,6 +17,12 @@ const THEMED = [
   'components/FlipCards.tsx', 'components/EditWordModal.tsx', 'components/FolderPicker.tsx',
   'components/ShareFolderModal.tsx', 'components/WordFixes.tsx', 'components/FilterSheet.tsx',
   'components/Sheet.tsx', 'components/Segmented.tsx',
+  // step 5a: the rest of the user screens
+  'pages/NewContextPage.tsx', 'components/PhotoImport.tsx', 'components/WordCheckHint.tsx', 'pages/SearchPage.tsx',
+  'pages/StoryPage.tsx', 'components/StoryFormModal.tsx', 'pages/StatsPage.tsx', 'components/ReviewsChart.tsx',
+  'components/HeroPanel.tsx', 'pages/AuthPage.tsx', 'components/PasswordField.tsx', 'pages/SharedFolderPage.tsx',
+  'components/FeedbackModal.tsx', 'components/StageUpOverlay.tsx', 'components/HeroIntroOverlay.tsx',
+  'components/ErrorBoundary.tsx', 'auth/ProtectedRoute.tsx',
 ]
 
 const FORBIDDEN = /\b(emerald|lime|teal|red)-\d{2,3}\b|text-white|bg-white/

@@ -114,7 +114,7 @@ describe('ReviewSession: ?start=1 (Home → Start training)', () => {
   it('with nothing due: the normal "nothing to review" screen (and no session)', async () => {
     vi.mocked(reviewApi.due).mockResolvedValue({ cards: [], total: 0 })
     renderSession('/cards?start=1')
-    expect(await screen.findByText('No words to review today 🎉')).toBeTruthy()
+    expect(await screen.findByText('No words to review today')).toBeTruthy()
     expect(screen.queryByRole('progressbar')).toBeNull()
     await waitFor(() => expect(where()).toBe('/cards'))
   })

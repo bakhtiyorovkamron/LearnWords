@@ -58,7 +58,7 @@ describe('NewContextPage', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'f1' } })
     fireEvent.change(textbox(), { target: { value: 'Ich freue mich' } })
     fireEvent.change(field(/mean/i), { target: { value: 'я радуюсь' } })
-    fireEvent.click(screen.getByRole('button', { name: /^➕ Add$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/ }))
 
     await waitFor(() => expect(contextsApi.create).toHaveBeenCalledTimes(1))
     expect(vi.mocked(contextsApi.create).mock.calls[0][0]).toMatchObject({ text: 'Ich freue mich', meaning: 'я радуюсь', folderId: 'f1' })
@@ -81,7 +81,7 @@ describe('NewContextPage', () => {
     renderPage()
     fireEvent.change(textbox(), { target: { value: 'Hund' } })
     fireEvent.change(field(/mean/i), { target: { value: 'собака' } })
-    fireEvent.click(screen.getByRole('button', { name: /^➕ Add$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/ }))
     await waitFor(() => expect(toaster.toast).toHaveBeenCalled())
     vi.mocked(toaster.toast).mock.calls[0][1]!.action!.onClick()
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/cards?tab=all'))

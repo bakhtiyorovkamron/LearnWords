@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Heart, Star, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { feedbackApi, type Me } from '../api/endpoints'
 import { toast } from './Toaster'
@@ -29,7 +30,7 @@ export function FeedbackModal() {
 
   const send = useMutation({
     mutationFn: () => feedbackApi.submit(rating, comment.trim()),
-    onSuccess: () => toast(t('feedback.thanks')),
+    onSuccess: () => toast(t('feedback.thanks'), { icon: Heart }),
   })
   const dismiss = useMutation({ mutationFn: feedbackApi.dismiss })
 
@@ -55,20 +56,20 @@ export function FeedbackModal() {
   const placeholder = !rating ? t('feedback.placeholder') : rating <= 3 ? t('feedback.placeholderLow') : t('feedback.placeholderHigh')
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
       onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
       <div role="dialog" aria-modal="true" aria-labelledby="feedback-title"
-        className="glass animate-rise relative max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto p-6 text-left">
-        <button type="button" onClick={close} aria-label="✕"
-          className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full text-xl text-emerald-100/70 hover:bg-white/10 hover:text-white">✕</button>
-        <h2 id="feedback-title" className="display pr-10 text-2xl font-extrabold">{t('feedback.title')}</h2>
+        className="glass relative max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto p-6 text-left">
+        <button type="button" onClick={close} aria-label={t('folders.close')}
+          className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-2"><X size={20} aria-hidden="true" /></button>
+        <h2 id="feedback-title" className="pr-10 text-2xl font-bold text-fg">{t('feedback.title')}</h2>
 
         <div role="radiogroup" aria-labelledby="feedback-title" className="flex justify-center gap-1" onMouseLeave={() => setHover(0)}>
           {STARS.map((n) => (
             <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={t('feedback.star', { n })}
               onClick={() => setRating(n)} onMouseEnter={() => setHover(n)}
-              className={`grid h-14 w-14 place-items-center text-4xl transition active:scale-90 ${n <= shown ? 'text-lime-300' : 'text-white/20'}`}>
-              ★
+              className={`grid h-14 w-14 place-items-center transition active:scale-90 ${n <= shown ? 'text-streak' : 'text-dot-off'}`}>
+              <Star size={36} aria-hidden="true" data-filled={n <= shown} className={n <= shown ? 'fill-current' : ''} />
             </button>
           ))}
         </div>

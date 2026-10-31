@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Loader2, PencilLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { storiesApi, type DailyStory, type OwnStoryInput } from '../api/endpoints'
 import { apiErrorInfo, errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
@@ -106,22 +107,21 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
     ? t(`story.own.${problem}`, { ...learning.vars, min: TEXT_MIN, max: problem === 'errTitle' ? TITLE_MAX : TEXT_MAX })
     : serverError
 
-  const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-emerald-100/60'
+  const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-faint'
   const pill = (on: boolean) =>
     `rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-      on ? 'border-lime-400 bg-lime-400 text-emerald-950'
-        : 'border-emerald-400/20 bg-emerald-950/40 text-emerald-100/80 hover:border-lime-400/50 hover:text-white'
+      on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface-2 text-muted hover:text-fg'
     }`
 
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="story-form-title"
         className="glass max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto p-6 text-left">
-        <h2 id="story-form-title" className="display text-2xl font-extrabold">
-          {story ? t('story.own.editTitle') : `✍️ ${t('story.own.addTitle')}`}
+        <h2 id="story-form-title" className="flex items-center gap-2 text-2xl font-bold text-fg">
+          <PencilLine size={22} aria-hidden="true" />{story ? t('story.own.editTitle') : t('story.own.addTitle')}
         </h2>
-        <p className="text-sm text-emerald-100/70">{t('story.own.intro', learning.vars)}</p>
+        <p className="text-sm text-muted">{t('story.own.intro', learning.vars)}</p>
 
         <div>
           <label className={label} htmlFor="sf-title">{t('story.own.titleLabel')}</label>
@@ -131,11 +131,11 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
 
         <div>
           <label className={label} htmlFor="sf-text">{t('story.own.textLabel', learning.vars)} *</label>
-          <textarea id="sf-text" rows={8} className="field" lang={learning.code} value={text}
+          <textarea id="sf-text" rows={8} className="field font-serif text-[17px]" lang={learning.code} value={text}
             onChange={(e) => setText(e.target.value)} autoFocus={!story} />
-          <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs text-emerald-100/50">
+          <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs text-faint">
             <span>{t('story.own.textHint')}</span>
-            <span className={length(text) > TEXT_MAX ? 'text-red-300' : ''}>{length(text)} / {TEXT_MAX}</span>
+            <span className={length(text) > TEXT_MAX ? 'text-danger' : ''}>{length(text)} / {TEXT_MAX}</span>
           </div>
         </div>
 
@@ -150,24 +150,24 @@ export function StoryFormModal({ story, initialMode, onClose, onSaved }: {
               onClick={() => setMode('manual')}>{t('story.own.modeManual')}</button>
           </div>
           {mode === 'auto' ? (
-            <p className="mt-2 text-sm text-emerald-100/60">{t('story.own.autoHint')}</p>
+            <p className="mt-2 text-sm text-muted">{t('story.own.autoHint')}</p>
           ) : (
             <div className="mt-3">
               <label className={label} htmlFor="sf-translation">{t('story.own.manualLabel')}</label>
               <textarea id="sf-translation" rows={6} className="field" maxLength={TRANSLATION_MAX} value={translation}
                 onChange={(e) => setTranslation(e.target.value)} autoFocus={!!story && initialMode === 'manual'} />
-              <p className="mt-1 text-xs text-emerald-100/50">{t('story.own.manualHint')}</p>
+              <p className="mt-1 text-xs text-faint">{t('story.own.manualHint')}</p>
             </div>
           )}
         </div>
 
         {shown && (
-          <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">{shown}</p>
+          <p role="alert" className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">{shown}</p>
         )}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-ghost">{t('story.own.cancel')}</button>
           <button type="submit" disabled={save.isPending} className="btn-primary">
-            {save.isPending ? t(mode === 'manual' ? 'story.own.saving' : 'story.own.translating') : t('story.own.save')}
+            {save.isPending ? <><Loader2 size={16} aria-hidden="true" className="animate-spin" />{t(mode === 'manual' ? 'story.own.saving' : 'story.own.translating')}</> : t('story.own.save')}
           </button>
         </div>
       </form>

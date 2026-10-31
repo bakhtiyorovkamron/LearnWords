@@ -93,7 +93,7 @@ describe('landing text', () => {
   it('no longer promises phrase splitting or audio', async () => {
     renderPage('register')
     expect(screen.getByText(/Snap a textbook page or type a word/)).toBeTruthy()
-    for (const badge of ['📷 Textbook photo', '🤖 Article & translation', '🔁 Spaced repetition']) {
+    for (const badge of ['Textbook photo', 'Article & translation', 'Spaced repetition']) {
       expect(screen.getByText(badge)).toBeTruthy()
     }
     expect(screen.queryByText(/transcription|Audio is available/i)).toBeNull()

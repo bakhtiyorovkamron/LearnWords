@@ -1,17 +1,17 @@
-import { Check } from 'lucide-react'
+import { Check, type LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 // Minimal global toast: toast('Saved') from anywhere, <Toaster /> renders it (mounted in Layout).
 // Optional action button ("Undo") and lifetime: toast(text, { action: { label, onClick }, ms: 6000 }).
 type Action = { label: string; onClick: () => void }
-type Toast = { id: number; text: string; action?: Action; ms: number }
+type Toast = { id: number; text: string; action?: Action; ms: number; icon?: LucideIcon }
 const EVENT = 'app-toast'
 const DEFAULT_MS = 2500
 let seq = 0
 
-export function toast(text: string, opts: { action?: Action; ms?: number } = {}) {
+export function toast(text: string, opts: { action?: Action; ms?: number; icon?: LucideIcon } = {}) {
   window.dispatchEvent(new CustomEvent<Toast>(EVENT, {
-    detail: { id: ++seq, text, action: opts.action, ms: opts.ms ?? DEFAULT_MS },
+    detail: { id: ++seq, text, action: opts.action, ms: opts.ms ?? DEFAULT_MS, icon: opts.icon },
   }))
 }
 
@@ -31,7 +31,7 @@ export function Toaster() {
     <div className="pointer-events-none fixed bottom-[calc(var(--nav-h)+1.5rem)] left-1/2 z-[60] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
       {items.map((x) => (
         <div key={x.id} className="glass animate-rise pointer-events-auto flex items-center gap-3 px-5 py-3 text-sm font-semibold text-fg">
-          <Check size={16} aria-hidden="true" className="shrink-0 text-accent-text" />
+          {(() => { const I = x.icon ?? Check; return <I size={16} aria-hidden="true" className="shrink-0 text-accent-text" /> })()}
           <span className="min-w-0">{x.text}</span>
           {x.action && (
             <button type="button"

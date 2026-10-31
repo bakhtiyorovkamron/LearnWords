@@ -54,12 +54,12 @@ describe('PushToggle (the More sheet)', () => {
   it('off → the button asks permission on click and posts the subscription; then it reads "on" with Turn off', async () => {
     const { N } = browser()
     render(<PushToggle variant="row" />)
-    const button = await screen.findByRole('button', { name: '🔔 Turn on notifications' })
+    const button = await screen.findByRole('button', { name: 'Turn on notifications' })
     expect(N.requestPermission).not.toHaveBeenCalled() // nothing is asked until the click
     fireEvent.click(button)
     await waitFor(() => expect(pushApi.subscribe).toHaveBeenCalledTimes(1))
     expect(N.requestPermission).toHaveBeenCalledTimes(1)
-    expect(await screen.findByText('🔔 Notifications on')).toBeTruthy()
+    expect(await screen.findByText('Notifications on')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Turn off' })).toBeTruthy()
   })
 
@@ -68,13 +68,13 @@ describe('PushToggle (the More sheet)', () => {
     render(<PushToggle variant="row" />)
     fireEvent.click(await screen.findByRole('button', { name: 'Turn off' }))
     await waitFor(() => expect(pushApi.unsubscribe).toHaveBeenCalledWith('https://push.example.com/abc'))
-    expect(await screen.findByRole('button', { name: '🔔 Turn on notifications' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Turn on notifications' })).toBeTruthy()
   })
 
   it('on mount an existing subscription is re-sent, so the device follows the logged-in account', async () => {
     browser({ permission: 'granted', sub: true })
     render(<PushToggle variant="row" />)
-    await screen.findByText('🔔 Notifications on')
+    await screen.findByText('Notifications on')
     await waitFor(() => expect(pushApi.subscribe).toHaveBeenCalledTimes(1))
   })
 
@@ -101,7 +101,7 @@ describe('PushToggle (the More sheet)', () => {
   it('a refused prompt shows the blocked hint', async () => {
     browser({ asked: 'denied' })
     render(<PushToggle variant="row" />)
-    fireEvent.click(await screen.findByRole('button', { name: '🔔 Turn on notifications' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn on notifications' }))
     expect(await screen.findByText(/Notifications are blocked in your browser/)).toBeTruthy()
     expect(pushApi.subscribe).not.toHaveBeenCalled()
   })
@@ -111,7 +111,7 @@ describe('PushToggle (the header bell)', () => {
   it('its title is the text of the state', async () => {
     browser()
     render(<PushToggle variant="icon" />)
-    expect((await screen.findByRole('button')).getAttribute('title')).toBe('🔔 Turn on notifications')
+    expect((await screen.findByRole('button')).getAttribute('title')).toBe('Turn on notifications')
   })
 
   it('where it cannot work, the click shows the hint instead of doing anything', async () => {

@@ -76,7 +76,7 @@ describe('/s/:token', () => {
     renderApp()
     expect(await screen.findByText('Tiere')).toBeTruthy()
     expect(screen.getByText('Words: 2')).toBeTruthy()
-    expect(screen.getByText('der').className).toContain('sky') // masculine
+    expect(screen.getByText('der').className).toContain('text-der') // masculine
     expect(screen.getByText('cat')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Log in to add these words' })).toBeTruthy()
     expect(sharedApi.import).not.toHaveBeenCalled()

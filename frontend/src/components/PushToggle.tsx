@@ -43,14 +43,14 @@ export function PushToggle({ variant }: { variant: 'row' | 'icon' }) {
     <div className="space-y-1">
       {push.status === 'on' ? (
         <div className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 font-semibold text-fg">
-          <span>{t('push.enabled')}</span>
+          <span className="flex items-center gap-2"><BellRing size={18} aria-hidden="true" className="text-accent-text" />{t('push.enabled')}</span>
           <button type="button" className="btn-ghost !px-3 !py-1 text-sm" disabled={push.busy} onClick={() => void push.disable()}>
             {t('push.disable')}
           </button>
         </div>
       ) : (
         <button type="button" className="btn-ghost w-full py-3" disabled={push.busy} onClick={() => void push.enable()}>
-          {t('push.enable')}
+          <Bell size={18} aria-hidden="true" />{t('push.enable')}
         </button>
       )}
       {push.failed && <p role="alert" className="px-4 text-sm text-danger">{t('common.unknownError')}</p>}

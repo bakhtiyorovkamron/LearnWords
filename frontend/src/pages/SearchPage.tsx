@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Check, Folder as FolderIcon, Plus, Search, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { searchApi, type WordInfo } from '../api/endpoints'
 import { errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
@@ -7,6 +8,7 @@ import { FolderSelect } from '../components/Folders'
 import { toast } from '../components/Toaster'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
+import { ARTICLE_COLOR, type Article } from '../lib/article'
 
 // Pronoun labels per learning language (keys are positions returned by the backend).
 const PERSONS_BY_LANG: Record<string, [string, string][]> = {
@@ -51,24 +53,25 @@ export function SearchPage() {
 
   const err = search.error
   if (!isOn('word_search')) {
-    return <p className="mx-auto max-w-3xl rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{t('errors.featureDisabled')}</p>
+    return <p className="mx-auto max-w-3xl rounded-xl border border-danger bg-surface-2 px-4 py-3 text-sm text-danger">{t('errors.featureDisabled')}</p>
   }
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="animate-rise text-center">
-        <h1 className="display text-3xl font-extrabold md:text-4xl">
-          {t('search.titleA')}<span className="text-lime-300">{t('search.titleB')}</span> 🔍
-        </h1>
-        <p className="mt-2 text-emerald-100/70">{t('search.subtitle', learning.vars)}</p>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('search.title')}</h1>
+        <p className="mt-1 text-[15px] text-muted">{t('search.subtitle', learning.vars)}</p>
       </div>
 
       <form onSubmit={submit} className="glass flex flex-col gap-3 p-4 sm:flex-row">
-        <input value={query} onChange={(e) => setQuery(e.target.value.slice(0, 100))} autoFocus
-          placeholder={t('search.placeholder', learning.vars)} className="field flex-1 text-lg" aria-label={t('search.placeholder', learning.vars)} />
+        <div className="relative flex-1">
+          <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-faint" />
+          <input value={query} onChange={(e) => setQuery(e.target.value.slice(0, 100))} autoFocus
+            placeholder={t('search.placeholder', learning.vars)} className="field pl-11" aria-label={t('search.placeholder', learning.vars)} />
+        </div>
         <button type="submit" disabled={!query.trim() || search.isPending} className="btn-primary shrink-0">
           {search.isPending ? (
             <>
-              <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-950 border-t-transparent" />
+              <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-on-accent border-t-transparent" />
               {t('search.searching')}
             </>
           ) : t('search.find')}
@@ -76,7 +79,7 @@ export function SearchPage() {
       </form>
 
       {err && (
-        <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <p className="rounded-xl border border-danger bg-surface-2 px-4 py-3 text-sm text-danger">
           {status(err) === 503
             ? t('search.notConfigured')
             : isFeatureError(err)
@@ -86,7 +89,7 @@ export function SearchPage() {
               : t('search.failed', { error: errorMessage(err) })}
         </p>
       )}
-      {search.isPending && <div className="h-64 animate-pulse rounded-3xl bg-emerald-800/30" />}
+      {search.isPending && <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />}
       {search.data && !search.isPending && <WordResult key={search.data.word} info={search.data} />}
     </div>
   )
@@ -130,39 +133,39 @@ function WordResult({ info }: { info: WordInfo }) {
   })
 
   const row = (label: string, value: string | null) => value && (
-    <div className="flex justify-between gap-4 border-b border-emerald-400/10 py-2 last:border-0">
-      <span className="text-emerald-100/60">{label}</span>
-      <span className="text-right font-semibold text-white">{value}</span>
+    <div className="flex justify-between gap-4 border-b border-divider py-2 last:border-0">
+      <span className="text-muted">{label}</span>
+      <span className="text-right font-semibold text-fg">{value}</span>
     </div>
   )
 
   return (
-    <article className="glass animate-rise space-y-6 p-6 md:p-8">
+    <article className="glass space-y-6 p-5 md:p-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="w-full min-w-0">
           {/* Label comes from the UI locale (never from the AI); no CSS uppercase — Uzbek Latin
               "ot" turned into "OT" looked like Cyrillic "ОТ". */}
-          <div className="text-xs font-semibold tracking-wide text-lime-300/70" lang={i18n.language}>
+          <div className="text-xs font-semibold tracking-wide text-faint" lang={i18n.language}>
             {t(`search.type.${info.word_type}`, { defaultValue: t('search.type.other') })}
           </div>
           {/* Adaptive size + wrapping: long compound words must not overflow the card. */}
-          <h2 className="display font-extrabold leading-tight text-white"
-            style={{ fontSize: 'clamp(1.75rem, 5vw, 3rem)', overflowWrap: 'anywhere', wordBreak: 'break-word', hyphens: 'auto' }}
+          <h2 className="font-serif font-medium leading-tight text-fg"
+            style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', overflowWrap: 'anywhere', wordBreak: 'break-word', hyphens: 'auto' }}
             lang={learning.code}>
-            {info.word_type === 'noun' && info.article && <span className="text-lime-300">{info.article} </span>}
+            {info.word_type === 'noun' && info.article && <span className={ARTICLE_COLOR[info.article.toLowerCase() as Article] ?? 'text-fg'}>{info.article} </span>}
             {info.word}
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            {info.pronunciation && <span className="font-mono text-lime-300/90">[{info.pronunciation}]</span>}
+            {info.pronunciation && <span className="font-mono text-muted">[{info.pronunciation}]</span>}
             {learning.code === 'de' && (
-              <button type="button" onClick={() => speak(full, learning.code)} className="btn-ghost !px-3 !py-1 text-sm" title={t('quiz.listenTitle')}>▶</button>
+              <button type="button" onClick={() => speak(full, learning.code)} className="grid h-10 w-10 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2" title={t('quiz.listenTitle')} aria-label={t('quiz.listenTitle')}><Volume2 size={18} aria-hidden="true" /></button>
             )}
           </div>
-          <p className="mt-3 text-xl text-emerald-100">{info.translation}</p>
+          <p className="mt-3 text-xl text-fg">{info.translation}</p>
           {!!info.alternatives?.length && (
-            <p className="mt-2 text-sm text-emerald-100/60">
+            <p className="mt-2 text-sm text-muted">
               {t('search.alternatives')}{' '}
-              <span className="text-emerald-50" lang={learning.code}>{info.alternatives.join(', ')}</span>
+              <span className="font-serif text-fg" lang={learning.code}>{info.alternatives.join(', ')}</span>
             </p>
           )}
         </div>
@@ -170,29 +173,29 @@ function WordResult({ info }: { info: WordInfo }) {
 
       {info.word_type === 'noun' && info.plural && (
         <section>
-          <h3 className="mb-1 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.plural')}</h3>
-          <p className="text-lg text-white">{learning.code === 'de' ? `die ${info.plural.replace(/^die\s+/i, '')}` : info.plural}</p>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-widest text-faint">{t('search.plural')}</h3>
+          <p className="font-serif text-lg text-fg">{learning.code === 'de' ? `die ${info.plural.replace(/^die\s+/i, '')}` : info.plural}</p>
         </section>
       )}
 
       {(info.word_type === 'verb' || (learning.code === 'ko' && info.word_type === 'adjective')) && (
         <section className="space-y-4">
           {info.verb_type && (
-            <span className="inline-block rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
+            <span className="inline-block rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-streak">
               {info.verb_type === 'strong' ? t('search.strong') : info.verb_type === 'weak' ? t('search.weak') : info.verb_type}
             </span>
           )}
           {info.conjugation_present && (
             <div>
-              <h3 className="mb-2 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.present')}</h3>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-faint">{t('search.present')}</h3>
               <table className="w-full overflow-hidden rounded-2xl text-left">
                 <tbody>
                   {persons.map(([key, label]) => {
                     const form = info.conjugation_present?.[key]
                     return form && (
-                      <tr key={key} className="odd:bg-emerald-900/30">
-                        <td className="w-1/3 px-4 py-2 text-emerald-100/60">{label}</td>
-                        <td className="px-4 py-2 font-semibold text-white">{form}</td>
+                      <tr key={key} className="odd:bg-surface-2">
+                        <td className="w-1/3 px-4 py-2 text-muted">{label}</td>
+                        <td className="px-4 py-2 font-semibold text-fg">{form}</td>
                       </tr>
                     )
                   })}
@@ -202,15 +205,15 @@ function WordResult({ info }: { info: WordInfo }) {
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {info.perfekt && (
-              <div className="rounded-2xl bg-emerald-900/30 p-4">
-                <div className="text-xs uppercase tracking-widest text-emerald-100/50">{perfektLabel}</div>
-                <div className="mt-1 text-lg font-semibold text-white">{info.perfekt}</div>
+              <div className="rounded-2xl bg-surface-2 p-4">
+                <div className="text-xs font-semibold uppercase tracking-widest text-faint">{perfektLabel}</div>
+                <div className="mt-1 text-lg font-semibold text-fg">{info.perfekt}</div>
               </div>
             )}
             {info.praeteritum && (
-              <div className="rounded-2xl bg-emerald-900/30 p-4">
-                <div className="text-xs uppercase tracking-widest text-emerald-100/50">{praetLabel}</div>
-                <div className="mt-1 text-lg font-semibold text-white">{info.praeteritum}</div>
+              <div className="rounded-2xl bg-surface-2 p-4">
+                <div className="text-xs font-semibold uppercase tracking-widest text-faint">{praetLabel}</div>
+                <div className="mt-1 text-lg font-semibold text-fg">{info.praeteritum}</div>
               </div>
             )}
           </div>
@@ -219,7 +222,7 @@ function WordResult({ info }: { info: WordInfo }) {
 
       {info.word_type === 'adjective' && (info.comparative || info.superlative) && (
         <section>
-          <h3 className="mb-1 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.degrees')}</h3>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-widest text-faint">{t('search.degrees')}</h3>
           {row(t('search.positive'), info.word)}
           {row(t('search.comparative'), info.comparative)}
           {row(t('search.superlative'), info.superlative)}
@@ -227,27 +230,28 @@ function WordResult({ info }: { info: WordInfo }) {
       )}
 
       {info.example_sentence && (
-        <section className="rounded-2xl border border-emerald-400/15 bg-emerald-950/40 p-4">
-          <h3 className="mb-2 text-xs uppercase tracking-widest text-emerald-100/50">{t('search.example')}</h3>
-          <p className="italic text-white">{info.example_sentence}</p>
-          {info.example_translation && <p className="mt-1 text-emerald-100/60">{info.example_translation}</p>}
+        <section className="rounded-2xl border border-line bg-surface-2 p-4">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-faint">{t('search.example')}</h3>
+          <p className="font-serif italic text-fg">{info.example_sentence}</p>
+          {info.example_translation && <p className="mt-1 text-muted">{info.example_translation}</p>}
         </section>
       )}
 
-      <footer className="flex flex-col gap-3 border-t border-emerald-400/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+      <footer className="flex flex-col gap-3 border-t border-divider pt-5 sm:flex-row sm:items-center sm:justify-between">
         {!added && (
-          <div className="flex min-w-0 items-center gap-2 text-sm text-emerald-100/60">
-            <span className="shrink-0">📁</span>
+          <div className="flex min-w-0 items-center gap-2 text-sm text-muted">
+            <FolderIcon size={18} aria-hidden="true" className="shrink-0" />
             <FolderSelect value={folder} onChange={setFolder} className="w-56 max-w-full" />
           </div>
         )}
         <button type="button" onClick={() => add.mutate()} disabled={added || add.isPending}
           className={`${added ? 'btn-ghost cursor-default opacity-70' : 'btn-primary'} sm:ml-auto`}>
-          {added ? `✓ ${t('search.alreadyAdded')}` : add.isPending ? t('search.adding') : `➕ ${t('search.add')}`}
+          {added ? <><Check size={18} aria-hidden="true" className="text-accent-text" />{t('search.alreadyAdded')}</>
+            : add.isPending ? t('search.adding') : <><Plus size={18} aria-hidden="true" />{t('search.add')}</>}
         </button>
       </footer>
       {add.error && status(add.error) !== 409 && (
-        <p className="text-sm text-red-300">{isRateLimited(add.error) ? rateLimitMessage(add.error) : t('search.addFailed', { error: errorMessage(add.error) })}</p>
+        <p className="text-sm text-danger">{isRateLimited(add.error) ? rateLimitMessage(add.error) : t('search.addFailed', { error: errorMessage(add.error) })}</p>
       )}
     </article>
   )

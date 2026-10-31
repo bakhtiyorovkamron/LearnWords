@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Share2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { heroApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -43,19 +44,21 @@ export function StageUpOverlay() {
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="stage-up-title"
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 overflow-y-auto bg-gradient-to-b from-[#14452F] to-[#0B2B1C] px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/60 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+      <div className="glass flex w-full max-w-md flex-col items-center gap-5 p-6">
       <Hero stage={stage} mood="happy" phrase={hero.phrase} size="large" label={name} className="w-full max-w-sm" />
-      <h2 id="stage-up-title" className="display max-w-md text-balance text-center text-2xl font-extrabold md:text-3xl">
+      <h2 id="stage-up-title" className="max-w-md text-balance text-center text-2xl font-bold text-fg">
         {t('hero.stageUp', { name })}
       </h2>
       <div className="flex flex-wrap justify-center gap-3">
         <button type="button" className="btn-primary" disabled={share.isPending}
           onClick={() => share.mutate({ stage, name })}>
-          {share.isPending ? t('common.loading') : `📤 ${t('hero.share')}`}
+          {share.isPending ? t('common.loading') : <><Share2 size={16} aria-hidden="true" />{t('hero.share')}</>}
         </button>
         <button type="button" className="btn-ghost" onClick={close}>{t('hero.close')}</button>
       </div>
-      {share.error && <p className="text-sm text-red-300">{errorMessage(share.error)}</p>}
+      {share.error && <p className="text-sm text-danger">{errorMessage(share.error)}</p>}
+      </div>
     </div>
   )
 }

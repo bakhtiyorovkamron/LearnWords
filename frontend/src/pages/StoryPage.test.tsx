@@ -54,13 +54,13 @@ const archive = () => screen.getByText('Story archive').closest('section') as HT
 const chip = (name: RegExp | string) => within(archive()).getByRole('button', { name })
 
 describe('StoryPage: the archive', () => {
-  it("today's own story is in the archive with a ✍️ chip; today's AI story is not (it is shown above)", async () => {
+  it("today's own story is in the archive with a chip; today's AI story is not (it is shown above)", async () => {
     renderPage()
-    expect(await within(archive()).findByRole('button', { name: /✍️ Mein Tag heute im Park/ })).toBeTruthy()
-    expect(chip(/✍️ Alte eigene/)).toBeTruthy()
+    expect(await within(archive()).findByRole('button', { name: /Mein Tag heute im Park/ })).toBeTruthy()
+    expect(chip(/Alte eigene/)).toBeTruthy()
     // AI chips are dates: yesterday's is there, today's is not.
     const labels = within(archive()).getAllByRole('button').map((b) => b.textContent)
-    expect(labels.filter((l) => !l?.startsWith('✍️') && l !== 'All' && !/Generated|Mine/.test(l ?? ''))).toHaveLength(1)
+    expect(labels.filter((l) => !/Mein Tag|Alte eigene/.test(l ?? '') && l !== 'All' && !/Generated|Mine/.test(l ?? ''))).toHaveLength(1)
     // the newest is selected by default (the story is fetched a tick after the chips appear)
     await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('own-today'))
   })
@@ -68,49 +68,49 @@ describe('StoryPage: the archive', () => {
   it('a long own title is cut to 24 characters in the chip', async () => {
     vi.mocked(storiesApi.list).mockResolvedValue([{ ...ownOld, title: 'X'.repeat(40), story_de: '' }])
     renderPage()
-    expect(await within(archive()).findByRole('button', { name: '✍️ ' + 'X'.repeat(23) + '…' })).toBeTruthy()
+    expect(await within(archive()).findByRole('button', { name: '' + 'X'.repeat(23) + '…' })).toBeTruthy()
   })
 
   it('edit and delete exist only on own stories', async () => {
     renderPage()
-    await within(archive()).findByRole('button', { name: /✍️ Mein Tag/ })
-    expect(await screen.findByRole('button', { name: '✏️ Edit' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '🗑 Delete' })).toBeTruthy()
-    expect(within(archive()).getByText(/✍️ Own story/)).toBeTruthy() // "date · badge" instead of the genre
+    await within(archive()).findByRole('button', { name: /Mein Tag/ })
+    expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy()
+    expect(within(archive()).getByText(/Own story/)).toBeTruthy() // "date · badge" instead of the genre
 
     // An AI story from the archive: neither button.
-    const aiChip = within(archive()).getAllByRole('button').find((b) => /\d/.test(b.textContent ?? '') && !b.textContent?.startsWith('✍️'))!
+    const aiChip = within(archive()).getAllByRole('button').find((b) => /\d/.test(b.textContent ?? '') && !/Mein Tag|Alte eigene/.test(b.textContent ?? ''))!
     fireEvent.click(aiChip)
     await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('ai-yesterday'))
-    await waitFor(() => expect(screen.queryByRole('button', { name: '✏️ Edit' })).toBeNull())
-    expect(screen.queryByRole('button', { name: '🗑 Delete' })).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull())
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
     // Today's AI story above the archive has none either.
     expect(screen.getByRole('heading', { name: 'KI heute' })).toBeTruthy()
   })
 
   it('filter pills appear only with own stories, and narrow the archive', async () => {
     renderPage()
-    await within(archive()).findByRole('button', { name: /✍️ Mein Tag/ })
-    fireEvent.click(screen.getByRole('button', { name: '✨ Generated' }))
-    await waitFor(() => expect(within(archive()).queryByRole('button', { name: /✍️ Mein Tag/ })).toBeNull())
+    await within(archive()).findByRole('button', { name: /Mein Tag/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Generated' }))
+    await waitFor(() => expect(within(archive()).queryByRole('button', { name: /Mein Tag/ })).toBeNull())
     await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('ai-yesterday')) // the selection stays valid
-    fireEvent.click(screen.getByRole('button', { name: '✍️ Mine' }))
-    expect(await within(archive()).findByRole('button', { name: /✍️ Alte eigene/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Mine' }))
+    expect(await within(archive()).findByRole('button', { name: /Alte eigene/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'All' }))
-    expect(within(archive()).getByRole('button', { name: /✍️ Mein Tag/ })).toBeTruthy()
+    expect(within(archive()).getByRole('button', { name: /Mein Tag/ })).toBeTruthy()
   })
 
   it('no pills when there are no own stories', async () => {
     vi.mocked(storiesApi.list).mockResolvedValue([{ ...aiYesterday, story_de: '' }])
     renderPage()
     await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('ai-yesterday'))
-    expect(screen.queryByRole('button', { name: '✍️ Mine' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '✨ Generated' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Mine' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Generated' })).toBeNull()
   })
 
   it('the date input selects the first story of that date; no story → the "no story" note', async () => {
     renderPage()
-    await within(archive()).findByRole('button', { name: /✍️ Mein Tag/ })
+    await within(archive()).findByRole('button', { name: /Mein Tag/ })
     const input = archive().querySelector('input[type=date]') as HTMLInputElement
     fireEvent.change(input, { target: { value: longAgo } })
     await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('own-old'))
@@ -129,31 +129,31 @@ describe('StoryPage: adding, deleting', () => {
     })
     vi.mocked(storiesApi.byId).mockImplementation(async (id) => [fresh, ...everything].find((s) => s.id === id)!)
     renderPage()
-    await within(archive()).findByRole('button', { name: /✍️ Mein Tag/ })
-    fireEvent.click(screen.getByRole('button', { name: '✨ Generated' })) // a narrowing filter is on
+    await within(archive()).findByRole('button', { name: /Mein Tag/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Generated' })) // a narrowing filter is on
 
-    fireEvent.click(screen.getByRole('button', { name: '✍️ Your own story' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Your own story' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText(/German text/), { target: { value: 'Der Hund läuft durch den Park.' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(storiesApi.createOwn).toHaveBeenCalledTimes(1))
-    expect(await within(archive()).findByRole('button', { name: /✍️ Frisch geschrieben/ })).toBeTruthy()
+    expect(await within(archive()).findByRole('button', { name: /Frisch geschrieben/ })).toBeTruthy()
     await waitFor(() => expect(storiesApi.byId).toHaveBeenCalledWith('own-new'))
-    expect(within(archive()).getByRole('button', { name: /✍️ Alte eigene/ })).toBeTruthy() // filter is "All" again
+    expect(within(archive()).getByRole('button', { name: /Alte eigene/ })).toBeTruthy() // filter is "All" again
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('the "Your own story" button opens the form', async () => {
     renderPage()
-    fireEvent.click(screen.getByRole('button', { name: '✍️ Your own story' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Your own story' }))
     expect(await screen.findByRole('dialog', { name: /Your own story/ })).toBeTruthy()
   })
 
   it('delete: confirm → deleteOwn(id) → toast, and the next story gets selected', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: '🗑 Delete' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
     expect(confirm).toHaveBeenCalledWith('Delete the story “Mein Tag heute im Park”?')
     await waitFor(() => expect(storiesApi.deleteOwn).toHaveBeenCalledWith('own-today'))
     await waitFor(() => expect(toast).toHaveBeenCalledWith('Story deleted'))
@@ -163,7 +163,7 @@ describe('StoryPage: adding, deleting', () => {
   it('delete is not sent when the user cancels the confirmation', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: '🗑 Delete' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
     expect(storiesApi.deleteOwn).not.toHaveBeenCalled()
   })
 
@@ -173,14 +173,14 @@ describe('StoryPage: adding, deleting', () => {
     vi.mocked(storiesApi.byId).mockResolvedValue(bare)
     renderPage()
     expect(await screen.findByText('No translation yet.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '✏️ Add a translation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a translation' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('radio', { name: /My own translation/ }).getAttribute('aria-checked')).toBe('true')
   })
 
   it('says who wrote the translation of an own story', async () => {
     renderPage()
-    await within(archive()).findByRole('button', { name: /✍️ Mein Tag/ })
+    await within(archive()).findByRole('button', { name: /Mein Tag/ })
     fireEvent.click(await within(archive()).findByRole('button', { name: 'Show translation' }))
     expect(await within(archive()).findByText('Translation: automatic')).toBeTruthy()
   })
@@ -189,7 +189,7 @@ describe('StoryPage: adding, deleting', () => {
     const mine = { ...ownToday, translation_source: 'user' as const }
     vi.mocked(storiesApi.byId).mockImplementation(async (id) => (id === 'own-today' ? mine : everything.find((s) => s.id === id)!))
     renderPage()
-    await within(archive()).findByRole('button', { name: /✍️ Mein Tag/ })
+    await within(archive()).findByRole('button', { name: /Mein Tag/ })
     fireEvent.click(await within(archive()).findByRole('button', { name: 'Show translation' }))
     expect(await within(archive()).findByText('Translation: yours')).toBeTruthy()
     // Today's AI story above the archive: its translation carries no such caption.
@@ -215,15 +215,32 @@ describe('StoryPage: daily_story switched off', () => {
     vi.mocked(meApi.get).mockResolvedValue(withFeatures(true))
     vi.mocked(storiesApi.today).mockResolvedValue({ story: null, words_today: words, genres: [] })
     renderPage()
-    expect(await screen.findByRole('button', { name: '✨ Generate story' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Generate story' })).toBeTruthy()
   })
 
   it('hides the generate block when off; the archive and own stories stay', async () => {
     vi.mocked(meApi.get).mockResolvedValue(withFeatures(false))
     vi.mocked(storiesApi.today).mockResolvedValue({ story: null, words_today: words, genres: [] })
     renderPage()
-    expect(await within(archive()).findByRole('button', { name: /✍️ Mein Tag heute im Park/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '✨ Generate story' })).toBeNull()
+    expect(await within(archive()).findByRole('button', { name: /Mein Tag heute im Park/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Generate story' })).toBeNull()
     expect(screen.getByRole('button', { name: /Your own story/ })).toBeTruthy()
   })
 })
+
+describe('StoryPage: the text', () => {
+  it("is serif and today's words are highlighted", async () => {
+    const withWords = story({
+      story_de: 'Der Hund kommt nach Hause.',
+      words_used: [{ word: 'der Hund', translation: 'собака', lemma: 'Hund', article: 'der', part_of_speech: 'noun' }],
+    })
+    vi.mocked(storiesApi.today).mockResolvedValue({ story: withWords, words_today: [{ word: 'der Hund', translation: 'собака' }], genres: [] } as never)
+    renderPage()
+    const hl = await screen.findAllByTestId('story-hl')
+    expect(hl.length).toBeGreaterThan(0)
+    expect(hl[0].textContent).toBe('Hund')
+    expect(hl[0].className).toContain('underline')
+    expect(hl[0].parentElement?.className).toContain('font-serif')
+  })
+})
+

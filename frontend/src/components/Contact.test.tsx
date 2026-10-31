@@ -62,7 +62,7 @@ describe('contact links', () => {
     expect(within(footer).queryByText(/Telegram/)).toBeNull()
   })
 
-  it('the phone "More" sheet ends with "💬 Contact us" → Instagram', () => {
+  it('the phone "More" sheet ends with "Contact us" → Instagram', () => {
     render(
       <QueryClientProvider client={client()}>
         <MemoryRouter initialEntries={['/x']}><Routes><Route element={<Layout />}><Route path="/x" element={<div />} /></Route></Routes></MemoryRouter>

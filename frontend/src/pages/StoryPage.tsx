@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Dices, Pencil, PencilLine, Plus, RotateCcw, Trash, WandSparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { storiesApi, type DailyStory, type StoryWord } from '../api/endpoints'
 import { errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
@@ -7,6 +8,7 @@ import { dateLocale } from '../i18n'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
 import { highlightStory } from '../lib/storyHighlight'
+import { Segmented } from '../components/Segmented'
 import { ErrorState } from '../components/ErrorState'
 import { StoryFormModal } from '../components/StoryFormModal'
 import { toast } from '../components/Toaster'
@@ -25,7 +27,7 @@ function Highlighted({ text, words = [] }: { text: string; words?: StoryWord[] }
     <>
       {segments.map((s, i) =>
         s.hl ? (
-          <mark key={i} className="rounded bg-lime-300/20 px-1 font-semibold text-lime-300">{s.text}</mark>
+          <mark key={i} data-testid="story-hl" className="rounded bg-surface-2 px-0.5 text-fg underline decoration-accent underline-offset-4">{s.text}</mark>
         ) : (
           <span key={i}>{s.text}</span>
         ),
@@ -41,6 +43,7 @@ function Highlighted({ text, words = [] }: { text: string; words?: StoryWord[] }
 function StoryView({ story, onDeleted }: { story: DailyStory; onDeleted?: (id: string) => void }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const learning = useLearningLang()
   const [showTranslation, setShowTranslation] = useState(false)
   const [editing, setEditing] = useState<'edit' | 'translation' | null>(null)
   const own = story.source === 'user'
@@ -57,12 +60,15 @@ function StoryView({ story, onDeleted }: { story: DailyStory; onDeleted?: (id: s
   return (
     <article className="glass space-y-4 p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="display text-2xl font-bold">{story.title || `${t('story.titleA')}${t('story.titleB')}`}</h2>
-        <span className="text-xs text-emerald-100/60">
-          {formatDate(story.date)} · {own ? t('story.own.badge') : t(`story.genres.${story.genre}`, { defaultValue: story.genre })}
+        <h2 className="text-xl font-bold text-fg">{story.title || t('story.title')}</h2>
+        <span className="flex items-center gap-2 text-xs text-muted">
+          {formatDate(story.date)}
+          {own
+            ? <span className="flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5"><PencilLine size={12} aria-hidden="true" />{t('story.own.badge')}</span>
+            : <span className="rounded-full bg-surface-2 px-2 py-0.5">{t(`story.genres.${story.genre}`, { defaultValue: story.genre })}</span>}
         </span>
       </div>
-      <p className="whitespace-pre-line leading-relaxed"><Highlighted text={story.story_de} words={story.words_used} /></p>
+      <p className="whitespace-pre-line font-serif text-[19px] leading-relaxed text-fg" lang={learning.code}><Highlighted text={story.story_de} words={story.words_used} /></p>
       {story.story_translation && (
         <button className="btn-ghost" onClick={() => setShowTranslation((v) => !v)}>
           {showTranslation ? t('story.hideTranslation') : t('story.showTranslation')}
@@ -70,9 +76,9 @@ function StoryView({ story, onDeleted }: { story: DailyStory; onDeleted?: (id: s
       )}
       {showTranslation && story.story_translation && (
         <div className="space-y-1">
-          <p className="whitespace-pre-line text-emerald-100/80"><Highlighted text={story.story_translation} /></p>
+          <p className="whitespace-pre-line text-muted"><Highlighted text={story.story_translation} /></p>
           {own && story.translation_source && (
-            <p className="text-xs text-emerald-100/50">
+            <p className="text-xs text-faint">
               {story.translation_source === 'user' ? t('story.own.translationByYou') : t('story.own.translationByAi')}
             </p>
           )}
@@ -80,27 +86,27 @@ function StoryView({ story, onDeleted }: { story: DailyStory; onDeleted?: (id: s
       )}
       {own && !story.story_translation && (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-emerald-100/60">{t('story.own.noTranslation')}</span>
-          <button className="btn-ghost" onClick={() => setEditing('translation')}>{t('story.own.addTranslation')}</button>
+          <span className="text-sm text-muted">{t('story.own.noTranslation')}</span>
+          <button className="btn-ghost" onClick={() => setEditing('translation')}><Pencil size={16} aria-hidden="true" />{t('story.own.addTranslation')}</button>
         </div>
       )}
       <div className="flex flex-wrap gap-2 pt-2">
         {story.words_used.map((w) => (
-          <span key={w.word} className="rounded-full bg-white/5 px-3 py-1 text-sm">
-            {w.word}{w.translation && <span className="text-emerald-100/60"> — {w.translation}</span>}
+          <span key={w.word} className="rounded-full bg-surface-2 px-3 py-1 text-sm text-fg">
+            <span className="font-serif" lang={learning.code}>{w.word}</span>{w.translation && <span className="text-muted"> — {w.translation}</span>}
           </span>
         ))}
       </div>
       {own && (
-        <div className="flex flex-wrap gap-2 border-t border-emerald-400/10 pt-4">
-          <button className="btn-ghost" onClick={() => setEditing('edit')}>{t('story.own.edit')}</button>
-          <button className="btn-ghost hover:!text-red-300" disabled={remove.isPending}
+        <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
+          <button className="btn-ghost" onClick={() => setEditing('edit')}><Pencil size={16} aria-hidden="true" />{t('story.own.edit')}</button>
+          <button className="btn-ghost hover:!text-danger" disabled={remove.isPending}
             onClick={() => { if (window.confirm(t('story.own.deleteConfirm', { title: story.title }))) remove.mutate() }}>
-            {t('story.own.delete')}
+            <Trash size={16} aria-hidden="true" />{t('story.own.delete')}
           </button>
         </div>
       )}
-      {remove.error && <p className="text-sm text-red-300">{errorMessage(remove.error)}</p>}
+      {remove.error && <p className="text-sm text-danger">{errorMessage(remove.error)}</p>}
       {editing && (
         <StoryFormModal story={story} initialMode={editing === 'translation' ? 'manual' : undefined}
           onClose={() => setEditing(null)} />
@@ -111,10 +117,10 @@ function StoryView({ story, onDeleted }: { story: DailyStory; onDeleted?: (id: s
 
 type Filter = 'all' | 'ai' | 'own'
 
-/** "✍️ " + the title cut to 24 characters (emoji-safe). */
+/** The title cut to 24 characters (emoji-safe). */
 function ownChipLabel(title: string, max = 24): string {
   const chars = Array.from(title.trim())
-  return '✍️ ' + (chars.length > max ? chars.slice(0, max - 1).join('') + '…' : chars.join(''))
+  return chars.length > max ? chars.slice(0, max - 1).join('') + '…' : chars.join('')
 }
 
 export function StoryPage() {
@@ -211,15 +217,13 @@ export function StoryPage() {
   const story = today.data?.story
 
   return (
-    <div className="space-y-8">
-      <div className="animate-rise flex flex-wrap items-start justify-between gap-3">
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="display text-3xl font-extrabold md:text-4xl">
-            {t('story.titleA')}<span className="text-lime-300">{t('story.titleB')}</span> 📖
-          </h1>
-          <p className="mt-2 text-emerald-100/70">{t('story.subtitle', learning.vars)}</p>
+          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('story.title')}</h1>
+          <p className="mt-1 text-[15px] text-muted">{t('story.subtitle', learning.vars)}</p>
         </div>
-        <button type="button" className="btn-ghost" onClick={() => setAdding(true)}>{t('story.own.add')}</button>
+        <button type="button" className="btn-ghost" onClick={() => setAdding(true)}><Plus size={16} aria-hidden="true" />{t('story.own.add')}</button>
       </div>
 
       {isOn('daily_story') && <section className="glass space-y-4 p-6">
@@ -229,7 +233,7 @@ export function StoryPage() {
           <p>{t('story.noWords')}</p>
         ) : (
           <>
-            <p>{t('story.wordsToday')} <b className="text-lime-300">{words.length}</b> — {words.map((w) => w.word).join(', ')}</p>
+            <p>{t('story.wordsToday')} <b className="text-accent-text">{words.length}</b> — {words.map((w) => w.word).join(', ')}</p>
             <div className="flex flex-wrap items-center gap-3">
               <select className="field max-w-xs" value={genre} onChange={(e) => setGenre(e.target.value)}>
                 <option value="">{t('story.randomGenre')}</option>
@@ -238,12 +242,14 @@ export function StoryPage() {
                 ))}
               </select>
               <button className="btn-primary" disabled={gen.isPending} onClick={() => gen.mutate()}>
-                {gen.isPending ? t('story.generating') : story ? t('story.regenerate') : t('story.generate')}
+                {gen.isPending ? t('story.generating') : story
+                  ? <><RotateCcw size={16} aria-hidden="true" />{t('story.regenerate')}</>
+                  : <><WandSparkles size={16} aria-hidden="true" />{t('story.generate')}</>}
               </button>
             </div>
           </>
         )}
-        {gen.error && <p className="text-red-300">{genError(gen.error)}</p>}
+        {gen.error && <p className="text-danger">{genError(gen.error)}</p>}
         {today.error && <ErrorState error={today.error} />}
       </section>}
 
@@ -251,7 +257,7 @@ export function StoryPage() {
 
       <section ref={archiveRef} className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="display text-xl font-bold">{t('story.archive')}</h2>
+          <h2 className="text-lg font-bold text-fg">{t('story.archive')}</h2>
           {past.length > 0 && (
             <input
               type="date"
@@ -264,35 +270,32 @@ export function StoryPage() {
           )}
         </div>
         {hasOwn && (
-          <div role="group" className="flex flex-wrap gap-2">
-            {(['all', 'ai', 'own'] as const).map((f) => (
-              <button key={f} type="button" aria-pressed={filter === f}
-                onClick={() => setFilter(f)} className={filter === f ? 'btn-primary' : 'btn-ghost'}>
-                {t(`story.own.filter${f === 'all' ? 'All' : f === 'ai' ? 'Ai' : 'Own'}`)}
-              </button>
-            ))}
-          </div>
+          <Segmented value={filter} onChange={setFilter} options={[
+            ['all', t('story.own.filterAll')],
+            ['ai', t('story.own.filterAi')],
+            ['own', t('story.own.filterOwn')],
+          ] as const} />
         )}
         {past.length === 0 ? (
-          <p className="text-emerald-100/60">{t('story.noArchive')}</p>
+          <p className="text-muted">{t('story.noArchive')}</p>
         ) : (
           <>
             <div className="flex flex-wrap gap-2">
               {past.map((s) => (
                 <button key={s.id} onClick={() => select(s.id)} title={s.title}
                   className={s.id === selectedId && !noStoryOnDate ? 'btn-primary' : 'btn-ghost'}>
-                  {s.source === 'user' ? ownChipLabel(s.title) : formatDate(s.date)}
+                  {s.source === 'user' && <PencilLine size={14} aria-hidden="true" />}{s.source === 'user' ? ownChipLabel(s.title) : formatDate(s.date)}
                 </button>
               ))}
             </div>
             {noStoryOnDate ? (
-              <p className="text-emerald-100/60">{t('story.noStoryForDate')}</p>
+              <p className="text-muted">{t('story.noStoryForDate')}</p>
             ) : selectedQuery.isLoading ? (
               <p>{t('common.loading')}</p>
             ) : selectedStory ? (
               <StoryView key={selectedStory.id} story={selectedStory} onDeleted={deleted} />
             ) : (
-              <p className="text-emerald-100/60">{t('story.noStoryForDate')}</p>
+              <p className="text-muted">{t('story.noStoryForDate')}</p>
             )}
           </>
         )}

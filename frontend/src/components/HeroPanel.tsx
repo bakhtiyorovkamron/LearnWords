@@ -24,20 +24,20 @@ export function HeroPanel() {
     : t('hero.rangeFrom', { from: num(STAGE_MIN[LAST_STAGE]) })
 
   return (
-    <section className="animate-rise relative space-y-4 overflow-hidden rounded-[28px] border border-[#1E4A35] bg-gradient-to-b from-[#14452F] to-[#0E3324] p-5">
+    <section className="glass relative space-y-4 overflow-hidden p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="display text-xl font-bold">{name}</h2>
-        <span className="text-xs font-semibold uppercase tracking-wider text-[#CFFA4D]">{range}</span>
+        <h2 className="text-xl font-bold text-fg">{name}</h2>
+        <span className="text-xs font-semibold uppercase tracking-wider text-accent-text">{range}</span>
       </div>
 
       <Hero stage={stage} mood={hero.mood} phrase={hero.phrase} size="large" label={name} />
-      <p className="text-center text-xs text-[#6F8F7B]">{t('hero.tapHint')}</p>
+      <p className="text-center text-xs text-faint">{t('hero.tapHint')}</p>
 
       <div>
-        <div className="mb-1.5 flex flex-wrap justify-between gap-2 text-sm tabular-nums text-[#A9C4B3]">
+        <div className="mb-1.5 flex flex-wrap justify-between gap-2 text-sm tabular-nums text-muted">
           <span>
-            {t('hero.learned')}: <b className="text-white">{num(hero.learned_count)}</b>
-            {' · '}{t('hero.almost')}: <b className="text-white">{num(hero.almost_count)}</b>
+            {t('hero.learned')}: <b className="text-fg">{num(hero.learned_count)}</b>
+            {' · '}{t('hero.almost')}: <b className="text-fg">{num(hero.almost_count)}</b>
           </span>
           <span>
             {stage === LAST_STAGE ? t('hero.lastStage') : t('hero.toNextStage', { n: num(hero.words_to_next_stage) })}
@@ -48,7 +48,7 @@ export function HeroPanel() {
           <div className="learned" style={{ width: `${learnedPct}%` }} />
           <div className="almost" style={{ width: `${almostPct}%` }} />
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-4 text-xs text-[#6F8F7B]">
+        <div className="mt-1.5 flex flex-wrap gap-4 text-xs text-faint">
           <span><i className="hero-legend-learned mr-1.5 inline-block h-2.5 w-2.5 rounded-[3px] align-[-1px]" />{t('hero.learned')}</span>
           <span><i className="hero-legend-almost mr-1.5 inline-block h-2.5 w-2.5 rounded-[3px] align-[-1px]" />{t('hero.almost')}</span>
         </div>
@@ -84,17 +84,17 @@ function StageStrip({ current, learned }: { current: number; learned: number }) 
           return (
             <div key={i}
               className={`flex w-24 shrink-0 snap-start flex-col items-center gap-1 rounded-2xl p-2 text-center md:w-auto ${
-                i === current ? 'border-2 border-[#CFFA4D] bg-[#CFFA4D]/10' : 'border border-[#1E4A35]'
+                i === current ? 'border-2 border-accent bg-surface-2' : 'border border-line'
               }`}
               title={!reached && !isNext ? t('hero.locked') : name}
             >
               <Hero stage={i} size="small" bubble={false} silhouette={!reached} label={reached || isNext ? name : t('hero.locked')}
                 className="w-full justify-center" figureClassName="w-16 md:w-full md:max-w-[96px]" onTap={reached ? () => say(i) : undefined} />
-              <span className={`text-[11px] font-semibold leading-tight ${reached ? 'text-white' : 'text-[#A9C4B3]'}`}>
-                {reached || isNext ? name : <span className="display text-base">?</span>}
+              <span className={`text-[11px] font-semibold leading-tight ${reached ? 'text-fg' : 'text-muted'}`}>
+                {reached || isNext ? name : <span className="text-base font-bold">?</span>}
               </span>
               {!reached && (
-                <span className="text-[10px] leading-tight text-[#6F8F7B]">
+                <span className="text-[10px] leading-tight text-faint">
                   {isNext ? t('hero.inWords', { count: Math.max(min - learned, 0) }) : t('hero.wordsAt', { count: min })}
                 </span>
               )}

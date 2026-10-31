@@ -56,6 +56,16 @@ describe('FeedbackModal', () => {
     expect(box().placeholder).toBe('What went wrong? (optional)')
   })
 
+  it('has five star buttons with names; picking 4 fills 4', () => {
+    renderModal()
+    expect(screen.getAllByRole('radio')).toHaveLength(5)
+    fireEvent.click(star(4))
+    const filled = screen.getAllByRole('radio').map((r) => r.querySelector('svg')?.getAttribute('data-filled'))
+    expect(filled).toEqual(['true', 'true', 'true', 'true', 'false'])
+    expect(star(4).className).toContain('text-streak')
+    expect(star(5).className).toContain('text-dot-off')
+  })
+
   it('sends the rating and the comment, says thanks, hides and never comes back', async () => {
     const qc = renderModal()
     fireEvent.click(star(5))
@@ -64,13 +74,13 @@ describe('FeedbackModal', () => {
     await waitFor(() => expect(feedbackApi.submit).toHaveBeenCalledWith(5, 'Love it'))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(qc.getQueryData<Me>(['me'])?.ask_feedback).toBe(false)
-    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Thanks for your feedback! 💚'))
+    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Thanks for your feedback!', expect.anything()))
     expect(feedbackApi.dismiss).not.toHaveBeenCalled()
   })
 
-  it('✕, Esc and a click outside all dismiss — once', async () => {
+  it('Close, Esc and a click outside all dismiss — once', async () => {
     for (const close of [
-      () => fireEvent.click(screen.getByRole('button', { name: '✕' })),
+      () => fireEvent.click(screen.getByRole('button', { name: 'Close' })),
       () => fireEvent.keyDown(window, { key: 'Escape' }),
       () => fireEvent.mouseDown(screen.getByRole('dialog').parentElement!),
     ]) {

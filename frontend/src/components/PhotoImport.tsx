@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Camera, Check, CircleAlert, Folder as FolderIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { foldersApi, photoApi, searchApi, type PhotoImportResult, type PhotoWord } from '../api/endpoints'
 import { apiErrorInfo, errorMessage, isFeatureError } from '../api/client'
+import { ARTICLE_COLOR, splitArticle } from '../lib/article'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
 import { PhotoQualityError, isPhotoType, preparePhoto } from '../lib/photo'
@@ -129,9 +131,8 @@ export function PhotoImport() {
   const hasFolders = (folders.data?.length ?? 0) > 0
   const mode = hasFolders ? folderMode : 'new'
   const seg = (on: boolean) =>
-    `rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${
-      on ? 'border-lime-400 bg-lime-400 text-emerald-950'
-        : 'border-emerald-400/20 bg-emerald-950/40 text-emerald-100/80 hover:border-lime-400/50 hover:text-white'
+    `flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${
+      on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface-2 text-muted hover:text-fg'
     }`
 
   function choose(file: File | undefined) {
@@ -167,29 +168,31 @@ export function PhotoImport() {
   }
 
   return (
-    <section className="glass animate-rise space-y-4 p-6">
+    <section className="glass space-y-4 p-5">
       <div>
-        <h2 className="display text-xl font-bold">📷 {t('photo.title')}</h2>
-        <p className="mt-1 text-sm text-emerald-100/70">{t('photo.hint')}</p>
+        <h2 className="flex items-center gap-2 text-lg font-bold text-fg"><Camera size={20} aria-hidden="true" className="text-accent-text" />{t('photo.title')}</h2>
+        <p className="mt-1 text-sm text-muted">{t('photo.hint')}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <input ref={input} type="file" accept="image/*" className="hidden" data-testid="photo-input"
           onChange={(e) => choose(e.target.files?.[0])} />
         <button type="button" className="btn-primary" disabled={read.isPending || add.isPending || exhausted}
           onClick={() => input.current?.click()}>
-          {read.isPending ? t('photo.reading') : result ? t('photo.another') : t('photo.choose')}
+          {read.isPending ? t('photo.reading') : (
+            <><Camera size={18} aria-hidden="true" />{result ? t('photo.another') : t('photo.choose')}</>
+          )}
         </button>
         {limit !== null && left !== null && (exhausted
-          ? <span className="text-sm text-emerald-100/60">{t('photo.noneLeft', { limit })}</span>
+          ? <span className="text-sm text-faint">{t('photo.noneLeft', { limit })}</span>
           : (
-            <span data-testid="photo-quota" className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-sm">
+            <span data-testid="photo-quota" className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm text-muted">
               {t('photo.left', { n: left, limit })}
               {/* Up to 5 photos: roomy dots; up to 12: small ones (10 fit a 360 px screen); more: text only. */}
               {limit <= MAX_DOTS && (
                 <span className={`flex ${limit > BIG_DOTS_UP_TO ? 'gap-1' : 'gap-1.5'}`} aria-hidden="true">
                   {Array.from({ length: limit }, (_, i) => (
                     <span key={i} data-testid="photo-dot" data-filled={i < left}
-                      className={`${limit > BIG_DOTS_UP_TO ? 'h-1.5 w-1.5' : 'h-2 w-2'} rounded-full ${i < left ? 'bg-lime-300' : 'bg-white/15'}`} />
+                      className={`${limit > BIG_DOTS_UP_TO ? 'h-1.5 w-1.5' : 'h-2 w-2'} rounded-full ${i < left ? 'bg-accent' : 'bg-dot-off'}`} />
                   ))}
                 </span>
               )}
@@ -197,25 +200,28 @@ export function PhotoImport() {
           ))}
       </div>
 
-      {read.isPending && <div className="h-24 animate-pulse rounded-2xl bg-emerald-800/30" />}
+      {read.isPending && <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />}
 
       {result && (result.words.length === 0 ? (
-        <p className="text-emerald-100/70">{t('photo.noWords')}</p>
+        <p className="text-muted">{t('photo.noWords')}</p>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-emerald-100/70">{t('photo.found', { n: result.words.length })}</p>
-          <ul className="max-h-96 space-y-1 overflow-y-auto">
+          <p className="text-sm text-muted">{t('photo.found', { n: result.words.length })}</p>
+          <ul className="max-h-96 divide-y divide-divider overflow-y-auto rounded-xl border border-line">
             {result.words.map((w) => {
               const done = saved.has(w.full_word)
               const disabled = w.already_added || done || add.isPending
+              const { article, rest } = splitArticle(w.full_word, w.article)
               return (
                 <li key={w.full_word}>
-                  <label className={`flex items-center gap-3 rounded-xl px-3 py-2 ${disabled ? 'opacity-60' : 'cursor-pointer hover:bg-emerald-400/10'}`}>
+                  <label className={`flex min-h-12 items-center gap-3 px-3 py-2 ${w.already_added || done ? 'text-faint' : disabled ? 'opacity-60' : 'cursor-pointer hover:bg-surface-2'}`}>
                     <input type="checkbox" disabled={disabled} checked={!w.already_added && !done && picked.has(w.full_word)}
-                      onChange={() => toggle(w)} />
-                    <span className="font-semibold" lang={learning.code}>{w.full_word}</span>
-                    <span className="min-w-0 flex-1 truncate text-emerald-100/70">{w.translation}</span>
-                    {(w.already_added || done) && <span className="shrink-0 text-xs text-lime-300">✓ {t('photo.have')}</span>}
+                      onChange={() => toggle(w)} className="h-5 w-5 shrink-0 accent-[var(--accent)]" />
+                    <span className={`font-serif text-[17px] font-medium ${w.already_added || done ? '' : 'text-fg'}`} lang={learning.code}>
+                      {article && <span className={w.already_added || done ? '' : ARTICLE_COLOR[article]}>{article} </span>}{rest}
+                    </span>
+                    <span className={`min-w-0 flex-1 truncate ${w.already_added || done ? '' : 'text-muted'}`}>{w.translation}</span>
+                    {(w.already_added || done) && <span className="flex shrink-0 items-center gap-1 text-xs text-accent-text"><Check size={14} aria-hidden="true" />{t('photo.have')}</span>}
                   </label>
                 </li>
               )
@@ -225,7 +231,7 @@ export function PhotoImport() {
             {hasFolders && (
               <div role="radiogroup" aria-label={t('folders.label')} className="flex flex-wrap gap-2">
                 <button type="button" role="radio" aria-checked={mode === 'new'} className={seg(mode === 'new')}
-                  onClick={() => setFolderMode('new')}>{t('photo.folderNew')}</button>
+                  onClick={() => setFolderMode('new')}><FolderIcon size={16} aria-hidden="true" />{t('photo.folderNew')}</button>
                 <button type="button" role="radio" aria-checked={mode === 'existing'} className={seg(mode === 'existing')}
                   onClick={() => setFolderMode('existing')}>{t('photo.folderExisting')}</button>
               </div>
@@ -247,9 +253,12 @@ export function PhotoImport() {
       ))}
 
       {shown && (
-        <div role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
-          <p>{shown}</p>
-          {rejection && !localError && <p className="mt-1 text-red-200/70">{t('photo.notCharged')}</p>}
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">
+          <CircleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+          <div>
+            <p>{shown}</p>
+            {rejection && !localError && <p className="mt-1 text-muted">{t('photo.notCharged')}</p>}
+          </div>
         </div>
       )}
     </section>
