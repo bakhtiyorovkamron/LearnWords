@@ -8,6 +8,7 @@ import { FolderSelect } from '../components/Folders'
 import { toast } from '../components/Toaster'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
+import { speak, useCanSpeak } from '../lib/speech'
 import { ARTICLE_COLOR, type Article } from '../lib/article'
 
 // Pronoun labels per learning language (keys are positions returned by the backend).
@@ -27,14 +28,6 @@ const VERB_FORMS: Record<string, [string, string]> = {
 
 function status(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status
-}
-
-function speak(text: string, lang: string) {
-  // Audio is available only for German.
-  if (lang !== 'de' || !('speechSynthesis' in window)) return
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'de-DE'
-  window.speechSynthesis.speak(u)
 }
 
 export function SearchPage() {
@@ -99,6 +92,7 @@ function WordResult({ info }: { info: WordInfo }) {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const learning = useLearningLang()
+  const canSpeak = useCanSpeak(learning.code)
   const persons = PERSONS_BY_LANG[learning.code] ?? PERSONS_BY_LANG.de
   const [perfektLabel, praetLabel] = VERB_FORMS[learning.code] ?? VERB_FORMS.de
   const [added, setAdded] = useState(info.already_added)
@@ -157,7 +151,7 @@ function WordResult({ info }: { info: WordInfo }) {
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             {info.pronunciation && <span className="font-mono text-muted">[{info.pronunciation}]</span>}
-            {learning.code === 'de' && (
+            {canSpeak && (
               <button type="button" onClick={() => speak(full, learning.code)} className="grid h-10 w-10 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2" title={t('quiz.listenTitle')} aria-label={t('quiz.listenTitle')}><Volume2 size={18} aria-hidden="true" /></button>
             )}
           </div>

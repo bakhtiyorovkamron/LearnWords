@@ -6,19 +6,11 @@ import type { Progress, WordCard } from '../api/types'
 import { whenLabel } from '../lib/boxInfo'
 import { dateLocale } from '../i18n'
 import {
-  buildOptions, checkTyped, countsAsCorrect, firstVariant, pickDistractors,
+  buildOptions, checkTyped, countsAsCorrect, pickDistractors,
   type QuizItem, type Verdict,
 } from '../lib/quiz'
 import { useLearningLang } from '../lib/learningLang'
-
-function speak(card: WordCard) {
-  // Pronunciation is available only for German.
-  if (card.language !== 'de' || !('speechSynthesis' in window)) return
-  // "der Samstag / der Sonnabend" → pronounce only the first variant.
-  const u = new SpeechSynthesisUtterance(firstVariant(card.word))
-  u.lang = 'de-DE'
-  window.speechSynthesis.speak(u)
-}
+import { speak, useCanSpeak } from '../lib/speech'
 
 interface Props {
   item: QuizItem
@@ -58,6 +50,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
   const { t } = useTranslation()
   const learning = useLearningLang()
   const { card, format } = item
+  const canSpeak = useCanSpeak(card.language)
   const isChoice = format !== 'ru_de_type'
 
   // ru_de_type has no options at all; de_ru/ru_de/gap all need 2 distractor cards (ru_de/gap
@@ -113,7 +106,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
   const almost = verdict === 'almost_article' || verdict === 'almost_typo'
   const correctOption = options.find((o) => o.correct)?.text ?? card.word
   const doneShare = ((position - (answered ? 0 : 1)) / total) * 100
-  const listenable = card.language === 'de' && (format === 'de_ru' || answered) // listening would give the answer away otherwise
+  const listenable = canSpeak && (format === 'de_ru' || answered) // listening would give the answer away otherwise
 
   return (
     <div className={`mx-auto max-w-xl ${answered ? 'pb-72' : ''}`}>
@@ -147,7 +140,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
         )}
         {format === 'gap' && card.example_translation && <p className="mt-2 text-[15px] text-muted">{card.example_translation}</p>}
         {listenable && (
-          <button type="button" onClick={() => speak(card)} aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')}
+          <button type="button" onClick={() => speak(card.word, card.language)} aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')}
             className="mt-4 grid h-11 w-11 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
             <Volume2 size={20} aria-hidden="true" />
           </button>

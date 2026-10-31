@@ -47,10 +47,12 @@ function setup(o: Over = {}) {
 }
 
 beforeEach(async () => {
+  vi.stubGlobal('speechSynthesis', { speak: vi.fn(), cancel: vi.fn(), getVoices: () => [], addEventListener: vi.fn() })
+  vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string }, text: string) { this.text = text })
   await i18n.changeLanguage('en')
   vi.mocked(meApi.get).mockResolvedValue({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de' })
 })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const sheet = () => screen.getByRole('status')
 const optionButtons = () => screen.getAllByRole('button').filter((b) => b.className.includes('min-h-14'))
@@ -347,6 +349,42 @@ describe('the gap format', () => {
     await screen.findByTestId('gap-blank')
     fireEvent.click(optionButtons().find((b) => b.textContent !== 'Hund')!)
     expect(screen.getByTestId('gap-answer').textContent).toBe('Hund')
+  })
+})
+
+describe('listening in other languages', () => {
+  const enCard = card(1, { word: 'the house', language: 'en', translation: 'дом' })
+  const stub = (voices: { lang: string }[] = []) => {
+    const speak = vi.fn()
+    vi.stubGlobal('speechSynthesis', { speak, cancel: vi.fn(), getVoices: () => voices, addEventListener: vi.fn() })
+    vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string }, text: string) { this.text = text })
+    return speak
+  }
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('an English card: listen is offered with de_ru and reads with en-US', async () => {
+    const speak = stub()
+    setup({ format: 'de_ru', card: enCard })
+    fireEvent.click(await screen.findByRole('button', { name: 'Listen' }))
+    const u = speak.mock.calls[0][0] as { text: string; lang: string }
+    expect(u.text).toBe('the house')
+    expect(u.lang).toBe('en-US')
+  })
+
+  it('still hidden before the answer in ru_de (it would give the answer away), shown after', async () => {
+    stub()
+    setup({ format: 'ru_de', card: enCard })
+    await screen.findByText('дом')
+    expect(screen.queryByRole('button', { name: 'Listen' })).toBeNull()
+    fireEvent.click(optionByText('the house'))
+    expect(screen.getByRole('button', { name: 'Listen' })).toBeTruthy()
+  })
+
+  it('hidden when the device cannot read the language', async () => {
+    stub([{ lang: 'de-DE' }])
+    setup({ format: 'de_ru', card: enCard })
+    await screen.findByText('the house')
+    expect(screen.queryByRole('button', { name: 'Listen' })).toBeNull()
   })
 })
 

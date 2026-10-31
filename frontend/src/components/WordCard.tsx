@@ -8,28 +8,18 @@ import { ARTICLE_COLOR, splitArticle } from '../lib/article'
 import { useMoveWords } from '../lib/moveWords'
 import { EditWordModal } from './EditWordModal'
 import { FolderPicker } from './FolderPicker'
+import { useCanSpeak, speak } from '../lib/speech'
 import { ProgressDots } from './ProgressDots'
 import { Sheet } from './Sheet'
 
-// Pronunciation is available only for German; other languages have no audio.
-export const hasAudio = (lang: string) => lang === 'de'
-
-// Cards have no recorded audio (audio_url is empty): the browser's speech synthesis reads the word.
+// A recorded audio_url is played first; otherwise (or if it fails) the browser reads the word in the
+// card's language.
 function play(card: WordCard) {
-  if (!hasAudio(card.language)) return
   if (card.audio_url && /^https?:/.test(card.audio_url)) {
-    new Audio(card.audio_url).play().catch(() => speak(card))
+    new Audio(card.audio_url).play().catch(() => speak(card.word, card.language))
   } else {
-    speak(card)
+    speak(card.word, card.language)
   }
-}
-
-function speak(card: WordCard) {
-  if (!('speechSynthesis' in window)) return
-  // "der Samstag / der Sonnabend" → pronounce only the first variant.
-  const u = new SpeechSynthesisUtterance(card.word.split('/')[0].trim())
-  u.lang = 'de-DE'
-  window.speechSynthesis.speak(u)
 }
 
 /** The word with its article in the article's colour (der / die / das); no article → plain. */
@@ -62,6 +52,7 @@ export function WordCardView({ card, progress, selection }: {
   const [sheet, setSheet] = useState(false)
   const [editing, setEditing] = useState(false)
   const [picking, setPicking] = useState(false)
+  const canSpeak = useCanSpeak(card.language)
   const moveWords = useMoveWords()
   async function moveTo(folderId: string | null, folderName: string) {
     setPicking(false)
@@ -104,7 +95,7 @@ export function WordCardView({ card, progress, selection }: {
           <ProgressDots compact boxLevel={progress.boxLevel} isLearned={progress.isLearned}
             schedule={{ nextReviewAt: progress.nextReviewAt, reviewedToday: progress.reviewedToday }} />
         )}
-        {hasAudio(card.language) && (
+        {canSpeak && (
           <button type="button" onClick={(e) => { e.stopPropagation(); play(card) }} aria-label={t('wordCard.listen')} title={t('wordCard.listen')}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
             <Volume2 size={18} aria-hidden="true" />

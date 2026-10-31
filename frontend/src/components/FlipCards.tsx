@@ -2,16 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Pencil, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
+import { speak, useCanSpeak } from '../lib/speech'
 import { ProgressDots } from './ProgressDots'
 import { EditWordModal } from './EditWordModal'
-
-function speak(card: CollectionCard) {
-  // Pronunciation is available only for German.
-  if (card.language !== 'de' || !('speechSynthesis' in window)) return
-  const u = new SpeechSynthesisUtterance(card.word.split('/')[0].trim())
-  u.lang = 'de-DE'
-  window.speechSynthesis.speak(u)
-}
 
 // Paper-flashcard mode: one card at a time, click/Space to flip, ←/→ to move.
 // Pure self-check — nothing is sent to the backend.
@@ -25,6 +18,8 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [editing, setEditing] = useState(false)
+  const current = cards[Math.min(index, cards.length - 1)]
+  const canSpeak = useCanSpeak(current?.language ?? '')
 
   useEffect(() => {
     setIndex(0)
@@ -134,8 +129,8 @@ export function FlipCards({ cards, resetKey, onNearEnd, direction = 'de_ru' }: {
           <ChevronLeft size={18} aria-hidden="true" />{t('collection.prev')}
         </button>
         {/* In RU → DE, listening before flipping would give the answer away. */}
-        {card.language === 'de' && (!ruFirst || flipped) ? (
-          <button type="button" onClick={() => speak(card)} className="btn-ghost" title={t('quiz.listenTitle')} aria-label={t('quiz.listenTitle')}><Volume2 size={18} aria-hidden="true" /></button>
+        {canSpeak && (!ruFirst || flipped) ? (
+          <button type="button" onClick={() => speak(card.word, card.language)} className="btn-ghost" title={t('quiz.listenTitle')} aria-label={t('quiz.listenTitle')}><Volume2 size={18} aria-hidden="true" /></button>
         ) : <span />}
         <button type="button" onClick={() => go(1)} disabled={index >= cards.length - 1} className="btn-ghost disabled:opacity-30">
           {t('collection.next')}<ChevronRight size={18} aria-hidden="true" />

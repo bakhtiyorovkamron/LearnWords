@@ -24,8 +24,14 @@ function view(c: WordCard, props: Partial<Parameters<typeof WordCardView>[0]> = 
   return render(<QueryClientProvider client={new QueryClient()}><WordCardView card={c} progress={progress} {...props} /></QueryClientProvider>)
 }
 
-beforeEach(async () => { await i18n.changeLanguage('en') })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+const speakApi = { speak: vi.fn(), cancel: vi.fn(), getVoices: vi.fn(() => [] as { lang: string }[]), addEventListener: vi.fn() }
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
+  speakApi.getVoices.mockReturnValue([])
+  vi.stubGlobal('speechSynthesis', speakApi)
+  vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string }, text: string) { this.text = text })
+})
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 
 describe('splitArticle', () => {
   it('uses card.article, else a leading article of the word (any case), else none', () => {
@@ -49,12 +55,25 @@ describe('WordCardView row', () => {
     expect(screen.getByText('laufen').className).toContain('text-fg')
   })
 
-  it('shows the translation, 5 box bars and a listen button only for German', () => {
-    const { container, rerender } = view(card)
+  it('shows the translation, 5 box bars and a listen button', () => {
+    const { container } = view(card)
     expect(screen.getByText('собака')).toBeTruthy()
     expect(container.querySelectorAll('[data-testid="box-bars"] span').length).toBe(5)
     expect(screen.getByLabelText('Listen')).toBeTruthy()
-    rerender(<QueryClientProvider client={new QueryClient()}><WordCardView card={{ ...card, language: 'en' }} progress={progress} /></QueryClientProvider>)
+  })
+
+  it('an English card has a listen button that reads it with the English locale', () => {
+    view({ ...card, language: 'en', word: 'the house', article: undefined })
+    fireEvent.click(screen.getByLabelText('Listen'))
+    const u = speakApi.speak.mock.calls.at(-1)![0] as { text: string; lang: string }
+    expect(u.text).toBe('the house')
+    expect(u.lang).toBe('en-US')
+    expect(screen.queryByRole('dialog')).toBeNull() // the click did not open the word sheet
+  })
+
+  it('no listen button when the device has no voice for the language', () => {
+    speakApi.getVoices.mockReturnValue([{ lang: 'en-US' }])
+    view({ ...card, language: 'ko', word: '집' })
     expect(screen.queryByLabelText('Listen')).toBeNull()
   })
 
