@@ -146,6 +146,26 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 	return &p, nil
 }
 
+// MarkGoalDay records today as a day the daily goal was reached, when it was: the Leitner answers of
+// the day (practice does not count) have reached min(goal, answered + still due) and that is above 0.
+// Same UTC day and the same "due" rule as CountDue; safe to call after every answer (once per day).
+func (r *ReviewRepository) MarkGoalDay(ctx context.Context, userID uuid.UUID, today time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO goal_days (user_id, day)
+		SELECT $1, $2::date
+		FROM (SELECT daily_goal FROM users WHERE id = $1) g,
+		     (SELECT count(*) AS n FROM review_logs
+		      WHERE user_id = $1 AND session_type = 'review'
+		        AND (reviewed_at AT TIME ZONE 'UTC')::date = $2::date) rev,
+		     (SELECT count(*) AS n FROM word_cards w
+		      LEFT JOIN word_progress p ON p.word_id = w.id
+		      WHERE w.user_id = $1 AND COALESCE(p.is_learned, false) = false
+		        AND COALESCE(p.next_review_at, $2::date) <= $2::date) due
+		WHERE rev.n > 0 AND rev.n >= LEAST(g.daily_goal, rev.n + due.n)
+		ON CONFLICT DO NOTHING`, userID, today)
+	return err
+}
+
 // PracticeWords returns a pool for extra practice — drawn from the user's WHOLE collection
 // (not filtered by due date or is_learned; that's the point — something to do when nothing is
 // due), ordered per mode:

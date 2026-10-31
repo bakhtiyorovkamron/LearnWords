@@ -12,7 +12,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type memSettings struct{ lang, size, theme string }
+type memSettings struct {
+	lang, size, theme string
+	goal              int
+}
 
 func (m *memSettings) InterfaceLanguage(context.Context, uuid.UUID) (string, error) {
 	return m.lang, nil
@@ -31,6 +34,16 @@ func (m *memSettings) SetReviewSessionSize(_ context.Context, _ uuid.UUID, s str
 func (m *memSettings) Theme(context.Context, uuid.UUID) (string, error) { return m.theme, nil }
 func (m *memSettings) SetTheme(_ context.Context, _ uuid.UUID, t string) error {
 	m.theme = t
+	return nil
+}
+func (m *memSettings) DailyGoal(context.Context, uuid.UUID) (int, error) {
+	if m.goal == 0 {
+		return 20, nil
+	}
+	return m.goal, nil
+}
+func (m *memSettings) SetDailyGoal(_ context.Context, _ uuid.UUID, g int) error {
+	m.goal = g
 	return nil
 }
 func settingsRouter(m *memSettings) *gin.Engine {
@@ -127,4 +140,50 @@ func TestSettings_Theme_OnlyTheKnownNames(t *testing.T) {
 	if code, out := do(http.MethodPut, `{"review_session_size":"50"}`); code != 200 || out["theme"] != "sand" || out["review_session_size"] != "50" {
 		t.Errorf("another setting touched the theme: %d %v", code, out)
 	}
+}
+
+func TestSettings_DailyGoal_OnlyTenTwentyThirtyFifty(t *testing.T) {
+	m := &memSettings{lang: "ru", size: "20"}
+	r := settingsRouter(m)
+	put := func(body string) (int, map[string]any) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/me/settings", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+	// GET carries the default
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/me/settings", nil))
+	var got map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if got["daily_goal"] != float64(20) {
+		t.Fatalf("default goal: %v", got)
+	}
+	for _, g := range []string{"10", "20", "30", "50"} {
+		if code, out := put(`{"daily_goal":` + g + `}`); code != 200 || out["daily_goal"] != mustFloat(g) {
+			t.Errorf("goal %s: %d %v", g, code, out)
+		}
+	}
+	m.goal = 30
+	for _, bad := range []string{`{"daily_goal":0}`, `{"daily_goal":15}`, `{"daily_goal":100}`, `{"daily_goal":-10}`, `{"daily_goal":"20"}`} {
+		if code, _ := put(bad); code != 400 {
+			t.Errorf("%s → %d, want 400", bad, code)
+		}
+	}
+	if m.goal != 30 {
+		t.Errorf("a rejected goal was stored: %d", m.goal)
+	}
+	// other settings still work alone
+	if code, _ := put(`{"review_session_size":"50"}`); code != 200 || m.goal != 30 {
+		t.Errorf("size only: %d goal %d", code, m.goal)
+	}
+}
+
+func mustFloat(s string) float64 {
+	var f float64
+	_ = json.Unmarshal([]byte(s), &f)
+	return f
 }

@@ -22,7 +22,8 @@ func NewStatsRepository(pool *pgxpool.Pool) *StatsRepository { return &StatsRepo
 func (r *StatsRepository) Daily(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]domain.DayStat, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT d::date,
-		       COALESCE(l.reviewed, 0), COALESCE(l.correct, 0), COALESCE(w.new_words, 0)
+		       COALESCE(l.reviewed, 0), COALESCE(l.correct, 0), COALESCE(w.new_words, 0),
+		       a.day IS NOT NULL, g.day IS NOT NULL
 		FROM generate_series($2::date::timestamp, $3::date::timestamp, interval '1 day') AS d
 		LEFT JOIN (
 			SELECT (reviewed_at AT TIME ZONE 'UTC')::date AS day,
@@ -36,6 +37,11 @@ func (r *StatsRepository) Daily(ctx context.Context, userID uuid.UUID, from, to 
 			FROM word_cards
 			WHERE user_id = $1 AND created_at >= ($2::date::timestamp AT TIME ZONE 'UTC')
 			GROUP BY 1) w ON w.day = d::date
+		LEFT JOIN (
+			SELECT DISTINCT (reviewed_at AT TIME ZONE 'UTC')::date AS day
+			FROM review_logs
+			WHERE user_id = $1 AND reviewed_at >= ($2::date::timestamp AT TIME ZONE 'UTC')) a ON a.day = d::date
+		LEFT JOIN goal_days g ON g.user_id = $1 AND g.day = d::date
 		ORDER BY d`, userID, from, to)
 	if err != nil {
 		return nil, err
@@ -45,7 +51,7 @@ func (r *StatsRepository) Daily(ctx context.Context, userID uuid.UUID, from, to 
 			day time.Time
 			s   domain.DayStat
 		)
-		if err := row.Scan(&day, &s.Reviewed, &s.Correct, &s.NewWords); err != nil {
+		if err := row.Scan(&day, &s.Reviewed, &s.Correct, &s.NewWords, &s.Active, &s.GoalMet); err != nil {
 			return s, err
 		}
 		s.Date = day.Format("2006-01-02")

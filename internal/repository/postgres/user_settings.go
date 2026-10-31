@@ -87,3 +87,25 @@ func (r *UserRepository) SetTheme(ctx context.Context, id uuid.UUID, theme strin
 	}
 	return nil
 }
+
+// DailyGoal returns the user's daily goal in words (10 | 20 | 30 | 50, 20 by default).
+func (r *UserRepository) DailyGoal(ctx context.Context, id uuid.UUID) (int, error) {
+	var goal int
+	err := r.pool.QueryRow(ctx, `SELECT daily_goal FROM users WHERE id = $1`, id).Scan(&goal)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, domain.ErrNotFound
+	}
+	return goal, err
+}
+
+// SetDailyGoal stores the user's daily goal (the database accepts only 10, 20, 30 and 50).
+func (r *UserRepository) SetDailyGoal(ctx context.Context, id uuid.UUID, goal int) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET daily_goal = $2, updated_at = now() WHERE id = $1`, id, goal)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}

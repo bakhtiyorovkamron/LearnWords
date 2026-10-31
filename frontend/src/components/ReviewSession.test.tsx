@@ -18,7 +18,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     cardsApi: { list: vi.fn() },
     foldersApi: { list: vi.fn() },
     heroApi: { ...mod.heroApi, get: vi.fn() },
-    settingsApi: { get: vi.fn(), setReviewSessionSize: vi.fn() },
+    settingsApi: { get: vi.fn(), setReviewSessionSize: vi.fn(), setDailyGoal: vi.fn() },
     statsApi: { get: vi.fn() },
   }
 })
@@ -167,7 +167,11 @@ describe('ReviewSession: Home always starts a short session', () => {
     vi.mocked(foldersApi.list).mockResolvedValue({
       all: { total: 500, new_count: 0, learning_count: 0, learned_count: 0, due_today: 408 }, folders: [],
     } as never)
-    vi.mocked(statsApi.get).mockResolvedValue({ totals: { current_streak_days: 1, longest_streak_days: 1 } } as never)
+    const today = new Date().toISOString().slice(0, 10)
+    vi.mocked(statsApi.get).mockResolvedValue({
+      daily: [{ date: today, reviewed: 0, correct: 0, new_words: 0, active: false, goal_met: false }],
+      totals: { current_streak_days: 0, longest_streak_days: 0, total_words_learned: 0, accuracy_percent: 0 },
+    } as never)
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={qc}>
@@ -176,9 +180,8 @@ describe('ReviewSession: Home always starts a short session', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('20 words')).toBeTruthy()
-    expect(screen.getByText('408 due in total')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /Start training/ }))
+    expect(await screen.findByText('20 words')).toBeTruthy() // the daily goal, not the 408 due
+    fireEvent.click(screen.getByRole('button', { name: /^Start/ }))
     expect(await screen.findByText('1/20')).toBeTruthy()
     expect(localStorage.getItem('review-session-size')).toBe('all')
   })
@@ -189,6 +192,44 @@ describe('ReviewSession: Home always starts a short session', () => {
     renderSession('/cards')
     await screen.findByRole('button', { name: 'Start training' })
     expect(reviewApi.due).toHaveBeenCalledWith('', 'all')
+  })
+})
+
+describe('ReviewSession: ?start=1&size=N takes any whole number of words from 1 to 50', () => {
+  const serve = (total: number) =>
+    vi.mocked(reviewApi.due).mockImplementation(async (_folder, limit) => {
+      const n = limit === 'all' ? total : Math.min(Number(limit), total)
+      return { cards: Array.from({ length: n }, (_, i) => due(i + 1)), total }
+    })
+
+  it.each([
+    ['12', '1/12', '20'], ['7', '1/7', '10'], ['1', '1/1', '10'], ['10', '1/10', '10'],
+    ['21', '1/21', '50'], ['50', '1/50', '50'],
+  ])('size=%s → %s questions, the server asked for %s', async (size, counter, fetched) => {
+    serve(408)
+    renderSession(`/cards?start=1&size=${size}`)
+    expect(await screen.findByText(counter)).toBeTruthy()
+    expect(reviewApi.due).toHaveBeenCalledWith('', fetched)
+  })
+
+  it('keeps the server order: the first N cards', async () => {
+    serve(408)
+    renderSession('/cards?start=1&size=12')
+    await screen.findByText('1/12')
+    // the first question is the first card the server sent
+    expect(screen.getByText('Wort1')).toBeTruthy()
+  })
+
+  it.each(['0', '51', 'abc', '1.5', '-3', ''])('an invalid size (%j) falls back to 20', async (size) => {
+    serve(408)
+    renderSession(`/cards?start=1&size=${size}`)
+    expect(await screen.findByText('1/20')).toBeTruthy()
+  })
+
+  it('fewer cards than N: the session is as long as what the server has', async () => {
+    serve(5)
+    renderSession('/cards?start=1&size=12')
+    expect(await screen.findByText('1/5')).toBeTruthy()
   })
 })
 

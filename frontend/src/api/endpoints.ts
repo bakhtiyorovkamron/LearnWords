@@ -255,13 +255,22 @@ export type SessionSize = (typeof SESSION_SIZES)[number]
 export const isSessionSize = (v: unknown): v is SessionSize =>
   typeof v === 'string' && (SESSION_SIZES as readonly string[]).includes(v)
 
+export interface UserSettings {
+  interface_language: string; review_session_size: string; theme: string
+  daily_goal?: number // words a day: 10 | 20 | 30 | 50 (20 when an old server sends none)
+}
+
+export const DAILY_GOALS = [10, 20, 30, 50] as const
+export type DailyGoal = (typeof DAILY_GOALS)[number]
+
 export const settingsApi = {
   get: () =>
-    api.get<{ interface_language: string; review_session_size: string; theme: string }>('/me/settings').then((r) => r.data),
+    api.get<UserSettings>('/me/settings').then((r) => r.data),
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
   setReviewSessionSize: (size: SessionSize) => api.put('/me/settings', { review_session_size: size }),
   /** auto | night | light | graphite | sand | navy */
   setTheme: (theme: string) => api.put('/me/settings', { theme }),
+  setDailyGoal: (goal: DailyGoal) => api.put<UserSettings>('/me/settings', { daily_goal: goal }).then((r) => r.data),
 }
 
 export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker'

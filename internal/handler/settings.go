@@ -16,6 +16,8 @@ type SettingsStore interface {
 	SetReviewSessionSize(ctx context.Context, id uuid.UUID, size string) error
 	Theme(ctx context.Context, id uuid.UUID) (string, error)
 	SetTheme(ctx context.Context, id uuid.UUID, theme string) error
+	DailyGoal(ctx context.Context, id uuid.UUID) (int, error)
+	SetDailyGoal(ctx context.Context, id uuid.UUID, goal int) error
 }
 
 type SettingsHandler struct{ store SettingsStore }
@@ -27,10 +29,13 @@ var supportedLanguages = map[string]bool{"ru": true, "en": true, "uz": true}
 // supportedThemes: 'auto' follows the system; the rest are colour themes (the same names as in the CSS).
 var supportedThemes = map[string]bool{"auto": true, "night": true, "light": true, "graphite": true, "sand": true, "navy": true}
 
+// supportedDailyGoals: words a day (the Home goal ring).
+var supportedDailyGoals = map[int]bool{10: true, 20: true, 30: true, 50: true}
+
 var supportedReviewSessionSizes = map[string]bool{"10": true, "20": true, "50": true, "all": true}
 
 // Get handles GET /api/me/settings → {"interface_language": "ru"|"en"|"uz"|"", "review_session_size": "10"|"20"|"50"|"all"|"",
-// "theme": "auto"|"night"|"light"|"graphite"|"sand"|"navy"|""}.
+// "theme": "auto"|"night"|"light"|"graphite"|"sand"|"navy"|"", "daily_goal": 10|20|30|50}.
 func (h *SettingsHandler) Get(c *gin.Context) {
 	ctx := c.Request.Context()
 	lang, err := h.store.InterfaceLanguage(ctx, userID(c))
@@ -48,10 +53,15 @@ func (h *SettingsHandler) Get(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"interface_language": lang, "review_session_size": size, "theme": theme})
+	goal, err := h.store.DailyGoal(ctx, userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"interface_language": lang, "review_session_size": size, "theme": theme, "daily_goal": goal})
 }
 
-// Update handles PUT /api/me/settings {"interface_language"?, "review_session_size"?, "theme"?} — each field is
+// Update handles PUT /api/me/settings {"interface_language"?, "review_session_size"?, "theme"?, "daily_goal"?} — each field is
 // independently optional, so one setting can be changed without resending the other. The sound
 // switches no longer exist; an old client that still sends them gets a 200 and nothing is stored.
 func (h *SettingsHandler) Update(c *gin.Context) {
@@ -59,6 +69,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		InterfaceLanguage *string `json:"interface_language"`
 		ReviewSessionSize *string `json:"review_session_size"`
 		Theme             *string `json:"theme"`
+		DailyGoal         *int    `json:"daily_goal"`
 		// Legacy: accepted and ignored (the sound features were removed).
 		SoundsEnabled   *bool `json:"sounds_enabled"`
 		UISoundsEnabled *bool `json:"ui_sounds_enabled"`
@@ -67,7 +78,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		badRequest(c, "invalid JSON body")
 		return
 	}
-	if req.InterfaceLanguage == nil && req.ReviewSessionSize == nil && req.Theme == nil && req.SoundsEnabled == nil && req.UISoundsEnabled == nil {
+	if req.InterfaceLanguage == nil && req.ReviewSessionSize == nil && req.Theme == nil && req.DailyGoal == nil && req.SoundsEnabled == nil && req.UISoundsEnabled == nil {
 		badRequest(c, "nothing to update")
 		return
 	}
@@ -98,6 +109,16 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 			return
 		}
 		if err := h.store.SetTheme(ctx, userID(c), *req.Theme); err != nil {
+			writeError(c, err)
+			return
+		}
+	}
+	if req.DailyGoal != nil {
+		if !supportedDailyGoals[*req.DailyGoal] {
+			badRequest(c, "daily_goal must be one of: 10, 20, 30, 50")
+			return
+		}
+		if err := h.store.SetDailyGoal(ctx, userID(c), *req.DailyGoal); err != nil {
 			writeError(c, err)
 			return
 		}

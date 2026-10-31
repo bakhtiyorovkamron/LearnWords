@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -63,6 +64,8 @@ type ReviewRepository interface {
 	// LogPractice records a practice answer for streak/activity purposes only. It must never
 	// update word_progress — see postgres.ReviewRepository.LogPractice's implementation.
 	LogPractice(ctx context.Context, userID, wordID uuid.UUID, correct bool) error
+	// MarkGoalDay records `today` as a goal day when the daily goal has been reached (idempotent).
+	MarkGoalDay(ctx context.Context, userID uuid.UUID, today time.Time) error
 }
 
 type ReviewService struct {
@@ -99,9 +102,17 @@ func (s *ReviewService) Due(ctx context.Context, userID uuid.UUID, folder *domai
 func (s *ReviewService) Answer(ctx context.Context, userID, wordID uuid.UUID, correct bool) (*domain.Progress, error) {
 	now := s.now()
 	today := dateOf(now)
-	return s.repo.Apply(ctx, userID, wordID, today, correct, func(p domain.Progress) domain.Progress {
+	p, err := s.repo.Apply(ctx, userID, wordID, today, correct, func(p domain.Progress) domain.Progress {
 		return ApplyAnswer(p, correct, now)
 	})
+	if err != nil {
+		return nil, err
+	}
+	// The answer is saved; a failure here must not turn it into an error — the next answer retries.
+	if err := s.repo.MarkGoalDay(ctx, userID, today); err != nil {
+		slog.WarnContext(ctx, "daily goal check failed", "user", userID, "err", err)
+	}
+	return p, nil
 }
 
 // Practice returns up to NormalizeSessionSize(sessionSize) words for EXTRA practice — drawn

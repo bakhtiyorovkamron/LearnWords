@@ -75,6 +75,7 @@ type fakeReviewRepoForPractice struct {
 	logPracticeCalls int
 	lastLogCorrect   bool
 	practiceWords    []domain.DueCard
+	goalChecks       int // MarkGoalDay calls
 }
 
 func (f *fakeReviewRepoForPractice) ListDue(context.Context, uuid.UUID, time.Time, int, *domain.FolderFilter) ([]domain.DueCard, error) {
@@ -90,6 +91,10 @@ func (f *fakeReviewRepoForPractice) Apply(context.Context, uuid.UUID, uuid.UUID,
 }
 func (f *fakeReviewRepoForPractice) PracticeWords(context.Context, uuid.UUID, string, int, *domain.FolderFilter) ([]domain.DueCard, error) {
 	return f.practiceWords, nil
+}
+func (f *fakeReviewRepoForPractice) MarkGoalDay(context.Context, uuid.UUID, time.Time) error {
+	f.goalChecks++
+	return nil
 }
 func (f *fakeReviewRepoForPractice) LogPractice(_ context.Context, _, _ uuid.UUID, correct bool) error {
 	f.logPracticeCalls++
@@ -127,5 +132,23 @@ func TestNormalizePracticeMode(t *testing.T) {
 		if got := NormalizePracticeMode(in); got != want {
 			t.Errorf("NormalizePracticeMode(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Only a Leitner answer checks the daily goal; a practice answer never does (it cannot reach the goal).
+func TestAnswer_ChecksTheGoal_PracticeNever(t *testing.T) {
+	repo := &fakeReviewRepoForPractice{}
+	s := NewReviewService(repo)
+	if _, err := s.Answer(context.Background(), uuid.New(), uuid.New(), true); err != nil {
+		t.Fatal(err)
+	}
+	if repo.goalChecks != 1 {
+		t.Errorf("review answer: %d goal checks, want 1", repo.goalChecks)
+	}
+	if err := s.AnswerPractice(context.Background(), uuid.New(), uuid.New(), true); err != nil {
+		t.Fatal(err)
+	}
+	if repo.goalChecks != 1 {
+		t.Errorf("practice answer checked the goal (%d)", repo.goalChecks)
 	}
 }

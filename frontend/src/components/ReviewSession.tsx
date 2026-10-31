@@ -4,13 +4,13 @@ import { Brain, CircleCheck, Layers } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
-  cardsApi, isSessionSize, practiceApi, reviewApi, PRACTICE_MODES, SESSION_SIZES,
+  cardsApi, practiceApi, reviewApi, PRACTICE_MODES, SESSION_SIZES,
   type PracticeMode, type SessionSize,
 } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { emitHeroEvent } from '../lib/heroBus'
 import { buildQueue, type Direction, type QuizItem } from '../lib/quiz'
-import { HOME_SESSION, useReviewSessionSize } from '../lib/reviewSessionSize'
+import { fetchSizeFor, parseUrlSize, useReviewSessionSize } from '../lib/reviewSessionSize'
 import { QuizQuestion } from './QuizQuestion'
 import { ReviewResult } from './ReviewResult'
 import { DirectionToggle, useStoredChoice } from './DirectionToggle'
@@ -72,15 +72,14 @@ export function ReviewSession() {
   const [folder, setFolder] = useState(() => localStorage.getItem('review-folder') ?? '')
   const [savedSize, setSavedSize] = useReviewSessionSize()
   const [params, setParams] = useSearchParams()
-  // ?start=1&size=N (Home): this session uses the size from the URL (HOME_SESSION without one);
-  // the saved setting is not touched. Any other way in uses the saved size.
-  const [override, setOverride] = useState<SessionSize | null>(() => {
-    if (params.get('start') !== '1') return null
-    const s = params.get('size')
-    return isSessionSize(s) ? s : (String(HOME_SESSION) as SessionSize)
-  })
-  const sessionSize = override ?? savedSize
-  const setSessionSize = (v: SessionSize) => { setOverride(null); setSavedSize(v) }
+  // ?start=1&size=N (Home): this session asks exactly N words (any whole number 1..50; 20 without a
+  // valid one). The server is asked for the smallest size that holds them and the first N cards are
+  // used, in the server's priority order. The saved setting is not touched. Other ways in use it.
+  const [urlCount, setUrlCount] = useState<number | null>(() =>
+    params.get('start') !== '1' ? null : parseUrlSize(params.get('size')) ?? 20)
+  const sessionSize: SessionSize = urlCount !== null ? fetchSizeFor(urlCount) : savedSize
+  const setSessionSize = (v: SessionSize) => { setUrlCount(null); setSavedSize(v) }
+  const take = <T,>(cards: T[]) => (urlCount !== null ? cards.slice(0, urlCount) : cards)
   const [practiceMode, setPracticeMode] = useStoredChoice<PracticeMode>('practice-mode', PRACTICE_MODES, 'hard')
   const due = useQuery({
     queryKey: ['review-due', folder, sessionSize],
@@ -152,7 +151,7 @@ export function ReviewSession() {
   function start() {
     // Random suitable format per word (gap only with an example, typing only for box 3+).
     setMode('review')
-    setDeck(buildQueue(due.data?.cards ?? [], direction))
+    setDeck(buildQueue(take(due.data?.cards ?? []), direction))
     setIndex(0)
     setCorrect(0)
     setStreak(0)
@@ -164,7 +163,7 @@ export function ReviewSession() {
   // "Пройти ещё раз" / "Тренироваться ещё": always leads into the practice word-selection
   // screen — the words just reviewed are no longer due, so a literal restart has nothing to do.
   function restart() {
-    setOverride(null) // the pickers show the saved size again
+    setUrlCount(null) // the pickers show the saved size again
     setDeck(null)
     setPracticeSetup(true)
     qc.invalidateQueries({ queryKey: ['review-due'] })
@@ -195,7 +194,7 @@ export function ReviewSession() {
     try {
       const result = await due.refetch()
       setMode('review')
-      setDeck(buildQueue(result.data?.cards ?? [], direction))
+      setDeck(buildQueue(take(result.data?.cards ?? []), direction))
       setIndex(0)
       setCorrect(0)
       setStreak(0)
@@ -291,7 +290,7 @@ export function ReviewSession() {
 
   if (index >= deck.length) {
     const remaining = mode === 'review' ? Math.max((due.data?.total ?? 0) - deck.length, 0) : 0
-    const moreCount = remaining > 0 ? Number(sessionSize) || 0 : 0
+    const moreCount = remaining > 0 ? urlCount ?? (Number(sessionSize) || 0) : 0
     return (
       <ReviewResult correct={correct} total={deck.length} onRestart={restart} restartLabel={t('practice.again')}
         moreCount={moreCount} onMore={more} moreLoading={moreLoading}

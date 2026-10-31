@@ -97,6 +97,8 @@ export interface DayStat {
   reviewed: number
   correct: number
   new_words: number
+  active?: boolean // any answer that day (review or practice)
+  goal_met?: boolean // the daily goal was reached
 }
 
 export interface Stats {

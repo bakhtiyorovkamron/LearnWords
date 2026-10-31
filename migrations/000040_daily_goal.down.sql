@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS goal_days;
+ALTER TABLE users DROP COLUMN IF EXISTS daily_goal;

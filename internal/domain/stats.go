@@ -6,6 +6,9 @@ type DayStat struct {
 	Reviewed int    `json:"reviewed"`
 	Correct  int    `json:"correct"`
 	NewWords int    `json:"new_words"`
+	// Active: any answer that day (review or practice — the streak rule). GoalMet: the daily goal was reached.
+	Active  bool `json:"active"`
+	GoalMet bool `json:"goal_met"`
 }
 
 type StatsTotals struct {
