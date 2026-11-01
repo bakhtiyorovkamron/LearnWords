@@ -54,7 +54,7 @@ func (r *FolderRepository) List(ctx context.Context, userID uuid.UUID) (*domain.
 		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) <= 2),
 		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.box_level, 1) BETWEEN 3 AND 5),
 		       count(*) FILTER (WHERE COALESCE(p.is_learned, false)),
-		       count(*) FILTER (WHERE NOT COALESCE(p.is_learned, false) AND COALESCE(p.next_review_at, $2::date) <= $2::date)
+		       count(*) FILTER (WHERE NOT w.paused AND NOT COALESCE(p.is_learned, false) AND COALESCE(p.next_review_at, $2::date) <= $2::date)
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		WHERE w.user_id = $1`, userID, today).Scan(

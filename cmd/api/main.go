@@ -99,6 +99,12 @@ func run() error {
 	// Services
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
+	// New users get the "Introductions" folder; if the content can't be loaded they just don't.
+	if starterSvc, err := service.NewStarterService(contextRepo); err != nil {
+		slog.Error("starter folder is off", "err", err)
+	} else {
+		authSvc.SetStarter(starterSvc)
+	}
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)

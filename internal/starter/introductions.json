@@ -1,0 +1,920 @@
+{
+  "folder": {
+    "name": {
+      "ru": "Знакомство",
+      "en": "Introductions",
+      "uz": "Tanishuv"
+    },
+    "color": "sky"
+  },
+  "languages": {
+    "de": [
+      {
+        "word": "Hallo!",
+        "transcription": "",
+        "translation": {
+          "ru": "Привет!",
+          "en": "Hello!",
+          "uz": "Salom!"
+        },
+        "example": "___ Ich heiße Anna.",
+        "example_translation": {
+          "ru": "Привет! Меня зовут Анна.",
+          "en": "Hello! My name is Anna.",
+          "uz": "Salom! Mening ismim Anna."
+        }
+      },
+      {
+        "word": "Guten Morgen!",
+        "transcription": "",
+        "translation": {
+          "ru": "Доброе утро!",
+          "en": "Good morning!",
+          "uz": "Xayrli tong!"
+        },
+        "example": "___ Hast du gut geschlafen?",
+        "example_translation": {
+          "ru": "Доброе утро! Как спалось?",
+          "en": "Good morning! Did you sleep well?",
+          "uz": "Xayrli tong! Yaxshi uxladingmi?"
+        }
+      },
+      {
+        "word": "Guten Abend!",
+        "transcription": "",
+        "translation": {
+          "ru": "Добрый вечер!",
+          "en": "Good evening!",
+          "uz": "Xayrli kech!"
+        },
+        "example": "___ Schön, dich zu sehen.",
+        "example_translation": {
+          "ru": "Добрый вечер! Приятно тебя видеть.",
+          "en": "Good evening! Nice to see you.",
+          "uz": "Xayrli kech! Seni ko‘rganimdan xursandman."
+        }
+      },
+      {
+        "word": "Tschüss!",
+        "transcription": "",
+        "translation": {
+          "ru": "Пока!",
+          "en": "Bye!",
+          "uz": "Xayr!"
+        },
+        "example": "___ Bis morgen!",
+        "example_translation": {
+          "ru": "Пока! До завтра!",
+          "en": "Bye! See you tomorrow!",
+          "uz": "Xayr! Ertagacha!"
+        }
+      },
+      {
+        "word": "Bis bald!",
+        "transcription": "",
+        "translation": {
+          "ru": "До скорой встречи!",
+          "en": "See you soon!",
+          "uz": "Tez orada ko‘rishamiz!"
+        },
+        "example": "___ Ich rufe dich an.",
+        "example_translation": {
+          "ru": "До скорой встречи! Я тебе позвоню.",
+          "en": "See you soon! I'll call you.",
+          "uz": "Tez orada ko‘rishamiz! Senga qo‘ng‘iroq qilaman."
+        }
+      },
+      {
+        "word": "bitte",
+        "transcription": "",
+        "translation": {
+          "ru": "Пожалуйста",
+          "en": "Please",
+          "uz": "Iltimos"
+        },
+        "example": "Einen Kaffee, ___.",
+        "example_translation": {
+          "ru": "Один кофе, пожалуйста.",
+          "en": "A coffee, please.",
+          "uz": "Bitta kofe, iltimos."
+        }
+      },
+      {
+        "word": "Danke",
+        "transcription": "",
+        "translation": {
+          "ru": "Спасибо",
+          "en": "Thank you",
+          "uz": "Rahmat"
+        },
+        "example": "___ für deine Hilfe.",
+        "example_translation": {
+          "ru": "Спасибо за твою помощь.",
+          "en": "Thank you for your help.",
+          "uz": "Yordaming uchun rahmat."
+        }
+      },
+      {
+        "word": "Gern geschehen!",
+        "transcription": "",
+        "translation": {
+          "ru": "Не за что!",
+          "en": "You're welcome!",
+          "uz": "Arzimaydi!"
+        },
+        "example": "Danke! — ___",
+        "example_translation": {
+          "ru": "Спасибо! — Не за что!",
+          "en": "Thank you! — You're welcome!",
+          "uz": "Rahmat! — Arzimaydi!"
+        }
+      },
+      {
+        "word": "Entschuldigung!",
+        "transcription": "",
+        "translation": {
+          "ru": "Извините!",
+          "en": "Excuse me!",
+          "uz": "Kechirasiz!"
+        },
+        "example": "___ Wo ist der Bahnhof?",
+        "example_translation": {
+          "ru": "Извините! Где вокзал?",
+          "en": "Excuse me! Where is the station?",
+          "uz": "Kechirasiz! Vokzal qayerda?"
+        }
+      },
+      {
+        "word": "Wie heißt du?",
+        "transcription": "",
+        "translation": {
+          "ru": "Как тебя зовут?",
+          "en": "What's your name?",
+          "uz": "Isming nima?"
+        },
+        "example": "___ — Ich bin Tom.",
+        "example_translation": {
+          "ru": "Как тебя зовут? — Я Том.",
+          "en": "What's your name? — I'm Tom.",
+          "uz": "Isming nima? — Men Tomman."
+        }
+      },
+      {
+        "word": "Freut mich!",
+        "transcription": "",
+        "translation": {
+          "ru": "Очень приятно!",
+          "en": "Nice to meet you!",
+          "uz": "Tanishganimdan xursandman!"
+        },
+        "example": "___ Ich bin Lena.",
+        "example_translation": {
+          "ru": "Очень приятно! Я Лена.",
+          "en": "Nice to meet you! I'm Lena.",
+          "uz": "Tanishganimdan xursandman! Men Lenaman."
+        }
+      },
+      {
+        "word": "Woher kommst du?",
+        "transcription": "",
+        "translation": {
+          "ru": "Откуда ты?",
+          "en": "Where are you from?",
+          "uz": "Qayerdansan?"
+        },
+        "example": "___ — Ich komme aus Polen.",
+        "example_translation": {
+          "ru": "Откуда ты? — Я из Польши.",
+          "en": "Where are you from? — I'm from Poland.",
+          "uz": "Qayerdansan? — Men Polshadanman."
+        }
+      },
+      {
+        "word": "Wie geht's?",
+        "transcription": "",
+        "translation": {
+          "ru": "Как дела?",
+          "en": "How are you?",
+          "uz": "Ishlaring qanday?"
+        },
+        "example": "___ — Gut, danke!",
+        "example_translation": {
+          "ru": "Как дела? — Хорошо, спасибо!",
+          "en": "How are you? — Fine, thanks!",
+          "uz": "Ishlaring qanday? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "Gut, danke!",
+        "transcription": "",
+        "translation": {
+          "ru": "Хорошо, спасибо!",
+          "en": "Fine, thanks!",
+          "uz": "Yaxshi, rahmat!"
+        },
+        "example": "Wie war dein Tag? — ___",
+        "example_translation": {
+          "ru": "Как прошёл день? — Хорошо, спасибо!",
+          "en": "How was your day? — Fine, thanks!",
+          "uz": "Kuning qanday o‘tdi? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "Ich verstehe nicht.",
+        "transcription": "",
+        "translation": {
+          "ru": "Я не понимаю.",
+          "en": "I don't understand.",
+          "uz": "Tushunmayapman."
+        },
+        "example": "Tut mir leid. ___",
+        "example_translation": {
+          "ru": "Извини. Я не понимаю.",
+          "en": "Sorry. I don't understand.",
+          "uz": "Kechir. Tushunmayapman."
+        }
+      }
+    ],
+    "en": [
+      {
+        "word": "Hello!",
+        "transcription": "",
+        "translation": {
+          "ru": "Привет!",
+          "en": "Hello!",
+          "uz": "Salom!"
+        },
+        "example": "___ My name is Anna.",
+        "example_translation": {
+          "ru": "Привет! Меня зовут Анна.",
+          "en": "Hello! My name is Anna.",
+          "uz": "Salom! Mening ismim Anna."
+        }
+      },
+      {
+        "word": "Good morning!",
+        "transcription": "",
+        "translation": {
+          "ru": "Доброе утро!",
+          "en": "Good morning!",
+          "uz": "Xayrli tong!"
+        },
+        "example": "___ Did you sleep well?",
+        "example_translation": {
+          "ru": "Доброе утро! Как спалось?",
+          "en": "Good morning! Did you sleep well?",
+          "uz": "Xayrli tong! Yaxshi uxladingmi?"
+        }
+      },
+      {
+        "word": "Good evening!",
+        "transcription": "",
+        "translation": {
+          "ru": "Добрый вечер!",
+          "en": "Good evening!",
+          "uz": "Xayrli kech!"
+        },
+        "example": "___ Nice to see you.",
+        "example_translation": {
+          "ru": "Добрый вечер! Приятно тебя видеть.",
+          "en": "Good evening! Nice to see you.",
+          "uz": "Xayrli kech! Seni ko‘rganimdan xursandman."
+        }
+      },
+      {
+        "word": "Bye!",
+        "transcription": "",
+        "translation": {
+          "ru": "Пока!",
+          "en": "Bye!",
+          "uz": "Xayr!"
+        },
+        "example": "___ See you tomorrow!",
+        "example_translation": {
+          "ru": "Пока! До завтра!",
+          "en": "Bye! See you tomorrow!",
+          "uz": "Xayr! Ertagacha!"
+        }
+      },
+      {
+        "word": "See you soon!",
+        "transcription": "",
+        "translation": {
+          "ru": "До скорой встречи!",
+          "en": "See you soon!",
+          "uz": "Tez orada ko‘rishamiz!"
+        },
+        "example": "___ I'll call you.",
+        "example_translation": {
+          "ru": "До скорой встречи! Я тебе позвоню.",
+          "en": "See you soon! I'll call you.",
+          "uz": "Tez orada ko‘rishamiz! Senga qo‘ng‘iroq qilaman."
+        }
+      },
+      {
+        "word": "please",
+        "transcription": "",
+        "translation": {
+          "ru": "Пожалуйста",
+          "en": "Please",
+          "uz": "Iltimos"
+        },
+        "example": "A coffee, ___.",
+        "example_translation": {
+          "ru": "Один кофе, пожалуйста.",
+          "en": "A coffee, please.",
+          "uz": "Bitta kofe, iltimos."
+        }
+      },
+      {
+        "word": "Thank you",
+        "transcription": "",
+        "translation": {
+          "ru": "Спасибо",
+          "en": "Thank you",
+          "uz": "Rahmat"
+        },
+        "example": "___ for your help.",
+        "example_translation": {
+          "ru": "Спасибо за твою помощь.",
+          "en": "Thank you for your help.",
+          "uz": "Yordaming uchun rahmat."
+        }
+      },
+      {
+        "word": "You're welcome!",
+        "transcription": "",
+        "translation": {
+          "ru": "Не за что!",
+          "en": "You're welcome!",
+          "uz": "Arzimaydi!"
+        },
+        "example": "Thank you! — ___",
+        "example_translation": {
+          "ru": "Спасибо! — Не за что!",
+          "en": "Thank you! — You're welcome!",
+          "uz": "Rahmat! — Arzimaydi!"
+        }
+      },
+      {
+        "word": "Excuse me!",
+        "transcription": "",
+        "translation": {
+          "ru": "Извините!",
+          "en": "Excuse me!",
+          "uz": "Kechirasiz!"
+        },
+        "example": "___ Where is the station?",
+        "example_translation": {
+          "ru": "Извините! Где вокзал?",
+          "en": "Excuse me! Where is the station?",
+          "uz": "Kechirasiz! Vokzal qayerda?"
+        }
+      },
+      {
+        "word": "What's your name?",
+        "transcription": "",
+        "translation": {
+          "ru": "Как тебя зовут?",
+          "en": "What's your name?",
+          "uz": "Isming nima?"
+        },
+        "example": "___ — I'm Tom.",
+        "example_translation": {
+          "ru": "Как тебя зовут? — Я Том.",
+          "en": "What's your name? — I'm Tom.",
+          "uz": "Isming nima? — Men Tomman."
+        }
+      },
+      {
+        "word": "Nice to meet you!",
+        "transcription": "",
+        "translation": {
+          "ru": "Очень приятно!",
+          "en": "Nice to meet you!",
+          "uz": "Tanishganimdan xursandman!"
+        },
+        "example": "___ I'm Lena.",
+        "example_translation": {
+          "ru": "Очень приятно! Я Лена.",
+          "en": "Nice to meet you! I'm Lena.",
+          "uz": "Tanishganimdan xursandman! Men Lenaman."
+        }
+      },
+      {
+        "word": "Where are you from?",
+        "transcription": "",
+        "translation": {
+          "ru": "Откуда ты?",
+          "en": "Where are you from?",
+          "uz": "Qayerdansan?"
+        },
+        "example": "___ — I'm from Poland.",
+        "example_translation": {
+          "ru": "Откуда ты? — Я из Польши.",
+          "en": "Where are you from? — I'm from Poland.",
+          "uz": "Qayerdansan? — Men Polshadanman."
+        }
+      },
+      {
+        "word": "How are you?",
+        "transcription": "",
+        "translation": {
+          "ru": "Как дела?",
+          "en": "How are you?",
+          "uz": "Ishlaring qanday?"
+        },
+        "example": "___ — Fine, thanks!",
+        "example_translation": {
+          "ru": "Как дела? — Хорошо, спасибо!",
+          "en": "How are you? — Fine, thanks!",
+          "uz": "Ishlaring qanday? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "Fine, thanks!",
+        "transcription": "",
+        "translation": {
+          "ru": "Хорошо, спасибо!",
+          "en": "Fine, thanks!",
+          "uz": "Yaxshi, rahmat!"
+        },
+        "example": "How was your day? — ___",
+        "example_translation": {
+          "ru": "Как прошёл день? — Хорошо, спасибо!",
+          "en": "How was your day? — Fine, thanks!",
+          "uz": "Kuning qanday o‘tdi? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "I don't understand.",
+        "transcription": "",
+        "translation": {
+          "ru": "Я не понимаю.",
+          "en": "I don't understand.",
+          "uz": "Tushunmayapman."
+        },
+        "example": "Sorry. ___",
+        "example_translation": {
+          "ru": "Извини. Я не понимаю.",
+          "en": "Sorry. I don't understand.",
+          "uz": "Kechir. Tushunmayapman."
+        }
+      }
+    ],
+    "fr": [
+      {
+        "word": "Salut !",
+        "transcription": "",
+        "translation": {
+          "ru": "Привет!",
+          "en": "Hello!",
+          "uz": "Salom!"
+        },
+        "example": "___ Je m'appelle Anna.",
+        "example_translation": {
+          "ru": "Привет! Меня зовут Анна.",
+          "en": "Hello! My name is Anna.",
+          "uz": "Salom! Mening ismim Anna."
+        }
+      },
+      {
+        "word": "Bonjour !",
+        "transcription": "",
+        "translation": {
+          "ru": "Доброе утро!",
+          "en": "Good morning!",
+          "uz": "Xayrli tong!"
+        },
+        "example": "___ Tu as bien dormi ?",
+        "example_translation": {
+          "ru": "Доброе утро! Как спалось?",
+          "en": "Good morning! Did you sleep well?",
+          "uz": "Xayrli tong! Yaxshi uxladingmi?"
+        }
+      },
+      {
+        "word": "Bonsoir !",
+        "transcription": "",
+        "translation": {
+          "ru": "Добрый вечер!",
+          "en": "Good evening!",
+          "uz": "Xayrli kech!"
+        },
+        "example": "___ Ça fait plaisir de te voir.",
+        "example_translation": {
+          "ru": "Добрый вечер! Приятно тебя видеть.",
+          "en": "Good evening! Nice to see you.",
+          "uz": "Xayrli kech! Seni ko‘rganimdan xursandman."
+        }
+      },
+      {
+        "word": "Au revoir !",
+        "transcription": "",
+        "translation": {
+          "ru": "Пока!",
+          "en": "Bye!",
+          "uz": "Xayr!"
+        },
+        "example": "___ À demain !",
+        "example_translation": {
+          "ru": "Пока! До завтра!",
+          "en": "Bye! See you tomorrow!",
+          "uz": "Xayr! Ertagacha!"
+        }
+      },
+      {
+        "word": "À bientôt !",
+        "transcription": "",
+        "translation": {
+          "ru": "До скорой встречи!",
+          "en": "See you soon!",
+          "uz": "Tez orada ko‘rishamiz!"
+        },
+        "example": "___ Je t'appelle.",
+        "example_translation": {
+          "ru": "До скорой встречи! Я тебе позвоню.",
+          "en": "See you soon! I'll call you.",
+          "uz": "Tez orada ko‘rishamiz! Senga qo‘ng‘iroq qilaman."
+        }
+      },
+      {
+        "word": "s'il te plaît",
+        "transcription": "",
+        "translation": {
+          "ru": "Пожалуйста",
+          "en": "Please",
+          "uz": "Iltimos"
+        },
+        "example": "Un café, ___.",
+        "example_translation": {
+          "ru": "Один кофе, пожалуйста.",
+          "en": "A coffee, please.",
+          "uz": "Bitta kofe, iltimos."
+        }
+      },
+      {
+        "word": "Merci",
+        "transcription": "",
+        "translation": {
+          "ru": "Спасибо",
+          "en": "Thank you",
+          "uz": "Rahmat"
+        },
+        "example": "___ pour ton aide.",
+        "example_translation": {
+          "ru": "Спасибо за твою помощь.",
+          "en": "Thank you for your help.",
+          "uz": "Yordaming uchun rahmat."
+        }
+      },
+      {
+        "word": "De rien !",
+        "transcription": "",
+        "translation": {
+          "ru": "Не за что!",
+          "en": "You're welcome!",
+          "uz": "Arzimaydi!"
+        },
+        "example": "Merci ! — ___",
+        "example_translation": {
+          "ru": "Спасибо! — Не за что!",
+          "en": "Thank you! — You're welcome!",
+          "uz": "Rahmat! — Arzimaydi!"
+        }
+      },
+      {
+        "word": "Excuse-moi !",
+        "transcription": "",
+        "translation": {
+          "ru": "Извините!",
+          "en": "Excuse me!",
+          "uz": "Kechirasiz!"
+        },
+        "example": "___ Où est la gare ?",
+        "example_translation": {
+          "ru": "Извините! Где вокзал?",
+          "en": "Excuse me! Where is the station?",
+          "uz": "Kechirasiz! Vokzal qayerda?"
+        }
+      },
+      {
+        "word": "Comment tu t'appelles ?",
+        "transcription": "",
+        "translation": {
+          "ru": "Как тебя зовут?",
+          "en": "What's your name?",
+          "uz": "Isming nima?"
+        },
+        "example": "___ — Moi, c'est Tom.",
+        "example_translation": {
+          "ru": "Как тебя зовут? — Я Том.",
+          "en": "What's your name? — I'm Tom.",
+          "uz": "Isming nima? — Men Tomman."
+        }
+      },
+      {
+        "word": "Enchanté !",
+        "transcription": "",
+        "translation": {
+          "ru": "Очень приятно!",
+          "en": "Nice to meet you!",
+          "uz": "Tanishganimdan xursandman!"
+        },
+        "example": "___ Moi, c'est Lena.",
+        "example_translation": {
+          "ru": "Очень приятно! Я Лена.",
+          "en": "Nice to meet you! I'm Lena.",
+          "uz": "Tanishganimdan xursandman! Men Lenaman."
+        }
+      },
+      {
+        "word": "Tu viens d'où ?",
+        "transcription": "",
+        "translation": {
+          "ru": "Откуда ты?",
+          "en": "Where are you from?",
+          "uz": "Qayerdansan?"
+        },
+        "example": "___ — Je viens de Pologne.",
+        "example_translation": {
+          "ru": "Откуда ты? — Я из Польши.",
+          "en": "Where are you from? — I'm from Poland.",
+          "uz": "Qayerdansan? — Men Polshadanman."
+        }
+      },
+      {
+        "word": "Ça va ?",
+        "transcription": "",
+        "translation": {
+          "ru": "Как дела?",
+          "en": "How are you?",
+          "uz": "Ishlaring qanday?"
+        },
+        "example": "___ — Bien, merci !",
+        "example_translation": {
+          "ru": "Как дела? — Хорошо, спасибо!",
+          "en": "How are you? — Fine, thanks!",
+          "uz": "Ishlaring qanday? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "Ça va bien, merci !",
+        "transcription": "",
+        "translation": {
+          "ru": "Хорошо, спасибо!",
+          "en": "Fine, thanks!",
+          "uz": "Yaxshi, rahmat!"
+        },
+        "example": "Comment était ta journée ? — ___",
+        "example_translation": {
+          "ru": "Как прошёл день? — Хорошо, спасибо!",
+          "en": "How was your day? — Fine, thanks!",
+          "uz": "Kuning qanday o‘tdi? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "Je ne comprends pas.",
+        "transcription": "",
+        "translation": {
+          "ru": "Я не понимаю.",
+          "en": "I don't understand.",
+          "uz": "Tushunmayapman."
+        },
+        "example": "Pardon. ___",
+        "example_translation": {
+          "ru": "Извини. Я не понимаю.",
+          "en": "Sorry. I don't understand.",
+          "uz": "Kechir. Tushunmayapman."
+        }
+      }
+    ],
+    "ko": [
+      {
+        "word": "안녕하세요!",
+        "transcription": "annyeonghaseyo",
+        "translation": {
+          "ru": "Привет!",
+          "en": "Hello!",
+          "uz": "Salom!"
+        },
+        "example": "___ 저는 안나예요.",
+        "example_translation": {
+          "ru": "Привет! Меня зовут Анна.",
+          "en": "Hello! My name is Anna.",
+          "uz": "Salom! Mening ismim Anna."
+        }
+      },
+      {
+        "word": "좋은 아침이에요!",
+        "transcription": "joeun achimieyo",
+        "translation": {
+          "ru": "Доброе утро!",
+          "en": "Good morning!",
+          "uz": "Xayrli tong!"
+        },
+        "example": "___ 잘 잤어요?",
+        "example_translation": {
+          "ru": "Доброе утро! Как спалось?",
+          "en": "Good morning! Did you sleep well?",
+          "uz": "Xayrli tong! Yaxshi uxladingmi?"
+        }
+      },
+      {
+        "word": "좋은 저녁이에요!",
+        "transcription": "joeun jeonyeogieyo",
+        "translation": {
+          "ru": "Добрый вечер!",
+          "en": "Good evening!",
+          "uz": "Xayrli kech!"
+        },
+        "example": "___ 만나서 반가워요.",
+        "example_translation": {
+          "ru": "Добрый вечер! Приятно тебя видеть.",
+          "en": "Good evening! Nice to see you.",
+          "uz": "Xayrli kech! Seni ko‘rganimdan xursandman."
+        }
+      },
+      {
+        "word": "안녕히 가세요!",
+        "transcription": "annyeonghi gaseyo",
+        "translation": {
+          "ru": "Пока!",
+          "en": "Bye!",
+          "uz": "Xayr!"
+        },
+        "example": "___ 내일 봐요!",
+        "example_translation": {
+          "ru": "Пока! До завтра!",
+          "en": "Bye! See you tomorrow!",
+          "uz": "Xayr! Ertagacha!"
+        }
+      },
+      {
+        "word": "곧 만나요!",
+        "transcription": "got mannayo",
+        "translation": {
+          "ru": "До скорой встречи!",
+          "en": "See you soon!",
+          "uz": "Tez orada ko‘rishamiz!"
+        },
+        "example": "___ 제가 전화할게요.",
+        "example_translation": {
+          "ru": "До скорой встречи! Я тебе позвоню.",
+          "en": "See you soon! I'll call you.",
+          "uz": "Tez orada ko‘rishamiz! Senga qo‘ng‘iroq qilaman."
+        }
+      },
+      {
+        "word": "부탁합니다",
+        "transcription": "butakhamnida",
+        "translation": {
+          "ru": "Пожалуйста",
+          "en": "Please",
+          "uz": "Iltimos"
+        },
+        "example": "커피 한 잔, ___.",
+        "example_translation": {
+          "ru": "Один кофе, пожалуйста.",
+          "en": "A coffee, please.",
+          "uz": "Bitta kofe, iltimos."
+        }
+      },
+      {
+        "word": "감사합니다",
+        "transcription": "gamsahamnida",
+        "translation": {
+          "ru": "Спасибо",
+          "en": "Thank you",
+          "uz": "Rahmat"
+        },
+        "example": "도와주셔서 ___.",
+        "example_translation": {
+          "ru": "Спасибо за твою помощь.",
+          "en": "Thank you for your help.",
+          "uz": "Yordaming uchun rahmat."
+        }
+      },
+      {
+        "word": "천만에요!",
+        "transcription": "cheonmaneyo",
+        "translation": {
+          "ru": "Не за что!",
+          "en": "You're welcome!",
+          "uz": "Arzimaydi!"
+        },
+        "example": "감사합니다! — ___",
+        "example_translation": {
+          "ru": "Спасибо! — Не за что!",
+          "en": "Thank you! — You're welcome!",
+          "uz": "Rahmat! — Arzimaydi!"
+        }
+      },
+      {
+        "word": "실례합니다!",
+        "transcription": "sillyehamnida",
+        "translation": {
+          "ru": "Извините!",
+          "en": "Excuse me!",
+          "uz": "Kechirasiz!"
+        },
+        "example": "___ 기차역이 어디예요?",
+        "example_translation": {
+          "ru": "Извините! Где вокзал?",
+          "en": "Excuse me! Where is the station?",
+          "uz": "Kechirasiz! Vokzal qayerda?"
+        }
+      },
+      {
+        "word": "이름이 뭐예요?",
+        "transcription": "ireumi mwoyeyo",
+        "translation": {
+          "ru": "Как тебя зовут?",
+          "en": "What's your name?",
+          "uz": "Isming nima?"
+        },
+        "example": "___ — 저는 톰이에요.",
+        "example_translation": {
+          "ru": "Как тебя зовут? — Я Том.",
+          "en": "What's your name? — I'm Tom.",
+          "uz": "Isming nima? — Men Tomman."
+        }
+      },
+      {
+        "word": "만나서 반갑습니다!",
+        "transcription": "mannaseo bangapseumnida",
+        "translation": {
+          "ru": "Очень приятно!",
+          "en": "Nice to meet you!",
+          "uz": "Tanishganimdan xursandman!"
+        },
+        "example": "___ 저는 레나예요.",
+        "example_translation": {
+          "ru": "Очень приятно! Я Лена.",
+          "en": "Nice to meet you! I'm Lena.",
+          "uz": "Tanishganimdan xursandman! Men Lenaman."
+        }
+      },
+      {
+        "word": "어디에서 왔어요?",
+        "transcription": "eodieseo wasseoyo",
+        "translation": {
+          "ru": "Откуда ты?",
+          "en": "Where are you from?",
+          "uz": "Qayerdansan?"
+        },
+        "example": "___ — 폴란드에서 왔어요.",
+        "example_translation": {
+          "ru": "Откуда ты? — Я из Польши.",
+          "en": "Where are you from? — I'm from Poland.",
+          "uz": "Qayerdansan? — Men Polshadanman."
+        }
+      },
+      {
+        "word": "잘 지내요?",
+        "transcription": "jal jinaeyo",
+        "translation": {
+          "ru": "Как дела?",
+          "en": "How are you?",
+          "uz": "Ishlaring qanday?"
+        },
+        "example": "___ — 잘 지내요, 고마워요!",
+        "example_translation": {
+          "ru": "Как дела? — Хорошо, спасибо!",
+          "en": "How are you? — Fine, thanks!",
+          "uz": "Ishlaring qanday? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "잘 지내요, 고마워요!",
+        "transcription": "jal jinaeyo, gomawoyo",
+        "translation": {
+          "ru": "Хорошо, спасибо!",
+          "en": "Fine, thanks!",
+          "uz": "Yaxshi, rahmat!"
+        },
+        "example": "오늘 어땠어요? — ___",
+        "example_translation": {
+          "ru": "Как прошёл день? — Хорошо, спасибо!",
+          "en": "How was your day? — Fine, thanks!",
+          "uz": "Kuning qanday o‘tdi? — Yaxshi, rahmat!"
+        }
+      },
+      {
+        "word": "이해 못 해요.",
+        "transcription": "ihae mot haeyo",
+        "translation": {
+          "ru": "Я не понимаю.",
+          "en": "I don't understand.",
+          "uz": "Tushunmayapman."
+        },
+        "example": "죄송해요. ___",
+        "example_translation": {
+          "ru": "Извини. Я не понимаю.",
+          "en": "Sorry. I don't understand.",
+          "uz": "Kechir. Tushunmayapman."
+        }
+      }
+    ]
+  }
+}

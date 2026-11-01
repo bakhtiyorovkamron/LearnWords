@@ -48,6 +48,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
 		  AND ($4::uuid IS NULL OR w.folder_id = $4::uuid)
 		  AND (NOT $5::bool OR w.folder_id IS NULL)
+		  AND (NOT w.paused OR $4::uuid IS NOT NULL) -- paused (starter) cards: only when asked by their folder
 		ORDER BY
 		  CASE WHEN COALESCE(p.next_review_at, $2::date) < $2::date OR COALESCE(p.box_level, 1) = 1 THEN 0 ELSE 1 END,
 		  COALESCE(p.next_review_at, $2::date),
@@ -80,7 +81,8 @@ func (r *ReviewRepository) CountDue(ctx context.Context, userID uuid.UUID, today
 		  AND COALESCE(p.is_learned, false) = false
 		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
 		  AND ($3::uuid IS NULL OR w.folder_id = $3::uuid)
-		  AND (NOT $4::bool OR w.folder_id IS NULL)`,
+		  AND (NOT $4::bool OR w.folder_id IS NULL)
+		  AND (NOT w.paused OR $3::uuid IS NOT NULL)`,
 		userID, today, folderOnly, noFolder).Scan(&total)
 	return total, err
 }
@@ -131,6 +133,10 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 		wordID, p.BoxLevel, p.CorrectStreakAtMax, p.IsLearned, p.NextReviewAt, p.LastReviewedAt); err != nil {
 		return nil, err
 	}
+	// The first review answer puts a paused (starter) card into the normal schedule.
+	if _, err := tx.Exec(ctx, `UPDATE word_cards SET paused = false WHERE id = $1 AND paused`, wordID); err != nil {
+		return nil, err
+	}
 	// Log the answer for statistics (same transaction: progress and log stay consistent).
 	// session_type is explicit here (not just relying on the column default) — this is the
 	// ONLY code path that may ever write 'review'; LogPractice is the only other writer and it
@@ -160,7 +166,7 @@ func (r *ReviewRepository) MarkGoalDay(ctx context.Context, userID uuid.UUID, to
 		     (SELECT count(*) AS n FROM word_cards w
 		      LEFT JOIN word_progress p ON p.word_id = w.id
 		      WHERE w.user_id = $1 AND COALESCE(p.is_learned, false) = false
-		        AND COALESCE(p.next_review_at, $2::date) <= $2::date) due
+		        AND COALESCE(p.next_review_at, $2::date) <= $2::date AND NOT w.paused) due
 		WHERE rev.n > 0 AND rev.n >= LEAST(g.daily_goal, rev.n + due.n)
 		ON CONFLICT DO NOTHING`, userID, today)
 	return err

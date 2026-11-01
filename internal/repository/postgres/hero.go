@@ -116,7 +116,8 @@ func (r *HeroRepository) CountDueToday(ctx context.Context, userID uuid.UUID, to
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		WHERE w.user_id = $1
 		  AND COALESCE(p.is_learned, false) = false
-		  AND COALESCE(p.next_review_at, $2::date) <= $2::date`, userID, today).Scan(&n)
+		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
+		  AND NOT w.paused`, userID, today).Scan(&n)
 	return n, err
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/mail"
 	"strings"
 	"time"
@@ -20,6 +21,30 @@ type AuthService struct {
 	tokens TokenManager
 	// dummyHash is used to equalize timing when the user does not exist.
 	dummyHash []byte
+	starter   StarterCreator
+}
+
+// StarterCreator gives a brand-new user their starter folder.
+type StarterCreator interface {
+	Create(ctx context.Context, userID uuid.UUID, learningLang string) error
+}
+
+// SetStarter turns the starter folder on for new registrations (nil = off).
+func (s *AuthService) SetStarter(st StarterCreator) { s.starter = st }
+
+// giveStarterFolder never fails the registration: no starter folder is better than a failed sign-up.
+func (s *AuthService) giveStarterFolder(ctx context.Context, userID uuid.UUID, learningLang string) {
+	if s.starter == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "starter folder panicked", "user", userID, "panic", r)
+		}
+	}()
+	if err := s.starter.Create(ctx, userID, learningLang); err != nil {
+		slog.WarnContext(ctx, "starter folder failed", "user", userID, "err", err)
+	}
 }
 
 func NewAuthService(users UserRepository, tokens TokenManager) *AuthService {
@@ -52,6 +77,7 @@ func (s *AuthService) Register(ctx context.Context, email, password, learningLan
 	if err := s.users.Create(ctx, u); err != nil {
 		return nil, domain.TokenPair{}, err
 	}
+	s.giveStarterFolder(ctx, u.ID, u.LearningLanguage)
 	pair, err := s.tokens.IssuePair(u.ID)
 	return u, pair, err
 }

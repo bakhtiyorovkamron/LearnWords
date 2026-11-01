@@ -79,6 +79,9 @@ type WordCard struct {
 	Article      *string `json:"article"`
 	Plural       *string `json:"plural"`
 	PartOfSpeech *string `json:"part_of_speech"`
+
+	// Paused: not in the general training queue (starter cards) until the first review answer.
+	Paused bool `json:"-"`
 }
 
 // ExampleInLanguage is the example translation if it is written in lang, else "". A card with no
