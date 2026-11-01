@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { Camera, Languages, Repeat } from 'lucide-react'
+import { Camera, Check, Languages, Repeat } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { authApi, LEARNING_LANGS, type LearningLang } from '../api/endpoints'
 import { errorMessage } from '../api/client'
+import { Flag } from '../components/Flag'
 import { Logo } from '../components/Logo'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { ContactLinks } from '../components/ContactLinks'
@@ -55,11 +56,35 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       : errorMessage(mutation.error))
     : null)
 
+  const languages = (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-semibold text-fg">{t('auth.learningLanguage')}</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {LEARNING_LANGS.map((l) => {
+          const on = learningLang === l.code
+          return (
+            <button key={l.code} type="button" onClick={() => setLearningLang(l.code)} aria-pressed={on}
+              className={`flex min-h-12 items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-left text-sm transition ${
+                on ? 'border-accent bg-surface-2 text-fg' : 'border-line text-muted hover:text-fg'}`}>
+              <Flag lang={l.code} />
+              <span className="min-w-0 flex-1 truncate font-semibold">{l.name}</span>
+              {on && <Check size={18} aria-hidden="true" className="shrink-0 text-accent-text" />}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-xs text-faint">{t('auth.learningLanguageHint')}</p>
+    </fieldset>
+  )
+
   return (
     <>
     <InAppBanner />
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
-      <div className="absolute right-4 top-4 z-10"><LanguageSwitcher sync={false} /></div>
+    <div className="relative flex min-h-screen flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+      <header className="relative z-10 flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+12px)]">
+        <Logo />
+        <LanguageSwitcher sync={false} />
+      </header>
       {floating.map((f) => (
         <div key={f.w} style={{ animationDelay: f.d }}
           className={`animate-float glass pointer-events-none absolute hidden px-5 py-3 lg:block ${f.c}`}>
@@ -68,14 +93,15 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
       ))}
 
-      <div className="grid w-full max-w-5xl items-center gap-10 md:grid-cols-2">
+      <main className="flex flex-1 items-center justify-center px-4 py-5 md:py-12">
+      <div className="grid w-full max-w-5xl items-center gap-5 md:grid-cols-2 md:gap-10">
         <div className="space-y-6 text-center md:text-left">
-          <div className="flex justify-center md:justify-start"><Logo /></div>
-          <h1 className="text-4xl font-bold leading-tight tracking-[-0.02em] text-fg md:text-5xl">
+          <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-fg md:text-5xl">
             {t('auth.heroTitle1')}<span className="text-accent-text">{t('auth.heroTitleAccent')}</span>{t('auth.heroTitle2')}
           </h1>
-          <p className="text-lg text-muted">{t('auth.heroText')}</p>
-          <ul className="inline-flex flex-col gap-2.5 text-left text-muted">
+          {/* Phones show just the title: the form must start on the first screen. */}
+          <p className="hidden text-lg text-muted md:block">{t('auth.heroText')}</p>
+          <ul className="hidden flex-col gap-2.5 text-left text-muted md:inline-flex">
             {[[Camera, t('auth.badgeTranslation')], [Languages, t('auth.badgeTranscription')], [Repeat, t('auth.badgeAudio')]].map(([Icon, text]) => {
               const I = Icon as typeof Camera
               return (
@@ -88,11 +114,12 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
 
         <div className="space-y-4">
-        <form onSubmit={submit} className="glass space-y-4 p-6 md:p-8">
+        <form onSubmit={submit} className="glass space-y-4 p-5 md:p-8">
           <h2 className="text-2xl font-bold text-fg">{isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}</h2>
           <p className="text-sm text-muted">
             {isLogin ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
           </p>
+          {!isLogin && languages}
           <input className="field" type="email" placeholder={t('auth.email')} autoComplete="email" required
             value={email} onChange={(e) => setEmail(e.target.value)} />
           <PasswordField placeholder={t('auth.password')} autoComplete={isLogin ? 'current-password' : 'new-password'}
@@ -100,25 +127,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           {!isLogin && (
             <PasswordField placeholder={t('auth.confirmPassword')} autoComplete="new-password"
               value={confirm} onChange={setConfirm} />
-          )}
-          {!isLogin && (
-            <fieldset className="space-y-2">
-              <legend className="text-sm text-muted">{t('auth.learningLanguage')}</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {LEARNING_LANGS.map((l) => (
-                  <button key={l.code} type="button" onClick={() => setLearningLang(l.code)}
-                    aria-pressed={learningLang === l.code}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
-                      learningLang === l.code
-                        ? 'border-accent bg-surface-2 text-fg'
-                        : 'border-line text-muted hover:text-fg'}`}>
-                    <span className="text-lg">{l.flag}</span>
-                    <span className="font-semibold">{l.name}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-faint">{t('auth.learningLanguageHint')}</p>
-            </fieldset>
           )}
           {error && (
             <p className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">{error}</p>
@@ -136,6 +144,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         <p className="text-center text-sm text-muted">{t('contact.loginProblem')} <ContactLinks /></p>
         </div>
       </div>
+      </main>
     </div>
     </>
   )

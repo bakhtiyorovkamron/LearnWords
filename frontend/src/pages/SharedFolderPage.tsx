@@ -85,8 +85,8 @@ export function SharedFolderPage() {
   const data = folder.data
 
   return (
-    <div className="min-h-screen pt-[env(safe-area-inset-top)]">
-      <header className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4">
+    <div className="min-h-screen pb-[env(safe-area-inset-bottom)]">
+      <header className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+12px)]">
         <Link to="/"><Logo /></Link>
         <LanguageSwitcher sync={false} />
       </header>
