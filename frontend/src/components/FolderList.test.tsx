@@ -31,7 +31,7 @@ function renderList() {
   )
 }
 const where = () => screen.getByTestId('where').textContent
-const rows = () => screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.includes('?folder='))
+const rows = () => screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/words/') && a.getAttribute('href') !== '/words/all')
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
@@ -50,14 +50,14 @@ describe('FolderList', () => {
     renderList()
     await screen.findByText('Folder 2')
     const row = rows().find((a) => a.textContent?.includes('Folder 2'))!
-    expect(row.getAttribute('href')).toBe('/cards?folder=f2')
+    expect(row.getAttribute('href')).toBe('/words/f2')
     expect(within(row).getByText('2')).toBeTruthy()
     expect(row.querySelector('svg')).toBeNull() // no chevron any more
   })
 
   it('"All · 13" opens the whole collection', async () => {
     renderList()
-    expect((await screen.findByRole('link', { name: 'All · 13' })).getAttribute('href')).toBe('/cards')
+    expect((await screen.findByRole('link', { name: 'All · 13' })).getAttribute('href')).toBe('/words/all')
   })
 
   it('a long name is cut, the full name is in the title', async () => {

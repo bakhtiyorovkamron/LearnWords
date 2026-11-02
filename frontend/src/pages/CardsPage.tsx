@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Leaf, Search, SearchX, SlidersHorizontal, SquareCheck, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -11,7 +11,6 @@ import { FlipCards } from '../components/FlipCards'
 import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
 import { FilterSheet } from '../components/FilterSheet'
 import { FolderBar, useFolderList } from '../components/Folders'
-import { Segmented } from '../components/Segmented'
 import { WordFixes } from '../components/WordFixes'
 import { FolderPicker } from '../components/FolderPicker'
 import { toast } from '../components/Toaster'
@@ -20,21 +19,32 @@ import { parseUrlSize } from '../lib/reviewSessionSize'
 import { ErrorState } from '../components/ErrorState'
 
 const PAGE = 48
-const VIEW_KEY = 'collection-view'
 const FLIP_DIRECTIONS = ['de_ru', 'ru_de'] as const
 
-export function CardsPage() {
-  // The collection. ?folder=<id|none> is its initial folder (a link from Home's folder list); old
-  // links keep working: /cards?start=1&size=N is now the training, /cards?practice=1 is gone.
+/**
+ * The collection, in two tabs: /cards shows it as flashcards, /words (and /words/:folder, a folder
+ * id | all | none) as a list. Old links keep working: /cards?start=1&size=N is now the training,
+ * /cards?practice=1 is gone, /cards?tab=all[&folder=X] is the list /words[/X].
+ */
+export function CardsPage({ view }: { view: 'flip' | 'list' }) {
   const [params] = useSearchParams()
-  if (params.get('start') === '1') {
-    const size = parseUrlSize(params.get('size'))
-    return <Navigate to={size ? `/train?size=${size}` : '/train'} replace />
+  const { folder: routeFolder } = useParams()
+  if (view === 'flip') {
+    if (params.get('start') === '1') {
+      const size = parseUrlSize(params.get('size'))
+      return <Navigate to={size ? `/train?size=${size}` : '/train'} replace />
+    }
+    if (params.get('practice') === '1') return <Navigate to="/" replace />
+    if (params.get('tab') === 'all') {
+      const f = params.get('folder')
+      return <Navigate to={f ? `/words/${encodeURIComponent(f)}` : '/words'} replace />
+    }
   }
-  if (params.get('practice') === '1') return <Navigate to="/" replace />
+  // list: the folder is in the path ("all" or missing = every word); flip: it is ?folder=
+  const folder = view === 'list' ? (routeFolder && routeFolder !== 'all' ? routeFolder : '') : params.get('folder') ?? ''
   return (
     <div className="space-y-4 md:space-y-6">
-      <Collection initialFolder={params.get('folder') ?? ''} />
+      <Collection key={`${view}:${folder}`} view={view} initialFolder={folder} />
     </div>
   )
 }
@@ -48,7 +58,7 @@ function useDebounced<T>(value: T, ms: number): T {
   return v
 }
 
-function Collection({ initialFolder = '' }: { initialFolder?: string }) {
+function Collection({ view, initialFolder = '' }: { view: 'flip' | 'list'; initialFolder?: string }) {
   const { t } = useTranslation()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<CollectionStatus>('all')
@@ -57,12 +67,8 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
   const [folder, setFolder] = useState(initialFolder) // '' = all words (default, as before)
   const [searchOpen, setSearchOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [view, setView] = useState<'list' | 'flip'>(() =>
-    localStorage.getItem(VIEW_KEY) === 'flip' ? 'flip' : 'list')
   const search = useDebounced(q.trim(), 300)
   const [flipDirection, setFlipDirection] = useStoredChoice('flip-direction', FLIP_DIRECTIONS, 'de_ru')
-
-  useEffect(() => { localStorage.setItem(VIEW_KEY, view) }, [view])
 
   // Bulk move: «Select» shows checkboxes (list view only); the bar at the bottom moves the picked words.
   const [selecting, setSelecting] = useState(false)
@@ -131,7 +137,7 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
     <div className={`mx-auto max-w-3xl space-y-4 ${selecting ? 'pb-24' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('cards.title')}</h1>
+          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t(view === 'flip' ? 'nav.cards' : 'cards.title')}</h1>
           <p className="mt-1 text-[15px] text-muted">
             {grandTotal.data !== undefined && t('folders.wordsCount', { count: grandTotal.data })}
             {grandTotal.data !== undefined && due > 0 && ` · ${t('cards.dueToday', { count: due })}`}
@@ -160,11 +166,6 @@ function Collection({ initialFolder = '' }: { initialFolder?: string }) {
       )}
 
       <WordFixes />
-
-      <Segmented value={view} onChange={setView} options={[
-        ['list', t('collection.view.list')],
-        ['flip', t('collection.view.flip')],
-      ] as const} />
 
       <FolderBar value={folder} onChange={setFolder} />
 

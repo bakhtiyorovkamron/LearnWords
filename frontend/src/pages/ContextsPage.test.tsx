@@ -349,6 +349,6 @@ describe('Home: folders', () => {
     renderHome()
     const section = (await screen.findByText('My folders')).closest('section')!
     expect(within(section).getByRole('link', { name: /Tiere/ })).toBeTruthy()
-    expect(within(section).getByRole('link', { name: 'All · 40' }).getAttribute('href')).toBe('/cards')
+    expect(within(section).getByRole('link', { name: 'All · 40' }).getAttribute('href')).toBe('/words/all')
   })
 })

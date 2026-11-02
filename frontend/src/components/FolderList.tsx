@@ -24,7 +24,7 @@ export function FolderList() {
     <div className="mb-3 flex items-baseline justify-between gap-3">
       <h2 className="text-[17px] font-semibold text-fg">{t('folders.myFolders')}</h2>
       {list.data && (
-        <Link to="/cards" className="text-sm text-muted hover:text-fg">{t('home.allWords', { count: list.data.all.total })}</Link>
+        <Link to="/words/all" className="text-sm text-muted hover:text-fg">{t('home.allWords', { count: list.data.all.total })}</Link>
       )}
     </div>
   )
@@ -52,7 +52,7 @@ export function FolderList() {
       <div className="glass divide-y divide-divider overflow-hidden">
         {rows.map((f) => (
           <div key={f.id} className="flex items-center transition hover:bg-surface-2">
-            <Link to={`/cards?folder=${encodeURIComponent(f.id)}`}
+            <Link to={`/words/${encodeURIComponent(f.id)}`}
               className="flex h-[54px] min-w-0 flex-1 items-center gap-3 pl-4 pr-2">
               <FolderDot color={f.color} />
               <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-fg" title={f.name}>{shortFolderName(f.name)}</span>

@@ -10,6 +10,7 @@
     "add": "Qo‘shish",
     "search": "Qidiruv",
     "cards": "Kartochkalar",
+    "words": "So‘zlarim",
     "stats": "Statistika",
     "dailyStory": "Kun hikoyasi",
     "admin": "Admin",
@@ -154,7 +155,6 @@
       "alpha": "Alifbo bo‘yicha",
       "progress": "Natija bo‘yicha (avval yomon biladiganlarim)"
     },
-    "view": { "list": "Ro‘yxat", "flip": "Flip-kartochkalar" },
     "status": { "new": "yangi", "learning": "o‘rganyapman", "learned": "o‘rganilgan" },
     "flipHint": "Aylantirish uchun bosing",
     "keysHint": "← → — varaqlash, probel — aylantirish",

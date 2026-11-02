@@ -89,7 +89,7 @@ export function PhotoImport() {
     },
     onSuccess: ({ added, skipped, folder }) => {
       toast(t('photo.addedTo', { folder: folder.name, added, skipped }), {
-        action: { label: t('photo.openFolder'), onClick: () => navigate(`/cards?folder=${encodeURIComponent(folder.id)}`) },
+        action: { label: t('photo.openFolder'), onClick: () => navigate(`/words/${encodeURIComponent(folder.id)}`) },
         ms: 7000,
       })
       setResult(null)

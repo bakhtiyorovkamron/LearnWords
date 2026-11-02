@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { meApi, type Me } from '../api/endpoints'
 import { Layout } from './Layout'
+import { setMoreMenuOpen } from '../lib/moreMenu'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
@@ -31,7 +32,7 @@ function renderLayout() {
 }
 
 beforeEach(async () => { await i18n.changeLanguage('en') })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); setMoreMenuOpen(false); vi.clearAllMocks() })
 
 describe('Layout: word_search', () => {
   it('shows the Search link (desktop menu; the phone sheet after tapping More) while the feature is on — and while /me loads', async () => {
@@ -40,7 +41,7 @@ describe('Layout: word_search', () => {
     expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(1) // the header
     await waitFor(() => expect(meApi.get).toHaveBeenCalled())
     expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    act(() => setMoreMenuOpen(true))
     expect(screen.getAllByRole('link', { name: /Search/ })).toHaveLength(2) // + the More sheet
   })
 
@@ -48,7 +49,7 @@ describe('Layout: word_search', () => {
     vi.mocked(meApi.get).mockResolvedValue(me(false))
     renderLayout()
     await waitFor(() => expect(screen.queryAllByRole('link', { name: /Search/ })).toHaveLength(0))
-    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    act(() => setMoreMenuOpen(true))
     expect(screen.queryAllByRole('link', { name: /Search/ })).toHaveLength(0)
     expect(screen.getAllByRole('link', { name: /Cards/ }).length).toBeGreaterThan(0)
   })

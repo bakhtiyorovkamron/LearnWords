@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, ChartColumn, House, Layers, LogOut, Menu, MessageCircle, Plus, Search, Shield, type LucideIcon } from 'lucide-react'
+import { BookOpen, ChartColumn, House, Layers, List, LogOut, MessageCircle, Plus, Search, Shield, type LucideIcon } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
@@ -13,6 +13,7 @@ import { ContactLinks } from './ContactLinks'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
+import { setMoreMenuOpen, useMoreMenuOpen } from '../lib/moreMenu'
 import { isTrainingOpen, useTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
 import { InAppBanner } from './InAppBanner'
@@ -57,7 +58,7 @@ export function Layout() {
   const { isOn } = useFeatures()
   const searchOn = isOn('word_search')
   useThemeSync(isOn('theme_picker'), me.isSuccess) // night without the picker; the server's theme with it
-  const [moreOpen, setMoreOpen] = useState(false)
+  const moreOpen = useMoreMenuOpen()
   // During a training session the shell steps aside: no header, bottom nav or footer.
   const focus = useTrainingOpen()
 
@@ -74,16 +75,13 @@ export function Layout() {
     return () => { clearTimeout(timer); clearInterval(poll) }
   }, [askFeedback])
 
-  useEffect(() => setMoreOpen(false), [pathname])
+  useEffect(() => setMoreMenuOpen(false), [pathname])
   useEffect(() => {
     if (!moreOpen) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMoreOpen(false)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMoreMenuOpen(false)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [moreOpen])
-
-  // Pages that live under "More" on phones (everything except the four bottom tabs).
-  const inMore = ['/search', '/stats', '/admin'].some((p) => pathname === p || pathname.startsWith(p + '/'))
 
   async function logout() {
     await authApi.logout()
@@ -107,6 +105,7 @@ export function Layout() {
           <NavLink to="/" className="mr-4" aria-label="yodla"><Logo /></NavLink>
           <NavLink to="/" end className={link}><Icon icon={House} />{t('nav.home')}</NavLink>
           <NavLink to="/cards" className={link}><Icon icon={Layers} />{t('nav.cards')}</NavLink>
+          <NavLink to="/words" className={link}><Icon icon={List} />{t('nav.words')}</NavLink>
           <NavLink to="/contexts/new" className={link}><Icon icon={Plus} />{t('nav.add')}</NavLink>
           {searchOn && <NavLink to="/search" className={link}><Icon icon={Search} />{t('nav.search')}</NavLink>}
           <NavLink to="/story" className={link}><Icon icon={BookOpen} />{t('nav.dailyStory')}</NavLink>
@@ -133,7 +132,7 @@ export function Layout() {
       )}
 
       {moreOpen && !focus && (
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setMoreOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setMoreMenuOpen(false)}>
           <div
             id="more-sheet"
             className="animate-rise absolute inset-x-0 bottom-[var(--nav-h)] max-h-[calc(100dvh-var(--nav-h)-env(safe-area-inset-top))] space-y-1 overflow-y-auto rounded-t-3xl border-t border-line bg-surface p-4"
@@ -159,22 +158,25 @@ export function Layout() {
 
       {/* Bottom navigation: phones only. Padded for the iPhone home indicator (safe area). */}
       {!focus && <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[var(--nav-h)] border-t border-line bg-bg/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        <NavLink to="/" end className={({ isActive }) => tab(isActive && !moreOpen)}>
+        <NavLink to="/" end className={({ isActive }) => tab(isActive)}>
           <Icon icon={House} size={22} stroke={1.75} />{t('nav.home')}
         </NavLink>
-        <NavLink to="/cards" className={({ isActive }) => tab(isActive && !moreOpen)}>
+        <NavLink to="/cards" className={({ isActive }) => tab(isActive)}>
           <Icon icon={Layers} size={22} stroke={1.75} />{t('nav.cards')}
         </NavLink>
-        <NavLink to="/contexts/new" className={({ isActive }) => tab(isActive && !moreOpen)}>
-          <Icon icon={Plus} size={22} stroke={1.75} />{t('nav.add')}
+        {/* The center action: add a word. No text label, a raised round button. */}
+        <div className="flex flex-1 justify-center">
+          <NavLink to="/contexts/new" aria-label={t('nav.add')}
+            className="-mt-5 grid h-14 w-14 place-items-center rounded-full border-4 border-bg bg-accent text-on-accent shadow-[var(--shadow-card)] transition active:scale-95">
+            <Plus size={26} strokeWidth={2.4} aria-hidden="true" />
+          </NavLink>
+        </div>
+        <NavLink to="/words" className={({ isActive }) => tab(isActive)}>
+          <Icon icon={List} size={22} stroke={1.75} />{t('nav.words')}
         </NavLink>
-        <NavLink to="/story" className={({ isActive }) => tab(isActive && !moreOpen)}>
+        <NavLink to="/story" className={({ isActive }) => tab(isActive)}>
           <Icon icon={BookOpen} size={22} stroke={1.75} />{t('nav.dailyStory')}
         </NavLink>
-        <button type="button" onClick={() => setMoreOpen((v) => !v)} className={tab(moreOpen || inMore)}
-          aria-expanded={moreOpen} aria-controls="more-sheet">
-          <Icon icon={Menu} size={22} stroke={1.75} />{t('nav.more')}
-        </button>
       </nav>}
 
       <Toaster />

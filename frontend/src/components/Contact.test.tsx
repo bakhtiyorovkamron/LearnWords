@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import { ContactLinks } from './ContactLinks'
 import { ErrorBoundary } from './ErrorBoundary'
 import { ErrorState } from './ErrorState'
 import { Layout } from './Layout'
+import { setMoreMenuOpen } from '../lib/moreMenu'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
@@ -23,7 +24,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
 
 const savedTelegram = CONTACT.telegram
 beforeEach(async () => { await i18n.changeLanguage('en') })
-afterEach(() => { cleanup(); CONTACT.telegram = savedTelegram })
+afterEach(() => { cleanup(); setMoreMenuOpen(false); CONTACT.telegram = savedTelegram })
 
 const client = () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
@@ -68,7 +69,7 @@ describe('contact links', () => {
         <MemoryRouter initialEntries={['/x']}><Routes><Route element={<Layout />}><Route path="/x" element={<div />} /></Route></Routes></MemoryRouter>
       </QueryClientProvider>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    act(() => setMoreMenuOpen(true))
     const sheet = document.getElementById('more-sheet') as HTMLElement
     const last = Array.from(sheet.children).at(-1) as HTMLElement
     expect(last.textContent).toContain('Contact us')

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import { meApi, settingsApi, heroApi, type Me } from '../api/endpoints'
 import { initTheme } from '../lib/theme'
 import { Layout } from './Layout'
 import { ThemePicker } from './ThemePicker'
+import { setMoreMenuOpen } from '../lib/moreMenu'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
@@ -46,7 +47,7 @@ beforeEach(async () => {
   vi.mocked(settingsApi.setTheme).mockResolvedValue({} as never)
   vi.mocked(heroApi.get).mockRejectedValue(new Error('no'))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); setMoreMenuOpen(false); vi.unstubAllGlobals(); vi.clearAllMocks() })
 
 const options = () => screen.getAllByRole('radio') as HTMLButtonElement[]
 
@@ -140,7 +141,7 @@ describe('ThemePicker (desktop menu)', () => {
 })
 
 describe('Layout', () => {
-  const openMore = () => fireEvent.click(screen.getByRole('button', { name: /More/ }))
+  const openMore = () => act(() => setMoreMenuOpen(true))
 
   it('with the feature: the More sheet has the theme row and the header has the 🎨 menu', async () => {
     wrap(<Layout />)

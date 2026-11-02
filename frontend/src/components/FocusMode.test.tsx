@@ -7,6 +7,7 @@ import { collectionApi, foldersApi, heroApi, meApi, settingsApi } from '../api/e
 import { setTrainingOpen } from '../lib/trainingState'
 import { TrainPage } from '../pages/TrainPage'
 import { Layout } from './Layout'
+import { setMoreMenuOpen } from '../lib/moreMenu'
 
 vi.mock('./ReviewSession', () => ({ ReviewSession: () => <div>REVIEW SCREEN</div> }))
 vi.mock('./WordFixes', () => ({ WordFixes: () => null }))
@@ -45,7 +46,7 @@ beforeEach(async () => {
   vi.mocked(collectionApi.list).mockResolvedValue({ items: [], total: 0 })
   vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 0 }, folders: [] } as never)
 })
-afterEach(() => { cleanup(); setTrainingOpen(false); vi.clearAllMocks() })
+afterEach(() => { cleanup(); setTrainingOpen(false); setMoreMenuOpen(false); vi.clearAllMocks() })
 
 describe('focus mode: during a training session the shell steps aside', () => {
   it('normally there is a header, a bottom nav (2 navigation landmarks) and a footer', () => {
@@ -85,7 +86,7 @@ describe('focus mode: during a training session the shell steps aside', () => {
 
   it('the More sheet cannot be open during a session', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    act(() => setMoreMenuOpen(true))
     expect(document.getElementById('more-sheet')).not.toBeNull()
     act(() => setTrainingOpen(true))
     expect(document.getElementById('more-sheet')).toBeNull()

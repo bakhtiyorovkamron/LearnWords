@@ -25,7 +25,9 @@ function renderCards(url: string) {
         <Where />
         <Link to="/cards">to cards</Link>
         <Routes>
-          <Route path="/cards" element={<CardsPage />} />
+          <Route path="/cards" element={<CardsPage view="flip" />} />
+          <Route path="/words" element={<CardsPage view="list" />} />
+          <Route path="/words/:folder" element={<CardsPage view="list" />} />
           <Route path="/train" element={<div>TRAIN SCREEN</div>} />
           <Route path="/" element={<div>HOME SCREEN</div>} />
         </Routes>
@@ -43,25 +45,70 @@ beforeEach(async () => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-describe('CardsPage: the collection and the old links', () => {
-  it('/cards is the collection, with no tabs', async () => {
+const cardRow = (id: string, word: string) => ({
+  id, context_id: 'x', word, translation: 'перевод', transcription: '', language: 'de', created_at: '',
+  box_level: 1, is_learned: false, next_review_at: new Date().toISOString(), reviewed_today: false,
+})
+
+describe('CardsPage: two tabs on one collection', () => {
+  beforeEach(() => {
+    vi.mocked(collectionApi.list).mockResolvedValue({ items: [cardRow('c1', 'Hund')], total: 1 } as never)
+  })
+
+  it('/words is the list: word rows, a "My words" title and no list/flashcards toggle', async () => {
+    renderCards('/words')
+    expect(await screen.findByTestId('word-row')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('My words')
+    expect(screen.queryByRole('button', { name: 'Flashcards' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'List' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Click to flip' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Select/ })).toBeTruthy() // select & move is a list feature
+    expect(localStorage.getItem('collection-view')).toBeNull() // the view is the route now
+  })
+
+  it('/cards shows flip cards, titled "Cards", with the direction toggle and no word rows', async () => {
     renderCards('/cards')
-    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
-    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Collection' })).toBeNull()
-    expect(screen.queryByText('TRAIN SCREEN')).toBeNull()
+    expect(await screen.findByRole('button', { name: 'Click to flip' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Cards')
+    expect(screen.queryByTestId('word-row')).toBeNull()
+    expect(screen.getByRole('radiogroup', { name: 'Direction' })).toBeTruthy()
     expect(where()).toBe('/cards')
   })
 
-  it('?folder=<id> is the initial folder; tab=all is simply ignored', async () => {
-    renderCards('/cards?tab=all&folder=f1')
+  it('/words/:folder is the initial folder of the list: an id, "all" or "none"', async () => {
+    renderCards('/words/f1')
     await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
     expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: 'f1' })
-    cleanup()
-    vi.clearAllMocks()
-    renderCards('/cards?folder=none')
+    cleanup(); vi.clearAllMocks()
+    renderCards('/words/none')
     await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
     expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: 'none' })
+    cleanup(); vi.clearAllMocks()
+    renderCards('/words/all')
+    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
+    expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: '' })
+    cleanup(); vi.clearAllMocks()
+    renderCards('/words')
+    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
+    expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: '' })
+  })
+
+  it('/cards?folder=<id> is the initial folder of the flashcards', async () => {
+    renderCards('/cards?folder=f1')
+    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
+    expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: 'f1' })
+  })
+})
+
+describe('CardsPage: old links', () => {
+  it('/cards?tab=all → /words, and with &folder=X → /words/X', async () => {
+    renderCards('/cards?tab=all')
+    await waitFor(() => expect(where()).toBe('/words'))
+    expect(await screen.findByRole('heading', { level: 1 })).toBeTruthy()
+    cleanup()
+    renderCards('/cards?tab=all&folder=f1')
+    await waitFor(() => expect(where()).toBe('/words/f1'))
+    await waitFor(() => expect(vi.mocked(collectionApi.list).mock.calls.some(([q]) => (q as { folder?: string }).folder === 'f1')).toBe(true))
   })
 
   it('an old /cards?start=1&size=12 link opens the training: /train?size=12', async () => {
@@ -91,7 +138,7 @@ describe('CardsPage: the collection and the old links', () => {
 describe('Collection: filter sheet and search', () => {
   const lastParams = () => vi.mocked(collectionApi.list).mock.calls.at(-1)![0]
   const open = async () => {
-    renderCards('/cards')
+    renderCards('/words')
     fireEvent.click(await screen.findByRole('button', { name: /Filter/ }))
     return screen.getByRole('dialog')
   }

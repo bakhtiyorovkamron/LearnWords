@@ -10,6 +10,7 @@
     "add": "Add",
     "search": "Search",
     "cards": "Cards",
+    "words": "My words",
     "stats": "Statistics",
     "dailyStory": "Daily Story",
     "admin": "Admin",
@@ -154,7 +155,6 @@
       "alpha": "Alphabetically",
       "progress": "By progress (weakest first)"
     },
-    "view": { "list": "List", "flip": "Flashcards" },
     "status": { "new": "new", "learning": "learning", "learned": "learned" },
     "flipHint": "Click to flip",
     "keysHint": "← → to browse, Space to flip",

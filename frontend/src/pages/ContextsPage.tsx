@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Camera, Plus } from 'lucide-react'
+import { Camera, Menu, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { FolderList } from '../components/FolderList'
 import { useFolderList } from '../components/Folders'
@@ -8,6 +8,7 @@ import { Logo } from '../components/Logo'
 import { TodayCard } from '../components/TodayCard'
 import { useFeatures } from '../lib/features'
 import { useLearningLang } from '../lib/learningLang'
+import { setMoreMenuOpen, useMoreMenuOpen } from '../lib/moreMenu'
 import { handOffPhoto } from '../lib/photoHandoff'
 
 const action = 'glass flex h-16 items-center gap-3 px-4 text-left transition hover:bg-surface-2'
@@ -20,6 +21,7 @@ export function ContextsPage() {
   const { isOn, remaining } = useFeatures()
   const folders = useFolderList()
   const fileInput = useRef<HTMLInputElement>(null)
+  const menuOpen = useMoreMenuOpen()
 
   const all = folders.data?.all
   const words = all?.total ?? 0
@@ -39,6 +41,12 @@ export function ContextsPage() {
     <div className="mx-auto max-w-xl space-y-6">
       <div className="flex h-11 items-center">
         <Logo className="md:invisible" />
+        {/* Phones: the "More" sheet (search, statistics, settings) opens from here. */}
+        <button type="button" onClick={() => setMoreMenuOpen(true)} aria-label={t('nav.more')} aria-haspopup="dialog"
+          aria-controls="more-sheet" aria-expanded={menuOpen}
+          className="ml-auto grid h-11 w-11 place-items-center rounded-full border border-line bg-surface text-fg transition hover:bg-surface-2 md:hidden">
+          <Menu size={20} aria-hidden="true" />
+        </button>
       </div>
 
       <div>

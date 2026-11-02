@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { meApi, type Me } from '../api/endpoints'
 import App from '../App'
+import { setMoreMenuOpen } from '../lib/moreMenu'
 import { Layout } from './Layout'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -21,7 +22,7 @@ vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: authe
 // The pages are stubs: these tests are about where URLs lead and what the navigation shows.
 vi.mock('../pages/ContextsPage', () => ({ ContextsPage: () => <div>HOME PAGE</div> }))
 vi.mock('../pages/NewContextPage', () => ({ NewContextPage: () => <div>ADD PAGE</div> }))
-vi.mock('../pages/CardsPage', () => ({ CardsPage: () => <div>CARDS PAGE</div> }))
+vi.mock('../pages/CardsPage', () => ({ CardsPage: ({ view }: { view: string }) => <div>CARDS PAGE {view}</div> }))
 vi.mock('../pages/StatsPage', () => ({ StatsPage: () => <div>STATS PAGE</div> }))
 vi.mock('../pages/StoryPage', () => ({ StoryPage: () => <div>STORY PAGE</div> }))
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div>SEARCH PAGE</div> }))
@@ -55,7 +56,7 @@ function renderLayout(path: string) {
   )
 }
 const bottomBar = () => screen.getAllByRole('navigation')[1] // [0] is the desktop header
-const moreTab = () => within(bottomBar()).getByRole('button', { name: /More/ })
+const openMore = () => act(() => setMoreMenuOpen(true))
 const isActive = (el: Element) => el.className.includes('text-accent-text')
 
 beforeEach(async () => {
@@ -66,29 +67,64 @@ beforeEach(async () => {
   vi.mocked(settingsApi.get).mockRejectedValue(new Error('no'))
   vi.mocked(heroApi.get).mockRejectedValue(new Error('no'))
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); setMoreMenuOpen(false); vi.clearAllMocks() })
 
 describe('bottom navigation', () => {
-  it('shows exactly Home, Cards, Add, Story, More — in that order, Home first at "/"', async () => {
+  it('shows Home, Cards, the round Add button, My words, Daily Story — in that order, Home active at "/"', async () => {
     renderLayout('/')
     const items = Array.from(bottomBar().children)
-    expect(items.map((el) => el.textContent)).toEqual(['Home', 'Cards', 'Add', 'Daily Story', 'More'])
-    expect(items.slice(0, 4).map((el) => el.getAttribute('href'))).toEqual(['/', '/cards', '/contexts/new', '/story'])
-    expect(isActive(items[0])).toBe(true)
+    expect(items).toHaveLength(5)
+    const links = within(bottomBar()).getAllByRole('link')
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/cards', '/contexts/new', '/words', '/story'])
+    expect(links.map((a) => a.getAttribute('aria-label') ?? a.textContent)).toEqual(['Home', 'Cards', 'Add', 'My words', 'Daily Story'])
+    expect(isActive(links[0])).toBe(true)
     await waitFor(() => expect(meApi.get).toHaveBeenCalled())
+  })
+
+  it('there is no More tab in the bar any more', () => {
+    renderLayout('/')
+    expect(within(bottomBar()).queryByRole('button')).toBeNull()
+    expect(within(bottomBar()).queryByText(/More/)).toBeNull()
+  })
+
+  it('the center button is a raised round "+" with no text label', () => {
+    renderLayout('/')
+    const add = within(bottomBar()).getByRole('link', { name: 'Add' })
+    expect(add.textContent).toBe('')
+    for (const c of ['-mt-5', 'h-14', 'w-14', 'rounded-full', 'border-4', 'border-bg', 'bg-accent', 'text-on-accent']) {
+      expect(add.className, c).toContain(c)
+    }
+    expect(add.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true')
+    expect(add.parentElement!.className).toContain('flex-1')
   })
 
   it('Home is active only at "/", not on every page', () => {
     renderLayout('/cards')
-    const [home, cards] = Array.from(bottomBar().children)
+    const [home, cards] = within(bottomBar()).getAllByRole('link')
     expect(isActive(home)).toBe(false)
     expect(isActive(cards)).toBe(true)
   })
 
-  it('Search is not in the bar: it is the first entry of More (when word_search is on)', async () => {
+  it.each(['/words', '/words/f1', '/words/all', '/words/none'])('%s makes My words the active tab, and Cards inactive', (path) => {
+    renderLayout(path)
+    const links = within(bottomBar()).getAllByRole('link')
+    expect(isActive(links[3])).toBe(true)
+    expect(isActive(links[1])).toBe(false)
+    expect(isActive(links[0])).toBe(false)
+  })
+
+  it('no bottom tab is active on the pages that live in the More sheet', () => {
+    for (const path of ['/search', '/stats', '/admin']) {
+      cleanup()
+      renderLayout(path)
+      for (const a of within(bottomBar()).getAllByRole('link')) expect(isActive(a), `${path} ${a.textContent}`).toBe(false)
+    }
+  })
+
+  it('the More sheet: Search (when word_search is on) first, then Statistics', async () => {
     renderLayout('/')
     expect(within(bottomBar()).queryByRole('link', { name: /Search/ })).toBeNull()
-    fireEvent.click(moreTab())
+    openMore()
     const sheet = document.getElementById('more-sheet')!
     const links = within(sheet).getAllByRole('link').map((a) => a.textContent)
     expect(links[0]).toBe('Search')
@@ -96,36 +132,23 @@ describe('bottom navigation', () => {
     expect(links.some((l) => /Contexts/.test(l ?? ''))).toBe(false) // the old entry is gone
   })
 
-  it('Search is not in More when word_search is off', async () => {
+  it('Search is not in the sheet when word_search is off', async () => {
     vi.mocked(meApi.get).mockResolvedValue(me(false))
     renderLayout('/')
     await waitFor(() => expect(screen.queryAllByRole('link', { name: /Search/ })).toHaveLength(0))
-    fireEvent.click(moreTab())
+    openMore()
     const sheet = document.getElementById('more-sheet')!
     expect(within(sheet).queryByRole('link', { name: /Search/ })).toBeNull()
     expect(within(sheet).getByRole('link', { name: /Statistics/ })).toBeTruthy()
   })
 
-  it.each(['/search', '/stats', '/admin'])('More is the active tab on %s', (path) => {
-    renderLayout(path)
-    expect(isActive(moreTab())).toBe(true)
-    for (const el of Array.from(bottomBar().children).slice(0, 4)) expect(isActive(el)).toBe(false)
-  })
-
-  it('More is not active on the bottom tabs\' own pages', () => {
-    for (const path of ['/', '/cards', '/contexts/new', '/story']) {
-      cleanup()
-      renderLayout(path)
-      expect(isActive(moreTab())).toBe(false)
-    }
-  })
-
-  it('the desktop header lists Home · Cards · Add · Search · Daily story · Statistics', () => {
+  it('the desktop header: yodla, Home, Cards, My words, Add, Search, Daily Story, Statistics', () => {
     renderLayout('/')
     const header = screen.getAllByRole('navigation')[0]
     const names = within(header).getAllByRole('link').map((a) => a.textContent)
-    expect(names).toEqual(['yodla' /* the logo */, 'Home', 'Cards', 'Add', 'Search', 'Daily Story', 'Statistics'])
+    expect(names).toEqual(['yodla' /* the logo */, 'Home', 'Cards', 'My words', 'Add', 'Search', 'Daily Story', 'Statistics'])
     expect(within(header).getAllByRole('link')[0].getAttribute('href')).toBe('/') // the logo
+    expect(within(header).getByRole('link', { name: 'My words' }).getAttribute('href')).toBe('/words')
   })
 })
 
@@ -151,6 +174,18 @@ describe('routes', () => {
     expect(screen.getByTestId('where').textContent).toBe('/')
   })
 
+  it('"/cards" is the flashcards, "/words" and "/words/:folder" the list', async () => {
+    renderApp('/cards')
+    expect(await screen.findByText('CARDS PAGE flip')).toBeTruthy()
+    cleanup()
+    renderApp('/words')
+    expect(await screen.findByText('CARDS PAGE list')).toBeTruthy()
+    cleanup()
+    renderApp('/words/f1')
+    expect(await screen.findByText('CARDS PAGE list')).toBeTruthy()
+    expect(screen.getByTestId('where').textContent).toBe('/words/f1')
+  })
+
   it('a logged-in user opening /login lands on "/"', async () => {
     renderApp('/login')
     expect(await screen.findByText('HOME PAGE')).toBeTruthy()
@@ -161,13 +196,11 @@ describe('routes', () => {
 describe('the shell has icons, not emoji', () => {
   it('every nav item has an svg icon (hidden from screen readers) and no emoji in its name', () => {
     renderLayout('/')
-    const bar = Array.from(bottomBar().children)
-    expect(bar).toHaveLength(5)
-    for (const item of bar) {
+    for (const item of within(bottomBar()).getAllByRole('link')) {
       const icon = item.querySelector('svg')!
       expect(icon, item.textContent ?? '').not.toBeNull()
       expect(icon.getAttribute('aria-hidden')).toBe('true')
-      expect(item.textContent).toMatch(/^[A-Za-z ]+$/)
+      expect(item.getAttribute('aria-label') ?? item.textContent).toMatch(/^[A-Za-z ]+$/)
     }
     const header = screen.getAllByRole('navigation')[0]
     for (const a of Array.from(within(header).getAllByRole('link')).slice(1)) {
@@ -178,17 +211,18 @@ describe('the shell has icons, not emoji', () => {
 
   it('the active bottom tab has the accent colour, the others are muted', () => {
     renderLayout('/story')
-    const [home, cards, add, story, more] = Array.from(bottomBar().children)
+    const [home, cards, add, words, story] = within(bottomBar()).getAllByRole('link')
     expect(story.className).toContain('text-accent-text')
-    for (const other of [home, cards, add, more]) {
+    for (const other of [home, cards, words]) {
       expect(other.className).toContain('text-muted')
       expect(other.className).not.toContain('text-accent-text')
     }
+    expect(add.className).not.toContain('text-muted') // the round button has its own colours
   })
 
   it('the More sheet rows are icon + label, and the active row is highlighted', () => {
     renderLayout('/stats')
-    fireEvent.click(moreTab())
+    openMore()
     const sheet = document.getElementById('more-sheet')!
     const stats = within(sheet).getByRole('link', { name: 'Statistics' })
     expect(stats.className).toContain('bg-surface-2')
