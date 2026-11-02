@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { AuthPage } from './pages/AuthPage'
 import { ContextsPage } from './pages/ContextsPage'
 import { NewContextPage } from './pages/NewContextPage'
+import { CardsDeckPage } from './pages/CardsDeckPage'
 import { CardsPage } from './pages/CardsPage'
 import { TrainPage } from './pages/TrainPage'
 import { StatsPage } from './pages/StatsPage'
@@ -26,9 +27,9 @@ export default function App() {
           <Route index element={<ContextsPage />} />
           <Route path="/contexts" element={<Navigate to="/" replace />} />
           <Route path="/contexts/new" element={<NewContextPage />} />
-          <Route path="/cards" element={<CardsPage view="flip" />} />
-          <Route path="/words" element={<CardsPage view="list" />} />
-          <Route path="/words/:folder" element={<CardsPage view="list" />} />
+          <Route path="/cards" element={<CardsDeckPage />} />
+          <Route path="/words" element={<CardsPage />} />
+          <Route path="/words/:folder" element={<CardsPage />} />
           <Route path="/train" element={<TrainPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />

@@ -11,6 +11,7 @@ import {
 } from '../lib/quiz'
 import { useLearningLang } from '../lib/learningLang'
 import { speak, useCanSpeak } from '../lib/speech'
+import { GapSentence } from './GapSentence'
 
 interface Props {
   item: QuizItem
@@ -26,18 +27,6 @@ interface Props {
 }
 
 const BOX_SEGMENTS = 5
-
-/** The sentence with its "___" turned into a blank — or, after the answer, the answer in the blank. */
-function GapSentence({ sentence, answered, answer }: { sentence: string; answered: boolean; answer: string }) {
-  const at = sentence.indexOf('___')
-  if (at < 0) return <>{sentence}</>
-  const blank = answered ? (
-    <span data-testid="gap-answer" className="text-accent-text underline decoration-accent underline-offset-4">{answer}</span>
-  ) : (
-    <span data-testid="gap-blank" aria-hidden="true" className="inline-block min-w-[4ch] border-b-2 border-faint">&nbsp;</span>
-  )
-  return <>{sentence.slice(0, at)}{blank}{sentence.slice(at + 3)}</>
-}
 
 // One training question in one of 4 formats. Choice formats (de_ru, ru_de, gap) share the
 // option buttons; ru_de_type uses a text field. Progress is updated the same way for all.

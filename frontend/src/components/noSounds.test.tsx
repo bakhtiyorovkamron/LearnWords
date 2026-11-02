@@ -49,10 +49,9 @@ const card = (n: number): CollectionCard => ({
 
 describe('flip cards', () => {
   it('turning, flipping and the keys make no sound; ▶ still speaks the word', () => {
-    render(wrap(<FlipCards cards={[card(1), card(2), card(3)]} resetKey="k" />))
-    click(screen.getByRole('button', { name: /Next/ }))
-    click(screen.getByRole('button', { name: /Back|Prev/ }))
-    click(screen.getByRole('button', { name: /flip|Flip|Tap|tap/i }))
+    render(wrap(<FlipCards cards={[card(1), card(2), card(3)]} total={3} resetKey="k" />))
+    click(screen.getByTestId('deck-next'))
+    click(screen.getByTestId('deck-card'))
     for (const key of ['ArrowRight', 'ArrowLeft', ' ', 'Enter']) fireEvent.keyDown(window, { key })
     expect(audioContext).not.toHaveBeenCalled()
 

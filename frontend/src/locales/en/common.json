@@ -143,7 +143,14 @@
     "saved": "Saved",
     "search": "Search by word or translation…",
     "nothingFound": "Nothing found",
-    "empty": "The collection is empty"
+    "empty": "The collection is empty",
+    "sideLearning": "In {{langName}}",
+    "flipToTranslation": "Tap to see the translation",
+    "flipToWord": "Tap to see the word",
+    "swipeHint": "Swipe to move between cards",
+    "emptyFolder": "This folder has no words yet",
+    "pickFolder": "Which folder?",
+    "sideNative": { "ru": "Russian", "en": "English", "uz": "Uzbek" }
   },
   "collection": { "found": "Found: {{count}}",
     "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned", "title": "Filter", "reset": "Reset", "done": "Done" },

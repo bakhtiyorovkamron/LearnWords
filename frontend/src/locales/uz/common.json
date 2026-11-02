@@ -143,7 +143,14 @@
     "saved": "Saqlandi",
     "search": "So‘z yoki tarjima bo‘yicha qidirish…",
     "nothingFound": "Hech narsa topilmadi",
-    "empty": "To‘plam hozircha bo‘sh"
+    "empty": "To‘plam hozircha bo‘sh",
+    "sideLearning": "{{langUz}} tilida",
+    "flipToTranslation": "Tarjimani ko‘rish uchun bosing",
+    "flipToWord": "So‘zni ko‘rish uchun bosing",
+    "swipeHint": "Kartochkalar orasida o‘tish uchun suring",
+    "emptyFolder": "Bu papkada hali so‘z yo‘q",
+    "pickFolder": "Qaysi papka?",
+    "sideNative": { "ru": "Ruscha", "en": "Inglizcha", "uz": "O‘zbekcha" }
   },
   "collection": { "found": "Topildi: {{count}}",
     "filter": { "all": "Hammasi", "new": "Yangi", "learning": "O‘rganyapman", "learned": "O‘rganilgan", "title": "Filtr", "reset": "Tozalash", "done": "Tayyor" },

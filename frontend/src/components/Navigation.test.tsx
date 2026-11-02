@@ -22,7 +22,8 @@ vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: authe
 // The pages are stubs: these tests are about where URLs lead and what the navigation shows.
 vi.mock('../pages/ContextsPage', () => ({ ContextsPage: () => <div>HOME PAGE</div> }))
 vi.mock('../pages/NewContextPage', () => ({ NewContextPage: () => <div>ADD PAGE</div> }))
-vi.mock('../pages/CardsPage', () => ({ CardsPage: ({ view }: { view: string }) => <div>CARDS PAGE {view}</div> }))
+vi.mock('../pages/CardsPage', () => ({ CardsPage: () => <div>WORDS PAGE</div> }))
+vi.mock('../pages/CardsDeckPage', () => ({ CardsDeckPage: () => <div>DECK PAGE</div> }))
 vi.mock('../pages/StatsPage', () => ({ StatsPage: () => <div>STATS PAGE</div> }))
 vi.mock('../pages/StoryPage', () => ({ StoryPage: () => <div>STORY PAGE</div> }))
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div>SEARCH PAGE</div> }))
@@ -176,13 +177,13 @@ describe('routes', () => {
 
   it('"/cards" is the flashcards, "/words" and "/words/:folder" the list', async () => {
     renderApp('/cards')
-    expect(await screen.findByText('CARDS PAGE flip')).toBeTruthy()
+    expect(await screen.findByText('DECK PAGE')).toBeTruthy()
     cleanup()
     renderApp('/words')
-    expect(await screen.findByText('CARDS PAGE list')).toBeTruthy()
+    expect(await screen.findByText('WORDS PAGE')).toBeTruthy()
     cleanup()
     renderApp('/words/f1')
-    expect(await screen.findByText('CARDS PAGE list')).toBeTruthy()
+    expect(await screen.findByText('WORDS PAGE')).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/words/f1')
   })
 
