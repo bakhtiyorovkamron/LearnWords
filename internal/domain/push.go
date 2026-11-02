@@ -27,7 +27,7 @@ const (
 	PushBodyMax      = 200
 	PushEndpointMax  = 2048
 	PushUserAgentMax = 200
-	PushDefaultURL   = "/cards"
+	PushDefaultURL   = "/"
 	pushKeyMaxLen    = 256
 )
 

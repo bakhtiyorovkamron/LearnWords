@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { foldersApi } from '../api/endpoints'
@@ -18,11 +18,20 @@ const folder = (n: number, extra: object = {}) => ({
 const data = (folders: object[], total = 13): FolderListData =>
   ({ all: { total, new_count: 0, learning_count: 0, learned_count: 0, due_today: 0 }, folders } as unknown as FolderListData)
 
+const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
 function renderList() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={qc}><MemoryRouter><FolderList /></MemoryRouter></QueryClientProvider>)
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <Where />
+        <Routes><Route path="/" element={<FolderList />} /><Route path="*" element={<div>elsewhere</div>} /></Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 }
-const rows = () => screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.includes('&folder='))
+const where = () => screen.getByTestId('where').textContent
+const rows = () => screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.includes('?folder='))
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
@@ -41,14 +50,14 @@ describe('FolderList', () => {
     renderList()
     await screen.findByText('Folder 2')
     const row = rows().find((a) => a.textContent?.includes('Folder 2'))!
-    expect(row.getAttribute('href')).toBe('/cards?tab=all&folder=f2')
+    expect(row.getAttribute('href')).toBe('/cards?folder=f2')
     expect(within(row).getByText('2')).toBeTruthy()
-    expect(row.querySelector('svg')).not.toBeNull() // the chevron
+    expect(row.querySelector('svg')).toBeNull() // no chevron any more
   })
 
   it('"All · 13" opens the whole collection', async () => {
     renderList()
-    expect((await screen.findByRole('link', { name: 'All · 13' })).getAttribute('href')).toBe('/cards?tab=all')
+    expect((await screen.findByRole('link', { name: 'All · 13' })).getAttribute('href')).toBe('/cards')
   })
 
   it('a long name is cut, the full name is in the title', async () => {
@@ -90,6 +99,30 @@ describe('FolderList', () => {
     const icons = screen.getAllByRole('img', { name: 'Shared via link' })
     expect(icons).toHaveLength(1)
     expect(rows().find((a) => a.contains(icons[0]))!.textContent).toContain('Folder 2')
+  })
+
+  it('the ▶ button is there only for a folder with words due, outside the link, and trains it', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue(data([folder(1), folder(2, { due_today: 7 }), folder(3, { due_today: 35 })]))
+    renderList()
+    await screen.findByText('Folder 3')
+    const play = screen.getAllByRole('button', { name: /^Train “/ })
+    expect(play.map((b) => b.getAttribute('aria-label'))).toEqual(['Train “Folder 3”', 'Train “Folder 2”'])
+    expect(rows().some((a) => a.contains(play[0]))).toBe(false) // a sibling, never inside the link
+    expect(play[0].className).toContain('h-11')
+    expect(play[0].querySelector('svg')!.getAttribute('fill')).toBe('currentColor')
+    // folder 1 has nothing due: an empty spacer instead, so the counts stay aligned
+    const row1 = rows().find((a) => a.textContent?.includes('Folder 1'))!.parentElement!
+    expect(row1.querySelector('button')).toBeNull()
+    expect(row1.lastElementChild!.className).toContain('w-11')
+    fireEvent.click(play[1])
+    expect(where()).toBe('/train?folder=f2&size=7')
+  })
+
+  it('the ▶ size is capped at 20', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue(data([folder(3, { due_today: 35 })]))
+    renderList()
+    fireEvent.click(await screen.findByRole('button', { name: 'Train “Folder 3”' }))
+    expect(where()).toBe('/train?folder=f3&size=20')
   })
 
   it('"+ New folder" opens the dialog', async () => {

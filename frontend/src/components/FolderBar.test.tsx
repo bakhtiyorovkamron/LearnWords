@@ -37,11 +37,11 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('FolderBar: Train', () => {
-  it('trains the active folder: review-folder is set and /cards opens', async () => {
+  it('trains the active folder: /train?folder=<id> opens', async () => {
     renderBar('f1')
     fireEvent.click(await screen.findByRole('button', { name: 'Train' }))
-    expect(localStorage.getItem('review-folder')).toBe('f1')
-    expect(screen.getByTestId('where').textContent).toBe('/cards') // the review tab, not the collection
+    expect(screen.getByTestId('where').textContent).toBe('/train?folder=f1')
+    expect(localStorage.getItem('review-folder')).toBeNull() // the URL is the only input
   })
 
   it('is the first action of the folder, before rename and share', async () => {

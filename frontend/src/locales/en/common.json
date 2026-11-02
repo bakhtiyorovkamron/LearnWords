@@ -3,7 +3,6 @@
   "direction": { "label": "Direction", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "hero": {"intro": "Meet your German hero!", "introText": "He grows with every word you learn", "introOk": "Got it", "stages": {"0": "Little Mozart", "1": "The Brothers Grimm", "2": "Schiller", "3": "Beethoven", "4": "Humboldt", "5": "Goethe"}, "stageUp": "Your hero grew up: meet {{name}}!", "share": "Share", "tapHint": "Tap the hero", "learned": "Learned", "almost": "Almost learned", "inWords_one": "in {{count}} word", "inWords_other": "in {{count}} words", "wordsAt_one": "{{count}} word", "wordsAt_other": "{{count}} words", "locked": "Still a secret", "toNextStage": "To the next stage: {{n}}", "lastStage": "Final stage", "close": "Close", "range": "{{from}}–{{to}} words", "rangeFrom": "{{from}}+ words"},
-"practice": { "start": "Practice more", "again": "Practice again", "pick": "Which words to practice?", "hard": "Hardest", "random": "Random", "recent": "Recently added", "note": "This practice does not change your review schedule" },
   "check": {"checking": "Checking the word…", "suggest": "Did you mean: {{word}}", "baseForm": "Base form: {{lemma}}", "plural": "Plural: {{plural}}", "useSuggestion": "Use this", "keep": "Keep as is", "unknown": "We couldn't find this word. Check the spelling"},
   "pwa": {"install": "Install app", "banner": "Add yodla to your phone — it opens like an app", "iosHint": "Tap Share, then Add to Home Screen", "later": "Not now"},
   "nav": {
@@ -86,7 +85,15 @@
     "nothingDueHint": "More words will be due tomorrow.",
     "goalSheet": "How many words a day?",
     "minutesShort": "≈{{count}} min",
-    "goalHint": "Nothing is lost — the rest waits in the queue."
+    "goalHint": "Nothing is lost — the rest waits in the queue.",
+    "askTitle": "How should words be asked?",
+    "askDeRu": "Word → translation",
+    "askDeRuHint": "You see the word and pick its translation",
+    "askRuDe": "Translation → word",
+    "askRuDeHint": "You see the translation and pick or type the word",
+    "askMixed": "Mixed",
+    "askMixedHint": "Each word in a random direction",
+    "sheetDone": "Done"
   },
   "stats": {
     "title": "My statistics",
@@ -133,8 +140,6 @@
     "dueToday_one": "{{count}} due today",
     "dueToday_other": "{{count}} due today",
     "saved": "Saved",
-    "tabReview": "Review",
-    "tabCollection": "Collection",
     "search": "Search by word or translation…",
     "nothingFound": "Nothing found",
     "empty": "The collection is empty"
@@ -196,7 +201,6 @@
     "deleted": "Folder deleted",
     "created": "Folder created",
     "saved": "Folder saved",
-    "trainOn": "Train words from",
     "myFolders": "My folders",
     "open": "Open",
     "train": "Train",
@@ -207,7 +211,8 @@
     "previewPlaceholder": "Folder name",
     "close": "Close",
     "wordsCount_one": "{{count}} word",
-    "wordsCount_other": "{{count}} words"
+    "wordsCount_other": "{{count}} words",
+    "trainFolder": "Train “{{name}}”"
   },
   "editWord": {
     "title": "Edit",
@@ -233,11 +238,7 @@
     "title": "Possible mistakes in your words", "accept": "Accept", "reject": "Reject",
     "nothingToday": "No words to review today",
     "comeBack": "Come back tomorrow or add new words.",
-    "dueCount": "Words to review today: {{count}}",
-    "start": "Start training",
-    "sessionSize": "Session size",
-    "sessionSizeAll": "All",
-    "sessionLine": "In this session: {{count}}"
+    "nothingInFolder": "Nothing to review in this folder today"
   },
   "quiz": {
     "prompt": {
@@ -260,7 +261,6 @@
     "wrong": "wrong",
     "total": "Total words: {{count}}",
     "more": "More {{count}}",
-    "restart": "Try again",
     "home": "Back to home"
   },
   "story": {
@@ -335,7 +335,7 @@
   "select": {"start": "Select", "all": "Select all", "count": "Selected: {{n}}", "cancel": "Done", "limit": "First {{n}} of {{total}} selected"},
   "move": {"button": "Move ({{n}})", "done": "Moved to “{{folder}}”: {{n}}", "undo": "Undo", "failed": "Couldn’t move"},
   "box": {"title": "Box {{n}} of 5", "next": "Next review: {{when}}", "rule": "Answer correctly and it moves to box {{next}}. Make a mistake and it goes back to box 1.", "lastBox": "A few more correct answers in a row and the word is learned. Make a mistake and it goes back to box 1.", "learned": "Word learned. We'll check it again {{when}}.", "today": "Already reviewed today", "when": {"today": "today", "tomorrow": "tomorrow", "inDays": "in {{n}} days"}},
-  "summary": {"moved": "Moved up a box: {{n}}", "practice": "Boxes don't change: this is extra practice"},
+  "summary": {"moved": "Moved up a box: {{n}}"},
   "feedback": {"title": "How do you like yodla?", "star": "{{n}} of 5", "placeholder": "What could be better? (optional)", "placeholderLow": "What went wrong? (optional)", "placeholderHigh": "What did you like? (optional)", "send": "Send", "thanks": "Thanks for your feedback!"},
   "errors": {"saveFailed": "Couldn't save. Please try again.", "featureDisabled": "This feature is turned off for your account.", "dailyLimit": "Today's limit is used up — tomorrow you get {{limit}} again."},
   "photo": {"title": "Words from a photo", "hint": "Take a photo of a textbook page or a word list — we find the words and translate them. You choose which to add.", "choose": "Choose a photo", "another": "Another photo", "reading": "Reading the photo…", "left": "Left today: {{n}} of {{limit}}", "found": "Words found: {{n}}", "noWords": "No words to learn were found in the photo. Try a closer, sharper shot.", "have": "already added", "add": "Add {{count}}", "adding": "Adding…", "notImage": "Please choose an image: JPEG, PNG, WebP or GIF.", "tooLarge": "The photo is too large (5 MB at most).", "notConfigured": "Reading photos is not available right now.", "failed": "Could not read the photo: {{error}}", "noneLeft": "No photos left today — {{limit}} again tomorrow", "folderNew": "New folder", "folderExisting": "Existing folder", "folderName": "Folder name", "folderDefault": "Lesson — {{date}}", "addedTo": "Added to “{{folder}}”: {{added}}. Already there: {{skipped}}", "openFolder": "Open folder", "errTooSmall": "The photo is too small — take it closer to the page.", "errTooDark": "Too dark — take the photo in good light.", "errBlurry": "The photo is blurry — hold the phone steady and try again.", "errNotDocument": "No study text in this photo — take a picture of a textbook page or a word list.", "errUnreadable": "The text can't be read — take the photo closer and straighter.", "notCharged": "Your daily limit was not used."},

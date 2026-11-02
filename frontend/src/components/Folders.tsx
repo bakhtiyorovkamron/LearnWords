@@ -85,10 +85,9 @@ export function FolderBar({ value, onChange }: { value: FolderSelection; onChang
   const [editing, setEditing] = useState<Folder | null>(null)
   const [sharing, setSharing] = useState<Folder | null>(null)
 
-  // Train the words of this folder: the review screen reads the choice from here.
+  // Train the words of this folder.
   function train(id: string) {
-    localStorage.setItem('review-folder', id)
-    navigate('/cards')
+    navigate(`/train?folder=${encodeURIComponent(id)}`)
   }
 
   const remove = useMutation({

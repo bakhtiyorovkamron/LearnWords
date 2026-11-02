@@ -3,7 +3,6 @@
   "direction": { "label": "Yo‘nalish", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Aralash" },
   "lang": { "label": "Interfeys tili", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "hero": {"intro": "Tanishing — nemis qahramoningiz!", "introText": "U siz yodlagan soʻzlar bilan ulgʻayadi", "introOk": "Tushunarli", "stages": {"0": "Kichkina Motsart", "1": "Aka-uka Grimmlar", "2": "Shiller", "3": "Betxoven", "4": "Gumboldt", "5": "Gyote"}, "stageUp": "Qahramoningiz ulgʻaydi: endi u — {{name}}!", "share": "Ulashish", "tapHint": "Qahramonni bosing", "learned": "Yodlangan", "almost": "Yaqinda yodlanadi", "inWords_other": "yana {{count}} ta soʻzdan keyin", "wordsAt_other": "{{count}} ta soʻz", "locked": "Hozircha sir", "toNextStage": "Keyingi bosqichgacha: {{n}}", "lastStage": "Soʻnggi bosqich", "close": "Yopish", "range": "{{from}}–{{to}} ta soʻz", "rangeFrom": "{{from}}+ ta soʻz"},
-"practice": { "start": "Yana mashq qilish", "again": "Yana bir bor oʻtish", "pick": "Qaysi soʻzlarni mashq qilamiz?", "hard": "Qiyin soʻzlar", "random": "Tasodifiy", "recent": "Yaqinda qoʻshilganlar", "note": "Bu mashq takrorlash jadvalini oʻzgartirmaydi" },
   "check": {"checking": "Soʻz tekshirilmoqda…", "suggest": "Toʻgʻrisi shundaymi: {{word}}?", "baseForm": "Boshlangʻich shakli: {{lemma}}", "plural": "Koʻplik shakli: {{plural}}", "useSuggestion": "Tuzatish", "keep": "Oʻzgartirmaslik", "unknown": "Bunday soʻz topilmadi. Yozilishini tekshiring"},
   "pwa": {"install": "Ilovani oʻrnatish", "banner": "yodla’ni telefoningizga oʻrnating — ilova kabi ochiladi", "iosHint": "«Ulashish» tugmasini bosing, soʻng «Bosh ekranga qoʻshish»ni tanlang", "later": "Hozir emas"},
   "nav": {
@@ -86,7 +85,15 @@
     "nothingDueHint": "Takrorlash uchun yangi so‘zlar ertaga paydo bo‘ladi.",
     "goalSheet": "Kuniga nechta so‘z?",
     "minutesShort": "≈{{count}} daq",
-    "goalHint": "Bajarilmagani yo‘qolmaydi — so‘zlar navbatda kutadi."
+    "goalHint": "Bajarilmagani yo‘qolmaydi — so‘zlar navbatda kutadi.",
+    "askTitle": "So‘zlar qanday so‘ralsin?",
+    "askDeRu": "So‘z → tarjima",
+    "askDeRuHint": "So‘zni ko‘rasiz, tarjimasini tanlaysiz",
+    "askRuDe": "Tarjima → so‘z",
+    "askRuDeHint": "Tarjimani ko‘rasiz, so‘zni tanlaysiz yoki yozasiz",
+    "askMixed": "Aralash",
+    "askMixedHint": "Har bir so‘z tasodifiy yo‘nalishda",
+    "sheetDone": "Tayyor"
   },
   "stats": {
     "title": "Mening statistikam",
@@ -133,8 +140,6 @@
     "dueToday_one": "{{count}} tasi bugun takrorlanadi",
     "dueToday_other": "{{count}} tasi bugun takrorlanadi",
     "saved": "Saqlandi",
-    "tabReview": "Takrorlash",
-    "tabCollection": "To‘plam",
     "search": "So‘z yoki tarjima bo‘yicha qidirish…",
     "nothingFound": "Hech narsa topilmadi",
     "empty": "To‘plam hozircha bo‘sh"
@@ -196,7 +201,6 @@
     "deleted": "Papka o‘chirildi",
     "created": "Papka yaratildi",
     "saved": "Papka saqlandi",
-    "trainOn": "Qaysi so‘zlarni mashq qilish",
     "myFolders": "Mening papkalarim",
     "open": "Ochish",
     "train": "Mashq qilish",
@@ -207,7 +211,8 @@
     "previewPlaceholder": "Papka nomi",
     "close": "Yopish",
     "wordsCount_one": "{{count}} ta so‘z",
-    "wordsCount_other": "{{count}} ta so‘z"
+    "wordsCount_other": "{{count}} ta so‘z",
+    "trainFolder": "“{{name}}” papkasini mashq qilish"
   },
   "editWord": {
     "title": "Tahrirlash",
@@ -233,11 +238,7 @@
     "title": "Soʻzlaringizdagi ehtimoliy xatolar", "accept": "Qabul qilish", "reject": "Rad etish",
     "nothingToday": "Bugun takrorlash uchun so‘z yo‘q",
     "comeBack": "Ertaga qayting yoki yangi so‘zlar qo‘shing.",
-    "dueCount": "Bugun takrorlanadigan so‘zlar: {{count}}",
-    "start": "Mashqni boshlash",
-    "sessionSize": "Mashq hajmi",
-    "sessionSizeAll": "Hammasi",
-    "sessionLine": "Shu mashqda: {{count}}"
+    "nothingInFolder": "Bu papkada bugun takrorlash uchun so‘z yo‘q"
   },
   "quiz": {
     "prompt": {
@@ -260,7 +261,6 @@
     "wrong": "noto‘g‘ri",
     "total": "Jami so‘zlar: {{count}}",
     "more": "Yana {{count}}",
-    "restart": "Yana bir bor",
     "home": "Bosh sahifaga qaytish"
   },
   "story": {
@@ -335,7 +335,7 @@
   "select": {"start": "Tanlash", "all": "Hammasini tanlash", "count": "Tanlandi: {{n}}", "cancel": "Tayyor", "limit": "{{total}} tadan dastlabki {{n}} tasi tanlandi"},
   "move": {"button": "Koʻchirish ({{n}})", "done": "{{folder}} papkasiga koʻchirildi: {{n}}", "undo": "Qaytarish", "failed": "Koʻchirib boʻlmadi"},
   "box": {"title": "{{n}}-quti (5 tadan)", "next": "Keyingi takrorlash: {{when}}", "rule": "Toʻgʻri javob bersangiz — {{next}}-qutiga oʻtadi. Xato qilsangiz — 1-qutiga qaytadi.", "lastBox": "Yana bir necha marta ketma-ket toʻgʻri javob bersangiz — soʻz yodlanadi. Xato qilsangiz — 1-qutiga qaytadi.", "learned": "Soʻz yodlandi. Uni yana {{when}} tekshiramiz.", "today": "Bugun takrorlangan", "when": {"today": "bugun", "tomorrow": "ertaga", "inDays": "{{n}} kundan keyin"}},
-  "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}", "practice": "Qutilar oʻzgarmaydi: bu qoʻshimcha mashq"},
+  "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}"},
   "feedback": {"title": "yodla sizga yoqyaptimi?", "star": "5 dan {{n}}", "placeholder": "Nimani yaxshilash kerak? (ixtiyoriy)", "placeholderLow": "Nima yoqmadi? (ixtiyoriy)", "placeholderHigh": "Sizga nima yoqdi? (ixtiyoriy)", "send": "Yuborish", "thanks": "Fikringiz uchun rahmat!"},
   "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring.", "featureDisabled": "Bu funksiya siz uchun o‘chirilgan.", "dailyLimit": "Bugungi limit tugadi, ertaga yana {{limit}} ta bo‘ladi."},
   "photo": {"title": "Suratdan so‘zlar", "hint": "Darslik sahifasi yoki so‘zlar ro‘yxatini suratga oling — so‘zlarni topib, tarjima qilamiz. Qaysilarini qo‘shishni o‘zingiz tanlaysiz.", "choose": "Surat tanlash", "another": "Boshqa surat", "reading": "Surat o‘qilmoqda…", "left": "Bugun qoldi: {{limit}} tadan {{n}} ta", "found": "Topilgan so‘zlar: {{n}}", "noWords": "Suratda o‘rganiladigan so‘z topilmadi. Yaqinroq va aniqroq suratga oling.", "have": "allaqachon bor", "add": "{{count}} ta qo‘shish", "adding": "Qo‘shilmoqda…", "notImage": "Rasm fayli kerak: JPEG, PNG, WebP yoki GIF.", "tooLarge": "Surat juda katta (ko‘pi bilan 5 MB).", "notConfigured": "Suratni o‘qish hozir mavjud emas.", "failed": "Suratni o‘qib bo‘lmadi: {{error}}", "noneLeft": "Bugungi suratlar tugadi — ertaga yana {{limit}} ta", "folderNew": "Yangi papka", "folderExisting": "Mavjud papka", "folderName": "Papka nomi", "folderDefault": "Dars — {{date}}", "addedTo": "«{{folder}}» papkasiga qo‘shildi: {{added}}. Allaqachon bor edi: {{skipped}}", "openFolder": "Papkani ochish", "errTooSmall": "Surat juda kichik — sahifani yaqinroqdan suratga oling.", "errTooDark": "Juda qorong‘i — yaxshi yorug‘likda suratga oling.", "errBlurry": "Surat xira chiqdi — telefonni qimirlatmasdan qayta suratga oling.", "errNotDocument": "Suratda darslik matni yo‘q — sahifani yoki so‘zlar ro‘yxatini suratga oling.", "errUnreadable": "Matnni o‘qib bo‘lmadi — yaqinroqdan va to‘g‘riroq suratga oling.", "notCharged": "Limit sarflanmadi."},

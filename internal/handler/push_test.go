@@ -325,7 +325,7 @@ func TestPushAPI_AdminSend_NoUrlFromTheClient_TheTapOpensCards(t *testing.T) {
 			t.Fatal(err)
 		}
 		var p domain.PushPayload
-		if err := json.Unmarshal(raw, &p); err != nil || p != (domain.PushPayload{Title: "Hi", Body: "Test", URL: "/cards"}) {
+		if err := json.Unmarshal(raw, &p); err != nil || p != (domain.PushPayload{Title: "Hi", Body: "Test", URL: "/"}) {
 			t.Errorf("url %s: the device received %s (%v)", url, raw, err)
 		}
 	}

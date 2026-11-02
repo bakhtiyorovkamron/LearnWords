@@ -83,10 +83,9 @@ describe('Home: the goal card', () => {
     expect(screen.getByText('to your goal · ≈3 min')).toBeTruthy() // 12 × 15 s
     expect(screen.getByText('381 words more in the queue — a goal a day')).toBeTruthy()
     expect(screen.getByText('Today’s goal')).toBeTruthy()
-    localStorage.setItem('review-folder', 'f1')
     fireEvent.click(screen.getByRole('button', { name: /Continue/ }))
-    expect(localStorage.getItem('review-folder')).toBe('')
-    expect(where()).toBe('/cards?start=1&size=12')
+    expect(localStorage.getItem('review-folder')).toBeNull() // the URL is the only input now
+    expect(where()).toBe('/train?size=12')
   })
 
   it('nothing done yet: the button says Start; the queue line is absent when nothing waits', async () => {
@@ -96,7 +95,7 @@ describe('Home: the goal card', () => {
     await waitCard()
     expect(screen.getByText('0/12')).toBeTruthy() // fewer due than the goal: the target is what is there
     fireEvent.click(screen.getByRole('button', { name: /^Start/ }))
-    expect(where()).toBe('/cards?start=1&size=12')
+    expect(where()).toBe('/train?size=12')
     expect(screen.queryByText(/in the queue/)).toBeNull()
   })
 
@@ -119,17 +118,17 @@ describe('Home: the goal card', () => {
     expect(screen.getByText('20 of 20')).toBeTruthy()
     expect(screen.queryByText('20/20')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /20 words more/ }))
-    expect(where()).toBe('/cards?start=1&size=20')
+    expect(where()).toBe('/train?size=20')
   })
 
-  it('goal met and nothing due → Practice more', async () => {
+  it('goal met and nothing due → no button at all (extra practice is gone)', async () => {
     vi.mocked(statsApi.get).mockResolvedValue(weekOf(4, { 0: { reviewed: 20, active: true } }) as never)
     vi.mocked(foldersApi.list).mockResolvedValue(list(500, 0))
     renderHome()
     await waitCard()
     expect(screen.getByText('Goal reached')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Practice more' }))
-    expect(where()).toBe('/cards?practice=1')
+    const card = screen.getByTestId('goal-ring').closest('section')!
+    expect(within(card).queryByRole('button', { name: /more|Practice|Start|Continue/i })).toBeNull()
   })
 
   it('a small queue is the target: 5 reviewed, 3 due → target 8, goal not met', async () => {
@@ -141,7 +140,7 @@ describe('Home: the goal card', () => {
     expect(screen.getByText('3 words')).toBeTruthy()
   })
 
-  it('nothing due and nothing done → "Nothing to review today", no ring, practice; the week stays', async () => {
+  it('nothing due and nothing done → "Nothing to review today", no ring, no button; the week stays', async () => {
     vi.mocked(statsApi.get).mockResolvedValue(weekOf(0) as never)
     vi.mocked(foldersApi.list).mockResolvedValue(list(40, 0))
     renderHome()
@@ -149,8 +148,7 @@ describe('Home: the goal card', () => {
     expect(screen.getByText('More words will be due tomorrow.')).toBeTruthy()
     expect(screen.queryByTestId('goal-ring')).toBeNull()
     expect(screen.getByTestId('week-strip')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Practice more' }))
-    expect(where()).toBe('/cards?practice=1')
+    expect(screen.queryByRole('button', { name: /Practice/ })).toBeNull()
   })
 
   it('no words at all → the empty text; no ring, no week', async () => {
@@ -242,21 +240,41 @@ describe('Home: the streak caption', () => {
 })
 
 describe('Home: the goal sheet', () => {
-  it('opens from "Change", has the four goals with minutes, and a pick saves it, closes, and changes the ring', async () => {
+  it('opens from "Change", has the four goals with minutes; a pick saves it and changes the ring but keeps the sheet open', async () => {
     vi.mocked(foldersApi.list).mockResolvedValue(list(500, 393))
     renderHome()
     await waitCard()
     expect(screen.getByText('8/20')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Change/ }))
     const dialog = screen.getByRole('dialog', { name: 'How many words a day?' })
-    const tiles = within(dialog).getAllByRole('radio')
+    const tiles = within(within(dialog).getAllByRole('radiogroup')[0]).getAllByRole('radio')
     expect(tiles.map((t) => t.textContent)).toEqual(['10≈3 min', '20≈5 min', '30≈8 min', '50≈13 min'])
     expect(tiles.map((t) => t.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'false'])
     expect(within(dialog).getByText('Nothing is lost — the rest waits in the queue.')).toBeTruthy()
     fireEvent.click(tiles[2])
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('dialog')).toBeTruthy() // a tap does not close it
     expect(await screen.findByText('8/30')).toBeTruthy() // optimistic: no waiting for the server
+    expect(tiles[2].getAttribute('aria-checked')).toBe('true')
     await waitFor(() => expect(settingsApi.setDailyGoal).toHaveBeenCalledWith(30))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('how the words are asked: three rows, the saved one selected, a tap writes review-direction', async () => {
+    localStorage.setItem('review-direction', 'ru_de')
+    renderHome()
+    await waitCard()
+    fireEvent.click(screen.getByRole('button', { name: /Change/ }))
+    const group = screen.getByRole('radiogroup', { name: 'How should words be asked?' })
+    const rows = within(group).getAllByRole('radio')
+    expect(rows.map((r) => r.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false'])
+    expect(rows.map((r) => r.className.includes('min-h-[60px]'))).toEqual([true, true, true])
+    fireEvent.click(rows[0])
+    expect(localStorage.getItem('review-direction')).toBe('de_ru')
+    expect(rows[0].getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(rows[2])
+    expect(localStorage.getItem('review-direction')).toBe('mixed')
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('Esc closes it without saving', async () => {
@@ -331,6 +349,6 @@ describe('Home: folders', () => {
     renderHome()
     const section = (await screen.findByText('My folders')).closest('section')!
     expect(within(section).getByRole('link', { name: /Tiere/ })).toBeTruthy()
-    expect(within(section).getByRole('link', { name: 'All · 40' }).getAttribute('href')).toBe('/cards?tab=all')
+    expect(within(section).getByRole('link', { name: 'All · 40' }).getAttribute('href')).toBe('/cards')
   })
 })

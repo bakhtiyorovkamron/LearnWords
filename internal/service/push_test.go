@@ -180,7 +180,7 @@ func (e pushEnv) device(t *testing.T, user uuid.UUID, path string) domain.PushSu
 	return e.repo.subs[endpoint]
 }
 
-var payload = domain.PushPayload{Title: "Time to learn", Body: "Your words are waiting", URL: "/cards"}
+var payload = domain.PushPayload{Title: "Time to learn", Body: "Your words are waiting", URL: "/"}
 
 // --- the sender ----------------------------------------------------------------------------
 
@@ -285,13 +285,13 @@ func TestPush_SendTo_OnlyThoseUsersDevices_AndTheTapOpensCards(t *testing.T) {
 		t.Errorf("reached: %v", e.hits.paths)
 	}
 
-	// what the device receives: the title, the body, and a tap that always opens /cards
+	// what the device receives: the title, the body, and a tap that always opens the Home page (/)
 	raw, err := e.browsers[e.srv.URL+"/ok/a1"].Decrypt(e.hits.bodies["/ok/a1"])
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got domain.PushPayload
-	if err := json.Unmarshal(raw, &got); err != nil || got != (domain.PushPayload{Title: "Hi", Body: "Test", URL: "/cards"}) {
+	if err := json.Unmarshal(raw, &got); err != nil || got != (domain.PushPayload{Title: "Hi", Body: "Test", URL: "/"}) {
 		t.Errorf("payload %s (%v)", raw, err)
 	}
 

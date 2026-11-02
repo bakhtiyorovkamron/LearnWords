@@ -23,7 +23,7 @@ const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000).toISOSt
 const progress = (box: number, days: number, learned = false): Progress =>
   ({ word_id: 'c1', box_level: box, correct_streak_at_max: 0, is_learned: learned, next_review_at: daysFromNow(days) })
 
-interface Over { format?: QuizFormat; card?: DueCard; saving?: boolean; error?: string | null; progress?: Progress | null; practice?: boolean; position?: number; total?: number }
+interface Over { format?: QuizFormat; card?: DueCard; saving?: boolean; error?: string | null; progress?: Progress | null; position?: number; total?: number }
 
 function setup(o: Over = {}) {
   const onAnswer = vi.fn(), onNext = vi.fn()
@@ -37,7 +37,7 @@ function setup(o: Over = {}) {
         <Routes>
           <Route path="*" element={
             <QuizQuestion item={item} pool={pool} position={props.position ?? 1} total={props.total ?? 3} saving={props.saving ?? false}
-              error={props.error} onAnswer={onAnswer} onNext={onNext} practice={props.practice} progress={props.progress} />} />
+              error={props.error} onAnswer={onAnswer} onNext={onNext} progress={props.progress} />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -73,15 +73,6 @@ describe('the question', () => {
     const { where } = setup()
     fireEvent.click(await screen.findByRole('button', { name: 'End training' }))
     expect(where.current).toBe('/')
-  })
-
-  it('practice mode: the lock line under the progress row', async () => {
-    setup({ practice: true })
-    expect(await screen.findByText('This practice does not change your review schedule')).toBeTruthy()
-    cleanup()
-    setup({ practice: false })
-    await screen.findByText('1/3')
-    expect(screen.queryByText(/does not change your review schedule/)).toBeNull()
   })
 
   it('de_ru: the German word big and serif, options are translations, listening is offered at once', async () => {
@@ -247,13 +238,6 @@ describe('the answer sheet', () => {
     await waitFor(() => expect(screen.queryByTestId('box-saving')).toBeNull())
     expect(within(sheet()).getByText('Box 3 · next review in 3 days')).toBeTruthy()
     expect((within(sheet()).getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(false)
-  })
-
-  it('practice mode: the "boxes do not change" line, no box bar, no pulse', async () => {
-    await answerRight({ practice: true, saving: true, progress: null })
-    expect(within(sheet()).getByText("Boxes don't change: this is extra practice")).toBeTruthy()
-    expect(screen.queryByTestId('box-bar')).toBeNull()
-    expect(screen.queryByTestId('box-saving')).toBeNull()
   })
 
   it('a save error is shown in the sheet', async () => {

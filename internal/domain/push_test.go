@@ -8,7 +8,7 @@ import (
 
 func TestNewPushPayload(t *testing.T) {
 	ok, err := NewPushPayload("  Time to learn  ", " 5 words are waiting ")
-	if err != nil || ok != (PushPayload{Title: "Time to learn", Body: "5 words are waiting", URL: "/cards"}) {
+	if err != nil || ok != (PushPayload{Title: "Time to learn", Body: "5 words are waiting", URL: "/"}) {
 		t.Fatalf("%+v %v", ok, err)
 	}
 

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { collectionApi, foldersApi, heroApi, meApi, settingsApi } from '../api/endpoints'
 import { setTrainingOpen } from '../lib/trainingState'
-import { CardsPage } from '../pages/CardsPage'
+import { TrainPage } from '../pages/TrainPage'
 import { Layout } from './Layout'
 
 vi.mock('./ReviewSession', () => ({ ReviewSession: () => <div>REVIEW SCREEN</div> }))
@@ -22,12 +22,12 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   }
 })
 
-function renderApp(path = '/cards') {
+function renderApp(path = '/train') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
-        <Routes><Route element={<Layout />}><Route path="/cards" element={<CardsPage />} /></Route></Routes>
+        <Routes><Route element={<Layout />}><Route path="/train" element={<TrainPage />} /></Route></Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -48,23 +48,19 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); setTrainingOpen(false); vi.clearAllMocks() })
 
 describe('focus mode: during a training session the shell steps aside', () => {
-  it('normally there is a header, a bottom nav (2 navigation landmarks), a footer and the tabs', () => {
+  it('normally there is a header, a bottom nav (2 navigation landmarks) and a footer', () => {
     renderApp()
     expect(navs()).toHaveLength(2)
     expect(header()).not.toBeNull()
     expect(footer()).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Review' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Collection' })).toBeTruthy()
   })
 
-  it('while a session is open: no header, no bottom nav, no footer, no tabs', () => {
+  it('while a session is open: no header, no bottom nav, no footer', () => {
     renderApp()
     act(() => setTrainingOpen(true))
     expect(navs()).toHaveLength(0)
     expect(header()).toBeNull()
     expect(footer()).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Collection' })).toBeNull()
     expect(screen.getByText('REVIEW SCREEN')).toBeTruthy() // the session itself stays
   })
 
@@ -85,7 +81,6 @@ describe('focus mode: during a training session the shell steps aside', () => {
     expect(navs()).toHaveLength(2)
     expect(header()).not.toBeNull()
     expect(footer()).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Review' })).toBeTruthy()
   })
 
   it('the More sheet cannot be open during a session', () => {

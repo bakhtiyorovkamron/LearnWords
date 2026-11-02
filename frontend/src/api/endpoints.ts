@@ -247,13 +247,10 @@ export const storiesApi = {
   deleteOwn: (id: string) => api.delete(`/stories/own/${id}`),
 }
 
-// Training-session size: how many due words one "Review" round asks at once. Persisted on
-// the server (per user, follows across devices) with a localStorage fallback — see
-// lib/reviewSessionSize.ts.
+// How many due words the server returns for a training request (lib/reviewSessionSize.ts picks the
+// smallest one that holds the N words the URL asks for).
 export const SESSION_SIZES = ['10', '20', '50', 'all'] as const
 export type SessionSize = (typeof SESSION_SIZES)[number]
-export const isSessionSize = (v: unknown): v is SessionSize =>
-  typeof v === 'string' && (SESSION_SIZES as readonly string[]).includes(v)
 
 export interface UserSettings {
   interface_language: string; review_session_size: string; theme: string
@@ -267,7 +264,6 @@ export const settingsApi = {
   get: () =>
     api.get<UserSettings>('/me/settings').then((r) => r.data),
   setLanguage: (lang: string) => api.put('/me/settings', { interface_language: lang }),
-  setReviewSessionSize: (size: SessionSize) => api.put('/me/settings', { review_session_size: size }),
   /** auto | night | light | graphite | sand | navy */
   setTheme: (theme: string) => api.put('/me/settings', { theme }),
   setDailyGoal: (goal: DailyGoal) => api.put<UserSettings>('/me/settings', { daily_goal: goal }).then((r) => r.data),
@@ -399,19 +395,6 @@ export const reviewApi = {
     api.post<Progress>(`/review/${id}/answer`, { correct }).then((r) => r.data),
 }
 
-// Extra practice: for when there's nothing left due, or just to drill more. Answers here never
-// touch the Leitner schedule — enforced on the backend (separate endpoint, separate code path),
-// not by anything the client sends.
-export const PRACTICE_MODES = ['hard', 'random', 'recent'] as const
-export type PracticeMode = (typeof PRACTICE_MODES)[number]
-
-export const practiceApi = {
-  words: (mode: PracticeMode, limit: SessionSize, folder: FolderSelection = '') =>
-    api
-      .get<{ cards: DueCard[] }>('/practice/words', { params: { mode, limit, folder_id: folder || undefined } })
-      .then((r) => r.data.cards),
-  answer: (id: string, correct: boolean) => api.post(`/practice/${id}/answer`, { correct }),
-}
 
 export const cardsApi = {
   list: () => api.get<Page<WordCard>>('/word-cards', { params: { limit: 100 } }).then((r) => r.data.items),

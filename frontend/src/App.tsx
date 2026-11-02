@@ -5,6 +5,7 @@ import { AuthPage } from './pages/AuthPage'
 import { ContextsPage } from './pages/ContextsPage'
 import { NewContextPage } from './pages/NewContextPage'
 import { CardsPage } from './pages/CardsPage'
+import { TrainPage } from './pages/TrainPage'
 import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
 import { AdminPage } from './pages/AdminPage'
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/contexts" element={<Navigate to="/" replace />} />
           <Route path="/contexts/new" element={<NewContextPage />} />
           <Route path="/cards" element={<CardsPage />} />
+          <Route path="/train" element={<TrainPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />
           <Route path="/search" element={<SearchPage />} />

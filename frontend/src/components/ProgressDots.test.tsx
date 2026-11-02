@@ -73,16 +73,11 @@ describe('ProgressDots compact', () => {
 })
 
 describe('ReviewResult box line', () => {
-  const noop = vi.fn()
-  const renderResult = (boxes: 'practice' | { movedUp: number }) =>
-    render(<MemoryRouter><ReviewResult correct={3} total={4} onRestart={noop} boxes={boxes} /></MemoryRouter>)
+  const renderResult = (movedUp: number) =>
+    render(<MemoryRouter><ReviewResult correct={3} total={4} movedUp={movedUp} /></MemoryRouter>)
 
   it('review: how many words moved up a box', () => {
-    renderResult({ movedUp: 3 })
+    renderResult(3)
     expect(screen.getByText('Перешли в следующую коробку: 3')).toBeTruthy()
-  })
-  it('practice: boxes do not change', () => {
-    renderResult('practice')
-    expect(screen.getByText('Коробки не меняются: это дополнительная тренировка')).toBeTruthy()
   })
 })

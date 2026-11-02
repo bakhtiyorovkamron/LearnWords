@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, CircleCheck, CircleX, Lock, Volume2, X } from 'lucide-react'
+import { Check, CircleCheck, CircleX, Volume2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Progress, WordCard } from '../api/types'
 import { whenLabel } from '../lib/boxInfo'
@@ -22,7 +22,6 @@ interface Props {
   onAnswer: (correct: boolean) => void // sent to the backend right after the answer
   onNext: () => void
   corner?: ReactNode // the training hero, left of the question label
-  practice?: boolean // extra practice: no box line, the schedule does not change
   progress?: Progress | null // the server's answer to this question (box and next review); review mode
 }
 
@@ -45,7 +44,7 @@ function GapSentence({ sentence, answered, answer }: { sentence: string; answere
 //
 // Every format uses the card's OWN stored translation (and example translation) — whatever the
 // interface language is now; nothing is looked up or generated at training time.
-export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner, practice = false, progress }: Props) {
+export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner, progress }: Props) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const learning = useLearningLang()
@@ -121,9 +120,6 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
         </div>
         <span className="text-sm tabular-nums text-muted">{position}/{total}</span>
       </div>
-      {practice && (
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-faint"><Lock size={14} aria-hidden="true" />{t('practice.note')}</p>
-      )}
 
       <div className="mt-4 flex items-center gap-3">
         {corner}
@@ -196,9 +192,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
           )}
 
           <div className="mt-3 min-h-[38px]">
-            {practice ? (
-              <p className="text-sm text-muted">{t('summary.practice')}</p>
-            ) : saving ? (
+            {saving ? (
               <div data-testid="box-saving" className="h-[38px] animate-pulse rounded-lg bg-surface-2" />
             ) : progress ? (
               <>

@@ -40,10 +40,6 @@ export function TodayCard() {
   const days = t('stats.days', { count: streak })
   const queue = due - remaining
 
-  function go(url: string) {
-    localStorage.setItem('review-folder', '') // the count is for all words
-    navigate(url)
-  }
 
   const caption = met ? t('home.streakDone', { days })
     : active ? t('home.streakActive', { days, left: t('folders.wordsCount', { count: remaining }) })
@@ -67,9 +63,6 @@ export function TodayCard() {
           <CircleCheck size={32} aria-hidden="true" className="text-accent-text" />
           <p className="text-[19px] font-semibold text-fg">{t('home.nothingDue')}</p>
           <p className="text-muted">{t('home.nothingDueHint')}</p>
-          <button type="button" onClick={() => go('/cards?practice=1')} className="btn-ghost mt-2 h-[52px] w-full rounded-[14px]">
-            {t('practice.start')}
-          </button>
         </div>
       ) : (
         <>
@@ -90,18 +83,14 @@ export function TodayCard() {
             </div>
           </div>
           {!met ? (
-            <button type="button" onClick={() => go(`/cards?start=1&size=${remaining}`)} className="btn-primary h-[52px] w-full rounded-[14px]">
+            <button type="button" onClick={() => navigate(`/train?size=${remaining}`)} className="btn-primary h-[52px] w-full rounded-[14px]">
               {reviewed === 0 ? t('home.begin') : t('training.continue')}<ArrowRight size={18} aria-hidden="true" />
             </button>
           ) : due > 0 ? (
-            <button type="button" onClick={() => go(`/cards?start=1&size=${MORE_STEP}`)} className="btn-ghost h-[52px] w-full rounded-[14px]">
+            <button type="button" onClick={() => navigate(`/train?size=${MORE_STEP}`)} className="btn-ghost h-[52px] w-full rounded-[14px]">
               {t('home.more', { words: t('folders.wordsCount', { count: MORE_STEP }) })}<ArrowRight size={18} aria-hidden="true" />
             </button>
-          ) : (
-            <button type="button" onClick={() => go('/cards?practice=1')} className="btn-ghost h-[52px] w-full rounded-[14px]">
-              {t('practice.start')}
-            </button>
-          )}
+          ) : null}
           {queue > 0 && (
             <p className="text-center text-[13px] text-muted">{t('home.queueLeft', { words: t('folders.wordsCount', { count: queue }) })}</p>
           )}

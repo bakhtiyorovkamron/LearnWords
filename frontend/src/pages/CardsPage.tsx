@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Leaf, Search, SearchX, SlidersHorizontal, SquareCheck, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -7,7 +7,6 @@ import { collectionApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { CollectionPeriod, CollectionSort, CollectionStatus } from '../api/types'
 import { WordCardView } from '../components/WordCard'
-import { ReviewSession } from '../components/ReviewSession'
 import { FlipCards } from '../components/FlipCards'
 import { DirectionToggle, useStoredChoice } from '../components/DirectionToggle'
 import { FilterSheet } from '../components/FilterSheet'
@@ -17,7 +16,7 @@ import { WordFixes } from '../components/WordFixes'
 import { FolderPicker } from '../components/FolderPicker'
 import { toast } from '../components/Toaster'
 import { useMoveWords } from '../lib/moveWords'
-import { useTrainingOpen } from '../lib/trainingState'
+import { parseUrlSize } from '../lib/reviewSessionSize'
 import { ErrorState } from '../components/ErrorState'
 
 const PAGE = 48
@@ -25,20 +24,17 @@ const VIEW_KEY = 'collection-view'
 const FLIP_DIRECTIONS = ['de_ru', 'ru_de'] as const
 
 export function CardsPage() {
-  const { t } = useTranslation()
-  // Deep link from a folder card on the Contexts page: ?tab=all&folder=<id|none|''>.
-  // The tab is in the URL, so /cards always opens Review — also when coming from /cards?tab=all.
-  const [params, setParams] = useSearchParams()
-  const tab: 'review' | 'all' = params.get('tab') === 'all' ? 'all' : 'review'
-  const initialFolder = params.get('folder') ?? ''
-  const training = useTrainingOpen() // a session is on screen: only the questions, no tabs
-  const tabs = [['review', t('cards.tabReview')], ['all', t('cards.tabCollection')]] as const
+  // The collection. ?folder=<id|none> is its initial folder (a link from Home's folder list); old
+  // links keep working: /cards?start=1&size=N is now the training, /cards?practice=1 is gone.
+  const [params] = useSearchParams()
+  if (params.get('start') === '1') {
+    const size = parseUrlSize(params.get('size'))
+    return <Navigate to={size ? `/train?size=${size}` : '/train'} replace />
+  }
+  if (params.get('practice') === '1') return <Navigate to="/" replace />
   return (
     <div className="space-y-4 md:space-y-6">
-      {!training && (
-        <Segmented value={tab} onChange={(k) => setParams(k === 'all' ? { tab: 'all' } : {}, { replace: true })} options={tabs} />
-      )}
-      {tab === 'review' ? <ReviewSession /> : <Collection initialFolder={initialFolder} />}
+      <Collection initialFolder={params.get('folder') ?? ''} />
     </div>
   )
 }

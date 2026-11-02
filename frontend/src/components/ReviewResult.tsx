@@ -5,19 +5,15 @@ import { useTranslation } from 'react-i18next'
 interface Props {
   correct: number
   total: number
-  onRestart: () => void
-  // Lets callers repurpose the restart button — e.g. "Пройти ещё раз" (practice.again) leads
-  // into the practice setup screen rather than literally restarting the same session.
-  restartLabel?: string
-  // moreCount > 0 → there are still due words left: show "Ещё N" (same filters + direction).
+  // moreCount > 0 → there are still due words left: show "More N" (same folder, same direction).
   moreCount?: number
   onMore?: () => void
   moreLoading?: boolean
-  // What happened to the Leitner boxes: review → how many words moved up; practice → they don't change.
-  boxes?: 'practice' | { movedUp: number }
+  // How many words moved up a Leitner box in this session.
+  movedUp: number
 }
 
-export function ReviewResult({ correct, total, onRestart, restartLabel, moreCount = 0, onMore, moreLoading, boxes }: Props) {
+export function ReviewResult({ correct, total, moreCount = 0, onMore, moreLoading, movedUp }: Props) {
   const { t } = useTranslation()
   const wrong = total - correct
   const hasMore = moreCount > 0
@@ -38,19 +34,14 @@ export function ReviewResult({ correct, total, onRestart, restartLabel, moreCoun
         </div>
       </div>
       <p className="mt-4 text-sm text-muted">{t('result.total', { count: total })}</p>
-      {boxes && (
-        <p className="mt-2 text-sm font-semibold text-muted">
-          {boxes === 'practice' ? t('summary.practice') : t('summary.moved', { n: boxes.movedUp })}
-        </p>
-      )}
+      <p className="mt-2 text-sm font-semibold text-muted">{t('summary.moved', { n: movedUp })}</p>
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
         {hasMore && (
           <button type="button" onClick={onMore} disabled={moreLoading} className="btn-primary disabled:opacity-60">
             {moreLoading ? t('common.loading') : t('result.more', { count: moreCount })}
           </button>
         )}
-        <button type="button" onClick={onRestart} className={hasMore ? 'btn-ghost' : 'btn-primary'}>{restartLabel ?? t('result.restart')}</button>
-        <Link to="/" className="btn-ghost">{t('result.home')}</Link>
+        <Link to="/" className={hasMore ? 'btn-ghost' : 'btn-primary'}>{t('result.home')}</Link>
       </div>
     </div>
   )

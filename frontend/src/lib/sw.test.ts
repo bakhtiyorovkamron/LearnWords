@@ -36,16 +36,16 @@ describe('sw.js: push', () => {
     })
   })
 
-  it('falls back to "/cards" and a plain-text body when the payload is not JSON', async () => {
+  it('falls back to "/" and a plain-text body when the payload is not JSON', async () => {
     const { self, listeners } = loadWorker()
     const e = event({ data: { json: () => { throw new Error('not json') }, text: () => 'Plain words' } })
     listeners.push(e)
     await e.finished()
-    expect(self.registration.showNotification).toHaveBeenCalledWith('yodla', expect.objectContaining({ body: 'Plain words', data: { url: '/cards' } }))
+    expect(self.registration.showNotification).toHaveBeenCalledWith('yodla', expect.objectContaining({ body: 'Plain words', data: { url: '/' } }))
     const empty = event({ data: null })
     listeners.push(empty)
     await empty.finished()
-    expect(self.registration.showNotification).toHaveBeenLastCalledWith('yodla', expect.objectContaining({ body: '', data: { url: '/cards' } }))
+    expect(self.registration.showNotification).toHaveBeenLastCalledWith('yodla', expect.objectContaining({ body: '', data: { url: '/' } }))
   })
 })
 
@@ -81,12 +81,12 @@ describe('sw.js: notificationclick', () => {
     expect(self.clients.openWindow).toHaveBeenCalledWith('https://yodla.fun/stats')
   })
 
-  it('no url in the data → "/cards"; a foreign url is never opened', async () => {
+  it('no url in the data → "/"; a foreign url is never opened', async () => {
     const { self, listeners } = loadWorker([])
     const none = click(undefined)
     listeners.notificationclick(none)
     await none.finished()
-    expect(self.clients.openWindow).toHaveBeenCalledWith('https://yodla.fun/cards')
+    expect(self.clients.openWindow).toHaveBeenCalledWith('https://yodla.fun/')
 
     self.clients.openWindow.mockClear()
     const foreign = click('https://evil.example/phish')

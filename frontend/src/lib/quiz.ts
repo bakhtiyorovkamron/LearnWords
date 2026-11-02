@@ -37,6 +37,7 @@ export function firstVariant(word: string): string {
 
 /** Training direction: what is shown (DE word or RU translation). "mixed" picks per word. */
 export type Direction = 'de_ru' | 'ru_de' | 'mixed'
+export const DIRECTIONS = ['de_ru', 'ru_de', 'mixed'] as const
 
 /**
  * Formats that make sense for this card in the chosen direction.

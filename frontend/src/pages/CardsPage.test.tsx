@@ -6,7 +6,6 @@ import i18n from '../i18n'
 import { collectionApi, foldersApi } from '../api/endpoints'
 import { CardsPage } from './CardsPage'
 
-vi.mock('../components/ReviewSession', () => ({ ReviewSession: () => <div>REVIEW SCREEN</div> }))
 vi.mock('../components/WordFixes', () => ({ WordFixes: () => null }))
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
@@ -25,7 +24,11 @@ function renderCards(url: string) {
       <MemoryRouter initialEntries={[url]}>
         <Where />
         <Link to="/cards">to cards</Link>
-        <Routes><Route path="/cards" element={<CardsPage />} /></Routes>
+        <Routes>
+          <Route path="/cards" element={<CardsPage />} />
+          <Route path="/train" element={<div>TRAIN SCREEN</div>} />
+          <Route path="/" element={<div>HOME SCREEN</div>} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -40,50 +43,55 @@ beforeEach(async () => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-describe('CardsPage: the tab lives in the URL', () => {
-  it('/cards opens Review', () => {
+describe('CardsPage: the collection and the old links', () => {
+  it('/cards is the collection, with no tabs', async () => {
     renderCards('/cards')
-    expect(screen.getByText('REVIEW SCREEN')).toBeTruthy()
+    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Collection' })).toBeNull()
+    expect(screen.queryByText('TRAIN SCREEN')).toBeNull()
+    expect(where()).toBe('/cards')
+  })
+
+  it('?folder=<id> is the initial folder; tab=all is simply ignored', async () => {
+    renderCards('/cards?tab=all&folder=f1')
+    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
+    expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: 'f1' })
+    cleanup()
+    vi.clearAllMocks()
+    renderCards('/cards?folder=none')
+    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
+    expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: 'none' })
+  })
+
+  it('an old /cards?start=1&size=12 link opens the training: /train?size=12', async () => {
+    renderCards('/cards?start=1&size=12')
+    expect(await screen.findByText('TRAIN SCREEN')).toBeTruthy()
+    expect(where()).toBe('/train?size=12')
     expect(collectionApi.list).not.toHaveBeenCalled()
   })
 
-  it('/cards?tab=all opens the collection, with the folder from the URL', async () => {
-    renderCards('/cards?tab=all&folder=f1')
-    expect(screen.queryByText('REVIEW SCREEN')).toBeNull()
-    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
-    expect(vi.mocked(collectionApi.list).mock.calls[0][0]).toMatchObject({ folder: 'f1' })
+  it('?start=1 with a size nobody accepts (or none) opens /train without a size', async () => {
+    renderCards('/cards?start=1&size=99')
+    expect(await screen.findByText('TRAIN SCREEN')).toBeTruthy()
+    expect(where()).toBe('/train')
+    cleanup()
+    renderCards('/cards?start=1')
+    expect(await screen.findByText('TRAIN SCREEN')).toBeTruthy()
+    expect(where()).toBe('/train')
   })
 
-  it('the tab buttons change the URL (no new history entry)', async () => {
-    renderCards('/cards')
-    fireEvent.click(screen.getByRole('button', { name: 'Collection' }))
-    expect(where()).toBe('/cards?tab=all')
-    await waitFor(() => expect(collectionApi.list).toHaveBeenCalled())
-    expect(screen.queryByText('REVIEW SCREEN')).toBeNull()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
-    expect(where()).toBe('/cards')
-    expect(screen.getByText('REVIEW SCREEN')).toBeTruthy()
-  })
-
-  it('going to /cards from the collection always lands on Review', () => {
-    renderCards('/cards?tab=all&folder=f1')
-    fireEvent.click(screen.getByRole('link', { name: 'to cards' }))
-    expect(where()).toBe('/cards')
-    expect(screen.getByText('REVIEW SCREEN')).toBeTruthy()
-  })
-
-  it('the active tab is the primary button', () => {
-    renderCards('/cards?tab=all')
-    expect(screen.getByRole('button', { name: 'Collection' }).className).toContain('bg-accent')
-    expect(screen.getByRole('button', { name: 'Review' }).className).not.toContain('bg-accent')
+  it('an old /cards?practice=1 link goes Home (extra practice is gone)', async () => {
+    renderCards('/cards?practice=1')
+    expect(await screen.findByText('HOME SCREEN')).toBeTruthy()
+    expect(where()).toBe('/')
   })
 })
 
 describe('Collection: filter sheet and search', () => {
   const lastParams = () => vi.mocked(collectionApi.list).mock.calls.at(-1)![0]
   const open = async () => {
-    renderCards('/cards?tab=all')
+    renderCards('/cards')
     fireEvent.click(await screen.findByRole('button', { name: /Filter/ }))
     return screen.getByRole('dialog')
   }
