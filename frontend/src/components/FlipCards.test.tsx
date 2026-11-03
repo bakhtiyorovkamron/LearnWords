@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Profiler } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import type { CollectionCard } from '../api/types'
@@ -303,5 +304,154 @@ describe('FlipCards: the controls under the deck', () => {
     expect(cardButton().getAttribute('aria-label')).toBe('Click to flip')
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
     expect(cardButton().className).toContain('rounded-[32px]')
+  })
+})
+
+/** requestAnimationFrame by hand: a frame runs only when the test flushes it. */
+function manualFrames() {
+  let id = 0
+  const queue = new Map<number, FrameRequestCallback>()
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { queue.set(++id, cb); return id })
+  vi.stubGlobal('cancelAnimationFrame', (n: number) => { queue.delete(n) })
+  return {
+    pending: () => queue.size,
+    flush: () => { const cbs = [...queue.values()]; queue.clear(); cbs.forEach((cb) => cb(0)) },
+  }
+}
+const SLIDE = 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+const transitionEnd = (el: Element) => act(() => { el.dispatchEvent(new Event('transitionend', { bubbles: true })) })
+
+describe('FlipCards: rendering the movement', () => {
+  it('a drag moves the track in the DOM: one write per animation frame, no React render per move', () => {
+    const frames = manualFrames()
+    const onRender = vi.fn()
+    render(<Profiler id="deck" onRender={onRender}><FlipCards cards={cards()} total={5} direction="de_ru" resetKey="k" /></Profiler>, { wrapper })
+    const renders = onRender.mock.calls.length
+    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
+    for (const x of [190, 180, 165, 150]) fireEvent.pointerMove(window, { clientX: x, pointerId: 1 })
+    expect(frames.pending()).toBe(1) // four moves, one frame
+    frames.flush()
+    expect(track().style.transform).toBe('translate3d(-50px,0,0)') // where the finger is now
+    expect(track().style.transition).toBe('none')
+    fireEvent.pointerMove(window, { clientX: 140, pointerId: 1 })
+    frames.flush()
+    expect(track().style.transform).toBe('translate3d(-60px,0,0)')
+    expect(onRender).toHaveBeenCalledTimes(renders) // nothing re-rendered while the finger moved
+  })
+
+  it('a release cancels the frame still waiting; a short drag springs back with the deck easing', () => {
+    const frames = manualFrames()
+    view()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 185, pointerId: 1 })
+    frames.flush() // drawn at -15 px
+    fireEvent.pointerMove(window, { clientX: 170, pointerId: 1 })
+    expect(frames.pending()).toBe(1) // -30 px waits for the next frame
+    now.mockReturnValue(1300) // the finger rested before the release: no flick
+    fireEvent.pointerUp(window, { clientX: 170, pointerId: 1 })
+    now.mockRestore()
+    expect(frames.pending()).toBe(0) // cancelled: the stale -30 px cannot overwrite the spring-back
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+    expect(track().style.transition).toBe(SLIDE)
+    expect(counter()).toBe('1 / 5')
+  })
+
+  it('a release before any frame was drawn needs no spring-back: the track never left 0', () => {
+    const frames = manualFrames()
+    view()
+    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 197, pointerId: 1 })
+    fireEvent.pointerUp(window, { clientX: 197, pointerId: 1 })
+    expect(frames.pending()).toBe(0)
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+    expect(track().style.transition).toBe('none')
+    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 }) // and a new drag is not held back
+    fireEvent.pointerMove(window, { clientX: 180, pointerId: 1 })
+    expect(frames.pending()).toBe(1)
+  })
+
+  it('a finger that comes back before the next frame still springs the track back from where it was drawn', () => {
+    const frames = manualFrames()
+    view()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 170, pointerId: 1 })
+    frames.flush() // the track is drawn at -30 px
+    fireEvent.pointerMove(window, { clientX: 200, pointerId: 1 }) // back at the start; its frame never runs
+    now.mockReturnValue(1300)
+    fireEvent.pointerUp(window, { clientX: 200, pointerId: 1 })
+    now.mockRestore()
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+    expect(track().style.transition).toBe(SLIDE) // a spring-back, not left at -30 px
+  })
+
+  it("a slide ends on the track's transitionend: the new card and the track back at 0 in the same step", () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(track().style.transform).toBe('translate3d(-14px,0,0)') // jsdom has no layout: one card = the 14 px gap
+    expect(track().style.transition).toBe(SLIDE)
+    fireEvent.keyDown(window, { key: ' ' }) // a render mid-slide (the flip) leaves the track where it is
+    expect(track().style.transform).toBe('translate3d(-14px,0,0)')
+    transitionEnd(cardButton().firstElementChild!) // the flip's own transitionend bubbles up: not the slide's
+    expect(counter()).toBe('1 / 5')
+
+    let seen = ''
+    track().addEventListener('transitionend', () => { seen = `${counter()} at ${track().style.transform}` })
+    transitionEnd(track())
+    expect(seen).toBe('2 / 5 at translate3d(0px,0,0)') // already true inside the event: one synchronous step
+    expect(track().style.transition).toBe('none')
+    expect(visible().dataset.side).toBe('learning') // the new card starts face up
+  })
+
+  it('without a transitionend a fallback timer ends the slide; a late transitionend moves nothing more', () => {
+    vi.useFakeTimers()
+    try {
+      view()
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      act(() => { vi.advanceTimersByTime(220 + 49) })
+      expect(counter()).toBe('1 / 5')
+      act(() => { vi.advanceTimersByTime(1) })
+      expect(counter()).toBe('2 / 5')
+      expect(track().style.transform).toBe('translate3d(0px,0,0)')
+      transitionEnd(track())
+      expect(counter()).toBe('2 / 5')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a flick is measured over the last ~80 ms: a slow drag with a fast end moves on, a fast start with a slow end springs back', async () => {
+    const frames = manualFrames()
+    const now = vi.spyOn(Date, 'now')
+    const drag = ([[t0, x0], ...moves]: [t: number, x: number][]) => {
+      now.mockReturnValue(t0)
+      fireEvent.pointerDown(track(), { clientX: x0, pointerId: 1 })
+      for (const [t, x] of moves) {
+        now.mockReturnValue(t)
+        fireEvent.pointerMove(window, { clientX: x, pointerId: 1 })
+        frames.flush()
+      }
+      fireEvent.pointerUp(window, { clientX: moves[moves.length - 1][1], pointerId: 1 })
+    }
+    // 50 px in all — less than the 60 px of a swipe, so only a flick can move on.
+    view()
+    drag([[1000, 200], [1050, 165], [1950, 150]]) // 35 px in 50 ms, then 15 px in 900 ms
+    expect(track().style.transform).toBe('translate3d(0px,0,0)') // springs back
+    expect(track().style.transition).toBe(SLIDE)
+    cleanup()
+    view()
+    drag([[1000, 200], [1500, 192], [1900, 185], [1950, 150]]) // 15 px in 900 ms, then 35 px in 50 ms
+    now.mockRestore()
+    expect(track().style.transform).toBe('translate3d(-14px,0,0)') // slides on
+    await waitFor(() => expect(counter()).toBe('2 / 5'))
+  })
+
+  it('the track and the flipping card are GPU layers; both sides hide their back', () => {
+    view()
+    expect(track().style.willChange).toBe('transform')
+    expect((cardButton().firstElementChild as HTMLElement).style.willChange).toBe('transform')
+    for (const s of [side('learning'), side('native')]) expect(s.style.backfaceVisibility).toBe('hidden')
+    expect(screen.getByTestId('deck-stage').style.touchAction).toBe('pan-y')
   })
 })

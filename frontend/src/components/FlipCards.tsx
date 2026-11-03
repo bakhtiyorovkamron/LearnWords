@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { ChevronLeft, ChevronRight, RotateCw, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
@@ -10,23 +11,46 @@ import { GapSentence } from './GapSentence'
 const GAP = 14 // px between the cards
 const SWIPE_PX = 60 // a drag this long moves to the neighbour
 const FLICK_PX_PER_MS = 0.5 // ... and so does a short, fast flick
+const VELOCITY_MS = 80 // the flick speed is that of the last moves: a fast end of a slow drag counts
 const TAP_PX = 8 // a movement shorter than this is a tap
 const ANIMATION_MS = 220
+const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 const CARD_WIDTH = 'min(420px, calc(100% - 88px))'
 const PEEK_STYLE = { top: 28, bottom: 28 } as const
+const BACKFACE_HIDDEN = { backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as const
 
 const reducedMotion = () =>
   typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 type Direction = 'de_ru' | 'ru_de'
+type Point = { x: number; t: number }
+
+/** px/ms over the drag's last VELOCITY_MS (0 when the finger rested before the release). */
+function velocity(points: Point[], x: number, t: number) {
+  const from = points.find((p) => p.t >= t - VELOCITY_MS)
+  return from && t > from.t ? (x - from.x) / (t - from.t) : 0
+}
 
 function Face({ className, children }: { className: string; children: React.ReactNode }) {
   return (
-    <span className={`absolute inset-0 flex flex-col items-center justify-center overflow-hidden rounded-[32px] p-7 text-center [backface-visibility:hidden] ${className}`}>
+    <span className={`absolute inset-0 flex flex-col items-center justify-center overflow-hidden rounded-[32px] p-7 text-center [backface-visibility:hidden] [-webkit-backface-visibility:hidden] ${className}`}>
       {children}
     </span>
   )
 }
+
+/**
+ * A neighbour peeking in from the edge: a surface only, a tap moves to it. memo with stable props:
+ * it renders when the card changes, not when the deck moves or flips.
+ */
+const Peek = memo(function Peek({ side, label, onPick }: { side: -1 | 1; label: string; onPick: (side: -1 | 1) => void }) {
+  return (
+    <button type="button" onClick={() => onPick(side)} aria-label={label}
+      data-testid={side === -1 ? 'deck-prev' : 'deck-next'}
+      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${side})`, transform: 'translateX(-50%)', ...PEEK_STYLE }}
+      className="absolute rounded-[32px] border border-line bg-surface opacity-60" />
+  )
+})
 
 const label = 'text-xs font-bold uppercase tracking-[0.12em] text-faint'
 
@@ -46,13 +70,19 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const learning = useLearningLang()
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
-  // The whole track moves with the finger (dx); after a swipe it slides the rest of the way (anim).
-  const [dx, setDx] = useState(0)
-  const [anim, setAnim] = useState(false)
+  // The track's position lives in the DOM, not in state: a move writes it in the next animation frame
+  // (no render per pointer move); React renders only when the card changes or flips.
+  const stage = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ x: number; t: number; moved: boolean } | null>(null)
+  const dx = useRef(0) // the offset the next frame shows
+  const at = useRef(0) // where place() last put the track
+  const frame = useRef(0) // the requested animation frame, 0 = none
+  const busy = useRef(false) // a slide or a spring-back is running: a new drag waits for it
+  // What the running animation ends with: the card to move by (0 = a spring-back) and the fallback timer.
+  const pending = useRef<{ delta: -1 | 0 | 1; fallback: ReturnType<typeof setTimeout> } | null>(null)
+  const drag = useRef<{ x: number; points: Point[]; moved: boolean } | null>(null)
+  const endDrag = useRef<(() => void) | null>(null) // removes the window listeners of the drag in progress
   const suppressClick = useRef(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
 
   const last = cards.length - 1
   const i = Math.min(index, Math.max(last, 0))
@@ -60,18 +90,19 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const canSpeak = useCanSpeak(card?.language ?? '')
   const ruFirst = direction === 'ru_de'
 
-  useEffect(() => {
-    clearTimeout(timer.current)
-    setIndex(0); setFlipped(false); setDx(0); setAnim(false)
-  }, [resetKey])
-
-  useEffect(() => { if (onNearEnd && cards.length > 0 && i >= cards.length - 3) onNearEnd() }, [i, cards.length, onNearEnd])
-  useEffect(() => () => clearTimeout(timer.current), [])
-
   const iRef = useRef(i)
   iRef.current = i
   const lastRef = useRef(last)
   lastRef.current = last
+
+  /** Puts the track at x px: sliding there, or at once. */
+  const place = useCallback((x: number, animate: boolean) => {
+    const el = track.current
+    if (!el) return
+    el.style.transition = animate ? `transform ${ANIMATION_MS}ms ${EASING}` : 'none'
+    el.style.transform = `translate3d(${x}px,0,0)`
+    at.current = x
+  }, [])
 
   const move = useCallback((delta: number) => {
     const next = Math.min(Math.max(iRef.current + delta, 0), lastRef.current)
@@ -82,21 +113,69 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
 
   const flip = useCallback(() => setFlipped((f) => !f), [])
 
+  /**
+   * Ends the running slide or spring-back; false if none was running. After a slide the new card is
+   * rendered (flushSync) and the track is put back to 0 in one synchronous step: both land in the same
+   * frame, so nothing jumps.
+   */
+  const finish = useCallback(() => {
+    const p = pending.current
+    if (!p) return false
+    pending.current = null
+    clearTimeout(p.fallback)
+    if (p.delta) flushSync(() => move(p.delta))
+    place(0, false)
+    busy.current = false
+    return true
+  }, [move, place])
+
+  /** Slides the track to x; the track's transitionend ends it (the timer only if that never comes). */
+  const animateTo = useCallback((x: number, delta: -1 | 0 | 1) => {
+    busy.current = true
+    place(x, true)
+    pending.current = { delta, fallback: setTimeout(finish, ANIMATION_MS + 50) }
+  }, [place, finish])
+
   /** Slides the track by one card in the swipe's direction, then switches the card. */
   const slide = useCallback((delta: 1 | -1) => {
+    // A slide still running (a quick second ← →) ends at once; the reflow lets the next one start from 0.
+    if (finish()) void track.current?.offsetWidth
     const next = iRef.current + delta
     if (next < 0 || next > lastRef.current) return
-    const width = track.current?.clientWidth ?? 0
+    if (reducedMotion()) { place(0, false); move(delta); return }
+    const width = stage.current?.clientWidth ?? 0
     const distance = Math.min(420, Math.max(width - 88, 0)) + GAP
-    if (reducedMotion()) { setDx(0); move(delta); return }
-    setAnim(true)
-    setDx(-delta * distance)
-    timer.current = setTimeout(() => {
-      setAnim(false) // jump back without a transition, now on the new card
-      setDx(0)
-      move(delta)
-    }, ANIMATION_MS)
-  }, [move])
+    animateTo(-delta * distance, delta)
+  }, [finish, place, move, animateTo])
+
+  const pick = useCallback((side: -1 | 1) => { if (!suppressClick.current) slide(side) }, [slide])
+
+  useEffect(() => {
+    const p = pending.current
+    if (p) clearTimeout(p.fallback)
+    pending.current = null
+    busy.current = false
+    place(0, false)
+    setIndex(0); setFlipped(false)
+  }, [resetKey, place])
+
+  useEffect(() => { if (onNearEnd && cards.length > 0 && i >= cards.length - 3) onNearEnd() }, [i, cards.length, onNearEnd])
+  useEffect(() => () => {
+    endDrag.current?.()
+    if (pending.current) clearTimeout(pending.current.fallback)
+    cancelAnimationFrame(frame.current)
+  }, [])
+
+  // The track's own transitionend ends a slide; the flip inside the card bubbles one up too — not that.
+  // A native listener: React has no TransitionEvent everywhere, and finish runs flushSync.
+  const shown = !!card
+  useEffect(() => {
+    const el = track.current
+    if (!el) return
+    const onEnd = (e: TransitionEvent) => { if (e.target === el) finish() }
+    el.addEventListener('transitionend', onEnd)
+    return () => el.removeEventListener('transitionend', onEnd)
+  }, [shown, finish])
 
   // ← → move, Space / Enter flip (not while typing)
   useEffect(() => {
@@ -116,41 +195,51 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   // Dragging: pointermove / pointerup are listened to on the window, so the cards under the finger
   // keep getting their own clicks (a tap on a neighbour, a tap on the card).
   function onPointerDown(e: React.PointerEvent) {
-    if (anim || (e.pointerType === 'mouse' && e.button !== 0)) return
-    drag.current = { x: e.clientX, t: Date.now(), moved: false }
+    if (busy.current || (e.pointerType === 'mouse' && e.button !== 0)) return
+    endDrag.current?.() // a drag whose pointerup never came
+    drag.current = { x: e.clientX, points: [{ x: e.clientX, t: Date.now() }], moved: false }
     suppressClick.current = false
     const onMove = (ev: PointerEvent) => {
       const d = drag.current
       if (!d) return
+      const t = Date.now()
       const delta = ev.clientX - d.x
       if (Math.abs(delta) >= TAP_PX) d.moved = true
+      d.points.push({ x: ev.clientX, t })
+      while (d.points.length > 1 && d.points[0].t < t - VELOCITY_MS) d.points.shift() // only the recent ones count
       const blocked = (delta > 0 && iRef.current === 0) || (delta < 0 && iRef.current === lastRef.current)
-      setDx(blocked ? delta / 4 : delta) // a little resistance at the ends
+      dx.current = blocked ? delta / 4 : delta // a little resistance at the ends
+      // One frame writes the latest position, however many moves arrive before it.
+      if (!frame.current) frame.current = requestAnimationFrame(() => { frame.current = 0; place(dx.current, false) })
     }
     const onUp = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
+      endDrag.current?.()
+      cancelAnimationFrame(frame.current)
+      frame.current = 0
       const d = drag.current
       drag.current = null
       if (!d) return
       const delta = ev.clientX - d.x
       if (d.moved) suppressClick.current = true // the click that follows a drag is not a tap
-      const fast = Math.abs(delta) > 20 && Math.abs(delta) / Math.max(Date.now() - d.t, 1) > FLICK_PX_PER_MS
+      const fast = Math.abs(delta) > 20 && velocity(d.points, ev.clientX, Date.now()) * Math.sign(delta) > FLICK_PX_PER_MS
       const dir = delta < 0 ? 1 : -1
       const exists = dir === 1 ? iRef.current < lastRef.current : iRef.current > 0
       if ((Math.abs(delta) > SWIPE_PX || fast) && exists) {
-        // the finger already moved the track by delta: continue from there
+        // the finger already moved the track: the slide continues from there
         slide(dir)
-      } else {
-        setAnim(true) // spring back
-        setDx(0)
-        timer.current = setTimeout(() => setAnim(false), ANIMATION_MS)
+      } else if (at.current !== 0) {
+        animateTo(0, 0) // spring back (from where the last frame put the track — not the cancelled one)
       }
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
+    endDrag.current = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      endDrag.current = null
+    }
   }
 
   if (!card) return null
@@ -208,34 +297,28 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     </Face>
   )
 
-  const peek = (side: -1 | 1, c: CollectionCard | undefined) => c && (
-    <button type="button" key={c.id} onClick={() => { if (!suppressClick.current) slide(side) }}
-      aria-label={t(side === -1 ? 'collection.prev' : 'collection.next')}
-      data-testid={side === -1 ? 'deck-prev' : 'deck-next'}
-      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${side})`, transform: 'translateX(-50%)', ...PEEK_STYLE }}
-      className="absolute rounded-[32px] border border-line bg-surface opacity-60" />
-  )
-
+  const prev = cards[i - 1]
+  const next = cards[i + 1]
   const circle = 'place-items-center rounded-full border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
   return (
     <div className="mt-4">
-      <div ref={track} onPointerDown={onPointerDown} data-testid="deck-track"
+      <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage"
         className="relative -mx-4 overflow-hidden md:mx-0"
         style={{ height: 'clamp(380px, 60dvh, 560px)', touchAction: 'pan-y' }}>
-        <div className="absolute inset-0"
-          style={{ transform: `translateX(${dx}px)`, transition: anim ? `transform ${ANIMATION_MS}ms ease-out` : 'none' }}>
-          {peek(-1, cards[i - 1])}
-          {peek(1, cards[i + 1])}
+        {/* Its own GPU layer; moved only by place() — React never sets its transform, so a render leaves it be. */}
+        <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>
+          {prev && <Peek key={prev.id} side={-1} label={t('collection.prev')} onPick={pick} />}
+          {next && <Peek key={next.id} side={1} label={t('collection.next')} onPick={pick} />}
           <button type="button" data-testid="deck-card" aria-label={t('collection.flipHint')}
             onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } flip() }}
             style={{ width: CARD_WIDTH, left: '50%', transform: 'translateX(-50%)', perspective: 1200 }}
             className="absolute inset-y-0 block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
             <span className="absolute inset-0 block transition-transform duration-500 [transform-style:preserve-3d]"
-              style={{ transform: flipped ? 'rotateY(180deg)' : 'none' }}>
+              style={{ transform: flipped ? 'rotateY(180deg)' : 'none', willChange: 'transform' }}>
               <span data-side="learning" aria-hidden={!learningVisible} className="absolute inset-0 block [transform-style:preserve-3d]"
-                style={{ transform: ruFirst ? 'rotateY(180deg)' : 'none' }}>{learningSide}</span>
+                style={{ transform: ruFirst ? 'rotateY(180deg)' : 'none', ...BACKFACE_HIDDEN }}>{learningSide}</span>
               <span data-side="native" aria-hidden={learningVisible} className="absolute inset-0 block [transform-style:preserve-3d]"
-                style={{ transform: ruFirst ? 'none' : 'rotateY(180deg)' }}>{nativeSide}</span>
+                style={{ transform: ruFirst ? 'none' : 'rotateY(180deg)', ...BACKFACE_HIDDEN }}>{nativeSide}</span>
             </span>
           </button>
         </div>
