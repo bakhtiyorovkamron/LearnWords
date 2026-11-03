@@ -242,7 +242,7 @@ describe('the next page', () => {
     renderDeck('/cards')
     await screen.findByTestId('deck-card')
     const asked = (offset: number) => vi.mocked(collectionApi.list).mock.calls.some(([q]) => (q as { offset: number }).offset === offset)
-    const counter = () => document.querySelector('[data-side="learning"] .tabular-nums')!.textContent
+    const counter = () => screen.getByTestId('deck-card').querySelector('[data-side="learning"] .tabular-nums')!.textContent
     for (let n = 0; n < 44; n++) fireEvent.keyDown(window, { key: 'ArrowRight' })
     await waitFor(() => expect(counter()).toBe('45 / 50'))
     expect(asked(48)).toBe(false) // 3 cards are still behind the 45th of 48 loaded

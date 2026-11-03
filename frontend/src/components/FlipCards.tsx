@@ -16,7 +16,7 @@ const TAP_PX = 8 // a movement shorter than this is a tap
 const ANIMATION_MS = 220
 const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 const CARD_WIDTH = 'min(420px, calc(100% - 88px))'
-const PEEK_STYLE = { top: 28, bottom: 28 } as const
+const AROUND = 2 // cards kept rendered on each side: a quick second slide never meets a blank card
 const BACKFACE_HIDDEN = { backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as const
 const PRESERVE_3D = { transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' } as const
 // A face hides its own back (Safari needs the -webkit- one too) and sits 1px in front of its side, so
@@ -70,20 +70,106 @@ function Face({ className, children }: { className: string; children: React.Reac
   )
 }
 
+const label = 'text-xs font-bold uppercase tracking-[0.12em] text-faint'
+
+type DeckCardProps = {
+  card: CollectionCard
+  n: number // its number in the deck (the counter chip)
+  total: number
+  offset: number // from the current card: 0 is it, ±1 the neighbours at the edges, ±2 waiting further out
+  direction: Direction
+  flipped: boolean // only ever true for the current card
+  showHints: boolean
+  onTap: (offset: number) => void
+}
+
 /**
- * A neighbour peeking in from the edge: a surface only, a tap moves to it. memo with stable props:
- * it renders when the card changes, not when the deck moves or flips.
+ * One card of the deck, at its offset from the current one. Every card is this same element keyed by
+ * its id, so after a slide React only moves it to its new offset: the card that slid in is the very
+ * node that was the neighbour, its word drawn all along — nothing re-mounts, no text comes late.
+ * A neighbour shows its front, cannot flip, and is a «Back» / «Next» button whose content is hidden
+ * from screen readers. memo: the props are the card from the list and plain values, so a flip renders
+ * the current card only.
  */
-const Peek = memo(function Peek({ side, label, onPick }: { side: -1 | 1; label: string; onPick: (side: -1 | 1) => void }) {
+const DeckCard = memo(function DeckCard({ card, n, total, offset, direction, flipped, showHints, onTap }: DeckCardProps) {
+  const { t, i18n } = useTranslation()
+  const learning = useLearningLang()
+  const current = offset === 0
+  const near = offset === -1 || offset === 1
+  const ruFirst = direction === 'ru_de'
+  const learningVisible = ruFirst ? flipped : !flipped // the other side is turned away (and hidden from screen readers)
+
+  const { article, rest } = splitArticle(card.word, card.article)
+  const filled = card.is_learned ? 5 : Math.min(Math.max(card.box_level, 0), 5)
+  const counter = <span className="text-[13px] tabular-nums text-muted">{n} / {total}</span>
+  const nativeLang = card.translation_language ?? i18n.language
+  const hint = (key: string) => showHints && (
+    <span className="absolute bottom-6 flex items-center gap-1.5 text-[13px] text-faint">
+      <RotateCw size={14} aria-hidden="true" />{t(key)}
+    </span>
+  )
+
+  const learningSide = (
+    <Face className="bg-surface">
+      <span className="absolute left-6 top-6 flex gap-1" data-testid="deck-box" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, k) => (
+          <span key={k} data-filled={k < filled} className={`h-[5px] w-4 rounded-full ${k < filled ? 'bg-accent' : 'bg-dot-off'}`} />
+        ))}
+      </span>
+      <span className="absolute right-6 top-5">{counter}</span>
+      <span className={label}>{t('cards.sideLearning', learning.vars)}</span>
+      <span lang={card.language} className="block">
+        {article && <span className={`mt-4 block font-serif text-[26px] ${ARTICLE_COLOR[article]}`}>{article}</span>}
+        <span data-testid="deck-word" className={`${article ? '' : 'mt-4 '}block break-words font-serif text-[clamp(40px,14vw,64px)] font-medium leading-none text-fg`}>{rest}</span>
+      </span>
+      {card.transcription && <span className="mt-3 block font-mono text-[15px] text-muted">{card.transcription}</span>}
+      {card.example_sentence && (
+        <>
+          <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
+          <span className="block font-serif text-xl leading-snug text-fg" lang={card.language}>
+            <GapSentence answered answer={card.word} sentence={card.example_sentence} />
+          </span>
+        </>
+      )}
+      {hint('cards.flipToTranslation')}
+    </Face>
+  )
+  const nativeSide = (
+    <Face className="bg-surface-2">
+      <span className="absolute right-6 top-5">{counter}</span>
+      <span className={label}>{t(`cards.sideNative.${nativeLang}`)}</span>
+      <span className="mt-5 block break-words text-[clamp(32px,11vw,52px)] font-bold leading-tight tracking-[-0.02em] text-accent-text">{card.translation || '—'}</span>
+      {card.example_translation && (
+        <>
+          <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
+          <span className="block text-[19px] leading-snug text-fg">{card.example_translation}</span>
+        </>
+      )}
+      {hint('cards.flipToWord')}
+    </Face>
+  )
+
   return (
-    <button type="button" onClick={() => onPick(side)} aria-label={label}
-      data-testid={side === -1 ? 'deck-prev' : 'deck-next'}
-      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${side})`, transform: 'translateX(-50%)', ...PEEK_STYLE }}
-      className="absolute rounded-[32px] border border-line bg-surface opacity-60" />
+    <button type="button" data-offset={offset} onClick={() => onTap(offset)}
+      data-testid={current ? 'deck-card' : offset === -1 ? 'deck-prev' : offset === 1 ? 'deck-next' : undefined}
+      aria-label={current ? t('collection.flipHint') : near ? t(offset < 0 ? 'collection.prev' : 'collection.next') : undefined}
+      aria-hidden={current || near ? undefined : true} tabIndex={current || near ? undefined : -1}
+      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${offset})`, transform: 'translateX(-50%)', perspective: 1200 }}
+      className="absolute inset-y-0 block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
+      {/* Nothing between the button (the perspective) and the faces may clip, fade, filter or
+          will-change anything but transform: Safari would flatten the 3D and show a face mirrored.
+          Only the current card animates its flip: one that stops being current is on its front at once. */}
+      <span data-testid={current ? 'deck-rotor' : undefined}
+        className={`absolute inset-0 block ${current ? 'transition-transform duration-500' : ''}`}
+        style={{ transform: flipped ? 'rotateY(180deg)' : 'none', willChange: 'transform', ...PRESERVE_3D }}>
+        <span data-side="learning" aria-hidden={!current || !learningVisible} className="absolute inset-0 block"
+          style={{ transform: ruFirst ? 'rotateY(180deg)' : 'none', ...PRESERVE_3D, ...BACKFACE_HIDDEN }}>{learningSide}</span>
+        <span data-side="native" aria-hidden={!current || learningVisible} className="absolute inset-0 block"
+          style={{ transform: ruFirst ? 'none' : 'rotateY(180deg)', ...PRESERVE_3D, ...BACKFACE_HIDDEN }}>{nativeSide}</span>
+      </span>
+    </button>
   )
 })
-
-const label = 'text-xs font-bold uppercase tracking-[0.12em] text-faint'
 
 /**
  * The flashcard deck: one big card at a time, the neighbours peek in from the edges. One side is one
@@ -99,8 +185,7 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   resetKey: string // changes with the folder / direction → back to the first card
   onNearEnd?: () => void // load the next page before the user reaches the last card
 }) {
-  const { t, i18n } = useTranslation()
-  const learning = useLearningLang()
+  const { t } = useTranslation()
   const showHints = useFirstVisitsHints()
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
@@ -182,7 +267,15 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     animateTo(-delta * distance, delta)
   }, [finish, place, move, animateTo])
 
-  const pick = useCallback((side: -1 | 1) => { if (!suppressClick.current) slide(side) }, [slide])
+  // A tap on a card: the current one flips, a neighbour is moved to. The click that ends a drag is no tap.
+  const tap = useCallback((offset: number) => {
+    if (suppressClick.current) {
+      if (offset === 0) suppressClick.current = false
+      return
+    }
+    if (offset === 0) flip()
+    else if (offset === -1 || offset === 1) slide(offset)
+  }, [flip, slide])
 
   useEffect(() => {
     const p = pending.current
@@ -278,59 +371,10 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
 
   if (!card) return null
 
-  const { article, rest } = splitArticle(card.word, card.article)
-  const filled = card.is_learned ? 5 : Math.min(Math.max(card.box_level, 0), 5)
-  const counter = <span className="text-[13px] tabular-nums text-muted">{i + 1} / {total}</span>
-  const nativeLang = card.translation_language ?? i18n.language
-  const learningVisible = ruFirst ? flipped : !flipped // the other side is turned away (and hidden from screen readers)
-  const hint = (key: string) => showHints && (
-    <span className="absolute bottom-6 flex items-center gap-1.5 text-[13px] text-faint">
-      <RotateCw size={14} aria-hidden="true" />{t(key)}
-    </span>
-  )
-
-  const learningSide = (
-    <Face className="bg-surface">
-      <span className="absolute left-6 top-6 flex gap-1" data-testid="deck-box" aria-hidden="true">
-        {Array.from({ length: 5 }, (_, n) => (
-          <span key={n} data-filled={n < filled} className={`h-[5px] w-4 rounded-full ${n < filled ? 'bg-accent' : 'bg-dot-off'}`} />
-        ))}
-      </span>
-      <span className="absolute right-6 top-5">{counter}</span>
-      <span className={label}>{t('cards.sideLearning', learning.vars)}</span>
-      <span lang={card.language} className="block">
-        {article && <span className={`mt-4 block font-serif text-[26px] ${ARTICLE_COLOR[article]}`}>{article}</span>}
-        <span className={`${article ? '' : 'mt-4 '}block break-words font-serif text-[clamp(40px,14vw,64px)] font-medium leading-none text-fg`}>{rest}</span>
-      </span>
-      {card.transcription && <span className="mt-3 block font-mono text-[15px] text-muted">{card.transcription}</span>}
-      {card.example_sentence && (
-        <>
-          <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
-          <span className="block font-serif text-xl leading-snug text-fg" lang={card.language}>
-            <GapSentence answered answer={card.word} sentence={card.example_sentence} />
-          </span>
-        </>
-      )}
-      {hint('cards.flipToTranslation')}
-    </Face>
-  )
-  const nativeSide = (
-    <Face className="bg-surface-2">
-      <span className="absolute right-6 top-5">{counter}</span>
-      <span className={label}>{t(`cards.sideNative.${nativeLang}`)}</span>
-      <span className="mt-5 block break-words text-[clamp(32px,11vw,52px)] font-bold leading-tight tracking-[-0.02em] text-accent-text">{card.translation || '—'}</span>
-      {card.example_translation && (
-        <>
-          <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
-          <span className="block text-[19px] leading-snug text-fg">{card.example_translation}</span>
-        </>
-      )}
-      {hint('cards.flipToWord')}
-    </Face>
-  )
-
-  const prev = cards[i - 1]
-  const next = cards[i + 1]
+  // The current card and AROUND on each side, in deck order: after a slide the cards that stay keep
+  // their place in the DOM — one leaves at one end, one comes in at the other, nothing moves.
+  const from = Math.max(i - AROUND, 0)
+  const around = cards.slice(from, i + AROUND + 1)
   const circle = 'place-items-center rounded-full border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -340,24 +384,11 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
         style={{ touchAction: 'pan-y' }}>
         {/* Its own GPU layer; moved only by place() — React never sets its transform, so a render leaves it be. */}
         <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>
-          {prev && <Peek key={prev.id} side={-1} label={t('collection.prev')} onPick={pick} />}
-          {next && <Peek key={next.id} side={1} label={t('collection.next')} onPick={pick} />}
-          <button type="button" data-testid="deck-card" aria-label={t('collection.flipHint')}
-            onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } flip() }}
-            style={{ width: CARD_WIDTH, left: '50%', transform: 'translateX(-50%)', perspective: 1200 }}
-            className="absolute inset-y-0 block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
-            {/* Nothing between the button (the perspective) and the faces may clip, fade, filter or
-                will-change anything but transform: Safari would flatten the 3D and show a face mirrored.
-                key: a new card gets a fresh rotor that starts unflipped — the old one's flip-back
-                transition never plays on it. */}
-            <span key={card.id} data-testid="deck-rotor" className="absolute inset-0 block transition-transform duration-500"
-              style={{ transform: flipped ? 'rotateY(180deg)' : 'none', willChange: 'transform', ...PRESERVE_3D }}>
-              <span data-side="learning" aria-hidden={!learningVisible} className="absolute inset-0 block"
-                style={{ transform: ruFirst ? 'rotateY(180deg)' : 'none', ...PRESERVE_3D, ...BACKFACE_HIDDEN }}>{learningSide}</span>
-              <span data-side="native" aria-hidden={learningVisible} className="absolute inset-0 block"
-                style={{ transform: ruFirst ? 'none' : 'rotateY(180deg)', ...PRESERVE_3D, ...BACKFACE_HIDDEN }}>{nativeSide}</span>
-            </span>
-          </button>
+          {around.map((c, k) => {
+            const offset = from + k - i
+            return <DeckCard key={c.id} card={c} n={from + k + 1} total={total} offset={offset} direction={direction}
+              flipped={offset === 0 && flipped} showHints={showHints} onTap={tap} />
+          })}
         </div>
       </div>
 

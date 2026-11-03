@@ -12,6 +12,9 @@ import './index.css'
 
 registerServiceWorker()
 initTheme()
+// The serif of the card words is display=block (index.html): start loading both of its weights on
+// the cards now, so a card never waits with its word invisible.
+for (const weight of ['400', '500']) void document.fonts?.load(`${weight} 1em Newsreader`).catch(() => undefined)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

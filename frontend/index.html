@@ -37,7 +37,10 @@
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;500;600&family=Unbounded:wght@600;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Unbounded:wght@600;800&display=swap" rel="stylesheet" />
+    <!-- The serif of the learning-language words (the cards): display=block, so a word is never drawn in
+         a fallback font first and swapped a moment later. main.tsx starts loading it at once. -->
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;500;600&display=block" rel="stylesheet" />
     <title>yodla — so‘zlarni kontekst bilan yodla</title>
   </head>
   <body>

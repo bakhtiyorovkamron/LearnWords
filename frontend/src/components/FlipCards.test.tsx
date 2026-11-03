@@ -42,10 +42,11 @@ function view(props: Partial<Parameters<typeof FlipCards>[0]> = {}) {
   const list = props.cards ?? cards()
   return render(<FlipCards cards={list} total={props.total ?? list.length} direction="de_ru" resetKey="k" {...props} />, { wrapper })
 }
-const side = (name: 'learning' | 'native') => document.querySelector(`[data-side="${name}"]`) as HTMLElement
-const visible = () => document.querySelector('[data-side][aria-hidden="false"]') as HTMLElement
+// The neighbours are whole cards too: these look into the current card only.
 const track = () => screen.getByTestId('deck-track')
 const cardButton = () => screen.getByTestId('deck-card')
+const side = (name: 'learning' | 'native') => cardButton().querySelector(`[data-side="${name}"]`) as HTMLElement
+const visible = () => cardButton().querySelector('[data-side][aria-hidden="false"]') as HTMLElement
 
 /** A horizontal drag with the pointer: down on the track, move, up. */
 function swipe(dx: number, ms = 300) {
@@ -57,7 +58,7 @@ function swipe(dx: number, ms = 300) {
   fireEvent.pointerUp(window, { clientX: 200 + dx, pointerId: 1 })
   now.mockRestore()
 }
-const counter = () => document.querySelector('[data-side="learning"] .tabular-nums')!.textContent
+const counter = () => cardButton().querySelector('[data-side="learning"] .tabular-nums')!.textContent
 
 describe('FlipCards: the two sides', () => {
   it('the front: the learning label, the word and the FILLED example — and not the translation', () => {
@@ -166,13 +167,13 @@ describe('FlipCards: moving', () => {
     now.mockRestore()
   })
 
-  it('the neighbours peek in: surface-only buttons labelled Back / Next, none before the first or after the last card', async () => {
+  it('the neighbours are Back / Next buttons over their own card (hidden from screen readers), none before the first or after the last card', async () => {
     view()
     expect(screen.queryByTestId('deck-prev')).toBeNull()
     const next = screen.getByTestId('deck-next')
     expect(next.getAttribute('aria-label')).toBe('Next')
-    expect(next.className).toContain('opacity-60')
-    expect(next.textContent).toBe('') // surface only, no text
+    const sides = Array.from(next.querySelectorAll('[data-side]'))
+    expect(sides.map((s) => s.getAttribute('aria-hidden'))).toEqual(['true', 'true']) // the button is just «Next»
     fireEvent.click(next)
     await waitFor(() => expect(counter()).toBe('2 / 5'))
     expect(screen.getByTestId('deck-prev').getAttribute('aria-label')).toBe('Back')
@@ -493,7 +494,7 @@ describe('FlipCards: the flip in iPhone Safari', () => {
 
   it('nothing between the perspective (the card button) and a face clips, fades, filters or will-change anything but transform', () => {
     view()
-    const faces = document.querySelectorAll<HTMLElement>('[data-face]')
+    const faces = cardButton().querySelectorAll<HTMLElement>('[data-face]')
     expect(faces).toHaveLength(2)
     for (const face of faces) {
       expect(face.className).toContain('overflow-hidden') // the rounded clipping stays on the face itself
@@ -522,7 +523,7 @@ describe('FlipCards: the flip in iPhone Safari', () => {
 
 describe('FlipCards: the hints on the first visits', () => {
   const swipeHint = () => screen.queryByText('Swipe to move between cards')
-  const flipHint = () => screen.queryByText('Tap to see the translation')
+  const flipHint = () => within(cardButton()).queryByText('Tap to see the translation')
 
   it('the swipe hint and the flip line on the card show on the first 3 visits, then never again', () => {
     for (let visit = 1; visit <= 3; visit++) {
@@ -536,6 +537,7 @@ describe('FlipCards: the hints on the first visits', () => {
     expect(swipeHint()).toBeNull()
     expect(flipHint()).toBeNull()
     expect(screen.queryByText('Tap to see the word')).toBeNull() // nor on the back
+    expect(screen.queryByText('Tap to see the translation')).toBeNull() // nor on the neighbours
     expect(screen.getByText('← → to browse, Space to flip')).toBeTruthy() // the keys hint stays
     expect(localStorage.getItem('yodla.cardsHintSeen')).toBe('3')
   })
@@ -561,5 +563,79 @@ describe('FlipCards: the hints on the first visits', () => {
       get.mockRestore()
       set.mockRestore()
     }
+  })
+})
+
+/** Which side of a card faces the viewer: the rotor's turn plus that side's own turn make 0° or 360°. */
+const facing = (cardEl: HTMLElement) => {
+  const turned = (cardEl.firstElementChild as HTMLElement).style.transform === 'rotateY(180deg)'
+  const sides = Array.from(cardEl.querySelectorAll<HTMLElement>('[data-side]'))
+  return sides.find((s) => (s.style.transform === 'rotateY(180deg)') === turned)!.dataset.side
+}
+const offsets = () => Array.from(track().querySelectorAll<HTMLElement>('[data-offset]')).map((c) => Number(c.dataset.offset))
+const wordOf = (cardEl: HTMLElement) => within(cardEl).getByTestId('deck-word')
+
+describe('FlipCards: the neighbours are real cards', () => {
+  it('the next and previous neighbours show their words, front side up, before they slide in', async () => {
+    view()
+    const next = screen.getByTestId('deck-next')
+    expect(wordOf(next).textContent).toBe('Wort2')
+    expect(facing(next)).toBe('learning')
+    expect(next.querySelector('[data-face]')!.className).toBe(cardButton().querySelector('[data-face]')!.className) // the same face
+    fireEvent.click(cardButton()) // the current card flipped…
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    const prev = screen.getByTestId('deck-prev')
+    expect(wordOf(prev).textContent).toBe('Wort1')
+    expect(facing(prev)).toBe('learning') // …is on its front again as the neighbour
+    expect(wordOf(screen.getByTestId('deck-next')).textContent).toBe('Wort3')
+  })
+
+  it('native → word: a neighbour shows its front, the translation', () => {
+    view({ direction: 'ru_de' })
+    const next = screen.getByTestId('deck-next')
+    expect(facing(next)).toBe('native')
+    expect(within(next.querySelector<HTMLElement>('[data-side="native"]')!).getByText('слово2')).toBeTruthy()
+  })
+
+  it('two cards wait on each side, rendered but out of sight and out of reach', async () => {
+    view()
+    expect(offsets()).toEqual([0, 1, 2])
+    const farther = track().querySelector<HTMLElement>('[data-offset="2"]')!
+    expect(farther.getAttribute('aria-hidden')).toBe('true')
+    expect(farther.tabIndex).toBe(-1)
+    expect(wordOf(farther).textContent).toBe('Wort3')
+    for (const n of [2, 3]) {
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      await waitFor(() => expect(counter()).toBe(`${n} / 5`))
+    }
+    expect(offsets()).toEqual([-2, -1, 0, 1, 2])
+    expect(Array.from(track().querySelectorAll<HTMLElement>('[data-offset]')).map((c) => wordOf(c).textContent)).toEqual(['Wort1', 'Wort2', 'Wort3', 'Wort4', 'Wort5'])
+  })
+
+  it('after a slide the card that slid in is the very same DOM node: its word is not drawn anew', async () => {
+    view()
+    const next = screen.getByTestId('deck-next')
+    const word = wordOf(next)
+    const old = cardButton()
+    swipe(-100)
+    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    expect(cardButton()).toBe(next) // the same button…
+    expect(wordOf(cardButton())).toBe(word) // …and the same word node: nothing re-mounted
+    expect(screen.getByTestId('deck-prev')).toBe(old) // the old card stays, now on the left
+  })
+
+  it('after moving, the new card shows its front at once; only the current card animates a flip', async () => {
+    view()
+    fireEvent.click(cardButton())
+    expect(facing(cardButton())).toBe('native')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    expect(facing(cardButton())).toBe('learning')
+    expect(visible().dataset.side).toBe('learning')
+    expect((cardButton().firstElementChild as HTMLElement).className).toContain('transition-transform')
+    const prev = screen.getByTestId('deck-prev').firstElementChild as HTMLElement
+    expect(prev.style.transform).toBe('none') // the old card is back on its front…
+    expect(prev.className).not.toContain('transition-transform') // …at once, without a flip animation
   })
 })
