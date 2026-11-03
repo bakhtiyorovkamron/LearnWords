@@ -58,6 +58,21 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('CardsDeckPage', () => {
+  it('fits the screen: a column of the screen height that never scrolls; the stage takes what is left', async () => {
+    renderDeck('/cards')
+    const page = screen.getByTestId('deck-page')
+    expect(page.className).toContain('flex-col')
+    expect(page.className).toContain('overflow-hidden')
+    expect(page.className).toContain('h-[calc(100dvh-var(--nav-h)-env(safe-area-inset-top)-2rem)]') // phones
+    expect(page.className).toContain('md:h-[calc(100dvh-var(--header-h,0px)-5rem)]') // under the desktop header
+    const stage = await screen.findByTestId('deck-stage')
+    expect(stage.className).toMatch(/\bflex-1\b/)
+    expect(stage.className).toContain('min-h-[320px]')
+    expect(stage.className).toContain('max-h-[620px]')
+    expect(stage.style.height).toBe('') // no fixed height any more
+    expect(stage.style.touchAction).toBe('pan-y')
+  })
+
   it('asks for the deck with the collection query (all words, 48 a page) and shows the first card', async () => {
     renderDeck('/cards')
     expect(await screen.findByTestId('deck-card')).toBeTruthy()

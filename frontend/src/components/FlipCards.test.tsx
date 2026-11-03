@@ -271,31 +271,51 @@ describe('FlipCards: the controls under the deck', () => {
     expect((speakApi.speak.mock.calls[0][0] as { lang: string }).lang).toBe('en-US')
   })
 
-  it('the pager has up to 5 dots; the active one is wide: first, middle, last', async () => {
-    view({ cards: cards(8), total: 8 })
-    const dots = () => Array.from(screen.getByTestId('deck-pager').children)
-    expect(dots()).toHaveLength(5)
-    const active = () => dots().findIndex((d) => d.className.includes('w-5'))
-    expect(active()).toBe(0)
+  it('under the controls the counter reads "i / total" with the folder total; there are no pager dots', async () => {
+    view({ cards: cards(8), total: 403 })
+    const under = screen.getByTestId('deck-counter')
+    expect(under.textContent).toBe('1 / 403')
+    expect(under.className).toContain('text-[13px]')
+    expect(under.className).toContain('text-muted')
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 8'))
-    expect(active()).toBe(2)
-    cleanup()
-    view({ cards: cards(2), total: 2 })
-    expect(dots()).toHaveLength(2) // fewer than 5 cards: a dot per card
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 2'))
-    expect(active()).toBe(1)
+    await waitFor(() => expect(under.textContent).toBe('2 / 403'))
+    expect(counter()).toBe('2 / 403') // the chip on the card stays too
+    expect(screen.queryByTestId('deck-pager')).toBeNull()
   })
 
-  it('swipe hint on phones, the keys hint and the ‹ › buttons from md up', async () => {
-    view()
-    expect(screen.getByText('Swipe to move between cards').className).toContain('md:hidden')
-    expect(screen.getByText('← → to browse, Space to flip').className).toContain('md:block')
-    const next = screen.getAllByRole('button', { name: 'Next' }).find((b) => b.className.includes('md:grid'))!
-    expect(next.className).toContain('hidden')
+  it('the row is ← 🔊 ⟳ →, 64px tall; ← and → are 52px and on every width, move, and stop at the ends', async () => {
+    view({ cards: cards(2) })
+    const row = screen.getByTestId('deck-controls')
+    expect(row.className).toContain('h-16')
+    expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Back', 'Listen', 'Flip the card', 'Next'])
+    const back = within(row).getByRole('button', { name: 'Back' }) as HTMLButtonElement
+    const next = within(row).getByRole('button', { name: 'Next' }) as HTMLButtonElement
+    for (const b of [back, next]) {
+      expect(b.className).toMatch(/\bh-13\b.*\bw-13\b/)
+      expect(b.className).not.toMatch(/\bhidden\b|md:grid/) // phones too
+    }
+    expect(back.disabled).toBe(true)
     fireEvent.click(next)
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    await waitFor(() => expect(counter()).toBe('2 / 2'))
+    expect(next.disabled).toBe(true)
+    fireEvent.click(back)
+    await waitFor(() => expect(counter()).toBe('1 / 2'))
+  })
+
+  it('⟳ flips the card like a tap on it', () => {
+    view()
+    const flipButton = screen.getByRole('button', { name: 'Flip the card' })
+    expect(flipButton.className).toMatch(/\bh-13\b.*\bw-13\b/)
+    fireEvent.click(flipButton)
+    expect(visible().dataset.side).toBe('native')
+    fireEvent.click(flipButton)
+    expect(visible().dataset.side).toBe('learning')
+  })
+
+  it('the keys hint stays from md up', () => {
+    view()
+    expect(screen.getByText('← → to browse, Space to flip').className).toContain('md:block')
+    expect(screen.getByText('Swipe to move between cards').className).toContain('md:hidden')
   })
 
   it('the card is a button with the flip hint as its name, and there is no pencil any more', () => {
@@ -453,5 +473,93 @@ describe('FlipCards: rendering the movement', () => {
     expect((cardButton().firstElementChild as HTMLElement).style.willChange).toBe('transform')
     for (const s of [side('learning'), side('native')]) expect(s.style.backfaceVisibility).toBe('hidden')
     expect(screen.getByTestId('deck-stage').style.touchAction).toBe('pan-y')
+  })
+})
+
+describe('FlipCards: the flip in iPhone Safari', () => {
+  it('both faces hide their back and sit 1px out of their side; the sides and the rotor keep 3D', () => {
+    view()
+    for (const name of ['learning', 'native'] as const) {
+      const face = side(name).querySelector<HTMLElement>('[data-face]')!
+      expect(face.style.backfaceVisibility).toBe('hidden')
+      expect(face.style.transform).toBe('translateZ(1px)')
+      expect(side(name).style.backfaceVisibility).toBe('hidden')
+      expect(side(name).style.transformStyle).toBe('preserve-3d')
+    }
+    const rotor = screen.getByTestId('deck-rotor')
+    expect(rotor.style.transformStyle).toBe('preserve-3d')
+    expect(rotor.style.willChange).toBe('transform')
+  })
+
+  it('nothing between the perspective (the card button) and a face clips, fades, filters or will-change anything but transform', () => {
+    view()
+    const faces = document.querySelectorAll<HTMLElement>('[data-face]')
+    expect(faces).toHaveLength(2)
+    for (const face of faces) {
+      expect(face.className).toContain('overflow-hidden') // the rounded clipping stays on the face itself
+      for (let el = face.parentElement!; el !== cardButton(); el = el.parentElement!) {
+        expect(el.className).not.toMatch(/\b(overflow-|opacity-|blur|brightness-|contrast-|grayscale|drop-shadow|backdrop-|filter)/)
+        expect(el.style.overflow).toBe('')
+        expect(['', '1']).toContain(el.style.opacity)
+        expect(['', 'transform']).toContain(el.style.willChange)
+      }
+    }
+  })
+
+  it('a new card starts face up on a fresh rotor: the flip-back of the old card never plays on it', async () => {
+    view()
+    fireEvent.click(cardButton())
+    const rotor = screen.getByTestId('deck-rotor')
+    expect(rotor.style.transform).toBe('rotateY(180deg)')
+    swipe(-100)
+    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    expect(visible().dataset.side).toBe('learning')
+    const fresh = screen.getByTestId('deck-rotor')
+    expect(fresh).not.toBe(rotor) // a new element: no 180° → 0° transition on the new card
+    expect(fresh.style.transform).toBe('none')
+  })
+})
+
+describe('FlipCards: the hints on the first visits', () => {
+  const swipeHint = () => screen.queryByText('Swipe to move between cards')
+  const flipHint = () => screen.queryByText('Tap to see the translation')
+
+  it('the swipe hint and the flip line on the card show on the first 3 visits, then never again', () => {
+    for (let visit = 1; visit <= 3; visit++) {
+      view()
+      expect(swipeHint()).not.toBeNull()
+      expect(flipHint()).not.toBeNull()
+      cleanup()
+    }
+    expect(localStorage.getItem('yodla.cardsHintSeen')).toBe('3')
+    view()
+    expect(swipeHint()).toBeNull()
+    expect(flipHint()).toBeNull()
+    expect(screen.queryByText('Tap to see the word')).toBeNull() // nor on the back
+    expect(screen.getByText('← → to browse, Space to flip')).toBeTruthy() // the keys hint stays
+    expect(localStorage.getItem('yodla.cardsHintSeen')).toBe('3')
+  })
+
+  it('without storage (private mode) the hints keep showing and nothing breaks', () => {
+    const real = { get: Storage.prototype.getItem, set: Storage.prototype.setItem }
+    const blocked = (key: string) => key === 'yodla.cardsHintSeen'
+    const get = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+      if (blocked(key)) throw new Error('denied')
+      return real.get.call(this, key)
+    })
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+      if (blocked(key)) throw new Error('denied')
+      real.set.call(this, key, value)
+    })
+    try {
+      for (let visit = 1; visit <= 4; visit++) {
+        view()
+        expect(swipeHint()).not.toBeNull()
+        cleanup()
+      }
+    } finally {
+      get.mockRestore()
+      set.mockRestore()
+    }
   })
 })

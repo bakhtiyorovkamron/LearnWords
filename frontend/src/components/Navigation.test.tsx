@@ -241,3 +241,22 @@ describe('the shell has icons, not emoji', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 })
+
+describe('the footer', () => {
+  const footer = () => document.querySelector('footer')
+
+  it('is under every page but the cards deck, which fills the screen', () => {
+    renderLayout('/')
+    expect(footer()).not.toBeNull()
+    cleanup()
+    renderLayout('/words')
+    expect(footer()).not.toBeNull()
+    cleanup()
+    renderLayout('/cards')
+    expect(footer()).toBeNull()
+    cleanup()
+    renderLayout('/cards?folder=f1')
+    expect(footer()).toBeNull()
+    expect(screen.getAllByRole('navigation')).toHaveLength(2) // the header and the bottom nav stay
+  })
+})

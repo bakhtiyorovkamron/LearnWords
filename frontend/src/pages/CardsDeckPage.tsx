@@ -70,9 +70,13 @@ export function CardsDeckPage() {
   const directionLabel = t(`direction.${direction}`, { lang: learning.vars.langCode, native: i18n.language.toUpperCase() })
   const pill = 'flex h-10 items-center gap-2 rounded-full border border-line bg-surface text-sm font-semibold text-fg transition hover:bg-surface-2'
 
+  // Exactly the screen, never scrolling: the viewport minus the bottom nav, the top safe area and
+  // main's padding on phones (py-4); minus the header and main's padding from md up (md:py-10).
+  // Top bar → the deck (takes the rest) → its controls.
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-var(--nav-h)-2rem)] max-w-3xl flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
+    <div data-testid="deck-page"
+      className="mx-auto flex h-[calc(100dvh-var(--nav-h)-env(safe-area-inset-top)-2rem)] max-w-3xl flex-col gap-3 overflow-hidden md:h-[calc(100dvh-var(--header-h,0px)-5rem)]">
+      <div className="flex shrink-0 items-center justify-between gap-3">
         <button type="button" onClick={() => setPicking(true)} aria-haspopup="dialog" className={`${pill} min-w-0 px-3.5`}>
           {current ? <FolderDot color={current.color} /> : <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${folder === 'none' ? 'bg-faint' : 'bg-accent'}`} />}
           <span className="min-w-0 truncate">{name}</span>
@@ -88,7 +92,7 @@ export function CardsDeckPage() {
       {query.error ? (
         <ErrorState error={query.error} />
       ) : query.isLoading ? (
-        <div className="mt-4 animate-pulse rounded-[32px] bg-surface-2" style={{ height: 'clamp(380px, 60dvh, 560px)' }} aria-busy="true" />
+        <div className="min-h-[320px] max-h-[620px] flex-1 animate-pulse rounded-[32px] bg-surface-2" aria-busy="true" />
       ) : cards.length === 0 ? (
         <div className="glass p-10 text-center">
           <Leaf size={40} aria-hidden="true" className="mx-auto text-faint" />

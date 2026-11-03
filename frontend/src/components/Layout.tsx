@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { BookOpen, ChartColumn, House, Layers, List, LogOut, MessageCircle, Plus, Search, Shield, type LucideIcon } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -61,6 +61,21 @@ export function Layout() {
   const moreOpen = useMoreMenuOpen()
   // During a training session the shell steps aside: no header, bottom nav or footer.
   const focus = useTrainingOpen()
+  // The cards deck fills the screen: no footer under it.
+  const cardsPage = pathname.startsWith('/cards')
+
+  // The desktop header's height as --header-h, for a page that fills the screen exactly (the cards
+  // deck). It wraps on narrow desktops, so it is measured, not assumed; 0 on phones (it is hidden).
+  const shell = useRef<HTMLDivElement>(null)
+  const header = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const root = shell.current
+    const el = header.current
+    if (!root || !el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => root.style.setProperty('--header-h', `${el.offsetHeight}px`))
+    observer.observe(el)
+    return () => { observer.disconnect(); root.style.removeProperty('--header-h') }
+  }, [focus])
 
   // The one-time rating window: 3 seconds after the page loads, and never in the middle of a training.
   const [feedbackDue, setFeedbackDue] = useState(false)
@@ -96,11 +111,11 @@ export function Layout() {
   )
 
   return (
-    <div className="min-h-screen pt-[env(safe-area-inset-top)] pb-[var(--nav-h)] md:pt-0"
+    <div ref={shell} className="min-h-screen pt-[env(safe-area-inset-top)] pb-[var(--nav-h)] md:pt-0"
       style={focus ? ({ '--nav-h': '0px' } as React.CSSProperties) : undefined}>
       <InAppBanner />
       {/* Top menu: tablets and desktops. Phones get the bottom navigation below instead. */}
-      {!focus && <header className="sticky top-0 z-20 hidden border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur md:block">
+      {!focus && <header ref={header} className="sticky top-0 z-20 hidden border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur md:block">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
           <NavLink to="/" className="mr-4" aria-label="yodla"><Logo /></NavLink>
           <NavLink to="/" end className={link}><Icon icon={House} />{t('nav.home')}</NavLink>
@@ -124,7 +139,7 @@ export function Layout() {
       <main className="mx-auto max-w-6xl px-4 py-4 md:py-10">
         <Outlet />
       </main>
-      {!focus && (
+      {!focus && !cardsPage && (
         <footer className="space-y-2 py-8 text-center text-xs text-faint">
           <div>{learning.tagline}</div>
           <div className="text-muted">{t('contact.question')} <ContactLinks /></div>

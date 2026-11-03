@@ -18,9 +18,38 @@ const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 const CARD_WIDTH = 'min(420px, calc(100% - 88px))'
 const PEEK_STYLE = { top: 28, bottom: 28 } as const
 const BACKFACE_HIDDEN = { backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as const
+const PRESERVE_3D = { transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' } as const
+// A face hides its own back (Safari needs the -webkit- one too) and sits 1px in front of its side, so
+// iPhone Safari composites it in 3D and never shows the face behind it mirrored.
+const FACE_STYLE = { ...BACKFACE_HIDDEN, transform: 'translateZ(1px)' } as const
 
 const reducedMotion = () =>
   typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+const HINT_KEY = 'yodla.cardsHintSeen' // how many times the deck was opened
+const HINT_VISITS = 3
+
+function hintVisits(): number {
+  try {
+    return Number(localStorage.getItem(HINT_KEY)) || 0
+  } catch {
+    return 0 // storage off (private mode): the hints just keep showing
+  }
+}
+
+/** The swipe and flip hints: shown on the first HINT_VISITS visits of the deck, then never again. */
+function useFirstVisitsHints(): boolean {
+  const [show] = useState(() => hintVisits() < HINT_VISITS)
+  const counted = useRef(false) // StrictMode runs the effect twice in development: one visit is one
+  useEffect(() => {
+    if (counted.current) return
+    counted.current = true
+    try {
+      localStorage.setItem(HINT_KEY, String(Math.min(hintVisits() + 1, HINT_VISITS)))
+    } catch { /* nothing to remember it in */ }
+  }, [])
+  return show
+}
 
 type Direction = 'de_ru' | 'ru_de'
 type Point = { x: number; t: number }
@@ -33,7 +62,9 @@ function velocity(points: Point[], x: number, t: number) {
 
 function Face({ className, children }: { className: string; children: React.ReactNode }) {
   return (
-    <span className={`absolute inset-0 flex flex-col items-center justify-center overflow-hidden rounded-[32px] p-7 text-center [backface-visibility:hidden] [-webkit-backface-visibility:hidden] ${className}`}>
+    // py-14 keeps the word and the example centred between the chips at the top and the hint below.
+    <span data-face="" style={FACE_STYLE}
+      className={`absolute inset-0 flex flex-col items-center justify-center overflow-hidden rounded-[32px] px-7 py-14 text-center ${className}`}>
       {children}
     </span>
   )
@@ -58,16 +89,19 @@ const label = 'text-xs font-bold uppercase tracking-[0.12em] text-faint'
  * The flashcard deck: one big card at a time, the neighbours peek in from the edges. One side is one
  * language — the learning-language side shows the word and its filled example, the other the
  * translation. A tap flips, a swipe (or ← →) moves. Pure self-check: nothing is sent to the backend.
+ * It fills the rest of its parent (a flex column of a fixed height): the stage stretches, the controls
+ * row stays under it.
  */
 export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearEnd }: {
   cards: CollectionCard[]
-  total: number // all cards of the folder (the counter and the pager), more than are loaded so far
+  total: number // all cards of the folder (the counter), more than are loaded so far
   direction?: Direction // which side is shown first
   resetKey: string // changes with the folder / direction → back to the first card
   onNearEnd?: () => void // load the next page before the user reaches the last card
 }) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
+  const showHints = useFirstVisitsHints()
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   // The track's position lives in the DOM, not in state: a move writes it in the next animation frame
@@ -245,13 +279,11 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   if (!card) return null
 
   const { article, rest } = splitArticle(card.word, card.article)
-  const dots = Math.min(5, Math.max(total, 1))
-  const activeDot = dots === 1 ? 0 : i === 0 ? 0 : i >= total - 1 ? dots - 1 : Math.floor(dots / 2)
   const filled = card.is_learned ? 5 : Math.min(Math.max(card.box_level, 0), 5)
   const counter = <span className="text-[13px] tabular-nums text-muted">{i + 1} / {total}</span>
   const nativeLang = card.translation_language ?? i18n.language
   const learningVisible = ruFirst ? flipped : !flipped // the other side is turned away (and hidden from screen readers)
-  const hint = (key: string) => (
+  const hint = (key: string) => showHints && (
     <span className="absolute bottom-6 flex items-center gap-1.5 text-[13px] text-faint">
       <RotateCw size={14} aria-hidden="true" />{t(key)}
     </span>
@@ -301,10 +333,11 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const next = cards[i + 1]
   const circle = 'place-items-center rounded-full border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
   return (
-    <div className="mt-4">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* The stage takes the height that is left, 320–620 px; the card width stays as it was. */}
       <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage"
-        className="relative -mx-4 overflow-hidden md:mx-0"
-        style={{ height: 'clamp(380px, 60dvh, 560px)', touchAction: 'pan-y' }}>
+        className="relative -mx-4 max-h-[620px] min-h-[320px] flex-1 overflow-hidden md:mx-0"
+        style={{ touchAction: 'pan-y' }}>
         {/* Its own GPU layer; moved only by place() — React never sets its transform, so a render leaves it be. */}
         <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>
           {prev && <Peek key={prev.id} side={-1} label={t('collection.prev')} onPick={pick} />}
@@ -313,26 +346,26 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
             onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } flip() }}
             style={{ width: CARD_WIDTH, left: '50%', transform: 'translateX(-50%)', perspective: 1200 }}
             className="absolute inset-y-0 block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
-            <span className="absolute inset-0 block transition-transform duration-500 [transform-style:preserve-3d]"
-              style={{ transform: flipped ? 'rotateY(180deg)' : 'none', willChange: 'transform' }}>
-              <span data-side="learning" aria-hidden={!learningVisible} className="absolute inset-0 block [transform-style:preserve-3d]"
-                style={{ transform: ruFirst ? 'rotateY(180deg)' : 'none', ...BACKFACE_HIDDEN }}>{learningSide}</span>
-              <span data-side="native" aria-hidden={learningVisible} className="absolute inset-0 block [transform-style:preserve-3d]"
-                style={{ transform: ruFirst ? 'none' : 'rotateY(180deg)', ...BACKFACE_HIDDEN }}>{nativeSide}</span>
+            {/* Nothing between the button (the perspective) and the faces may clip, fade, filter or
+                will-change anything but transform: Safari would flatten the 3D and show a face mirrored.
+                key: a new card gets a fresh rotor that starts unflipped — the old one's flip-back
+                transition never plays on it. */}
+            <span key={card.id} data-testid="deck-rotor" className="absolute inset-0 block transition-transform duration-500"
+              style={{ transform: flipped ? 'rotateY(180deg)' : 'none', willChange: 'transform', ...PRESERVE_3D }}>
+              <span data-side="learning" aria-hidden={!learningVisible} className="absolute inset-0 block"
+                style={{ transform: ruFirst ? 'rotateY(180deg)' : 'none', ...PRESERVE_3D, ...BACKFACE_HIDDEN }}>{learningSide}</span>
+              <span data-side="native" aria-hidden={learningVisible} className="absolute inset-0 block"
+                style={{ transform: ruFirst ? 'none' : 'rotateY(180deg)', ...PRESERVE_3D, ...BACKFACE_HIDDEN }}>{nativeSide}</span>
             </span>
           </button>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-1.5" aria-hidden="true" data-testid="deck-pager">
-          {Array.from({ length: dots }, (_, n) => (
-            <span key={n} className={`h-1.5 rounded-full ${n === activeDot ? 'w-5 bg-accent' : 'w-1.5 bg-dot-off'}`} />
-          ))}
-        </div>
-        <div className="flex items-center gap-5">
+      {/* The controls: the same big, thumb-friendly row on phones and desktops — ← 🔊 ⟳ →. */}
+      <div className="mt-3 flex shrink-0 flex-col items-center gap-1">
+        <div className="flex h-16 items-center justify-center gap-4" data-testid="deck-controls">
           <button type="button" onClick={() => slide(-1)} disabled={i === 0} aria-label={t('collection.prev')}
-            className={`hidden h-12 w-12 md:grid ${circle}`}><ChevronLeft size={22} aria-hidden="true" /></button>
+            className={`grid h-13 w-13 ${circle}`}><ChevronLeft size={24} aria-hidden="true" /></button>
           {canSpeak ? (
             // In native → word, listening before the flip would give the answer away.
             <button type="button" onClick={() => speak(card.word, card.language)} disabled={ruFirst && !flipped}
@@ -341,10 +374,13 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
               <Volume2 size={24} aria-hidden="true" />
             </button>
           ) : <span className="h-16 w-0" />}
+          <button type="button" onClick={flip} aria-label={t('cards.flip')} title={t('cards.flip')}
+            className={`grid h-13 w-13 ${circle}`}><RotateCw size={22} aria-hidden="true" /></button>
           <button type="button" onClick={() => slide(1)} disabled={i >= last} aria-label={t('collection.next')}
-            className={`hidden h-12 w-12 md:grid ${circle}`}><ChevronRight size={22} aria-hidden="true" /></button>
+            className={`grid h-13 w-13 ${circle}`}><ChevronRight size={24} aria-hidden="true" /></button>
         </div>
-        <p className="text-[13px] text-faint md:hidden">{t('cards.swipeHint')}</p>
+        <span data-testid="deck-counter" className="text-[13px] tabular-nums text-muted">{i + 1} / {total}</span>
+        {showHints && <p className="text-[13px] text-faint md:hidden">{t('cards.swipeHint')}</p>}
         <p className="hidden text-[13px] text-faint md:block">{t('collection.keysHint')}</p>
       </div>
     </div>

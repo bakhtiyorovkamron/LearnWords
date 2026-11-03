@@ -146,6 +146,7 @@
     "flipToTranslation": "Tarjimani ko‘rish uchun bosing",
     "flipToWord": "So‘zni ko‘rish uchun bosing",
     "swipeHint": "Kartochkalar orasida o‘tish uchun suring",
+    "flip": "Kartochkani aylantirish",
     "emptyFolder": "Bu papkada hali so‘z yo‘q",
     "pickFolder": "Qaysi papka?",
     "sideNative": { "ru": "Ruscha", "en": "Inglizcha", "uz": "O‘zbekcha" }

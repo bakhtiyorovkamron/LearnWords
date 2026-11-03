@@ -146,6 +146,7 @@
     "flipToTranslation": "Tap to see the translation",
     "flipToWord": "Tap to see the word",
     "swipeHint": "Swipe to move between cards",
+    "flip": "Flip the card",
     "emptyFolder": "This folder has no words yet",
     "pickFolder": "Which folder?",
     "sideNative": { "ru": "Russian", "en": "English", "uz": "Uzbek" }
