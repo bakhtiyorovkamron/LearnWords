@@ -19,6 +19,7 @@ import { toast } from '../components/Toaster'
 import { NothingFound, WordList } from '../components/WordList'
 import { useDebounced } from '../lib/useDebounced'
 import { useMoveWords } from '../lib/moveWords'
+import { useVisibleCards } from '../lib/deleteWords'
 
 const PAGE = 48
 const squareButton = 'grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
@@ -77,7 +78,8 @@ export function FolderPage() {
     },
     placeholderData: keepPreviousData,
   })
-  const cards = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data])
+  // Words waiting to be deleted are left out, so the empty state shows when they were the last ones.
+  const cards = useVisibleCards(useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data]))
   const filteredTotal = query.data?.pages[0]?.total
 
   const remove = useMutation({

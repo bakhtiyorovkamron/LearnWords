@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { collectionApi, foldersApi, wordsApi } from '../api/endpoints'
+import { resetDeleteWords } from '../lib/deleteWords'
 import { FolderPage } from './FolderPage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -12,7 +13,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     ...mod,
     collectionApi: { list: vi.fn(), ids: vi.fn() },
     foldersApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), share: vi.fn() },
-    wordsApi: { ...mod.wordsApi, move: vi.fn() },
+    wordsApi: { ...mod.wordsApi, move: vi.fn(), remove: vi.fn() },
   }
 })
 
@@ -55,7 +56,7 @@ beforeEach(async () => {
   vi.mocked(collectionApi.ids).mockResolvedValue({ ids: ['c1', 'c2'], total: 2 } as never)
   vi.mocked(wordsApi.move).mockResolvedValue({ moved: 2, previous: [] } as never)
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); resetDeleteWords(); vi.clearAllMocks() })
 
 describe('FolderPage: a folder', () => {
   it('the title, the word count, the ring with the percent, the learned/due line', async () => {
@@ -117,6 +118,19 @@ describe('FolderPage: a folder', () => {
     expect(collectionApi.list).toHaveBeenCalledWith({ status: 'all', period: 'all', sort: 'date', q: '', folder: 'f1', limit: 48, offset: 0 })
     expect(screen.getByRole('heading', { level: 2, name: 'Words' })).toBeTruthy()
     expect(screen.getAllByTestId('box-bars')).toHaveLength(2)
+  })
+
+  it('a word waiting to be deleted is not rendered; the last one gone → the empty state', async () => {
+    renderFolder('/words/f1')
+    fireEvent.click((await screen.findAllByTestId('word-row'))[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Delete word' }))
+    expect(screen.getAllByTestId('word-row')).toHaveLength(1)
+    expect(screen.queryByText('Wort1')).toBeNull()
+    fireEvent.click(screen.getByTestId('word-row'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete word' }))
+    expect(screen.queryByTestId('word-row')).toBeNull()
+    expect(screen.getByText('This folder has no words yet')).toBeTruthy()
+    expect(wordsApi.remove).not.toHaveBeenCalled() // still within Undo time
   })
 
   it('an unknown folder id goes back to the hub once the folders have loaded', async () => {

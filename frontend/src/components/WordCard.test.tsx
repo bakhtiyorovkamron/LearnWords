@@ -1,17 +1,19 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { cardsApi } from '../api/endpoints'
+import { wordsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
 import { splitArticle } from '../lib/article'
+import { UNDO_MS, resetDeleteWords } from '../lib/deleteWords'
+import { Toaster } from './Toaster'
 import { WordCardView } from './WordCard'
 
 vi.mock('./EditWordModal', () => ({ EditWordModal: () => <div>EDIT MODAL</div> }))
 vi.mock('./FolderPicker', () => ({ FolderPicker: () => <div>FOLDER PICKER</div> }))
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, cardsApi: { remove: vi.fn().mockResolvedValue(undefined) } }
+  return { ...mod, wordsApi: { ...mod.wordsApi, remove: vi.fn().mockResolvedValue({ deleted: 1 }) } }
 })
 
 const card: WordCard = {
@@ -31,7 +33,7 @@ beforeEach(async () => {
   vi.stubGlobal('speechSynthesis', speakApi)
   vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string }, text: string) { this.text = text })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); resetDeleteWords(); vi.useRealTimers(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 
 describe('splitArticle', () => {
   it('uses card.article, else a leading article of the word (any case), else none', () => {
@@ -97,16 +99,18 @@ describe('WordCardView row', () => {
     expect(screen.getByText('FOLDER PICKER')).toBeTruthy()
   })
 
-  it('Delete asks to confirm, then deletes; cancel does nothing', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-    view(card)
+  it('Delete closes the sheet without a confirm dialog, shows the toast with Undo; nothing is sent before 6 s', async () => {
+    vi.useFakeTimers()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<QueryClientProvider client={new QueryClient()}><Toaster /><WordCardView card={card} progress={progress} /></QueryClientProvider>)
     fireEvent.click(screen.getByTestId('word-row'))
     fireEvent.click(screen.getByRole('button', { name: 'Delete word' }))
-    expect(cardsApi.remove).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByTestId('word-row'))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete word' }))
-    await waitFor(() => expect(cardsApi.remove).toHaveBeenCalledWith('c1'))
-    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.getByText('Deleted “Hund”')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
+    await act(() => vi.advanceTimersByTimeAsync(UNDO_MS - 1))
+    expect(wordsApi.remove).not.toHaveBeenCalled()
   })
 
   it('Esc closes the sheet', () => {

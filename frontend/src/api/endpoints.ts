@@ -118,6 +118,8 @@ export const wordsApi = {
   // has every word's previous folder for "Undo".
   move: (wordIds: string[], folderId: string | null) =>
     api.post<MoveResult>('/words/move', { word_ids: wordIds, folder_id: folderId }).then((r) => r.data),
+  // One word or many (≤ 500). Ids that are already gone are skipped.
+  remove: (wordIds: string[]) => api.post<{ deleted: number }>('/words/delete', { word_ids: wordIds }).then((r) => r.data),
 }
 
 export interface MoveResult {

@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { FolderInput, Pencil, Trash, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { cardsApi } from '../api/endpoints'
 import type { WordCard } from '../api/types'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
+import { useDeleteWords } from '../lib/deleteWords'
 import { useMoveWords } from '../lib/moveWords'
 import { EditWordModal } from './EditWordModal'
 import { FolderPicker } from './FolderPicker'
@@ -48,7 +47,6 @@ export function WordCardView({ card, progress, selection }: {
   selection?: { checked: boolean; onToggle: () => void }
 }) {
   const { t } = useTranslation()
-  const qc = useQueryClient()
   const [sheet, setSheet] = useState(false)
   const [editing, setEditing] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -58,18 +56,12 @@ export function WordCardView({ card, progress, selection }: {
     setPicking(false)
     await moveWords([card.id], folderId, folderName)
   }
-  const remove = useMutation({
-    mutationFn: () => cardsApi.remove(card.id),
-    onSuccess: () => {
-      // Drop the card from every cached list immediately.
-      qc.setQueriesData<WordCard[]>({ queryKey: ['cards'] }, (old) => old?.filter((c) => c.id !== card.id))
-      qc.invalidateQueries({ queryKey: ['collection'] })
-    },
-  })
+  const deleteWords = useDeleteWords()
 
+  // No confirm: the row disappears at once (the lists drop hidden words) and the toast offers Undo.
   function onDelete() {
     setSheet(false)
-    if (window.confirm(t('wordCard.deleteConfirm', { word: card.word }))) remove.mutate()
+    deleteWords([{ id: card.id, word: card.word }])
   }
 
   // The modals are siblings of the row, not children: a click inside them must not reach the row.
@@ -79,7 +71,7 @@ export function WordCardView({ card, progress, selection }: {
         data-testid="word-row"
         onClick={() => (selection ? selection.onToggle() : setSheet(true))}
         className={`flex min-h-16 cursor-pointer items-center gap-3 px-4 py-2.5 transition hover:bg-surface-2 ${
-          selection?.checked ? 'bg-surface-2' : ''} ${remove.isPending ? 'pointer-events-none opacity-40' : ''}`}
+          selection?.checked ? 'bg-surface-2' : ''}`}
       >
         {selection && (
           <input type="checkbox" checked={selection.checked} onChange={selection.onToggle}
@@ -89,7 +81,6 @@ export function WordCardView({ card, progress, selection }: {
         <button type="button" aria-haspopup="dialog" className="min-w-0 flex-1 text-left">
           <span className="block truncate font-serif text-[18px] font-medium text-fg" lang={card.language}><Word card={card} /></span>
           <span className="block truncate text-sm text-muted">{card.translation}</span>
-          {remove.error && <span className="block text-xs text-danger">{t('wordCard.deleteFailed')}</span>}
         </button>
         {progress && (
           <ProgressDots compact boxLevel={progress.boxLevel} isLearned={progress.isLearned}
@@ -123,7 +114,7 @@ export function WordCardView({ card, progress, selection }: {
             <button type="button" className={`${sheetAction} text-fg`} onClick={() => { setSheet(false); setPicking(true) }}>
               <FolderInput size={18} aria-hidden="true" />{t('word.move')}
             </button>
-            <button type="button" className={`${sheetAction} text-danger`} disabled={remove.isPending} onClick={onDelete}>
+            <button type="button" className={`${sheetAction} text-danger`} onClick={onDelete}>
               <Trash size={18} aria-hidden="true" />{t('wordCard.delete')}
             </button>
           </div>

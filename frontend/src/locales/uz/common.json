@@ -343,6 +343,7 @@
   "folder": {"none": "Papkasiz", "new": "+ Yangi papka"},
   "select": {"start": "Tanlash", "all": "Hammasini tanlash", "count": "Tanlandi: {{n}}", "cancel": "Tayyor", "limit": "{{total}} tadan dastlabki {{n}} tasi tanlandi"},
   "move": {"button": "Koʻchirish ({{n}})", "done": "{{folder}} papkasiga koʻchirildi: {{n}}", "undo": "Qaytarish", "failed": "Koʻchirib boʻlmadi"},
+  "del": {"doneOne": "«{{word}}» so‘zi o‘chirildi", "doneMany_one": "{{count}} ta so‘z o‘chirildi", "doneMany_other": "{{count}} ta so‘z o‘chirildi"},
   "box": {"title": "{{n}}-quti (5 tadan)", "next": "Keyingi takrorlash: {{when}}", "rule": "Toʻgʻri javob bersangiz — {{next}}-qutiga oʻtadi. Xato qilsangiz — 1-qutiga qaytadi.", "lastBox": "Yana bir necha marta ketma-ket toʻgʻri javob bersangiz — soʻz yodlanadi. Xato qilsangiz — 1-qutiga qaytadi.", "learned": "Soʻz yodlandi. Uni yana {{when}} tekshiramiz.", "today": "Bugun takrorlangan", "when": {"today": "bugun", "tomorrow": "ertaga", "inDays": "{{n}} kundan keyin"}},
   "feedback": {"title": "yodla sizga yoqyaptimi?", "star": "5 dan {{n}}", "placeholder": "Nimani yaxshilash kerak? (ixtiyoriy)", "placeholderLow": "Nima yoqmadi? (ixtiyoriy)", "placeholderHigh": "Sizga nima yoqdi? (ixtiyoriy)", "send": "Yuborish", "thanks": "Fikringiz uchun rahmat!"},
   "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring.", "featureDisabled": "Bu funksiya siz uchun o‘chirilgan.", "dailyLimit": "Bugungi limit tugadi, ertaga yana {{limit}} ta bo‘ladi."},

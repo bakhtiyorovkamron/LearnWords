@@ -11,6 +11,7 @@ import { SearchField } from '../components/SearchField'
 import { NothingFound, WordList } from '../components/WordList'
 import { WordFixes } from '../components/WordFixes'
 import { useDebounced } from '../lib/useDebounced'
+import { useVisibleCards } from '../lib/deleteWords'
 
 const PAGE = 48
 const tile = 'relative min-h-[128px] rounded-[18px] border border-line bg-surface p-3.5'
@@ -49,7 +50,7 @@ export function WordsPage() {
     enabled: search !== '',
     placeholderData: keepPreviousData,
   })
-  const cards = useMemo(() => found.data?.pages.flatMap((p) => p.items) ?? [], [found.data])
+  const cards = useVisibleCards(useMemo(() => found.data?.pages.flatMap((p) => p.items) ?? [], [found.data]))
   const foundTotal = found.data?.pages[0]?.total
 
   const all = list.data?.all
