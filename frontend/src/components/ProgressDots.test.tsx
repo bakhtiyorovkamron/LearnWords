@@ -1,9 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { ProgressDots } from './ProgressDots'
-import { ReviewResult } from './ReviewResult'
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString()
 
@@ -69,15 +67,5 @@ describe('ProgressDots compact', () => {
     render(<ProgressDots compact boxLevel={3} isLearned={false} schedule={sched} />)
     fireEvent.click(screen.getByRole('button'))
     expect(screen.getByRole('dialog').textContent).toContain('Коробка 3 из 5')
-  })
-})
-
-describe('ReviewResult box line', () => {
-  const renderResult = (movedUp: number) =>
-    render(<MemoryRouter><ReviewResult correct={3} total={4} movedUp={movedUp} /></MemoryRouter>)
-
-  it('review: how many words moved up a box', () => {
-    renderResult(3)
-    expect(screen.getByText('Перешли в следующую коробку: 3')).toBeTruthy()
   })
 })

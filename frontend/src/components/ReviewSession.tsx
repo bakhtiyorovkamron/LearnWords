@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { cardsApi, reviewApi } from '../api/endpoints'
 import { errorMessage, isRateLimited, rateLimitMessage } from '../api/client'
 import { emitHeroEvent } from '../lib/heroBus'
+import type { DueCard } from '../api/types'
 import { buildQueue, DIRECTIONS, type Direction, type QuizItem } from '../lib/quiz'
 import { fetchSizeFor, parseUrlSize } from '../lib/reviewSessionSize'
 import { QuizQuestion } from './QuizQuestion'
@@ -13,6 +14,7 @@ import { ReviewResult } from './ReviewResult'
 import { useStoredChoice } from './DirectionToggle'
 import { ReviewHero, TrainingHero } from './TrainingHero'
 import { ErrorState } from './ErrorState'
+import { useTodayGoal } from '../lib/todayGoal'
 import { setTrainingOpen } from '../lib/trainingState'
 
 const DEFAULT_SIZE = 20
@@ -42,7 +44,14 @@ export function ReviewSession() {
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
   const [streak, setStreak] = useState(0) // consecutive correct answers; resets on a wrong one
-  const [movedUp, setMovedUp] = useState(0) // words that went up a Leitner box in this session
+  // For the result screen — all reset when a deck starts.
+  const [answeredCount, setAnsweredCount] = useState(0)
+  const [bestStreak, setBestStreak] = useState(0)
+  const [mistakes, setMistakes] = useState<DueCard[]>([])
+  const [startedAt, setStartedAt] = useState(() => Date.now())
+  // Today's goal as it was when the deck started: the numbers must not jump when the stats refetch.
+  const today = useTodayGoal()
+  const [goalAtStart, setGoalAtStart] = useState({ reviewed: 0, target: 1 })
   const [moreLoading, setMoreLoading] = useState(false)
   // Only changes how words are asked; progress (box_level) is shared by all directions.
   const [direction] = useStoredChoice<Direction>('review-direction', DIRECTIONS, 'mixed')
@@ -50,30 +59,31 @@ export function ReviewSession() {
   // The hero widget only ever hears about training through these events — it has no other
   // hook into this component, and this component has no idea the hero exists.
   const answer = useMutation({
-    mutationFn: ({ id, ok }: { id: string; ok: boolean; wasLearned: boolean; prevBox: number }) => reviewApi.answer(id, ok),
+    mutationFn: ({ id, ok }: { id: string; ok: boolean; wasLearned: boolean }) => reviewApi.answer(id, ok),
     onSuccess: (progress, variables) => {
       qc.invalidateQueries({ queryKey: ['stats'] })
       qc.invalidateQueries({ queryKey: ['folders'] }) // Home shows a fresh "due today" count
       if (progress.box_level >= 4 && !variables.wasLearned) emitHeroEvent({ type: 'word_learned' })
-      if (progress.box_level > variables.prevBox) setMovedUp((n) => n + 1)
     },
   })
 
-  // Tell the rest of the UI that questions are on screen (e.g. the feedback window waits).
-  const inSession = !!deck && index < deck.length
+  // Tell the rest of the UI that a session is on screen — the questions and the result — so the shell
+  // (header, bottom menu) stays out of the way and the feedback window waits.
+  const inSession = !!deck
   useEffect(() => {
     setTrainingOpen(inSession)
     return () => setTrainingOpen(false)
   }, [inSession])
 
-  // Starts once, as soon as fresh due words are in (not a stale cache). Nothing due: the screen below.
+  // Starts once, as soon as fresh due words are in (not a stale cache) and today's numbers are known
+  // (they are snapshotted). Nothing due: the screen below.
   const started = useRef(false)
   useEffect(() => {
-    if (started.current || due.isFetching || !due.data) return
+    if (started.current || due.isFetching || !due.data || !today.settled) return
     started.current = true
     if (due.data.total > 0) start(due.data.cards)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [due.isFetching, due.data])
+  }, [due.isFetching, due.data, today.settled])
 
   // Reports exactly once when the deck is exhausted, not on every re-render of the result screen.
   useEffect(() => {
@@ -89,7 +99,11 @@ export function ReviewSession() {
     setIndex(0)
     setCorrect(0)
     setStreak(0)
-    setMovedUp(0)
+    setAnsweredCount(0)
+    setBestStreak(0)
+    setMistakes([])
+    setStartedAt(Date.now())
+    setGoalAtStart({ reviewed: today.reviewed, target: Math.max(today.target, 1) })
     answer.reset()
     emitHeroEvent({ type: 'session_started' })
   }
@@ -124,8 +138,10 @@ export function ReviewSession() {
   if (index >= deck.length) {
     const moreCount = Math.min(size, Math.max((due.data?.total ?? 0) - deck.length, 0))
     return (
-      <ReviewResult correct={correct} total={deck.length} moreCount={moreCount} onMore={more} moreLoading={moreLoading}
-        movedUp={movedUp} />
+      <ReviewResult correct={correct} total={deck.length} mistakes={mistakes} bestStreak={bestStreak}
+        minutes={Math.max(1, Math.round((Date.now() - startedAt) / 60000))}
+        goal={{ done: goalAtStart.reviewed + answeredCount, target: goalAtStart.target }}
+        moreCount={moreCount} onMore={more} moreLoading={moreLoading} />
     )
   }
 
@@ -149,8 +165,11 @@ export function ReviewSession() {
         if (ok) setCorrect((c) => c + 1)
         const newStreak = ok ? streak + 1 : 0
         setStreak(newStreak)
+        setBestStreak((b) => Math.max(b, newStreak))
+        setAnsweredCount((n) => n + 1)
+        if (!ok) setMistakes((m) => [...m, item.card])
         emitHeroEvent({ type: 'answer', correct: ok, streak: newStreak })
-        answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4, prevBox: item.card.box_level }) // saved immediately, not at the end
+        answer.mutate({ id: item.card.id, ok, wasLearned: item.card.box_level >= 4 }) // saved immediately, not at the end
       }}
       onNext={() => {
         answer.reset()

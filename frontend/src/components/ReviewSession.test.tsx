@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -28,6 +28,13 @@ const due = (n: number): DueCard => ({
 } as DueCard)
 const card = (n: number): WordCard => ({ ...due(n) } as unknown as WordCard)
 
+const todayIso = () => new Date().toISOString().slice(0, 10)
+/** GET /stats?period=week with today's answers so far. */
+const week = (reviewed: number, streak = 0) => ({
+  daily: [{ date: todayIso(), reviewed, correct: reviewed, new_words: 0, active: reviewed > 0, goal_met: false }],
+  totals: { current_streak_days: streak, longest_streak_days: streak, total_words_learned: 0, accuracy_percent: 0 },
+})
+
 const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
 function renderSession(url: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -42,7 +49,8 @@ beforeEach(async () => {
   localStorage.clear()
   localStorage.setItem('review-direction', 'de_ru')
   vi.mocked(meApi.get).mockResolvedValue({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de' })
-  vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 0 }, folders: [] } as never)
+  vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 500, due_today: 30 }, folders: [] } as never)
+  vi.mocked(statsApi.get).mockResolvedValue(week(0) as never)
   vi.mocked(heroApi.get).mockRejectedValue({ response: { status: 404 } })
   vi.mocked(settingsApi.get).mockResolvedValue({ interface_language: '', review_session_size: '', theme: '' })
   vi.mocked(cardsApi.list).mockResolvedValue([1, 2, 3, 4].map(card))
@@ -182,44 +190,109 @@ describe('ReviewSession: the URL is the only input', () => {
 })
 
 describe('ReviewSession: the result', () => {
-  async function finish(total: number, size: string) {
+  /** Answers `size` questions; `pick` chooses the option (default: the right one — 'слово<n>' of the card shown). */
+  async function finish(total: number, size: string, answer: 'right' | 'wrong' = 'right') {
     serve(total)
     vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 2, is_learned: false, next_review_at: '2030-01-01' } as never)
     renderSession(`/train?size=${size}`)
     for (let i = 0; i < Number(size); i++) {
+      const word = await screen.findByText(/^Wort\d+$/)
+      const right = `слово${word.textContent!.slice(4)}`
       const options = await screen.findAllByRole('button', { name: /слово\d/ })
-      fireEvent.click(options[0])
+      fireEvent.click(options.find((o) => (answer === 'right') === (o.textContent === right))!)
       fireEvent.click(await screen.findByRole('button', { name: /Continue|Finish/ }))
     }
-    await screen.findByText('Training complete')
   }
 
-  it('words are left: "More N" (N = the session size at most) is the primary button, Home the ghost one', async () => {
+  it('goal not met: "Training complete", what is left to the goal, and "N more" is the primary button', async () => {
     await finish(30, '2')
-    const more = screen.getByRole('button', { name: 'More 2' })
+    expect(await screen.findByText('Training complete')).toBeTruthy()
+    expect(screen.getByText('18 words to the goal · 1 min')).toBeTruthy() // 20 − 2
+    const more = screen.getByRole('button', { name: /2 words more/ })
     expect(more.className).toContain('btn-primary')
-    expect(screen.getByRole('link', { name: 'Back to home' }).className).toContain('btn-ghost')
-    expect(screen.queryByText('Try again')).toBeNull()
-    expect(screen.queryByRole('button', { name: /Practice/ })).toBeNull()
+    const done = screen.getByRole('button', { name: 'Done' })
+    expect(done.className).toContain('btn-ghost')
+    expect(screen.queryByRole('button', { name: /Practice|Try again/ })).toBeNull()
   })
 
-  it('"More" is capped by what is left', async () => {
+  it('"more" is capped by what is left', async () => {
     await finish(3, '2')
-    expect(screen.getByRole('button', { name: 'More 1' })).toBeTruthy()
+    await screen.findByText('Training complete')
+    expect(screen.getByRole('button', { name: /1 word more/ })).toBeTruthy()
   })
 
-  it('nothing is left: only "Back to home", as the primary button', async () => {
+  it('nothing is left: only "Done", as the primary button', async () => {
     await finish(2, '2')
-    expect(screen.queryByRole('button', { name: /^More/ })).toBeNull()
-    expect(screen.getByRole('link', { name: 'Back to home' }).className).toContain('btn-primary')
+    await screen.findByText('Training complete')
+    expect(screen.queryByRole('button', { name: /more/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-primary')
   })
 
-  it('"More" asks the next portion with the same folder and size', async () => {
+  it('"more" asks the next portion with the same folder and size', async () => {
     await finish(30, '2')
+    await screen.findByText('Training complete')
     vi.mocked(reviewApi.due).mockClear()
-    fireEvent.click(screen.getByRole('button', { name: 'More 2' }))
+    fireEvent.click(screen.getByRole('button', { name: /2 words more/ }))
     expect(await screen.findByText('1/2')).toBeTruthy()
     expect(reviewApi.due).toHaveBeenCalledWith('', '10')
+  })
+
+  it('a wrong answer lands in the mistakes with its translation; right answers do not', async () => {
+    await finish(30, '2', 'wrong')
+    await screen.findByText('Training complete')
+    const block = screen.getByTestId('mistakes')
+    expect(within(block).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(block).getByText('Mistakes')).toBeTruthy()
+    expect(block.textContent).toMatch(/Wort\d+ — слово\d+/)
+  })
+
+  it('no mistakes → no mistakes block; the tiles show right / wrong / best streak', async () => {
+    await finish(30, '3')
+    await screen.findByText('Training complete')
+    expect(screen.queryByTestId('mistakes')).toBeNull()
+    const tiles = screen.getByText('correct').parentElement!.parentElement!
+    expect(tiles.textContent).toContain('3correct')
+    expect(tiles.textContent).toContain('0wrong')
+    expect(tiles.textContent).toContain('3best streak')
+  })
+
+  it('the result screen keeps the shell hidden; leaving it brings it back', async () => {
+    const { isTrainingOpen } = await import('../lib/trainingState')
+    await finish(30, '2')
+    await screen.findByText('Training complete')
+    expect(isTrainingOpen()).toBe(true) // the questions are over, the result is still a session screen
+    cleanup()
+    expect(isTrainingOpen()).toBe(false)
+  })
+
+  it('"almost" (a typo) counts as right: it is not a mistake', async () => {
+    localStorage.setItem('review-direction', 'ru_de')
+    vi.mocked(reviewApi.due).mockResolvedValue({ cards: [{ ...due(1), box_level: 3 }], total: 1 })
+    vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 4, is_learned: false, next_review_at: '2030-01-01' } as never)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99) // the last format of the direction: typing
+    renderSession('/train?size=1')
+    const field = await screen.findByPlaceholderText(/./)
+    fireEvent.change(field, { target: { value: 'Wort2' } }) // one letter off
+    fireEvent.submit(field.closest('form')!)
+    fireEvent.click(await screen.findByRole('button', { name: /Finish|Continue/ }))
+    await screen.findByText('Training complete')
+    expect(screen.queryByTestId('mistakes')).toBeNull()
+    random.mockRestore()
+  })
+
+  it('a typed wrong answer is a mistake', async () => {
+    localStorage.setItem('review-direction', 'ru_de')
+    vi.mocked(reviewApi.due).mockResolvedValue({ cards: [{ ...due(1), box_level: 3 }], total: 1 })
+    vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 1, is_learned: false, next_review_at: '2030-01-01' } as never)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    renderSession('/train?size=1')
+    const field = await screen.findByPlaceholderText(/./)
+    fireEvent.change(field, { target: { value: 'xyzxyz' } })
+    fireEvent.submit(field.closest('form')!)
+    fireEvent.click(await screen.findByRole('button', { name: /Finish|Continue/ }))
+    await screen.findByText('Training complete')
+    expect(within(screen.getByTestId('mistakes')).getAllByRole('listitem')).toHaveLength(1)
+    random.mockRestore()
   })
 })
 

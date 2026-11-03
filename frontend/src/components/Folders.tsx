@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Folder as FolderIcon, Pencil, Play, Plus, Share2, Trash, X } from 'lucide-react'
+import { Check, Folder as FolderIcon, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { foldersApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import type { Folder, FolderSelection } from '../api/types'
 import { FOLDER_COLORS, FOLDER_DOT } from '../lib/folderColors'
 import { toast } from './Toaster'
-import { ShareFolderModal } from './ShareFolderModal'
 
 export { FOLDER_COLORS }
 const DOT = FOLDER_DOT
@@ -69,86 +67,6 @@ export function FolderSelect({ value, onChange, includeAll = false, withoutNone 
         <option key={f.id} value={f.id} title={f.name}>{shortFolderName(f.name)}</option>
       ))}
     </select>
-  )
-}
-
-// A small ghost action under the chips.
-const action = 'inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent'
-
-/** Chips row for the Collection: All words / each folder / + Folder; actions for the active folder. */
-export function FolderBar({ value, onChange }: { value: FolderSelection; onChange: (v: FolderSelection) => void }) {
-  const { t } = useTranslation()
-  const qc = useQueryClient()
-  const navigate = useNavigate()
-  const folders = useFolders()
-  const [creating, setCreating] = useState(false)
-  const [editing, setEditing] = useState<Folder | null>(null)
-  const [sharing, setSharing] = useState<Folder | null>(null)
-
-  // Train the words of this folder.
-  function train(id: string) {
-    navigate(`/train?folder=${encodeURIComponent(id)}`)
-  }
-
-  const remove = useMutation({
-    mutationFn: (id: string) => foldersApi.remove(id),
-    onSuccess: () => {
-      onChange('')
-      qc.invalidateQueries({ queryKey: ['folders'] })
-      qc.invalidateQueries({ queryKey: ['collection'] })
-      toast(t('folders.deleted'))
-    },
-  })
-
-  const active = folders.data?.find((f) => f.id === value)
-  const chip = (on: boolean) =>
-    `flex h-9 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition ${
-      on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-muted hover:text-fg'
-    }`
-
-  return (
-    <div className="space-y-2">
-      <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
-        <button type="button" className={chip(value === '')} onClick={() => onChange('')}>{t('folders.all')}</button>
-        {folders.data?.map((f) => (
-          <button key={f.id} type="button" className={chip(value === f.id)} onClick={() => onChange(f.id)} title={f.name}>
-            <FolderDot color={f.color} /> <span className="max-w-[12rem] truncate">{shortFolderName(f.name)}</span>
-            <span className="text-xs opacity-70">{f.total}</span>
-          </button>
-        ))}
-        <button type="button" className={chip(value === 'none')} onClick={() => onChange('none')}>{t('folders.none')}</button>
-        <button type="button" onClick={() => setCreating(true)}
-          className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-line px-4 text-sm font-semibold text-accent-text transition hover:bg-surface-2">
-          <Plus size={16} aria-hidden="true" />{t('folders.new')}
-        </button>
-      </div>
-      {active && (
-        <div className="flex flex-wrap gap-1">
-          {active.total > 0 && (
-            <button type="button" className={`${action} font-semibold text-accent-text`} onClick={() => train(active.id)}>
-              <Play size={16} aria-hidden="true" />{t('folders.train')}
-            </button>
-          )}
-          <button type="button" className={`${action} text-muted`} disabled={active.total === 0}
-            title={active.total === 0 ? t('share.emptyFolder') : undefined} onClick={() => setSharing(active)}>
-            <Share2 size={16} aria-hidden="true" />{t('folders.share')}
-          </button>
-          <button type="button" className={`${action} text-muted`} onClick={() => setEditing(active)}>
-            <Pencil size={16} aria-hidden="true" />{t('folders.rename')}
-          </button>
-          <button type="button" className={`${action} text-danger`} disabled={remove.isPending}
-            onClick={() => { if (window.confirm(t('folders.deleteConfirm', { name: active.name }))) remove.mutate(active.id) }}>
-            <Trash size={16} aria-hidden="true" />{t('folders.delete')}
-          </button>
-        </div>
-      )}
-      {remove.error && <p className="text-xs text-danger">{errorMessage(remove.error)}</p>}
-      {sharing && <ShareFolderModal folder={sharing} onClose={() => setSharing(null)} />}
-      {(creating || editing) && (
-        <FolderFormModal folder={editing} onClose={() => { setCreating(false); setEditing(null) }}
-          onCreated={(f) => onChange(f.id)} />
-      )}
-    </div>
   )
 }
 

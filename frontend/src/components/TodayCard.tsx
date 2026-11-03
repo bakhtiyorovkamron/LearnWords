@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, CircleCheck, Flame, Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { statsApi } from '../api/endpoints'
-import { minutesFor, useDailyGoal } from '../lib/dailyGoal'
+import { minutesFor } from '../lib/dailyGoal'
+import { streakLine, useTodayGoal } from '../lib/todayGoal'
 import { GoalRing } from './GoalRing'
 import { GoalSheet } from './GoalSheet'
-import { useFolderList } from './Folders'
 import { weekDays, WeekStrip } from './WeekStrip'
 
 const MORE_STEP = 20 // "20 more" once the goal is met
@@ -19,32 +17,14 @@ const MORE_STEP = 20 // "20 more" once the goal is met
 export function TodayCard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const folders = useFolderList()
-  const week = useQuery({ queryKey: ['stats', 'week'], queryFn: () => statsApi.get('week') })
-  const { goal, setGoal } = useDailyGoal()
+  const g = useTodayGoal()
   const [editing, setEditing] = useState(false)
 
-  const all = folders.data?.all
-  if (!all || !week.data) return <div className="glass h-[330px] animate-pulse rounded-[20px]" aria-busy="true" />
+  if (!g.ready) return <div className="glass h-[330px] animate-pulse rounded-[20px]" aria-busy="true" />
 
-  const due = all.due_today
-  const daily = week.data.daily
-  const today = daily[daily.length - 1] // the server's day: the last of the 7
-  const reviewed = today?.reviewed ?? 0
-  const target = Math.min(goal, reviewed + due)
-  const met = target > 0 && reviewed >= target
-  const remaining = Math.max(target - reviewed, 0)
-  const done = Math.min(reviewed, target)
-  const active = !!today?.active || reviewed > 0
-  const streak = week.data.totals.current_streak_days
-  const days = t('stats.days', { count: streak })
+  const { goal, setGoal, due, reviewed, target, met, remaining, done, streak, today, daily } = g
   const queue = due - remaining
-
-
-  const caption = met ? t('home.streakDone', { days })
-    : active ? t('home.streakActive', { days, left: t('folders.wordsCount', { count: remaining }) })
-    : streak > 0 ? t('home.streakStart', { days, next: streak + 1 })
-    : t('home.streakNew')
+  const caption = streakLine(t, g)
 
   const week7 = weekDays(today?.date ?? new Date().toISOString().slice(0, 10), daily, met)
 

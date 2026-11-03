@@ -7,7 +7,9 @@ import { Sheet } from './Sheet'
  * Which words are in the deck: all of them, one folder, or the words without a folder (offered only
  * when there are some). `value` is '' (all) | 'none' | a folder id; picking closes the sheet.
  */
-export function DeckFolderSheet({ value, onPick, onClose }: { value: string; onPick: (v: string) => void; onClose: () => void }) {
+export function FolderSheet({ title, value, onPick, onClose }: {
+  title: string; value: string; onPick: (folder: string) => void; onClose: () => void
+}) {
   const { t } = useTranslation()
   const list = useFolderList()
   const all = list.data?.all.total ?? 0
@@ -19,9 +21,9 @@ export function DeckFolderSheet({ value, onPick, onClose }: { value: string; onP
   const mark = (on: boolean) => on && <Check size={18} aria-hidden="true" className="shrink-0 text-accent-text" />
 
   return (
-    <Sheet label={t('cards.pickFolder')} onClose={onClose}>
-      <h2 className="text-lg font-bold text-fg">{t('cards.pickFolder')}</h2>
-      <div role="radiogroup" aria-label={t('cards.pickFolder')} className="mt-2 divide-y divide-divider">
+    <Sheet label={title} onClose={onClose}>
+      <h2 className="text-lg font-bold text-fg">{title}</h2>
+      <div role="radiogroup" aria-label={title} className="mt-2 divide-y divide-divider">
         <button type="button" role="radio" aria-checked={value === ''} className={row} onClick={() => choose('')}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" />
           <span className="min-w-0 flex-1 truncate font-semibold">{t('folders.all')}</span>

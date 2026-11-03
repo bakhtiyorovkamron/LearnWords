@@ -5,7 +5,8 @@ import { AuthPage } from './pages/AuthPage'
 import { ContextsPage } from './pages/ContextsPage'
 import { NewContextPage } from './pages/NewContextPage'
 import { CardsDeckPage } from './pages/CardsDeckPage'
-import { CardsPage } from './pages/CardsPage'
+import { FolderPage } from './pages/FolderPage'
+import { WordsPage } from './pages/WordsPage'
 import { TrainPage } from './pages/TrainPage'
 import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
@@ -28,8 +29,8 @@ export default function App() {
           <Route path="/contexts" element={<Navigate to="/" replace />} />
           <Route path="/contexts/new" element={<NewContextPage />} />
           <Route path="/cards" element={<CardsDeckPage />} />
-          <Route path="/words" element={<CardsPage />} />
-          <Route path="/words/:folder" element={<CardsPage />} />
+          <Route path="/words" element={<WordsPage />} />
+          <Route path="/words/:folder" element={<FolderPage />} />
           <Route path="/train" element={<TrainPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />

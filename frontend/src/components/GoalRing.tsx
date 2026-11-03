@@ -1,15 +1,17 @@
+import type { ReactNode } from 'react'
 import { Check } from 'lucide-react'
-
-const SIZE = 76
-const STROKE = 8
-const R = (SIZE - STROKE) / 2
-const LENGTH = 2 * Math.PI * R
 
 /**
  * The daily-goal ring: an accent arc over a track, from the top, with round caps. Inside: "done/target",
- * or a check mark once the goal is met.
+ * or a check mark once the goal is met. `label` replaces "done/target" (a percent on a folder page).
  */
-export function GoalRing({ done, target, met }: { done: number; target: number; met: boolean }) {
+export function GoalRing({ done, target, met, size = 76, stroke = 8, label }: {
+  done: number; target: number; met: boolean; size?: number; stroke?: number; label?: ReactNode
+}) {
+  const SIZE = size
+  const STROKE = stroke
+  const R = (SIZE - STROKE) / 2
+  const LENGTH = 2 * Math.PI * R
   const share = met ? 1 : target > 0 ? Math.min(done / target, 1) : 0
   return (
     <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }} data-testid="goal-ring" data-met={met}>
@@ -20,9 +22,9 @@ export function GoalRing({ done, target, met }: { done: number; target: number; 
       </svg>
       <div className="absolute inset-0 grid place-items-center">
         {met ? (
-          <Check size={30} strokeWidth={3} aria-hidden="true" className="text-accent-text" />
+          <Check size={Math.round(SIZE * 0.38)} strokeWidth={3} aria-hidden="true" className="text-accent-text" />
         ) : (
-          <span className="text-base font-bold tabular-nums text-fg">{done}/{target}</span>
+          <span className="text-base font-bold tabular-nums text-fg">{label ?? `${done}/${target}`}</span>
         )}
       </div>
     </div>

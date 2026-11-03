@@ -5,7 +5,7 @@ import { ArrowLeftRight, ChevronDown, Leaf, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { collectionApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { DeckFolderSheet } from '../components/DeckFolderSheet'
+import { FolderSheet } from '../components/FolderSheet'
 import { useStoredChoice } from '../components/DirectionToggle'
 import { ErrorState } from '../components/ErrorState'
 import { FlipCards } from '../components/FlipCards'
@@ -104,7 +104,7 @@ export function CardsDeckPage() {
           onNearEnd={query.hasNextPage && !query.isFetchingNextPage ? () => void query.fetchNextPage() : undefined}
         />
       )}
-      {picking && <DeckFolderSheet value={folder} onPick={pickFolder} onClose={() => setPicking(false)} />}
+      {picking && <FolderSheet title={t('cards.pickFolder')} value={folder} onPick={pickFolder} onClose={() => setPicking(false)} />}
     </div>
   )
 }

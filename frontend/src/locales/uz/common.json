@@ -138,8 +138,6 @@
   },
   "cards": {
     "title": "So‘zlarim",
-    "dueToday_one": "{{count}} tasi bugun takrorlanadi",
-    "dueToday_other": "{{count}} tasi bugun takrorlanadi",
     "saved": "Saqlandi",
     "search": "So‘z yoki tarjima bo‘yicha qidirish…",
     "nothingFound": "Hech narsa topilmadi",
@@ -266,9 +264,13 @@
     "done": "Mashq yakunlandi",
     "correct": "to‘g‘ri",
     "wrong": "noto‘g‘ri",
-    "total": "Jami so‘zlar: {{count}}",
-    "more": "Yana {{count}}",
-    "home": "Bosh sahifaga qaytish"
+    "home": "Bosh sahifaga qaytish",
+    "minutes": "{{count}} daq",
+    "toGoal": "Maqsadgacha: {{words}}",
+    "bestStreak": "eng uzun seriya",
+    "mistakes": "Xatolar",
+    "mistakesHint": "Yana ko‘rib chiqing",
+    "showMore": "Yana {{count}} ta ko‘rsatish"
   },
   "story": {
     "own": {"add": "O‘z hikoyangiz", "addTitle": "O‘z hikoyangiz", "editTitle": "Hikoyani tahrirlash", "intro": "Darslikdagi, darsdagi yoki o‘zingiz yozgan {{langUz}} tilidagi matnni joylang. Tarjimani o‘zingiz yozing yoki tizimga topshiring.", "titleLabel": "Sarlavha", "titlePlaceholder": "Masalan: 3-dars — Mening kvartiram", "textLabel": "Matn ({{langUz}} tilida)", "textHint": "So‘zni **mana bunday** belgilang — u ajratib ko‘rsatiladi.", "translationLabel": "Tarjima", "modeAuto": "Avtomatik tarjima", "modeManual": "O‘z tarjimam", "autoHint": "Tizim matnni o‘zbek tiliga tarjima qiladi. Bu bir daqiqagacha vaqt olishi mumkin.", "manualLabel": "O‘zbek tiliga tarjimangiz", "manualHint": "Boshqa interfeys tillari uchun tarjimani tizim qiladi.", "save": "Saqlash", "saving": "Saqlanmoqda…", "translating": "Tarjima qilinmoqda…", "cancel": "Bekor qilish", "saved": "Hikoya saqlandi", "deleted": "Hikoya o‘chirildi", "edit": "Tahrirlash", "delete": "O‘chirish", "deleteConfirm": "«{{title}}» hikoyasini o‘chirasizmi?", "badge": "O‘z hikoyam", "translationByYou": "Tarjima: sizniki", "translationByAi": "Tarjima: avtomatik", "noTranslation": "Hozircha tarjima yo‘q.", "addTranslation": "Tarjima qo‘shish", "errText": "Matn uzunligi: {{min}}–{{max}} belgi.", "errCyrillic": "Matn kirillchada. Bu yerga {{langUz}} tilidagi matnni yozing, tarjimani esa pastga.", "errTitle": "Sarlavha — ko‘pi bilan {{max}} belgi.", "errTranslation": "Tarjimani yozing yoki «Avtomatik tarjima»ni tanlang.", "autoUnavailable": "Avtomatik tarjima hozir ishlamayapti — tarjimani o‘zingiz yozing.", "saveFailed": "Saqlab bo‘lmadi: {{error}}", "filterAll": "Hammasi", "filterAi": "Yaratilganlar", "filterOwn": "Meniki"},
@@ -342,7 +344,6 @@
   "select": {"start": "Tanlash", "all": "Hammasini tanlash", "count": "Tanlandi: {{n}}", "cancel": "Tayyor", "limit": "{{total}} tadan dastlabki {{n}} tasi tanlandi"},
   "move": {"button": "Koʻchirish ({{n}})", "done": "{{folder}} papkasiga koʻchirildi: {{n}}", "undo": "Qaytarish", "failed": "Koʻchirib boʻlmadi"},
   "box": {"title": "{{n}}-quti (5 tadan)", "next": "Keyingi takrorlash: {{when}}", "rule": "Toʻgʻri javob bersangiz — {{next}}-qutiga oʻtadi. Xato qilsangiz — 1-qutiga qaytadi.", "lastBox": "Yana bir necha marta ketma-ket toʻgʻri javob bersangiz — soʻz yodlanadi. Xato qilsangiz — 1-qutiga qaytadi.", "learned": "Soʻz yodlandi. Uni yana {{when}} tekshiramiz.", "today": "Bugun takrorlangan", "when": {"today": "bugun", "tomorrow": "ertaga", "inDays": "{{n}} kundan keyin"}},
-  "summary": {"moved": "Keyingi qutiga oʻtdi: {{n}}"},
   "feedback": {"title": "yodla sizga yoqyaptimi?", "star": "5 dan {{n}}", "placeholder": "Nimani yaxshilash kerak? (ixtiyoriy)", "placeholderLow": "Nima yoqmadi? (ixtiyoriy)", "placeholderHigh": "Sizga nima yoqdi? (ixtiyoriy)", "send": "Yuborish", "thanks": "Fikringiz uchun rahmat!"},
   "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring.", "featureDisabled": "Bu funksiya siz uchun o‘chirilgan.", "dailyLimit": "Bugungi limit tugadi, ertaga yana {{limit}} ta bo‘ladi."},
   "photo": {"title": "Suratdan so‘zlar", "hint": "Darslik sahifasi yoki so‘zlar ro‘yxatini suratga oling — so‘zlarni topib, tarjima qilamiz. Qaysilarini qo‘shishni o‘zingiz tanlaysiz.", "choose": "Surat tanlash", "another": "Boshqa surat", "reading": "Surat o‘qilmoqda…", "left": "Bugun qoldi: {{limit}} tadan {{n}} ta", "found": "Topilgan so‘zlar: {{n}}", "noWords": "Suratda o‘rganiladigan so‘z topilmadi. Yaqinroq va aniqroq suratga oling.", "have": "allaqachon bor", "add": "{{count}} ta qo‘shish", "adding": "Qo‘shilmoqda…", "notImage": "Rasm fayli kerak: JPEG, PNG, WebP yoki GIF.", "tooLarge": "Surat juda katta (ko‘pi bilan 5 MB).", "notConfigured": "Suratni o‘qish hozir mavjud emas.", "failed": "Suratni o‘qib bo‘lmadi: {{error}}", "noneLeft": "Bugungi suratlar tugadi — ertaga yana {{limit}} ta", "folderNew": "Yangi papka", "folderExisting": "Mavjud papka", "folderName": "Papka nomi", "folderDefault": "Dars — {{date}}", "addedTo": "«{{folder}}» papkasiga qo‘shildi: {{added}}. Allaqachon bor edi: {{skipped}}", "openFolder": "Papkani ochish", "errTooSmall": "Surat juda kichik — sahifani yaqinroqdan suratga oling.", "errTooDark": "Juda qorong‘i — yaxshi yorug‘likda suratga oling.", "errBlurry": "Surat xira chiqdi — telefonni qimirlatmasdan qayta suratga oling.", "errNotDocument": "Suratda darslik matni yo‘q — sahifani yoki so‘zlar ro‘yxatini suratga oling.", "errUnreadable": "Matnni o‘qib bo‘lmadi — yaqinroqdan va to‘g‘riroq suratga oling.", "notCharged": "Limit sarflanmadi."},
@@ -353,5 +354,17 @@
   "shared": {"words": "So‘zlar: {{count}}", "add": "O‘zimga qo‘shish", "loginToAdd": "So‘zlarni qo‘shish uchun kiring", "added": "Qo‘shildi: {{added}}. Avvaldan bor edi: {{skipped}}", "notFound": "Havola noto‘g‘ri yoki o‘chirilgan", "own": "Bu sizning papkangiz", "langMismatch": "Bu papka boshqa o‘rganish tili uchun", "empty": "Bu papkada hali so‘z yo‘q"},
   "contact": {"title": "Biz bilan bog‘lanish", "question": "Savol yoki muammo bormi? Bizga yozing:", "loginProblem": "Kira olmayapsizmi? Bizga yozing:", "reportProblem": "Muammo haqida xabar berish"},
   "errorBoundary": {"title": "Nimadir xato ketdi", "text": "Sahifa xato bilan to‘xtadi. Uni qayta yuklang — yordam bermasa, bizga yozing.", "reload": "Qayta yuklash"},
-  "app": {"title": "yodla — so‘zlarni kontekst bilan yodla"}
+  "app": {"title": "yodla — so‘zlarni kontekst bilan yodla"},
+  "words": {
+    "summary": "{{words}} · {{folders}}",
+    "foldersCount_one": "{{count}} ta papka",
+    "foldersCount_other": "{{count}} ta papka",
+    "tileAll": "{{count}} tadan {{learned}} tasi o‘rganilgan",
+    "back": "Papkalarga qaytish",
+    "pickFolder": "Papkani tanlang",
+    "folderStats": "O‘rganilgan: {{learned}} · bugun: {{due}}",
+    "noDueToday": "Bugun takrorlash yo‘q",
+    "listTitle": "So‘zlar",
+    "actions": "Amallar"
+  }
 }
