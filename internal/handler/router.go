@@ -26,6 +26,7 @@ type RouterDeps struct {
 	Collection  *CollectionHandler
 	WordEdit    *WordEditHandler
 	WordMove    *WordMoveHandler
+	WordDelete  *WordDeleteHandler
 	Folders     *FolderHandler
 	Shared      *SharedHandler
 	Search      *SearchHandler
@@ -122,6 +123,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.DELETE("/word-cards/:id", d.Contexts.DeleteCard)
 		protected.PATCH("/words/:id", d.WordEdit.Update)
 		protected.POST("/words/move", d.WordMove.Move)
+		protected.POST("/words/delete", d.WordDelete.Delete)
 		protected.GET("/folders", d.Folders.List)
 		protected.POST("/folders", d.Folders.Create)
 		protected.PATCH("/folders/:id", d.Folders.Update)

@@ -154,6 +154,7 @@ func run() error {
 		Collection:  handler.NewCollectionHandler(cardRepo),
 		WordEdit:    handler.NewWordEditHandler(cardRepo),
 		WordMove:    handler.NewWordMoveHandler(cardRepo),
+		WordDelete:  handler.NewWordDeleteHandler(cardRepo),
 		Folders:     handler.NewFolderHandler(folderRepo),
 		Shared:      handler.NewSharedHandler(folderRepo),
 		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
