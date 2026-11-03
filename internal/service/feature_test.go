@@ -91,9 +91,43 @@ func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 		t.Errorf("photo_import: %+v", p)
 	}
 	for _, st := range states[1:] {
-		if !st.Enabled || st.DailyLimit != nil || st.Remaining != nil {
-			t.Errorf("%s must be on and unlimited: %+v", st.Feature, st)
+		// daily_story is off for everybody until the admin turns it on; the others are on. All unlimited.
+		if on := st.Feature != domain.FeatureDailyStory; st.Enabled != on || st.DailyLimit != nil || st.Remaining != nil {
+			t.Errorf("%s must be enabled=%v and unlimited: %+v", st.Feature, on, st)
 		}
+	}
+}
+
+// daily_story (AI generation) is off for everybody; the admin turns it on per user (and off again).
+func TestFeatures_DailyStoryIsOffByDefault_AdminCanTurnItOn(t *testing.T) {
+	ctx, u := context.Background(), uuid.New()
+	s := NewFeatureService(newMemFeatureRepo())
+
+	if spec, ok := domain.FeatureByName(domain.FeatureDailyStory); !ok || !spec.DisabledByDefault {
+		t.Fatalf("catalog: %+v %v", spec, ok)
+	}
+	st, err := s.State(ctx, u, domain.FeatureDailyStory)
+	if err != nil || st.Enabled || st.DailyLimit != nil || st.LimitOverride != nil {
+		t.Fatalf("default: %+v %v", st, err)
+	}
+	if err := s.Require(ctx, u, domain.FeatureDailyStory); !errors.Is(err, domain.ErrFeatureDisabled) {
+		t.Errorf("Require without an override: %v, want ErrFeatureDisabled", err)
+	}
+
+	// an admin override "on" (a user_features row with enabled = true)
+	if err := s.Set(ctx, u, domain.FeatureDailyStory, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Require(ctx, u, domain.FeatureDailyStory); err != nil {
+		t.Errorf("Require with an enabled override: %v", err)
+	}
+	if st, _ = s.State(ctx, u, domain.FeatureDailyStory); !st.Enabled {
+		t.Errorf("after the admin enabled it: %+v", st)
+	}
+	// and off again
+	_ = s.Set(ctx, u, domain.FeatureDailyStory, false, nil)
+	if err := s.Require(ctx, u, domain.FeatureDailyStory); !errors.Is(err, domain.ErrFeatureDisabled) {
+		t.Errorf("after disabling again: %v", err)
 	}
 }
 

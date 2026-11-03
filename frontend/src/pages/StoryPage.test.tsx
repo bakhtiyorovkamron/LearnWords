@@ -223,8 +223,35 @@ describe('StoryPage: daily_story switched off', () => {
     vi.mocked(storiesApi.today).mockResolvedValue({ story: null, words_today: words, genres: [] })
     renderPage()
     expect(await within(archive()).findByRole('button', { name: /Mein Tag heute im Park/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Generate story' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^(Generate story|Generate again)$/ })).toBeNull()
+    expect(screen.queryByRole('combobox')).toBeNull() // no genre picker either
     expect(screen.getByRole('button', { name: /Your own story/ })).toBeTruthy()
+    expect(storiesApi.generate).not.toHaveBeenCalled()
+  })
+
+  it("off, with today's AI story: the story is still shown, nothing offers to regenerate it", async () => {
+    vi.mocked(meApi.get).mockResolvedValue(withFeatures(false))
+    vi.mocked(storiesApi.today).mockResolvedValue({ story: aiToday, words_today: words, genres: [] })
+    renderPage()
+    expect(await screen.findByRole('heading', { name: 'KI heute' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^(Generate story|Generate again)$/ })).toBeNull()
+  })
+
+  it("on, with today's AI story: «Generate again» is offered", async () => {
+    vi.mocked(meApi.get).mockResolvedValue(withFeatures(true))
+    vi.mocked(storiesApi.today).mockResolvedValue({ story: aiToday, words_today: words, genres: [] })
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Generate again' })).toBeTruthy()
+  })
+
+  it('no generate button while /me is still loading (daily_story is off by default)', async () => {
+    vi.mocked(meApi.get).mockReturnValue(new Promise(() => undefined)) // never answers
+    vi.mocked(storiesApi.today).mockResolvedValue({ story: null, words_today: words, genres: [] })
+    renderPage()
+    await waitFor(() => expect(storiesApi.today).toHaveBeenCalled())
+    await screen.findByText('Story archive')
+    await new Promise((r) => setTimeout(r, 20)) // today's words have arrived
+    expect(screen.queryByRole('button', { name: 'Generate story' })).toBeNull()
   })
 })
 

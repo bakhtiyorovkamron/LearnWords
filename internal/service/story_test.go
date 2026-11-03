@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ type fakeStoryRepo struct {
 	cache map[string]domain.StoryTranslation // key: storyID.String()+":"+lang
 
 	words       []domain.StoryWord // WordsAddedOn
+	users       []uuid.UUID        // UsersWithWordsOn
 	saved       []domain.DailyStory
 	corrections []domain.StoryCorrection
 
@@ -109,7 +111,7 @@ func (r *fakeStoryRepo) WordsAddedOn(context.Context, uuid.UUID, string) ([]doma
 	return r.words, nil
 }
 func (r *fakeStoryRepo) UsersWithWordsOn(context.Context, string) ([]uuid.UUID, error) {
-	return nil, nil
+	return r.users, nil
 }
 func (r *fakeStoryRepo) LearningLanguage(context.Context, uuid.UUID) (string, error) {
 	return "de", nil
@@ -273,5 +275,66 @@ func TestResolveTranslation_NoTranslatorLeavesEmpty(t *testing.T) {
 	}
 	if st.Language != "uz" {
 		t.Errorf("Language = %q, want %q (still records what was requested)", st.Language, "uz")
+	}
+}
+
+// storyGate: daily_story is on for the users in `on`; for the ones in `broken` the check itself fails.
+type storyGate struct{ on, broken map[uuid.UUID]bool }
+
+func (g storyGate) Require(_ context.Context, userID uuid.UUID, feature string) error {
+	switch {
+	case g.broken[userID]:
+		return errors.New("db down")
+	case feature == domain.FeatureDailyStory && g.on[userID]:
+		return nil
+	}
+	return domain.ErrFeatureDisabled
+}
+
+func cronStory(users []uuid.UUID, opts ...StoryOption) (*StoryService, *fakeStoryRepo, *fakeStoryGen) {
+	repo := newFakeStoryRepo()
+	repo.words = append([]domain.StoryWord(nil), storyWords...)
+	repo.users = users
+	gen := &fakeStoryGen{story: rawStory}
+	return NewStoryService(repo, gen, nil, nil, opts...), repo, gen
+}
+
+// The nightly cron calls the AI only for users with daily_story on. A failed check counts as off.
+func TestDailyStoryCron_OnlyUsersWithTheFeature(t *testing.T) {
+	on, off, broken := uuid.New(), uuid.New(), uuid.New()
+	gate := storyGate{on: map[uuid.UUID]bool{on: true, broken: true}, broken: map[uuid.UUID]bool{broken: true}}
+	s, repo, _ := cronStory([]uuid.UUID{off, on, broken}, WithStoryFeatures(gate))
+
+	s.generateForAll(context.Background(), "2026-11-03")
+	if len(repo.saved) != 1 || repo.saved[0].UserID != on || repo.saved[0].Date != "2026-11-03" {
+		t.Fatalf("stories: %+v, want one, for the user with daily_story on", repo.saved)
+	}
+}
+
+// With the real catalog nobody gets a story until the admin turns daily_story on for them.
+func TestDailyStoryCron_OffByDefault_OnWithAdminOverride(t *testing.T) {
+	ctx, u := context.Background(), uuid.New()
+	feats := NewFeatureService(newMemFeatureRepo())
+	s, repo, gen := cronStory([]uuid.UUID{u}, WithStoryFeatures(feats))
+
+	s.generateForAll(ctx, "2026-11-03")
+	if len(repo.saved) != 0 || gen.got != nil {
+		t.Fatalf("no override: the AI must not be called (saved %+v)", repo.saved)
+	}
+	if err := feats.Set(ctx, u, domain.FeatureDailyStory, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	s.generateForAll(ctx, "2026-11-03")
+	if len(repo.saved) != 1 || repo.saved[0].UserID != u {
+		t.Errorf("enabled override: %+v, want one story", repo.saved)
+	}
+}
+
+// Without a feature check the cron cannot tell who has daily_story on, so it generates for nobody.
+func TestDailyStoryCron_NoFeatureCheck_GeneratesNothing(t *testing.T) {
+	s, repo, gen := cronStory([]uuid.UUID{uuid.New()})
+	s.generateForAll(context.Background(), "2026-11-03")
+	if len(repo.saved) != 0 || gen.got != nil {
+		t.Errorf("saved %+v", repo.saved)
 	}
 }

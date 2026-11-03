@@ -177,8 +177,8 @@ func TestMe_ContainsFeatures(t *testing.T) {
 	if f["word_search"].(map[string]any)["enabled"] != false {
 		t.Errorf("word_search must be off: %v", f["word_search"])
 	}
-	if d := f["daily_story"].(map[string]any); d["daily_limit"] != nil || d["remaining"] != nil {
-		t.Errorf("daily_story is unlimited: %v", d)
+	if d := f["daily_story"].(map[string]any); d["enabled"] != false || d["daily_limit"] != nil || d["remaining"] != nil {
+		t.Errorf("daily_story is off by default (the frontend hides generation by it) and unlimited: %v", d)
 	}
 }
 

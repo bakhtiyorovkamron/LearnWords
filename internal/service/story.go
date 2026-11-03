@@ -64,16 +64,34 @@ const maxStoryWords = 12
 // maxStoryList caps the archive (AI and own stories together).
 const maxStoryList = 500
 
+// FeatureChecker says whether a feature is on for a user (FeatureService.Require).
+type FeatureChecker interface {
+	Require(ctx context.Context, userID uuid.UUID, feature string) error
+}
+
 type StoryService struct {
 	repo       StoryRepository
 	gen        StoryGenerator   // nil when ANTHROPIC_API_KEY is not set
 	translator StoryTranslator  // nil when ANTHROPIC_API_KEY is not set
 	proof      StoryProofreader // nil when ANTHROPIC_API_KEY is not set
+	features   FeatureChecker   // the cron's daily_story check; nil → the cron generates for nobody
 	now        func() time.Time
 }
 
-func NewStoryService(repo StoryRepository, gen StoryGenerator, translator StoryTranslator, proof StoryProofreader) *StoryService {
-	return &StoryService{repo: repo, gen: gen, translator: translator, proof: proof, now: time.Now}
+// StoryOption customizes a StoryService.
+type StoryOption func(*StoryService)
+
+// WithStoryFeatures lets the daily cron generate for the users who have daily_story on.
+func WithStoryFeatures(f FeatureChecker) StoryOption {
+	return func(s *StoryService) { s.features = f }
+}
+
+func NewStoryService(repo StoryRepository, gen StoryGenerator, translator StoryTranslator, proof StoryProofreader, opts ...StoryOption) *StoryService {
+	s := &StoryService{repo: repo, gen: gen, translator: translator, proof: proof, now: time.Now}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 func (s *StoryService) today() string { return s.now().UTC().Format("2006-01-02") }
@@ -335,7 +353,7 @@ func (s *StoryService) List(ctx context.Context, userID uuid.UUID) ([]domain.Dai
 }
 
 // RunScheduler generates stories once a day at hour:00 (in loc) for every user who added
-// words that day and has no story yet. Blocks until ctx is cancelled.
+// words that day and has daily_story on. Blocks until ctx is cancelled.
 func (s *StoryService) RunScheduler(ctx context.Context, hour int, loc *time.Location) {
 	if s.gen == nil {
 		return
@@ -361,8 +379,15 @@ func (s *StoryService) generateForAll(ctx context.Context, day string) {
 		slog.Error("daily story cron: list users", "err", err)
 		return
 	}
-	slog.Info("daily story cron started", "date", day, "users", len(users))
+	// daily_story is off by default: only the users the admin turned it on for get a story.
+	enabled := make([]uuid.UUID, 0, len(users))
 	for _, uid := range users {
+		if s.dailyStoryOn(ctx, uid) {
+			enabled = append(enabled, uid)
+		}
+	}
+	slog.Info("daily story cron started", "date", day, "users", len(users), "enabled", len(enabled))
+	for _, uid := range enabled {
 		// Up to 3 attempts per story inside the generator.
 		c, cancel := context.WithTimeout(ctx, 7*time.Minute)
 		lang, err := s.repo.LearningLanguage(c, uid)
@@ -381,4 +406,17 @@ func (s *StoryService) generateForAll(ctx context.Context, day string) {
 			return
 		}
 	}
+}
+
+// dailyStoryOn: may the cron generate for the user? Only with daily_story on. No feature check
+// configured, or a failed one, counts as off: the cron costs AI calls, so when in doubt it skips.
+func (s *StoryService) dailyStoryOn(ctx context.Context, userID uuid.UUID) bool {
+	if s.features == nil {
+		return false
+	}
+	err := s.features.Require(ctx, userID, domain.FeatureDailyStory)
+	if err != nil && !errors.Is(err, domain.ErrFeatureDisabled) {
+		slog.Warn("daily story cron: feature check", "user", userID, "err", err)
+	}
+	return err == nil
 }

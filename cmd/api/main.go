@@ -106,9 +106,11 @@ func run() error {
 		authSvc.SetStarter(starterSvc)
 	}
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers)
-	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
-	adminRepo := postgres.NewAdminRepository(pool)
 	featureSvc := service.NewFeatureService(postgres.NewFeatureRepository(pool))
+	// The daily cron generates only for users with daily_story on (off by default).
+	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader,
+		service.WithStoryFeatures(featureSvc))
+	adminRepo := postgres.NewAdminRepository(pool)
 	feedbackRepo := postgres.NewFeedbackRepository(pool)
 	pushSvc := service.NewPushService(postgres.NewPushRepository(pool), cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject)
 	if !pushSvc.Enabled() {
