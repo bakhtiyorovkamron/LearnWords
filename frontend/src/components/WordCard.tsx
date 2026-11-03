@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FolderInput, Pencil, Trash, Volume2 } from 'lucide-react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { FolderInput, Pencil, Trash, Trash2, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { WordCard } from '../api/types'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
@@ -22,7 +22,7 @@ function play(card: WordCard) {
 }
 
 /** The word with its article in the article's colour (der / die / das); no article → plain. */
-function Word({ card }: { card: WordCard }) {
+export function Word({ card }: { card: Pick<WordCard, 'word' | 'article'> }) {
   const { article, rest } = splitArticle(card.word, card.article)
   return (
     <>
@@ -33,6 +33,108 @@ function Word({ card }: { card: WordCard }) {
 }
 
 const sheetAction = 'flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-base font-medium transition hover:bg-surface-2'
+
+const PANEL = 168 // the swipe panel: two 84px actions
+const ROW_OPEN = 'word-row-open' // window event: a row opened its panel (detail = card id); the others close
+const reducedMotion = () =>
+  typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+type Sample = { x: number; t: number }
+type Gesture = { x: number; y: number; start: number; offset: number; width: number; mode: 'pending' | 'swipe' | 'scroll'; prev: Sample; last: Sample }
+
+/**
+ * Swipe a row left to reveal its actions. Vertical moves stay native scroll (touch-action: pan-y);
+ * a horizontal move of 8px decides it is a swipe. On release: past 60% of the row → onFullSwipe,
+ * past half the panel or a fast flick → open, otherwise closed. Only one row is open at a time.
+ */
+function useRowSwipe(id: string, enabled: boolean, onFullSwipe: () => void) {
+  const [offset, setOffset] = useState(0) // 0 (closed) … -row width
+  const [dragging, setDragging] = useState(false)
+  const gesture = useRef<Gesture | null>(null)
+  const moved = useRef(false) // the click after a swipe must not open the sheet
+  const open = offset < 0
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOffset(0)
+    const onOther = (e: Event) => { if ((e as CustomEvent<string>).detail !== id) close() }
+    window.addEventListener(ROW_OPEN, onOther)
+    window.addEventListener('scroll', close, { passive: true })
+    return () => {
+      window.removeEventListener(ROW_OPEN, onOther)
+      window.removeEventListener('scroll', close)
+    }
+  }, [open, id])
+
+  function onPointerDown(e: ReactPointerEvent<HTMLElement>) {
+    moved.current = false
+    gesture.current = null
+    if (!enabled || (e.target as Element).closest('[data-no-swipe]')) return
+    const s = { x: e.clientX, t: Date.now() }
+    gesture.current = { x: e.clientX, y: e.clientY, start: offset, offset, width: 0, mode: 'pending', prev: s, last: s }
+  }
+
+  function onPointerMove(e: ReactPointerEvent<HTMLElement>) {
+    const g = gesture.current
+    if (!g || g.mode === 'scroll') return
+    const dx = e.clientX - g.x
+    const dy = e.clientY - g.y
+    if (g.mode === 'pending') {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > 1.2 * Math.abs(dy)) {
+        g.mode = 'swipe'
+        g.width = e.currentTarget.getBoundingClientRect().width || e.currentTarget.offsetWidth
+        moved.current = true
+        setDragging(true)
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* no capture (jsdom): moves still arrive on the row */ }
+      } else {
+        if (Math.abs(dy) > 8) g.mode = 'scroll' // a scroll: give up for this gesture
+        return
+      }
+    }
+    g.prev = g.last
+    g.last = { x: e.clientX, t: Date.now() }
+    g.offset = Math.min(0, Math.max(-g.width, g.start + dx))
+    setOffset(g.offset)
+  }
+
+  function onPointerEnd() {
+    const g = gesture.current
+    gesture.current = null
+    if (!g || g.mode !== 'swipe') return
+    setDragging(false)
+    // px/ms of the last move; a pause before releasing is no flick.
+    const dt = g.last.t - g.prev.t
+    const v = dt > 0 && Date.now() - g.last.t < 100 ? (g.last.x - g.prev.x) / dt : 0
+    if (g.offset < -0.6 * g.width) {
+      setOffset(0)
+      onFullSwipe()
+    } else if (g.offset < -PANEL / 2 || v < -0.5) {
+      setOffset(-PANEL)
+      window.dispatchEvent(new CustomEvent(ROW_OPEN, { detail: id }))
+    } else {
+      setOffset(0)
+    }
+  }
+
+  /** True when the click belongs to the swipe (it ended one, or closes the open panel). */
+  function takeClick() {
+    if (moved.current) {
+      moved.current = false
+      return true
+    }
+    if (open) {
+      setOffset(0)
+      return true
+    }
+    return false
+  }
+
+  return {
+    offset, open, takeClick, close: () => setOffset(0),
+    transition: dragging || reducedMotion() ? 'none' : 'transform 200ms ease-out',
+    handlers: { onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd },
+  }
+}
 
 /**
  * One word of the collection, as a row: the word (article coloured) with its translation, the box
@@ -63,14 +165,22 @@ export function WordCardView({ card, progress, selection }: {
     setSheet(false)
     deleteWords([{ id: card.id, word: card.word }])
   }
+  // Swipe left: Move / Delete; a full swipe deletes at once. Off in select mode.
+  const swipe = useRowSwipe(card.id, !selection, () => deleteWords([{ id: card.id, word: card.word }]))
+  const swipeAction = 'flex w-[84px] flex-col items-center justify-center gap-1 text-xs font-semibold'
 
   // The modals are siblings of the row, not children: a click inside them must not reach the row.
   return (
     <>
       <div
         data-testid="word-row"
-        onClick={() => (selection ? selection.onToggle() : setSheet(true))}
-        className={`flex min-h-16 cursor-pointer items-center gap-3 px-4 py-2.5 transition hover:bg-surface-2 ${
+        {...swipe.handlers}
+        onClick={() => {
+          if (swipe.takeClick()) return
+          if (selection) selection.onToggle()
+          else setSheet(true)
+        }}
+        className={`relative flex min-h-16 cursor-pointer touch-pan-y select-none items-center gap-3 overflow-hidden px-4 py-2.5 transition [-webkit-touch-callout:none] hover:bg-surface-2 ${
           selection?.checked ? 'bg-surface-2' : ''}`}
       >
         {selection && (
@@ -87,10 +197,26 @@ export function WordCardView({ card, progress, selection }: {
             schedule={{ nextReviewAt: progress.nextReviewAt, reviewedToday: progress.reviewedToday }} />
         )}
         {canSpeak && (
-          <button type="button" onClick={(e) => { e.stopPropagation(); play(card) }} aria-label={t('wordCard.listen')} title={t('wordCard.listen')}
+          <button type="button" data-no-swipe onClick={(e) => { e.stopPropagation(); play(card) }} aria-label={t('wordCard.listen')} title={t('wordCard.listen')}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:bg-surface-2">
             <Volume2 size={18} aria-hidden="true" />
           </button>
+        )}
+        {/* Slides in from the right over the row; the row content stays in place. */}
+        {!selection && (
+          <div aria-hidden={!swipe.open || undefined} data-testid="swipe-panel"
+            onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}
+            className="absolute inset-y-0 right-0 flex w-[168px] shadow-[-6px_0_14px_-6px_rgba(0,0,0,0.3)]"
+            style={{ transform: `translateX(${PANEL + swipe.offset}px)`, transition: swipe.transition }}>
+            <button type="button" tabIndex={swipe.open ? 0 : -1} className={`${swipeAction} bg-surface-2 text-accent-text`}
+              onClick={() => { swipe.close(); setPicking(true) }}>
+              <FolderInput size={20} aria-hidden="true" />{t('del.swipeMove')}
+            </button>
+            <button type="button" tabIndex={swipe.open ? 0 : -1} className={`${swipeAction} bg-danger text-on-accent`}
+              onClick={() => { swipe.close(); deleteWords([{ id: card.id, word: card.word }]) }}>
+              <Trash2 size={20} aria-hidden="true" />{t('del.swipeDelete')}
+            </button>
+          </div>
         )}
       </div>
 

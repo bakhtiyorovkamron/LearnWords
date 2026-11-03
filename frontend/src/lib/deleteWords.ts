@@ -119,7 +119,10 @@ export function useDeleteWords() {
 
     batches.set(id, { ids, timer: setTimeout(() => void send(id), UNDO_MS), commit })
     listenForPageExit()
-    const text = items.length === 1 ? t('del.doneOne', { word: items[0].word }) : t('del.doneMany', { count: items.length })
+    // A word not loaded on the page (after «Select all») has no text: only the count is shown.
+    const text = items.length === 1 && items[0].word
+      ? t('del.doneOne', { word: items[0].word })
+      : t('del.doneMany', { count: items.length })
     toast(text, { ms: UNDO_MS, icon: Trash2, action: { label: t('move.undo'), onClick: undo } })
   }, [t, qc])
 }

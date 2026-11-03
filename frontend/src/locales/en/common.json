@@ -1,5 +1,5 @@
 {
-  "common": { "unknownError": "Unknown error", "loading": "Loading…", "rateLimited": "Too many requests. Please try again in {{seconds}} s." },
+  "common": { "unknownError": "Unknown error", "loading": "Loading…", "rateLimited": "Too many requests. Please try again in {{seconds}} s.", "close": "Close" },
   "direction": { "label": "Direction", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Mixed" },
   "lang": { "label": "Interface language", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "hero": {"intro": "Meet your German hero!", "introText": "He grows with every word you learn", "introOk": "Got it", "stages": {"0": "Little Mozart", "1": "The Brothers Grimm", "2": "Schiller", "3": "Beethoven", "4": "Humboldt", "5": "Goethe"}, "stageUp": "Your hero grew up: meet {{name}}!", "share": "Share", "tapHint": "Tap the hero", "learned": "Learned", "almost": "Almost learned", "inWords_one": "in {{count}} word", "inWords_other": "in {{count}} words", "wordsAt_one": "{{count}} word", "wordsAt_other": "{{count}} words", "locked": "Still a secret", "toNextStage": "To the next stage: {{n}}", "lastStage": "Final stage", "close": "Close", "range": "{{from}}–{{to}} words", "rangeFrom": "{{from}}+ words"},
@@ -340,10 +340,10 @@
     "feedback": {"tile": "Average rating", "count": "reviews: {{n}}", "title": "Feedback", "noComment": "no comment", "userRating": "Rating: {{rating}}"}
   },
   "word": {"move": "Move to folder"},
-  "folder": {"none": "No folder", "new": "+ New folder"},
+  "folder": {"none": "No folder", "new": "New folder"},
   "select": {"start": "Select", "all": "Select all", "count": "Selected: {{n}}", "cancel": "Done", "limit": "First {{n}} of {{total}} selected"},
   "move": {"button": "Move ({{n}})", "done": "Moved to “{{folder}}”: {{n}}", "undo": "Undo", "failed": "Couldn’t move"},
-  "del": {"doneOne": "Deleted “{{word}}”", "doneMany_one": "Deleted {{count}} word", "doneMany_other": "Deleted {{count}} words"},
+  "del": {"doneOne": "Deleted “{{word}}”", "doneMany_one": "Deleted {{count}} word", "doneMany_other": "Deleted {{count}} words", "swipeMove": "Move", "swipeDelete": "Delete", "button": "Delete ({{n}})", "confirmTitle_one": "Delete {{count}} word?", "confirmTitle_other": "Delete {{count}} words?", "confirmText": "Their learning progress will be lost. You can undo for a few seconds.", "confirm": "Delete", "cancel": "Cancel"},
   "box": {"title": "Box {{n}} of 5", "next": "Next review: {{when}}", "rule": "Answer correctly and it moves to box {{next}}. Make a mistake and it goes back to box 1.", "lastBox": "A few more correct answers in a row and the word is learned. Make a mistake and it goes back to box 1.", "learned": "Word learned. We'll check it again {{when}}.", "today": "Already reviewed today", "when": {"today": "today", "tomorrow": "tomorrow", "inDays": "in {{n}} days"}},
   "feedback": {"title": "How do you like yodla?", "star": "{{n}} of 5", "placeholder": "What could be better? (optional)", "placeholderLow": "What went wrong? (optional)", "placeholderHigh": "What did you like? (optional)", "send": "Send", "thanks": "Thanks for your feedback!"},
   "errors": {"saveFailed": "Couldn't save. Please try again.", "featureDisabled": "This feature is turned off for your account.", "dailyLimit": "Today's limit is used up — tomorrow you get {{limit}} again."},

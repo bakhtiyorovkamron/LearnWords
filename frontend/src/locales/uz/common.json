@@ -1,5 +1,5 @@
 {
-  "common": { "unknownError": "Noma’lum xato", "loading": "Yuklanmoqda…", "rateLimited": "So‘rovlar juda ko‘p. {{seconds}} soniyadan keyin urinib ko‘ring." },
+  "common": { "unknownError": "Noma’lum xato", "loading": "Yuklanmoqda…", "rateLimited": "So‘rovlar juda ko‘p. {{seconds}} soniyadan keyin urinib ko‘ring.", "close": "Yopish" },
   "direction": { "label": "Yo‘nalish", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Aralash" },
   "lang": { "label": "Interfeys tili", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "hero": {"intro": "Tanishing — nemis qahramoningiz!", "introText": "U siz yodlagan soʻzlar bilan ulgʻayadi", "introOk": "Tushunarli", "stages": {"0": "Kichkina Motsart", "1": "Aka-uka Grimmlar", "2": "Shiller", "3": "Betxoven", "4": "Gumboldt", "5": "Gyote"}, "stageUp": "Qahramoningiz ulgʻaydi: endi u — {{name}}!", "share": "Ulashish", "tapHint": "Qahramonni bosing", "learned": "Yodlangan", "almost": "Yaqinda yodlanadi", "inWords_other": "yana {{count}} ta soʻzdan keyin", "wordsAt_other": "{{count}} ta soʻz", "locked": "Hozircha sir", "toNextStage": "Keyingi bosqichgacha: {{n}}", "lastStage": "Soʻnggi bosqich", "close": "Yopish", "range": "{{from}}–{{to}} ta soʻz", "rangeFrom": "{{from}}+ ta soʻz"},
@@ -340,10 +340,10 @@
     "feedback": {"tile": "O‘rtacha baho", "count": "fikrlar: {{n}}", "title": "Fikrlar", "noComment": "izohsiz", "userRating": "Baho: {{rating}}"}
   },
   "word": {"move": "Papkaga koʻchirish"},
-  "folder": {"none": "Papkasiz", "new": "+ Yangi papka"},
+  "folder": {"none": "Papkasiz", "new": "Yangi papka"},
   "select": {"start": "Tanlash", "all": "Hammasini tanlash", "count": "Tanlandi: {{n}}", "cancel": "Tayyor", "limit": "{{total}} tadan dastlabki {{n}} tasi tanlandi"},
   "move": {"button": "Koʻchirish ({{n}})", "done": "{{folder}} papkasiga koʻchirildi: {{n}}", "undo": "Qaytarish", "failed": "Koʻchirib boʻlmadi"},
-  "del": {"doneOne": "«{{word}}» so‘zi o‘chirildi", "doneMany_one": "{{count}} ta so‘z o‘chirildi", "doneMany_other": "{{count}} ta so‘z o‘chirildi"},
+  "del": {"doneOne": "«{{word}}» so‘zi o‘chirildi", "doneMany_one": "{{count}} ta so‘z o‘chirildi", "doneMany_other": "{{count}} ta so‘z o‘chirildi", "swipeMove": "Papkaga", "swipeDelete": "O‘chirish", "button": "O‘chirish ({{n}})", "confirmTitle_one": "{{count}} ta so‘z o‘chirilsinmi?", "confirmTitle_other": "{{count}} ta so‘z o‘chirilsinmi?", "confirmText": "Bu so‘zlar bo‘yicha o‘rganish natijalari yo‘qoladi. Bir necha soniya ichida bekor qilish mumkin.", "confirm": "O‘chirish", "cancel": "Bekor qilish"},
   "box": {"title": "{{n}}-quti (5 tadan)", "next": "Keyingi takrorlash: {{when}}", "rule": "Toʻgʻri javob bersangiz — {{next}}-qutiga oʻtadi. Xato qilsangiz — 1-qutiga qaytadi.", "lastBox": "Yana bir necha marta ketma-ket toʻgʻri javob bersangiz — soʻz yodlanadi. Xato qilsangiz — 1-qutiga qaytadi.", "learned": "Soʻz yodlandi. Uni yana {{when}} tekshiramiz.", "today": "Bugun takrorlangan", "when": {"today": "bugun", "tomorrow": "ertaga", "inDays": "{{n}} kundan keyin"}},
   "feedback": {"title": "yodla sizga yoqyaptimi?", "star": "5 dan {{n}}", "placeholder": "Nimani yaxshilash kerak? (ixtiyoriy)", "placeholderLow": "Nima yoqmadi? (ixtiyoriy)", "placeholderHigh": "Sizga nima yoqdi? (ixtiyoriy)", "send": "Yuborish", "thanks": "Fikringiz uchun rahmat!"},
   "errors": {"saveFailed": "Saqlab bo‘lmadi. Qayta urinib ko‘ring.", "featureDisabled": "Bu funksiya siz uchun o‘chirilgan.", "dailyLimit": "Bugungi limit tugadi, ertaga yana {{limit}} ta bo‘ladi."},

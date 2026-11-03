@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { collectionApi, foldersApi, wordsApi } from '../api/endpoints'
-import { resetDeleteWords } from '../lib/deleteWords'
+import { commitPendingDeletes, resetDeleteWords } from '../lib/deleteWords'
 import { FolderPage } from './FolderPage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -47,6 +47,7 @@ function renderFolder(path: string) {
 }
 const where = () => screen.getByTestId('where').textContent
 const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Actions' }))
+const buttonName = (b: HTMLElement) => b.textContent || b.getAttribute('aria-label')
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
@@ -146,7 +147,7 @@ describe('FolderPage: the More sheet', () => {
     await screen.findByText('8 words')
     openMenu()
     const sheet = screen.getByRole('dialog', { name: 'Actions' })
-    expect(within(sheet).getAllByRole('button').map((b) => b.textContent)).toEqual(['Edit folder', 'Select', 'Delete folder'])
+    expect(within(sheet).getAllByRole('button').map(buttonName)).toEqual(['Edit folder', 'Select', 'Delete folder', 'Close'])
     fireEvent.click(within(sheet).getByRole('button', { name: 'Edit folder' }))
     const edit = await screen.findByRole('dialog')
     expect((within(edit).getByRole('textbox') as HTMLInputElement).value).toBe('Tiere')
@@ -198,6 +199,68 @@ describe('FolderPage: the More sheet', () => {
     await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull()) // selection mode is over
   })
 
+  async function selectTwo() {
+    renderFolder('/words/f1')
+    await screen.findAllByTestId('word-row')
+    openMenu()
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    fireEvent.click(screen.getAllByTestId('word-row')[0])
+    fireEvent.click(screen.getAllByTestId('word-row')[1])
+  }
+
+  it('Delete in the bar is disabled with nothing selected', async () => {
+    renderFolder('/words/f1')
+    await screen.findAllByTestId('word-row')
+    openMenu()
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    const del = screen.getByRole('button', { name: 'Delete (0)' }) as HTMLButtonElement
+    expect(del.disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Move (0)' })).toBeTruthy() // Move keeps its label
+  })
+
+  it('Delete with 2 selected opens the confirm sheet: the count and the word chips', async () => {
+    await selectTwo()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete (2)' }))
+    const sheet = screen.getByRole('dialog', { name: 'Delete 2 words?' })
+    expect(within(sheet).getByRole('heading', { name: 'Delete 2 words?' })).toBeTruthy()
+    expect(within(sheet).getAllByTestId('delete-chip').map((c) => c.textContent)).toEqual(['Wort1', 'Wort2'])
+    expect(within(sheet).getByText(/learning progress will be lost/)).toBeTruthy()
+  })
+
+  it('the chips show up to 3 words and «+N» for the rest, also for words not loaded (Select all)', async () => {
+    vi.mocked(collectionApi.list).mockResolvedValue({ items: [row(1), row(2), row(3), row(4)], total: 6 } as never)
+    vi.mocked(collectionApi.ids).mockResolvedValue({ ids: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'], total: 6 } as never)
+    renderFolder('/words/f1')
+    await screen.findAllByTestId('word-row')
+    openMenu()
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete (6)' }))
+    const sheet = screen.getByRole('dialog', { name: 'Delete 6 words?' })
+    expect(within(sheet).getAllByTestId('delete-chip').map((c) => c.textContent)).toEqual(['Wort1', 'Wort2', 'Wort3', '+3'])
+  })
+
+  it('Cancel closes the sheet and nothing is deleted', async () => {
+    await selectTwo()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete (2)' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getAllByTestId('word-row')).toHaveLength(2)
+    expect(screen.getByText('Selected: 2')).toBeTruthy() // still selecting
+  })
+
+  it('Delete in the sheet deletes the 2 words, leaves select mode, and the rows disappear', async () => {
+    await selectTwo()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete (2)' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByTestId('word-row')).toBeNull()
+    expect(wordsApi.remove).not.toHaveBeenCalled() // sent after the Undo time
+    await act(() => commitPendingDeletes())
+    expect(wordsApi.remove).toHaveBeenCalledWith(['c1', 'c2'])
+  })
+
   it('cancel in the bar leaves selection mode', async () => {
     renderFolder('/words/f1')
     await screen.findAllByTestId('word-row')
@@ -221,7 +284,7 @@ describe('FolderPage: all words and the words without a folder', () => {
     expect((await screen.findByRole('link', { name: 'Cards' })).getAttribute('href')).toBe('/cards')
     expect(screen.queryByRole('button', { name: 'Share' })).toBeNull()
     openMenu()
-    expect(within(screen.getByRole('dialog', { name: 'Actions' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Select'])
+    expect(within(screen.getByRole('dialog', { name: 'Actions' })).getAllByRole('button').map(buttonName)).toEqual(['Select', 'Close'])
     expect(collectionApi.list).toHaveBeenCalledWith(expect.objectContaining({ folder: '' }))
   })
 

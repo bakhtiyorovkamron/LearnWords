@@ -1,5 +1,5 @@
 {
-  "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…", "rateLimited": "Слишком много запросов. Попробуйте через {{seconds}} сек." },
+  "common": { "unknownError": "Неизвестная ошибка", "loading": "Загрузка…", "rateLimited": "Слишком много запросов. Попробуйте через {{seconds}} сек.", "close": "Закрыть" },
   "direction": { "label": "Направление", "de_ru": "{{lang}} → {{native}}", "ru_de": "{{native}} → {{lang}}", "mixed": "Смешанно" },
   "lang": { "label": "Язык интерфейса", "ru": "Русский", "en": "English", "uz": "O‘zbekcha" },
   "hero": {"intro": "Знакомься — твой немецкий герой!", "introText": "Он растёт вместе с твоими выученными словами", "introOk": "Понятно", "stages": {"0": "Маленький Моцарт", "1": "Братья Гримм", "2": "Шиллер", "3": "Бетховен", "4": "Гумбольдт", "5": "Гёте"}, "stageUp": "Твой герой вырос: теперь это {{name}}!", "share": "Поделиться", "tapHint": "Нажми на героя", "learned": "Выучено", "almost": "На подходе", "inWords_one": "через {{count}} слово", "inWords_few": "через {{count}} слова", "inWords_many": "через {{count}} слов", "inWords_other": "через {{count}} слов", "wordsAt_one": "{{count}} слово", "wordsAt_few": "{{count}} слова", "wordsAt_many": "{{count}} слов", "wordsAt_other": "{{count}} слов", "locked": "Пока секрет", "toNextStage": "До следующей стадии: {{n}}", "lastStage": "Последняя стадия", "close": "Закрыть", "range": "{{from}}–{{to}} слов", "rangeFrom": "{{from}}+ слов"},
@@ -346,10 +346,10 @@
     "feedback": {"tile": "Средняя оценка", "count": "отзывов: {{n}}", "title": "Отзывы", "noComment": "без комментария", "userRating": "Оценка: {{rating}}"}
   },
   "word": {"move": "Переместить в папку"},
-  "folder": {"none": "Без папки", "new": "+ Новая папка"},
+  "folder": {"none": "Без папки", "new": "Новая папка"},
   "select": {"start": "Выбрать", "all": "Выбрать все", "count": "Выбрано: {{n}}", "cancel": "Готово", "limit": "Выбраны первые {{n}} из {{total}}"},
   "move": {"button": "Переместить ({{n}})", "done": "Перемещено в «{{folder}}»: {{n}}", "undo": "Отменить", "failed": "Не удалось переместить"},
-  "del": {"doneOne": "Слово «{{word}}» удалено", "doneMany_one": "Удалено {{count}} слово", "doneMany_few": "Удалено {{count}} слова", "doneMany_many": "Удалено {{count}} слов", "doneMany_other": "Удалено {{count}} слова"},
+  "del": {"doneOne": "Слово «{{word}}» удалено", "doneMany_one": "Удалено {{count}} слово", "doneMany_few": "Удалено {{count}} слова", "doneMany_many": "Удалено {{count}} слов", "doneMany_other": "Удалено {{count}} слова", "swipeMove": "В папку", "swipeDelete": "Удалить", "button": "Удалить ({{n}})", "confirmTitle_one": "Удалить {{count}} слово?", "confirmTitle_few": "Удалить {{count}} слова?", "confirmTitle_many": "Удалить {{count}} слов?", "confirmTitle_other": "Удалить {{count}} слова?", "confirmText": "Прогресс изучения этих слов пропадёт. Несколько секунд удаление можно будет отменить.", "confirm": "Удалить", "cancel": "Отмена"},
   "box": {"title": "Коробка {{n}} из 5", "next": "Следующее повторение: {{when}}", "rule": "Ответишь правильно — перейдёт в коробку {{next}}. Ошибёшься — вернётся в коробку 1.", "lastBox": "Ещё несколько верных ответов подряд — и слово будет выучено. Ошибёшься — вернётся в коробку 1.", "learned": "Слово выучено. Проверим его ещё раз {{when}}.", "today": "Сегодня уже повторено", "when": {"today": "сегодня", "tomorrow": "завтра", "inDays": "через {{n}} дн."}},
   "feedback": {"title": "Как вам yodla?", "star": "{{n}} из 5", "placeholder": "Что улучшить? (необязательно)", "placeholderLow": "Что пошло не так? (необязательно)", "placeholderHigh": "Что вам понравилось? (необязательно)", "send": "Отправить", "thanks": "Спасибо за отзыв!"},
   "errors": {"saveFailed": "Не удалось сохранить. Попробуйте ещё раз.", "featureDisabled": "Эта функция для вас отключена.", "dailyLimit": "Лимит на сегодня исчерпан, завтра снова будет {{limit}}."},

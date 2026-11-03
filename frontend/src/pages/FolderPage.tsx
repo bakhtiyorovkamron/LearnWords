@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronLeft, Ellipsis, Layers, Leaf, Pencil, Play, Plus, Search, Share2, SlidersHorizontal, SquareCheck, Trash } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Ellipsis, Layers, Leaf, Pencil, Play, Plus, Search, Share2, SlidersHorizontal, SquareCheck, Trash, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { collectionApi, foldersApi } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -16,10 +16,11 @@ import { SearchField } from '../components/SearchField'
 import { Sheet } from '../components/Sheet'
 import { ShareFolderModal } from '../components/ShareFolderModal'
 import { toast } from '../components/Toaster'
+import { Word } from '../components/WordCard'
 import { NothingFound, WordList } from '../components/WordList'
 import { useDebounced } from '../lib/useDebounced'
 import { useMoveWords } from '../lib/moveWords'
-import { useVisibleCards } from '../lib/deleteWords'
+import { useDeleteWords, useVisibleCards } from '../lib/deleteWords'
 
 const PAGE = 48
 const squareButton = 'grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
@@ -56,7 +57,9 @@ export function FolderPage() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [movePicker, setMovePicker] = useState(false)
   const [selectingAll, setSelectingAll] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const moveWords = useMoveWords()
+  const deleteWords = useDeleteWords()
   const filterKey = JSON.stringify({ status, period, sort, search, folder: folderId })
   useEffect(() => { setSelected(new Set()) }, [filterKey]) // picked words may be filtered out now
   const stopSelecting = () => { setSelecting(false); setSelected(new Set()) }
@@ -130,6 +133,14 @@ export function FolderPage() {
   async function moveSelected(id: string | null, folderName: string) {
     setMovePicker(false)
     if (await moveWords([...selected], id, folderName)) stopSelecting()
+  }
+  // The picked words that are loaded on the page; after «Select all» some may not be.
+  const selectedCards = cards.filter((c) => selected.has(c.id))
+  function deleteSelected() {
+    setConfirmDelete(false)
+    const words = new Map(cards.map((c) => [c.id, c.word]))
+    deleteWords([...selected].map((id) => ({ id, word: words.get(id) ?? '' })))
+    stopSelecting()
   }
   function onDelete() {
     setMenu(false)
@@ -236,11 +247,17 @@ export function FolderPage() {
       {selecting && (
         // Above the tab bar on phones (--nav-h), at the very bottom on desktop (--nav-h is 0 there).
         <div className="fixed inset-x-0 bottom-[var(--nav-h)] z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-            <span className="text-sm font-semibold text-fg">{t('select.count', { n: selected.size })}</span>
-            <div className="flex gap-2">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-sm font-semibold text-fg">{t('select.count', { n: selected.size })}</span>
+            {/* Delete is icon-only (44×44) so the bar fits a phone; Move keeps its label. */}
+            <div className="flex shrink-0 items-center gap-2">
               <button type="button" onClick={stopSelecting} className="btn-ghost">{t('select.cancel')}</button>
-              <button type="button" disabled={!selected.size} onClick={() => setMovePicker(true)} className="btn-primary disabled:opacity-50">
+              <button type="button" disabled={!selected.size} onClick={() => setConfirmDelete(true)}
+                aria-label={t('del.button', { n: selected.size })} title={t('del.button', { n: selected.size })}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line text-danger transition hover:bg-surface-2 disabled:opacity-50">
+                <Trash2 size={18} aria-hidden="true" />
+              </button>
+              <button type="button" disabled={!selected.size} onClick={() => setMovePicker(true)} className="btn-primary whitespace-nowrap disabled:opacity-50">
                 {t('move.button', { n: selected.size })}
               </button>
             </div>
@@ -269,6 +286,33 @@ export function FolderPage() {
                 <Trash size={18} aria-hidden="true" />{t('folders.delete')}
               </button>
             )}
+          </div>
+        </Sheet>
+      )}
+      {confirmDelete && (
+        <Sheet label={t('del.confirmTitle', { count: selected.size })} onClose={() => setConfirmDelete(false)}>
+          {/* px-10: clear of the sheet's X on both sides, so the block stays centred. */}
+          <div className="px-10 text-center">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-danger/15 text-danger">
+              <Trash2 size={24} aria-hidden="true" />
+            </span>
+            <h2 className="mt-3 text-lg font-bold text-fg">{t('del.confirmTitle', { count: selected.size })}</h2>
+            <ul className="mt-3 flex flex-wrap justify-center gap-1.5" aria-label={t('select.count', { n: selected.size })}>
+              {selectedCards.slice(0, 3).map((c) => (
+                <li key={c.id} data-testid="delete-chip" lang={c.language}
+                  className="rounded-full bg-surface-2 px-3 py-1 font-serif text-[15px] text-fg"><Word card={c} /></li>
+              ))}
+              {selected.size > Math.min(3, selectedCards.length) && (
+                <li data-testid="delete-chip" className="rounded-full bg-surface-2 px-3 py-1 text-sm font-semibold text-muted">
+                  +{selected.size - Math.min(3, selectedCards.length)}
+                </li>
+              )}
+            </ul>
+            <p className="mt-3 text-sm text-muted">{t('del.confirmText')}</p>
+          </div>
+          <div className="mt-5 space-y-2">
+            <button type="button" onClick={deleteSelected} className="btn-primary w-full !bg-danger">{t('del.confirm')}</button>
+            <button type="button" onClick={() => setConfirmDelete(false)} className="btn-ghost h-12 w-full">{t('del.cancel')}</button>
           </div>
         </Sheet>
       )}
