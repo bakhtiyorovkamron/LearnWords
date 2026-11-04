@@ -25,7 +25,17 @@ class TestPointerEvent extends MouseEvent {
   }
 }
 
+// The animation runs on a clock the tests move by hand: requestAnimationFrame and performance.now
+// (what the deck reads) both follow it, so nothing here waits for real time.
+const clock = { now: 1000, id: 0, queue: new Map<number, FrameRequestCallback>() }
+const realNow = performance.now.bind(performance)
+
 beforeEach(async () => {
+  clock.now = 1000
+  clock.queue.clear()
+  performance.now = () => clock.now
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { clock.queue.set(++clock.id, cb); return clock.id })
+  vi.stubGlobal('cancelAnimationFrame', (n: number) => { clock.queue.delete(n) })
   vi.stubGlobal('PointerEvent', TestPointerEvent)
   await i18n.changeLanguage('en')
   localStorage.setItem('learning_language', 'de')
@@ -33,14 +43,22 @@ beforeEach(async () => {
   vi.stubGlobal('speechSynthesis', speakApi)
   vi.stubGlobal('SpeechSynthesisUtterance', function (this: { text: string }, text: string) { this.text = text })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); localStorage.clear() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); performance.now = realNow })
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
 )
+// jsdom has no layout: the stage is 508 px wide, so a card is 420 px and one page 420 + 14 px.
+const STAGE_PX = 508
+const PAGE_PX = 434
+function sized() {
+  Object.defineProperty(screen.getByTestId('deck-stage'), 'clientWidth', { configurable: true, value: STAGE_PX })
+}
 function view(props: Partial<Parameters<typeof FlipCards>[0]> = {}) {
   const list = props.cards ?? cards()
-  return render(<FlipCards cards={list} total={props.total ?? list.length} direction="de_ru" resetKey="k" {...props} />, { wrapper })
+  const r = render(<FlipCards cards={list} total={props.total ?? list.length} direction="de_ru" resetKey="k" {...props} />, { wrapper })
+  sized()
+  return r
 }
 // The neighbours are whole cards too: these look into the current card only.
 const track = () => screen.getByTestId('deck-track')
@@ -48,16 +66,42 @@ const cardButton = () => screen.getByTestId('deck-card')
 const side = (name: 'learning' | 'native') => cardButton().querySelector(`[data-side="${name}"]`) as HTMLElement
 const visible = () => cardButton().querySelector('[data-side][aria-hidden="false"]') as HTMLElement
 
-/** A horizontal drag with the pointer: down on the track, move, up. */
-function swipe(dx: number, ms = 300) {
-  const now = vi.spyOn(Date, 'now')
-  now.mockReturnValue(1000)
-  fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
-  fireEvent.pointerMove(window, { clientX: 200 + dx, pointerId: 1 })
-  now.mockReturnValue(1000 + ms)
-  fireEvent.pointerUp(window, { clientX: 200 + dx, pointerId: 1 })
-  now.mockRestore()
+/** One animation frame (16 ms by default) on the test clock. */
+const frame = (ms = 16) => act(() => {
+  clock.now += ms
+  const callbacks = [...clock.queue.values()]
+  clock.queue.clear()
+  callbacks.forEach((cb) => cb(clock.now))
+})
+/** Runs frames until the spring has come to rest (at most 4 s). */
+function settle() {
+  for (let n = 0; n < 250 && clock.queue.size; n++) frame()
+  expect(clock.queue.size).toBe(0)
 }
+const trackX = () => parseFloat(/translate3d\((-?[\d.e-]+)px/.exec(track().style.transform)![1])
+
+const finger = {
+  down: (x: number) => fireEvent.pointerDown(track(), { clientX: x, pointerId: 1 }),
+  move: (x: number) => fireEvent.pointerMove(window, { clientX: x, pointerId: 1 }),
+  up: (x: number) => fireEvent.pointerUp(window, { clientX: x, pointerId: 1 }),
+  wait: (ms: number) => { clock.now += ms }, // time passes, no frame is drawn
+}
+
+/** A horizontal drag: down, move, rest for `ms`, up — a finger that has stopped (no flick). */
+function swipe(dx: number, ms = 300) {
+  finger.down(200)
+  finger.move(200 + dx)
+  finger.wait(ms)
+  finger.up(200 + dx)
+}
+/** A drag that ends with the finger still moving: dx px in `ms`, released at once. */
+function flick(dx: number, ms: number) {
+  finger.down(300)
+  finger.wait(ms)
+  finger.move(300 + dx)
+  finger.up(300 + dx)
+}
+
 const counter = () => screen.getByTestId('deck-counter').textContent
 
 describe('FlipCards: the two sides', () => {
@@ -136,41 +180,34 @@ describe('FlipCards: moving', () => {
     view()
     fireEvent.click(cardButton())
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    settle(); expect(counter()).toBe('2 / 5')
     expect(visible().dataset.side).toBe('learning') // a new card starts on its front
     expect(visible().textContent).toContain('Wort2')
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
-    await waitFor(() => expect(counter()).toBe('1 / 5'))
+    settle(); expect(counter()).toBe('1 / 5')
   })
 
-  it('a swipe of -100px moves to the next card, +100px back', async () => {
+  it('a slow drag past half a card moves to the next card, and back again', () => {
     view()
-    swipe(-100)
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
-    swipe(100)
-    await waitFor(() => expect(counter()).toBe('1 / 5'))
+    swipe(-250) // more than half of the 434 px page
+    settle(); expect(counter()).toBe('2 / 5')
+    swipe(250)
+    settle(); expect(counter()).toBe('1 / 5')
   })
 
-  it('a short drag springs back and a swipe past the ends does nothing', async () => {
+  it('a slow drag short of half a card springs back; a drag past the ends does nothing', () => {
     view()
-    swipe(-30)
-    await new Promise((r) => setTimeout(r, 300))
-    expect(counter()).toBe('1 / 5')
+    swipe(-200)
+    settle(); expect(counter()).toBe('1 / 5')
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
     swipe(100) // there is no card before the first
-    await new Promise((r) => setTimeout(r, 300))
-    expect(counter()).toBe('1 / 5')
+    settle(); expect(counter()).toBe('1 / 5')
   })
 
-  it('a fast short flick moves too', async () => {
+  it('a short, fast flick moves to the next card', () => {
     view()
-    const now = vi.spyOn(Date, 'now')
-    now.mockReturnValue(1000)
-    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
-    now.mockReturnValue(1030)
-    fireEvent.pointerMove(window, { clientX: 160, pointerId: 1 })
-    fireEvent.pointerUp(window, { clientX: 160, pointerId: 1 })
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
-    now.mockRestore()
+    flick(-40, 30) // 40 px in 30 ms: it would coast past half a card
+    settle(); expect(counter()).toBe('2 / 5')
   })
 
   it('the neighbours are Back / Next buttons over their own card (hidden from screen readers), none before the first or after the last card', async () => {
@@ -181,14 +218,14 @@ describe('FlipCards: moving', () => {
     const sides = Array.from(next.querySelectorAll('[data-side]'))
     expect(sides.map((s) => s.getAttribute('aria-hidden'))).toEqual(['true', 'true']) // the button is just «Next»
     fireEvent.click(next)
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    settle(); expect(counter()).toBe('2 / 5')
     expect(screen.getByTestId('deck-prev').getAttribute('aria-label')).toBe('Back')
     fireEvent.click(screen.getByTestId('deck-prev'))
-    await waitFor(() => expect(counter()).toBe('1 / 5'))
+    settle(); expect(counter()).toBe('1 / 5')
     cleanup()
     view({ cards: cards(2) })
     fireEvent.click(screen.getByTestId('deck-next'))
-    await waitFor(() => expect(counter()).toBe('2 / 2'))
+    settle(); expect(counter()).toBe('2 / 2')
     expect(screen.queryByTestId('deck-next')).toBeNull()
   })
 
@@ -218,10 +255,10 @@ describe('FlipCards: moving', () => {
   it('a new resetKey (another folder or direction) goes back to the first card, face up', async () => {
     const { rerender } = view()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    settle(); expect(counter()).toBe('2 / 5')
     fireEvent.click(cardButton())
     rerender(<FlipCards cards={cards()} total={5} direction="de_ru" resetKey="other" />)
-    await waitFor(() => expect(counter()).toBe('1 / 5'))
+    settle(); expect(counter()).toBe('1 / 5')
     expect(visible().dataset.side).toBe('learning')
   })
 
@@ -236,10 +273,11 @@ describe('FlipCards: moving', () => {
     const onNearEnd = vi.fn()
     view({ cards: cards(8), onNearEnd })
     expect(onNearEnd).not.toHaveBeenCalled()
-    for (let n = 0; n < 4; n++) fireEvent.keyDown(window, { key: 'ArrowRight' }), await waitFor(() => expect(counter()).toBe(`${n + 2} / 8`))
+    for (let n = 0; n < 4; n++) { fireEvent.keyDown(window, { key: 'ArrowRight' }); settle(); expect(counter()).toBe(`${n + 2} / 8`) }
     expect(onNearEnd).not.toHaveBeenCalled() // on the 5th of 8: 3 cards are still behind it
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(onNearEnd).toHaveBeenCalled())
+    settle()
+    expect(onNearEnd).toHaveBeenCalled()
   })
 })
 
@@ -285,7 +323,8 @@ describe('FlipCards: the controls under the deck', () => {
     expect(under.className).toContain('text-[13px]')
     expect(under.className).toContain('text-muted')
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(under.textContent).toBe('2 / 403'))
+    settle()
+    expect(under.textContent).toBe('2 / 403')
     expect(screen.queryByTestId('deck-pager')).toBeNull()
   })
 
@@ -302,10 +341,10 @@ describe('FlipCards: the controls under the deck', () => {
     }
     expect(back.disabled).toBe(true)
     fireEvent.click(next)
-    await waitFor(() => expect(counter()).toBe('2 / 2'))
+    settle(); expect(counter()).toBe('2 / 2')
     expect(next.disabled).toBe(true)
     fireEvent.click(back)
-    await waitFor(() => expect(counter()).toBe('1 / 2'))
+    settle(); expect(counter()).toBe('1 / 2')
   })
 
   it('⟳ flips the card like a tap on it', () => {
@@ -333,144 +372,249 @@ describe('FlipCards: the controls under the deck', () => {
   })
 })
 
-/** requestAnimationFrame by hand: a frame runs only when the test flushes it. */
-function manualFrames() {
-  let id = 0
-  const queue = new Map<number, FrameRequestCallback>()
-  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { queue.set(++id, cb); return id })
-  vi.stubGlobal('cancelAnimationFrame', (n: number) => { queue.delete(n) })
-  return {
-    pending: () => queue.size,
-    flush: () => { const cbs = [...queue.values()]; queue.clear(); cbs.forEach((cb) => cb(0)) },
-  }
-}
-const SLIDE = 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
-const transitionEnd = (el: Element) => act(() => { el.dispatchEvent(new Event('transitionend', { bubbles: true })) })
-
-describe('FlipCards: rendering the movement', () => {
-  it('a drag moves the track in the DOM: one write per animation frame, no React render per move', () => {
-    const frames = manualFrames()
+describe('FlipCards: the spring', () => {
+  it('a drag moves the track 1:1 in the DOM, with no React render per move', () => {
     const onRender = vi.fn()
     render(<Profiler id="deck" onRender={onRender}><FlipCards cards={cards()} total={5} direction="de_ru" resetKey="k" /></Profiler>, { wrapper })
+    sized()
     const renders = onRender.mock.calls.length
-    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
-    for (const x of [190, 180, 165, 150]) fireEvent.pointerMove(window, { clientX: x, pointerId: 1 })
-    expect(frames.pending()).toBe(1) // four moves, one frame
-    frames.flush()
-    expect(track().style.transform).toBe('translate3d(-50px,0,0)') // where the finger is now
-    expect(track().style.transition).toBe('none')
-    fireEvent.pointerMove(window, { clientX: 140, pointerId: 1 })
-    frames.flush()
-    expect(track().style.transform).toBe('translate3d(-60px,0,0)')
-    expect(onRender).toHaveBeenCalledTimes(renders) // nothing re-rendered while the finger moved
+    finger.down(200)
+    for (const x of [190, 180, 165, 150]) finger.move(x)
+    expect(trackX()).toBe(-50) // where the finger is, at once — not a frame later
+    expect(clock.queue.size).toBe(0) // dragging runs no animation
+    finger.move(140)
+    expect(trackX()).toBe(-60)
+    expect(onRender).toHaveBeenCalledTimes(renders)
   })
 
-  it('a release cancels the frame still waiting; a short drag springs back with the deck easing', () => {
-    const frames = manualFrames()
+  it('a release starts the spring: the track moves frame by frame, eases to the page, and only then the card changes', () => {
     view()
-    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
-    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
-    fireEvent.pointerMove(window, { clientX: 185, pointerId: 1 })
-    frames.flush() // drawn at -15 px
-    fireEvent.pointerMove(window, { clientX: 170, pointerId: 1 })
-    expect(frames.pending()).toBe(1) // -30 px waits for the next frame
-    now.mockReturnValue(1300) // the finger rested before the release: no flick
-    fireEvent.pointerUp(window, { clientX: 170, pointerId: 1 })
-    now.mockRestore()
-    expect(frames.pending()).toBe(0) // cancelled: the stale -30 px cannot overwrite the spring-back
+    swipe(-250)
+    expect(trackX()).toBe(-250)
+    expect(clock.queue.size).toBe(1)
+    const seen: number[] = []
+    while (clock.queue.size) { frame(); seen.push(trackX()) }
+    expect(counter()).toBe('2 / 5')
+    expect(seen.length).toBeGreaterThan(10) // an animation, not a jump
+    // Before it settles the track only heads towards -434 …
+    const travel = seen.slice(0, -1)
+    expect(travel.every((x) => x <= -250 && x >= -PAGE_PX - 40)).toBe(true) // at most a small overshoot
+    expect(Math.min(...travel)).toBeLessThan(-PAGE_PX + 40) // … gets there …
+    // … and the card change and the rebase to 0 land in the same step.
+    expect(seen[seen.length - 1]).toBe(0)
     expect(track().style.transform).toBe('translate3d(0px,0,0)')
-    expect(track().style.transition).toBe(SLIDE)
-    expect(counter()).toBe('1 / 5')
+    expect(track().style.transition).toBe('') // no CSS transition any more
   })
 
-  it('a release before any frame was drawn needs no spring-back: the track never left 0', () => {
-    const frames = manualFrames()
-    view()
-    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
-    fireEvent.pointerMove(window, { clientX: 197, pointerId: 1 })
-    fireEvent.pointerUp(window, { clientX: 197, pointerId: 1 })
-    expect(frames.pending()).toBe(0)
-    expect(track().style.transform).toBe('translate3d(0px,0,0)')
-    expect(track().style.transition).toBe('none')
-    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 }) // and a new drag is not held back
-    fireEvent.pointerMove(window, { clientX: 180, pointerId: 1 })
-    expect(frames.pending()).toBe(1)
-  })
-
-  it('a finger that comes back before the next frame still springs the track back from where it was drawn', () => {
-    const frames = manualFrames()
-    view()
-    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
-    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
-    fireEvent.pointerMove(window, { clientX: 170, pointerId: 1 })
-    frames.flush() // the track is drawn at -30 px
-    fireEvent.pointerMove(window, { clientX: 200, pointerId: 1 }) // back at the start; its frame never runs
-    now.mockReturnValue(1300)
-    fireEvent.pointerUp(window, { clientX: 200, pointerId: 1 })
-    now.mockRestore()
-    expect(track().style.transform).toBe('translate3d(0px,0,0)')
-    expect(track().style.transition).toBe(SLIDE) // a spring-back, not left at -30 px
-  })
-
-  it("a slide ends on the track's transitionend: the new card and the track back at 0 in the same step", () => {
+  it('the spring settles in well under a second and stops (|x - target| < 0.5 and |v| < 0.5)', () => {
     view()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(track().style.transform).toBe('translate3d(-14px,0,0)') // jsdom has no layout: one card = the 14 px gap
-    expect(track().style.transition).toBe(SLIDE)
-    fireEvent.keyDown(window, { key: ' ' }) // a render mid-slide (the flip) leaves the track where it is
-    expect(track().style.transform).toBe('translate3d(-14px,0,0)')
-    transitionEnd(cardButton().firstElementChild!) // the flip's own transitionend bubbles up: not the slide's
+    let ms = 0
+    while (clock.queue.size) { frame(); ms += 16; if (ms > 4000) break }
+    expect(ms).toBeLessThan(1200)
+    expect(counter()).toBe('2 / 5')
+    expect(clock.queue.size).toBe(0) // no frames are requested at rest
+  })
+
+  it('a long frame is clamped to 32 ms: a stalled tab does not make the spring jump', () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    frame(16)
+    frame(5000) // the tab was in the background
     expect(counter()).toBe('1 / 5')
-
-    let seen = ''
-    track().addEventListener('transitionend', () => { seen = `${counter()} at ${track().style.transform}` })
-    transitionEnd(track())
-    expect(seen).toBe('2 / 5 at translate3d(0px,0,0)') // already true inside the event: one synchronous step
-    expect(track().style.transition).toBe('none')
-    expect(visible().dataset.side).toBe('learning') // the new card starts face up
+    expect(trackX()).toBeGreaterThan(-PAGE_PX * 0.5) // two normal frames of travel, not the whole page
   })
 
-  it('without a transitionend a fallback timer ends the slide; a late transitionend moves nothing more', () => {
-    vi.useFakeTimers()
-    try {
-      view()
-      fireEvent.keyDown(window, { key: 'ArrowRight' })
-      act(() => { vi.advanceTimersByTime(220 + 49) })
-      expect(counter()).toBe('1 / 5')
-      act(() => { vi.advanceTimersByTime(1) })
-      expect(counter()).toBe('2 / 5')
-      expect(track().style.transform).toBe('translate3d(0px,0,0)')
-      transitionEnd(track())
-      expect(counter()).toBe('2 / 5')
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('a flick is measured over the last ~80 ms: a slow drag with a fast end moves on, a fast start with a slow end springs back', async () => {
-    const frames = manualFrames()
-    const now = vi.spyOn(Date, 'now')
-    const drag = ([[t0, x0], ...moves]: [t: number, x: number][]) => {
-      now.mockReturnValue(t0)
-      fireEvent.pointerDown(track(), { clientX: x0, pointerId: 1 })
-      for (const [t, x] of moves) {
-        now.mockReturnValue(t)
-        fireEvent.pointerMove(window, { clientX: x, pointerId: 1 })
-        frames.flush()
-      }
-      fireEvent.pointerUp(window, { clientX: moves[moves.length - 1][1], pointerId: 1 })
-    }
-    // 50 px in all — less than the 60 px of a swipe, so only a flick can move on.
+  it('the buttons, the keys and a tap on a neighbour use the same spring, from velocity 0', () => {
     view()
-    drag([[1000, 200], [1050, 165], [1950, 150]]) // 35 px in 50 ms, then 15 px in 900 ms
-    expect(track().style.transform).toBe('translate3d(0px,0,0)') // springs back
-    expect(track().style.transition).toBe(SLIDE)
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    frame()
+    const first = trackX()
+    expect(first).toBeLessThan(0)
+    expect(first).toBeGreaterThan(-40) // starting from rest: a small first step, not a jump
+    settle(); expect(counter()).toBe('2 / 5')
+    fireEvent.click(screen.getByTestId('deck-next'))
+    expect(clock.queue.size).toBe(1)
+    settle(); expect(counter()).toBe('3 / 5')
+    fireEvent.click(screen.getByTestId('deck-prev'))
+    settle(); expect(counter()).toBe('2 / 5')
+  })
+
+  it('a second arrow press during the slide retargets it: two cards on, without waiting', () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    frame(); frame()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    settle(); expect(counter()).toBe('3 / 5')
+  })
+
+  it('a fast flick keeps its speed: it covers more in the first frames than a slow slide', () => {
+    view()
+    flick(-120, 40) // 3000 px/s
+    frame(); frame()
+    const flicked = trackX()
     cleanup()
+    clock.queue.clear()
     view()
-    drag([[1000, 200], [1500, 192], [1900, 185], [1950, 150]]) // 15 px in 900 ms, then 35 px in 50 ms
-    now.mockRestore()
-    expect(track().style.transform).toBe('translate3d(-14px,0,0)') // slides on
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    swipe(-250) // the finger rested: starts at 0 px/s from -250
+    frame(); frame()
+    expect(flicked).toBeLessThan(-120 - 60) // the flick carried on from -120 at speed …
+    expect(trackX() - -250).toBeGreaterThan(-60) // … where the rested drag barely moved
+  })
+
+  it('a fast flick of the whole deck: two cards at once above 2500 px/s, one below', () => {
+    view()
+    flick(-200, 40) // 5000 px/s
+    settle(); expect(counter()).toBe('3 / 5')
+    flick(-100, 40) // 2500 px/s is not above the limit …
+    settle(); expect(counter()).toBe('4 / 5')
+  })
+
+  it('a flick the other way goes back two cards just the same, and never past the first', () => {
+    view({ cards: cards(6) })
+    for (let n = 0; n < 4; n++) { fireEvent.keyDown(window, { key: 'ArrowRight' }); settle() }
+    expect(counter()).toBe('5 / 6')
+    flick(240, 40) // 6000 px/s to the right
+    settle(); expect(counter()).toBe('3 / 6')
+    flick(400, 30)
+    settle(); expect(counter()).toBe('1 / 6')
+    flick(400, 30)
+    settle(); expect(counter()).toBe('1 / 6')
+  })
+
+  it('only the last 100 ms count for the speed: a fast start that rested is no flick, a slow drag with a fast end is', () => {
+    view()
+    finger.down(300)
+    finger.wait(20)
+    finger.move(240) // 3000 px/s …
+    finger.wait(300) // … but the finger rested
+    finger.up(240)
+    settle(); expect(counter()).toBe('1 / 5') // 60 px, no speed: springs back
+    finger.down(300)
+    finger.wait(400)
+    finger.move(285) // slow
+    finger.wait(30)
+    finger.move(225) // 2000 px/s at the end
+    finger.up(225)
+    settle(); expect(counter()).toBe('2 / 5')
+  })
+
+  it('the first card: a drag to the right follows the iOS rubber band, and a release springs back', () => {
+    view()
+    finger.down(200)
+    finger.move(300) // 100 px beyond the end
+    const w = STAGE_PX
+    const expected = (1 - 1 / ((100 * 0.55) / w + 1)) * w
+    expect(expected).toBeGreaterThan(40)
+    expect(expected).toBeLessThan(100)
+    expect(trackX()).toBeCloseTo(expected, 5)
+    finger.move(700) // far beyond: never more than the view's width
+    expect(trackX()).toBeLessThan(w)
+    expect(trackX()).toBeGreaterThan(expected)
+    finger.move(300)
+    finger.wait(300)
+    finger.up(300)
+    const seen: number[] = []
+    while (clock.queue.size) { frame(); seen.push(trackX()) }
+    expect(seen.length).toBeGreaterThan(5)
+    expect(seen[0]).toBeLessThan(expected) // heading back
+    expect(seen[seen.length - 1]).toBe(0)
+    expect(counter()).toBe('1 / 5')
+  })
+
+  it('the last card: the same band to the left, back to the last card', () => {
+    view({ cards: cards(2) })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    settle()
+    expect(counter()).toBe('2 / 2')
+    finger.down(300)
+    finger.move(200)
+    expect(trackX()).toBeCloseTo(-(1 - 1 / ((100 * 0.55) / STAGE_PX + 1)) * STAGE_PX, 5)
+    finger.wait(300)
+    finger.up(200)
+    settle(); expect(counter()).toBe('2 / 2')
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+  })
+
+  it('a touch during the slide stops it right there and the finger carries on from that position', () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    while (trackX() > -300) frame()
+    const stopped = trackX()
+    expect(counter()).toBe('1 / 5') // still on the first card
+    finger.down(200)
+    expect(clock.queue.size).toBe(0) // the spring is gone — no waiting …
+    expect(trackX()).toBe(stopped) // … and no jump
+    finger.move(180) // the finger moves 20 px: the track follows from where it was
+    expect(trackX()).toBeCloseTo(stopped - 20, 5)
+    finger.wait(300)
+    finger.up(180)
+    fireEvent.click(cardButton()) // the touch that stopped the slide is no tap: no flip
+    expect(visible().dataset.side).toBe('learning')
+    settle(); expect(counter()).toBe('2 / 5') // past half: on to the next card
+  })
+
+  it('… and letting go the other way sends it back to where it came from', () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    while (trackX() > -300) frame()
+    finger.down(200)
+    finger.move(320) // drags it back 120 px
+    finger.wait(300)
+    finger.up(320)
+    settle(); expect(counter()).toBe('1 / 5')
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+  })
+
+  it('a touch on a track at rest takes over with no jump either, and a mere tap leaves it at 0 without an animation', () => {
+    view()
+    finger.down(200)
+    expect(trackX()).toBe(0)
+    finger.up(200)
+    expect(clock.queue.size).toBe(0)
+    expect(trackX()).toBe(0)
+  })
+
+  it('a card settles with a small vibration where the browser has one', () => {
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { vibrate }))
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    settle()
+    expect(vibrate).toHaveBeenCalledTimes(1)
+    expect(vibrate).toHaveBeenCalledWith(8)
+    swipe(-100) // springs back to the same card: no vibration
+    settle()
+    expect(vibrate).toHaveBeenCalledTimes(1)
+  })
+
+  it('without vibrate (iOS) nothing breaks', () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(() => settle()).not.toThrow()
+    expect(counter()).toBe('2 / 5')
+  })
+
+  it('reduced motion: no spring, the track jumps to the target and the card changes at once', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    view()
+    act(() => { fireEvent.keyDown(window, { key: 'ArrowRight' }) })
+    expect(counter()).toBe('2 / 5')
+    expect(clock.queue.size).toBe(0)
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+    swipe(-300)
+    expect(counter()).toBe('3 / 5')
+    expect(clock.queue.size).toBe(0)
+  })
+
+  it('a new folder (resetKey) stops a running spring and starts at the first card', () => {
+    const { rerender } = view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    frame(); frame()
+    rerender(<FlipCards cards={cards()} total={5} direction="de_ru" resetKey="other" />)
+    expect(clock.queue.size).toBe(0)
+    expect(trackX()).toBe(0)
+    expect(counter()).toBe('1 / 5')
   })
 
   it('the track and the flipping card are GPU layers; both sides hide their back', () => {
@@ -517,8 +661,8 @@ describe('FlipCards: the flip in iPhone Safari', () => {
     fireEvent.click(cardButton())
     const rotor = screen.getByTestId('deck-rotor')
     expect(rotor.style.transform).toBe('rotateY(180deg)')
-    swipe(-100)
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    swipe(-250)
+    settle(); expect(counter()).toBe('2 / 5')
     expect(visible().dataset.side).toBe('learning')
     const fresh = screen.getByTestId('deck-rotor')
     expect(fresh).not.toBe(rotor) // a new element: no 180° → 0° transition on the new card
@@ -589,7 +733,7 @@ describe('FlipCards: the neighbours are real cards', () => {
     expect(next.querySelector('[data-face]')!.className).toBe(cardButton().querySelector('[data-face]')!.className) // the same face
     fireEvent.click(cardButton()) // the current card flipped…
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    settle(); expect(counter()).toBe('2 / 5')
     const prev = screen.getByTestId('deck-prev')
     expect(wordOf(prev).textContent).toBe('Wort1')
     expect(facing(prev)).toBe('learning') // …is on its front again as the neighbour
@@ -612,7 +756,7 @@ describe('FlipCards: the neighbours are real cards', () => {
     expect(wordOf(farther).textContent).toBe('Wort3')
     for (const n of [2, 3]) {
       fireEvent.keyDown(window, { key: 'ArrowRight' })
-      await waitFor(() => expect(counter()).toBe(`${n} / 5`))
+      settle(); expect(counter()).toBe(`${n} / 5`)
     }
     expect(offsets()).toEqual([-2, -1, 0, 1, 2])
     expect(Array.from(track().querySelectorAll<HTMLElement>('[data-offset]')).map((c) => wordOf(c).textContent)).toEqual(['Wort1', 'Wort2', 'Wort3', 'Wort4', 'Wort5'])
@@ -623,8 +767,8 @@ describe('FlipCards: the neighbours are real cards', () => {
     const next = screen.getByTestId('deck-next')
     const word = wordOf(next)
     const old = cardButton()
-    swipe(-100)
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    swipe(-250)
+    settle(); expect(counter()).toBe('2 / 5')
     expect(cardButton()).toBe(next) // the same button…
     expect(wordOf(cardButton())).toBe(word) // …and the same word node: nothing re-mounted
     expect(screen.getByTestId('deck-prev')).toBe(old) // the old card stays, now on the left
@@ -635,7 +779,7 @@ describe('FlipCards: the neighbours are real cards', () => {
     fireEvent.click(cardButton())
     expect(facing(cardButton())).toBe('native')
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    settle(); expect(counter()).toBe('2 / 5')
     expect(facing(cardButton())).toBe('learning')
     expect(visible().dataset.side).toBe('learning')
     expect((cardButton().firstElementChild as HTMLElement).className).toContain('transition-transform')
@@ -726,7 +870,7 @@ describe('FlipCards: the neighbours', () => {
   it('clip on their own rounded edge; the current card does not, or its flip would be cut', async () => {
     view()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    settle(); expect(counter()).toBe('2 / 5')
     for (const neighbour of [screen.getByTestId('deck-prev'), screen.getByTestId('deck-next')]) {
       expect(neighbour.style.overflow).toBe('hidden')
       expect(neighbour.className).toContain('rounded-[32px]')
@@ -738,7 +882,7 @@ describe('FlipCards: the neighbours', () => {
     view({ cards: [card(1), card(2, { word: 'Lebensmittelgeschäft' })] })
     const size = wordOf(screen.getByTestId('deck-next')).style.fontSize
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    await waitFor(() => expect(counter()).toBe('2 / 2'))
+    settle(); expect(counter()).toBe('2 / 2')
     expect(wordOf(cardButton()).style.fontSize).toBe(size)
     expect(cardButton().style.overflow).toBe('')
   })

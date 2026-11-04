@@ -10,12 +10,18 @@ import { speak, useCanSpeak } from '../lib/speech'
 import { GapSentence } from './GapSentence'
 
 const GAP = 14 // px between the cards
-const SWIPE_PX = 60 // a drag this long moves to the neighbour
-const FLICK_PX_PER_MS = 0.5 // ... and so does a short, fast flick
-const VELOCITY_MS = 80 // the flick speed is that of the last moves: a fast end of a slow drag counts
 const TAP_PX = 8 // a movement shorter than this is a tap
-const ANIMATION_MS = 220
-const EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+// The slide is a spring, like UIScrollView paging: a = k·(target − x) − c·v, mass 1.
+const STIFFNESS = 300
+const DAMPING = 30
+const MAX_DT = 0.032 // s: a long frame (a stall, a background tab) must not blow the integration up
+const SUBSTEP = 0.008 // s: the integration step, small enough to stay stable and smooth
+const REST = 0.5 // px and px/s: closer to the target and slower than this, the spring stops
+const VELOCITY_WINDOW_MS = 100 // the release velocity is that of the finger's last moves
+const COAST_S = 0.2 // where the card would coast in this long decides the page
+const FAST_PX_PER_S = 2500 // faster than this a flick may skip a card
+const RUBBER = 0.55 // iOS's rubber band constant
+const HAPTIC_MS = 8
 const CARD_WIDTH = 'min(420px, calc(100% - 88px))'
 const AROUND = 2 // cards kept rendered on each side: a quick second slide never meets a blank card
 const BACKFACE_HIDDEN = { backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as const
@@ -64,11 +70,18 @@ function useFirstVisitsHints(): boolean {
 type Direction = 'de_ru' | 'ru_de'
 type Point = { x: number; t: number }
 
-/** px/ms over the drag's last VELOCITY_MS (0 when the finger rested before the release). */
+const clock = () => performance.now()
+
+/** px/s over the drag's last VELOCITY_WINDOW_MS (0 when the finger rested before the release). */
 function velocity(points: Point[], x: number, t: number) {
-  const from = points.find((p) => p.t >= t - VELOCITY_MS)
-  return from && t > from.t ? (x - from.x) / (t - from.t) : 0
+  const from = points.find((p) => p.t >= t - VELOCITY_WINDOW_MS)
+  return from && t > from.t ? ((x - from.x) / (t - from.t)) * 1000 : 0
 }
+
+/** The iOS rubber band: how far a view follows a finger that is d px beyond its end (w = the view's width). */
+const rubberBand = (d: number, w: number) => (1 - 1 / ((d * RUBBER) / w + 1)) * w
+/** The finger's distance beyond the end for a view that is o px beyond it: rubberBand's inverse. */
+const unRubberBand = (o: number, w: number) => { const c = Math.min(o, w * 0.999); return (c * w) / ((w - c) * RUBBER) }
 
 function Face({ className, children }: { className: string; children: React.ReactNode }) {
   return (
@@ -213,17 +226,17 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [textWidth, setTextWidth] = useState(DEFAULT_TEXT_WIDTH)
-  // The track's position lives in the DOM, not in state: a move writes it in the next animation frame
-  // (no render per pointer move); React renders only when the card changes or flips.
+  // The track's position lives in the DOM, not in state: a spring frame or a pointer move writes it
+  // straight to the element (no render per frame); React renders only when the card changes or flips.
   const stage = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
-  const dx = useRef(0) // the offset the next frame shows
-  const at = useRef(0) // where place() last put the track
+  const x = useRef(0) // the track's offset from the current card, px
+  const v = useRef(0) // its velocity, px/s
+  // The running spring: the cards to move by when it settles (0 = a spring-back).
+  const aim = useRef<{ delta: number } | null>(null)
   const frame = useRef(0) // the requested animation frame, 0 = none
-  const busy = useRef(false) // a slide or a spring-back is running: a new drag waits for it
-  // What the running animation ends with: the card to move by (0 = a spring-back) and the fallback timer.
-  const pending = useRef<{ delta: -1 | 0 | 1; fallback: ReturnType<typeof setTimeout> } | null>(null)
-  const drag = useRef<{ x: number; points: Point[]; moved: boolean } | null>(null)
+  const lastFrame = useRef<number | null>(null) // the previous frame's timestamp
+  const drag = useRef<{ x0: number; raw0: number; points: Point[]; moved: boolean; interrupted: boolean } | null>(null)
   const endDrag = useRef<(() => void) | null>(null) // removes the window listeners of the drag in progress
   const suppressClick = useRef(false)
 
@@ -238,14 +251,15 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const lastRef = useRef(last)
   lastRef.current = last
 
-  /** Puts the track at x px: sliding there, or at once. */
-  const place = useCallback((x: number, animate: boolean) => {
+  /** Puts the track at px. */
+  const write = useCallback((px: number) => {
+    x.current = px
     const el = track.current
-    if (!el) return
-    el.style.transition = animate ? `transform ${ANIMATION_MS}ms ${EASING}` : 'none'
-    el.style.transform = `translate3d(${x}px,0,0)`
-    at.current = x
+    if (el) el.style.transform = `translate3d(${px}px,0,0)`
   }, [])
+
+  /** One card's distance: the card and the gap. */
+  const pageWidth = useCallback(() => Math.min(420, Math.max((stage.current?.clientWidth ?? 0) - 88, 0)) + GAP, [])
 
   const move = useCallback((delta: number) => {
     const next = Math.min(Math.max(iRef.current + delta, 0), lastRef.current)
@@ -256,40 +270,79 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
 
   const flip = useCallback(() => setFlipped((f) => !f), [])
 
+  /** Stops the spring where it is (a finger, a new folder). */
+  const halt = useCallback(() => {
+    cancelAnimationFrame(frame.current)
+    frame.current = 0
+    lastFrame.current = null
+    aim.current = null
+    v.current = 0
+  }, [])
+
   /**
-   * Ends the running slide or spring-back; false if none was running. After a slide the new card is
-   * rendered (flushSync) and the track is put back to 0 in one synchronous step: both land in the same
-   * frame, so nothing jumps.
+   * The spring has come to rest on its page: the card changes and the track is rebased to 0 in the
+   * same step (flushSync renders the new card first), so both land in one frame — cards are keyed by
+   * id, nothing re-mounts and nothing jumps.
    */
-  const finish = useCallback(() => {
-    const p = pending.current
-    if (!p) return false
-    pending.current = null
-    clearTimeout(p.fallback)
-    if (p.delta) flushSync(() => move(p.delta))
-    place(0, false)
-    busy.current = false
-    return true
-  }, [move, place])
+  const settle = useCallback(() => {
+    const delta = aim.current?.delta ?? 0
+    halt()
+    if (delta) {
+      flushSync(() => move(delta))
+      navigator.vibrate?.(HAPTIC_MS) // Android; iOS ignores it
+    }
+    write(0)
+  }, [halt, move, write])
 
-  /** Slides the track to x; the track's transitionend ends it (the timer only if that never comes). */
-  const animateTo = useCallback((x: number, delta: -1 | 0 | 1) => {
-    busy.current = true
-    place(x, true)
-    pending.current = { delta, fallback: setTimeout(finish, ANIMATION_MS + 50) }
-  }, [place, finish])
+  /** One animation frame of the spring. */
+  const tick = useCallback(function step(now: number) {
+    frame.current = 0
+    const a = aim.current
+    if (!a) return
+    const target = -a.delta * pageWidth()
+    let dt = lastFrame.current === null ? 1 / 60 : Math.min((now - lastFrame.current) / 1000, MAX_DT)
+    lastFrame.current = now
+    let pos = x.current
+    let vel = v.current
+    while (dt > 1e-9) {
+      const h = Math.min(dt, SUBSTEP)
+      vel += (STIFFNESS * (target - pos) - DAMPING * vel) * h
+      pos += vel * h
+      dt -= h
+    }
+    if (Math.abs(pos - target) < REST && Math.abs(vel) < REST) {
+      write(target)
+      settle()
+      return
+    }
+    v.current = vel
+    write(pos)
+    frame.current = requestAnimationFrame(step)
+  }, [pageWidth, write, settle])
 
-  /** Slides the track by one card in the swipe's direction, then switches the card. */
+  /** Springs the track to the page `delta` cards away, starting at velocity px/s (a new target keeps a running spring going). */
+  const springTo = useCallback((delta: number, velocity: number) => {
+    aim.current = { delta }
+    v.current = velocity
+    const target = -delta * pageWidth()
+    if (reducedMotion() || (Math.abs(x.current - target) < REST && Math.abs(velocity) < REST)) {
+      write(target)
+      settle()
+      return
+    }
+    if (!frame.current) {
+      lastFrame.current = null
+      frame.current = requestAnimationFrame(tick)
+    }
+  }, [pageWidth, write, settle, tick])
+
+  /** The buttons and keys: one card on, from rest (or from where a running spring is). */
   const slide = useCallback((delta: 1 | -1) => {
-    // A slide still running (a quick second ← →) ends at once; the reflow lets the next one start from 0.
-    if (finish()) void track.current?.offsetWidth
-    const next = iRef.current + delta
-    if (next < 0 || next > lastRef.current) return
-    if (reducedMotion()) { place(0, false); move(delta); return }
-    const width = stage.current?.clientWidth ?? 0
-    const distance = Math.min(420, Math.max(width - 88, 0)) + GAP
-    animateTo(-delta * distance, delta)
-  }, [finish, place, move, animateTo])
+    const pending = aim.current?.delta ?? 0
+    const total = Math.min(Math.max(pending + delta, -iRef.current), lastRef.current - iRef.current)
+    if (total === pending) return
+    springTo(total, aim.current ? v.current : 0)
+  }, [springTo])
 
   // A tap on a card: the current one flips, a neighbour is moved to. The click that ends a drag is no tap.
   const tap = useCallback((offset: number) => {
@@ -302,35 +355,21 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   }, [flip, slide])
 
   useEffect(() => {
-    const p = pending.current
-    if (p) clearTimeout(p.fallback)
-    pending.current = null
-    busy.current = false
-    place(0, false)
+    halt()
+    write(0)
     setIndex(0); setFlipped(false)
-  }, [resetKey, place])
+  }, [resetKey, halt, write])
 
   useEffect(() => { if (onNearEnd && cards.length > 0 && i >= cards.length - 3) onNearEnd() }, [i, cards.length, onNearEnd])
   useEffect(() => () => {
     endDrag.current?.()
-    if (pending.current) clearTimeout(pending.current.fallback)
     cancelAnimationFrame(frame.current)
   }, [])
-
-  // The track's own transitionend ends a slide; the flip inside the card bubbles one up too — not that.
-  // A native listener: React has no TransitionEvent everywhere, and finish runs flushSync.
-  const shown = !!card
-  useEffect(() => {
-    const el = track.current
-    if (!el) return
-    const onEnd = (e: TransitionEvent) => { if (e.target === el) finish() }
-    el.addEventListener('transitionend', onEnd)
-    return () => el.removeEventListener('transitionend', onEnd)
-  }, [shown, finish])
 
   // All faces are one width, and only the stage changes it: one observer sizes every card, so a card
   // that joins the deck is right from its first render. Measured before the first paint too — a state
   // set from the observer alone would land a frame late. clientWidth, as the flip distorts a rect.
+  const shown = !!card
   useLayoutEffect(() => {
     const el = stage.current
     if (!el) return
@@ -363,44 +402,67 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     return () => window.removeEventListener('keydown', onKey)
   }, [slide, flip])
 
+  /**
+   * Where the track is for a finger that has dragged it to raw px: 1:1 inside the deck, the iOS rubber
+   * band beyond its first and last card. Only the cards that are rendered (AROUND) can be dragged to.
+   */
+  const follow = (raw: number) => {
+    const W = pageWidth()
+    const w = stage.current?.clientWidth || W
+    const endLo = -(lastRef.current - iRef.current) * W
+    const endHi = iRef.current * W
+    const lo = Math.max(endLo, -AROUND * W)
+    const hi = Math.min(endHi, AROUND * W)
+    if (raw > hi) return hi === endHi ? hi + rubberBand(raw - hi, w) : hi
+    if (raw < lo) return lo === endLo ? lo - rubberBand(lo - raw, w) : lo
+    return raw
+  }
+  /** follow()'s inverse: the raw drag position behind a track that may be stretched at an end. */
+  const rawOf = (px: number) => {
+    const W = pageWidth()
+    const w = stage.current?.clientWidth || W
+    const endLo = -(lastRef.current - iRef.current) * W
+    const endHi = iRef.current * W
+    if (px > endHi && endHi <= AROUND * W) return endHi + unRubberBand(px - endHi, w)
+    if (px < endLo && endLo >= -AROUND * W) return endLo - unRubberBand(endLo - px, w)
+    return px
+  }
+
   // Dragging: pointermove / pointerup are listened to on the window, so the cards under the finger
   // keep getting their own clicks (a tap on a neighbour, a tap on the card).
   function onPointerDown(e: React.PointerEvent) {
-    if (busy.current || (e.pointerType === 'mouse' && e.button !== 0)) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
     endDrag.current?.() // a drag whose pointerup never came
-    drag.current = { x: e.clientX, points: [{ x: e.clientX, t: Date.now() }], moved: false }
+    // A spring still running stops right here and the finger takes over from this very position.
+    const interrupted = aim.current !== null
+    if (interrupted) halt()
+    const t0 = clock()
+    drag.current = { x0: e.clientX, raw0: rawOf(x.current), points: [{ x: e.clientX, t: t0 }], moved: false, interrupted }
     suppressClick.current = false
     const onMove = (ev: PointerEvent) => {
       const d = drag.current
       if (!d) return
-      const t = Date.now()
-      const delta = ev.clientX - d.x
+      const t = clock()
+      const delta = ev.clientX - d.x0
       if (Math.abs(delta) >= TAP_PX) d.moved = true
       d.points.push({ x: ev.clientX, t })
-      while (d.points.length > 1 && d.points[0].t < t - VELOCITY_MS) d.points.shift() // only the recent ones count
-      const blocked = (delta > 0 && iRef.current === 0) || (delta < 0 && iRef.current === lastRef.current)
-      dx.current = blocked ? delta / 4 : delta // a little resistance at the ends
-      // One frame writes the latest position, however many moves arrive before it.
-      if (!frame.current) frame.current = requestAnimationFrame(() => { frame.current = 0; place(dx.current, false) })
+      while (d.points.length > 1 && d.points[0].t < t - VELOCITY_WINDOW_MS) d.points.shift() // only the recent ones count
+      write(follow(d.raw0 + delta)) // 1:1 with the finger
     }
     const onUp = (ev: PointerEvent) => {
       endDrag.current?.()
-      cancelAnimationFrame(frame.current)
-      frame.current = 0
       const d = drag.current
       drag.current = null
       if (!d) return
-      const delta = ev.clientX - d.x
-      if (d.moved) suppressClick.current = true // the click that follows a drag is not a tap
-      const fast = Math.abs(delta) > 20 && velocity(d.points, ev.clientX, Date.now()) * Math.sign(delta) > FLICK_PX_PER_MS
-      const dir = delta < 0 ? 1 : -1
-      const exists = dir === 1 ? iRef.current < lastRef.current : iRef.current > 0
-      if ((Math.abs(delta) > SWIPE_PX || fast) && exists) {
-        // the finger already moved the track: the slide continues from there
-        slide(dir)
-      } else if (at.current !== 0) {
-        animateTo(0, 0) // spring back (from where the last frame put the track — not the cancelled one)
-      }
+      if (d.moved || d.interrupted) suppressClick.current = true // the click that follows a drag (or stops a slide) is not a tap
+      const vel = velocity(d.points, ev.clientX, clock())
+      // Where the card would coast to decides the page, like paging in a UIScrollView; a very fast flick may skip one.
+      const W = pageWidth()
+      const reach = Math.abs(vel) > FAST_PX_PER_S ? 2 : 1
+      const wanted = Math.round(-(x.current + vel * COAST_S) / W) || 0
+      const page = Math.min(Math.max(wanted, -reach), reach)
+      // The spring starts with the release velocity, so a flick carries on instead of starting over.
+      springTo(Math.min(Math.max(page, -iRef.current), lastRef.current - iRef.current), vel)
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -426,7 +488,7 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
       <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage"
         className="relative -mx-4 max-h-[620px] min-h-[320px] flex-1 overflow-hidden md:mx-0"
         style={{ touchAction: 'pan-y' }}>
-        {/* Its own GPU layer; moved only by place() — React never sets its transform, so a render leaves it be. */}
+        {/* Its own GPU layer; moved only by write() — React never sets its transform, so a render leaves it be. */}
         <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>
           {around.map((c, k) => {
             const offset = from + k - i
