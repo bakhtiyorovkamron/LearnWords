@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { ChevronLeft, ChevronRight, RotateCw, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -22,6 +22,15 @@ const PRESERVE_3D = { transformStyle: 'preserve-3d', WebkitTransformStyle: 'pres
 // A face hides its own back (Safari needs the -webkit- one too) and sits 1px in front of its side, so
 // iPhone Safari composites it in 3D and never shows the face behind it mirrored.
 const FACE_STYLE = { ...BACKFACE_HIDDEN, transform: 'translateZ(1px)' } as const
+
+// Glyph width of a WIDE word, in em. Not the average (0.53 serif, 0.59 bold Cyrillic): every word
+// wider than the factor would break mid-word, and measured on real words that is 1 in 4 or more.
+const GLYPH_EM = 0.68
+const DEFAULT_TEXT_WIDTH = 300 // px of a face without its padding, until it is measured
+const MIN_FONT_PX = 26
+const WORD_MAX_PX = 64
+const TRANSLATION_MAX_PX = 52
+const EXAMPLE_FIT = 'line-clamp-3 wrap-anywhere hyphens-auto'
 
 const reducedMotion = () =>
   typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -72,14 +81,25 @@ function Face({ className, children }: { className: string; children: React.Reac
 
 const label = 'text-xs font-bold uppercase tracking-[0.12em] text-faint'
 
+/**
+ * The font that keeps the longest single word of `text` on one line of a face: phrases still wrap
+ * between their words. Only a word too long even at MIN_FONT_PX may hyphenate — `hyphens: auto` is
+ * off otherwise, or it would split words that could simply wrap whole to the next line.
+ */
+function fitted(text: string, width: number, max: number) {
+  const longest = Math.max(...text.split(/\s+/).map((w) => w.length))
+  const wanted = width / (longest * GLYPH_EM)
+  const hyphens = wanted < MIN_FONT_PX ? 'auto' : 'manual'
+  return { fontSize: `${Math.floor(Math.min(Math.max(wanted, MIN_FONT_PX), max))}px`, hyphens, WebkitHyphens: hyphens } as const
+}
+
 type DeckCardProps = {
   card: CollectionCard
-  n: number // its number in the deck (the counter chip)
-  total: number
   offset: number // from the current card: 0 is it, ±1 the neighbours at the edges, ±2 waiting further out
   direction: Direction
   flipped: boolean // only ever true for the current card
   showHints: boolean
+  textWidth: number // px of a face without its padding
   onTap: (offset: number) => void
 }
 
@@ -91,7 +111,7 @@ type DeckCardProps = {
  * from screen readers. memo: the props are the card from the list and plain values, so a flip renders
  * the current card only.
  */
-const DeckCard = memo(function DeckCard({ card, n, total, offset, direction, flipped, showHints, onTap }: DeckCardProps) {
+const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, showHints, textWidth, onTap }: DeckCardProps) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const current = offset === 0
@@ -101,7 +121,7 @@ const DeckCard = memo(function DeckCard({ card, n, total, offset, direction, fli
 
   const { article, rest } = splitArticle(card.word, card.article)
   const filled = card.is_learned ? 5 : Math.min(Math.max(card.box_level, 0), 5)
-  const counter = <span className="text-[13px] tabular-nums text-muted">{n} / {total}</span>
+  const translation = card.translation || '—'
   const nativeLang = card.translation_language ?? i18n.language
   const hint = (key: string) => showHints && (
     <span className="absolute bottom-6 flex items-center gap-1.5 text-[13px] text-faint">
@@ -116,17 +136,17 @@ const DeckCard = memo(function DeckCard({ card, n, total, offset, direction, fli
           <span key={k} data-filled={k < filled} className={`h-[5px] w-4 rounded-full ${k < filled ? 'bg-accent' : 'bg-dot-off'}`} />
         ))}
       </span>
-      <span className="absolute right-6 top-5">{counter}</span>
       <span className={label}>{t('cards.sideLearning', learning.vars)}</span>
       <span lang={card.language} className="block">
         {article && <span className={`mt-4 block font-serif text-[26px] ${ARTICLE_COLOR[article]}`}>{article}</span>}
-        <span data-testid="deck-word" className={`${article ? '' : 'mt-4 '}block break-words font-serif text-[clamp(40px,14vw,64px)] font-medium leading-none text-fg`}>{rest}</span>
+        <span data-testid="deck-word" lang={card.language} style={fitted(rest, textWidth, WORD_MAX_PX)}
+          className={`${article ? '' : 'mt-4 '}block wrap-anywhere font-serif font-medium leading-none text-fg`}>{rest}</span>
       </span>
       {card.transcription && <span className="mt-3 block font-mono text-[15px] text-muted">{card.transcription}</span>}
       {card.example_sentence && (
         <>
           <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
-          <span className="block font-serif text-xl leading-snug text-fg" lang={card.language}>
+          <span className={`${EXAMPLE_FIT} font-serif text-xl leading-snug text-fg`} lang={card.language}>
             <GapSentence answered answer={card.word} sentence={card.example_sentence} />
           </span>
         </>
@@ -136,13 +156,13 @@ const DeckCard = memo(function DeckCard({ card, n, total, offset, direction, fli
   )
   const nativeSide = (
     <Face className="bg-surface-2">
-      <span className="absolute right-6 top-5">{counter}</span>
       <span className={label}>{t(`cards.sideNative.${nativeLang}`)}</span>
-      <span className="mt-5 block break-words text-[clamp(32px,11vw,52px)] font-bold leading-tight tracking-[-0.02em] text-accent-text">{card.translation || '—'}</span>
+      <span lang={nativeLang} style={fitted(translation, textWidth, TRANSLATION_MAX_PX)}
+        className="mt-5 block wrap-anywhere font-bold leading-tight tracking-[-0.02em] text-accent-text">{translation}</span>
       {card.example_translation && (
         <>
           <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
-          <span className="block text-[19px] leading-snug text-fg">{card.example_translation}</span>
+          <span lang={nativeLang} className={`${EXAMPLE_FIT} text-[19px] leading-snug text-fg`}>{card.example_translation}</span>
         </>
       )}
       {hint('cards.flipToWord')}
@@ -154,7 +174,9 @@ const DeckCard = memo(function DeckCard({ card, n, total, offset, direction, fli
       data-testid={current ? 'deck-card' : offset === -1 ? 'deck-prev' : offset === 1 ? 'deck-next' : undefined}
       aria-label={current ? t('collection.flipHint') : near ? t(offset < 0 ? 'collection.prev' : 'collection.next') : undefined}
       aria-hidden={current || near ? undefined : true} tabIndex={current || near ? undefined : -1}
-      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${offset})`, transform: 'translateX(-50%)', perspective: 1200 }}
+      // A neighbour clips here, at the card's own rounded edge. Never the current card: it flips, and
+      // its turning corners leave the button.
+      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${offset})`, transform: 'translateX(-50%)', perspective: 1200, overflow: current ? undefined : 'hidden' }}
       className="absolute inset-y-0 block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
       {/* Nothing between the button (the perspective) and the faces may clip, fade, filter or
           will-change anything but transform: Safari would flatten the 3D and show a face mirrored.
@@ -189,6 +211,7 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const showHints = useFirstVisitsHints()
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [textWidth, setTextWidth] = useState(DEFAULT_TEXT_WIDTH)
   // The track's position lives in the DOM, not in state: a move writes it in the next animation frame
   // (no render per pointer move); React renders only when the card changes or flips.
   const stage = useRef<HTMLDivElement>(null)
@@ -304,6 +327,26 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     return () => el.removeEventListener('transitionend', onEnd)
   }, [shown, finish])
 
+  // All faces are one width, and only the stage changes it: one observer sizes every card, so a card
+  // that joins the deck is right from its first render. Measured before the first paint too — a state
+  // set from the observer alone would land a frame late. clientWidth, as the flip distorts a rect.
+  useLayoutEffect(() => {
+    const el = stage.current
+    if (!el) return
+    const measure = () => {
+      const face = el.querySelector<HTMLElement>('[data-face]')
+      if (!face) return
+      const { paddingLeft, paddingRight } = getComputedStyle(face)
+      const width = face.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight)
+      if (width > 0) setTextWidth(width)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [shown])
+
   // ← → move, Space / Enter flip (not while typing)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -386,8 +429,8 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
         <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>
           {around.map((c, k) => {
             const offset = from + k - i
-            return <DeckCard key={c.id} card={c} n={from + k + 1} total={total} offset={offset} direction={direction}
-              flipped={offset === 0 && flipped} showHints={showHints} onTap={tap} />
+            return <DeckCard key={c.id} card={c} offset={offset} direction={direction}
+              flipped={offset === 0 && flipped} showHints={showHints} textWidth={textWidth} onTap={tap} />
           })}
         </div>
       </div>

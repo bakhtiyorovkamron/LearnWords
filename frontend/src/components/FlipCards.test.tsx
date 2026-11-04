@@ -58,7 +58,7 @@ function swipe(dx: number, ms = 300) {
   fireEvent.pointerUp(window, { clientX: 200 + dx, pointerId: 1 })
   now.mockRestore()
 }
-const counter = () => cardButton().querySelector('[data-side="learning"] .tabular-nums')!.textContent
+const counter = () => screen.getByTestId('deck-counter').textContent
 
 describe('FlipCards: the two sides', () => {
   it('the front: the learning label, the word and the FILLED example — and not the translation', () => {
@@ -280,7 +280,6 @@ describe('FlipCards: the controls under the deck', () => {
     expect(under.className).toContain('text-muted')
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     await waitFor(() => expect(under.textContent).toBe('2 / 403'))
-    expect(counter()).toBe('2 / 403') // the chip on the card stays too
     expect(screen.queryByTestId('deck-pager')).toBeNull()
   })
 
@@ -637,5 +636,113 @@ describe('FlipCards: the neighbours are real cards', () => {
     const prev = screen.getByTestId('deck-prev').firstElementChild as HTMLElement
     expect(prev.style.transform).toBe('none') // the old card is back on its front…
     expect(prev.className).not.toContain('transition-transform') // …at once, without a flip animation
+  })
+})
+
+const fontPx = (el: HTMLElement) => parseFloat(el.style.fontSize)
+const words = () => screen.getAllByTestId('deck-word')
+
+describe('FlipCards: the text fits the card', () => {
+  it('a 20-letter word gets a smaller font than a 4-letter one, and nothing goes below 26px', () => {
+    view({ cards: [card(1, { word: 'Haus' }), card(2, { word: 'Lebensmittelgeschäft' }), card(3, { word: 'Geschwindigkeitsbegrenzung' })] })
+    const [short, long, longest] = words().map(fontPx)
+    expect(short).toBe(64)
+    expect(long).toBeLessThan(short)
+    expect(long).toBeGreaterThanOrEqual(26)
+    expect(longest).toBe(26)
+  })
+
+  it('a phrase is sized by its longest word: "auf keinen Fall" keeps the maximum and wraps whole', () => {
+    view({ cards: [card(1, { word: 'auf keinen Fall' })] })
+    expect(fontPx(words()[0])).toBe(64)
+    expect(words()[0].style.hyphens).toBe('manual')
+  })
+
+  it('only a word too long even at 26px may hyphenate', () => {
+    view({ cards: [card(1, { word: 'Grundschule' }), card(2, { word: 'Geschwindigkeitsbegrenzung' })] })
+    expect(words().map((w) => w.style.hyphens)).toEqual(['manual', 'auto'])
+    for (const word of words()) {
+      expect(word.className).toContain('wrap-anywhere')
+      expect(word.getAttribute('lang')).toBe('de')
+    }
+  })
+
+  it('the article is not part of the fit and keeps its size', () => {
+    view({ cards: [card(1, { word: 'die Mathematik (Mathe) (Sg.)' })] })
+    expect(words()[0].textContent).toBe('Mathematik (Mathe) (Sg.)')
+    expect(fontPx(words()[0])).toBe(44) // 10 letters: 300 / (10 × 0.68)
+    expect(within(side('learning')).getByText('die').className).toContain('text-[26px]')
+  })
+
+  it('the translation has its own maximum of 52px, the same minimum, and its own language', () => {
+    view({ cards: [card(1, { translation: 'дом' }), card(2, { translation: 'достопримечательности и не только' })] })
+    const short = within(side('native')).getByText('дом')
+    expect(fontPx(short)).toBe(52)
+    expect(short.getAttribute('lang')).toBe('ru')
+    const long = within(screen.getByTestId('deck-next')).getByText('достопримечательности и не только')
+    expect(fontPx(long)).toBeLessThan(52)
+    expect(fontPx(long)).toBeGreaterThanOrEqual(26)
+  })
+
+  it('the size follows the measured face: its width without the padding', () => {
+    const style = document.head.appendChild(document.createElement('style'))
+    style.textContent = '[data-face] { padding-left: 28px; padding-right: 28px }'
+    let resized = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(cb: () => void) { resized = cb }
+      observe() {}
+      disconnect() {}
+    })
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(285)
+    view({ cards: [card(1, { word: 'Grundschule' })] })
+    expect(fontPx(words()[0])).toBe(30) // 229 / (11 × 0.68): measured before the first paint
+    clientWidth.mockReturnValue(418)
+    act(() => resized())
+    expect(fontPx(words()[0])).toBe(48) // 362 / (11 × 0.68)
+    clientWidth.mockRestore()
+    style.remove()
+  })
+
+  it('an example is at most 3 lines, on both sides, and may break anywhere', () => {
+    view()
+    const examples = cardButton().querySelectorAll<HTMLElement>('.line-clamp-3')
+    expect(Array.from(examples).map((e) => e.textContent)).toEqual(['Das ist Wort1 1.', 'Это слово 1.'])
+    for (const example of examples) {
+      expect(example.className).toContain('wrap-anywhere')
+      expect(example.className).toContain('hyphens-auto')
+      expect(example.className).not.toMatch(/\bblock\b/) // display: block would undo the clamp
+      expect(example.getAttribute('lang')).toBeTruthy()
+    }
+  })
+})
+
+describe('FlipCards: the neighbours', () => {
+  it('clip on their own rounded edge; the current card does not, or its flip would be cut', async () => {
+    view()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await waitFor(() => expect(counter()).toBe('2 / 5'))
+    for (const neighbour of [screen.getByTestId('deck-prev'), screen.getByTestId('deck-next')]) {
+      expect(neighbour.style.overflow).toBe('hidden')
+      expect(neighbour.className).toContain('rounded-[32px]')
+    }
+    expect(cardButton().style.overflow).toBe('')
+  })
+
+  it('a neighbour has the size it keeps as the current card', async () => {
+    view({ cards: [card(1), card(2, { word: 'Lebensmittelgeschäft' })] })
+    const size = wordOf(screen.getByTestId('deck-next')).style.fontSize
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await waitFor(() => expect(counter()).toBe('2 / 2'))
+    expect(wordOf(cardButton()).style.fontSize).toBe(size)
+    expect(cardButton().style.overflow).toBe('')
+  })
+})
+
+describe('FlipCards: the counter', () => {
+  it('appears once, under the controls: on no face of any card', () => {
+    view()
+    expect(screen.getAllByText('1 / 5')).toEqual([screen.getByTestId('deck-counter')])
+    expect(screen.queryByText('2 / 5')).toBeNull() // the neighbour has none either
+    expect(screen.getAllByTestId('deck-box').length).toBeGreaterThan(0) // the box bars stay
   })
 })

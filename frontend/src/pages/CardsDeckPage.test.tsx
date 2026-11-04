@@ -77,7 +77,7 @@ describe('CardsDeckPage', () => {
     renderDeck('/cards')
     expect(await screen.findByTestId('deck-card')).toBeTruthy()
     expect(collectionApi.list).toHaveBeenCalledWith({ status: 'all', period: 'all', sort: 'date', q: '', folder: '', limit: 48, offset: 0 })
-    expect(screen.getAllByText('1 / 2').length).toBeGreaterThan(0) // the counter, on both faces
+    expect(screen.getByTestId('deck-counter').textContent).toBe('1 / 2')
   })
 
   it('?folder=<id|none> narrows the deck', async () => {
@@ -242,7 +242,7 @@ describe('the next page', () => {
     renderDeck('/cards')
     await screen.findByTestId('deck-card')
     const asked = (offset: number) => vi.mocked(collectionApi.list).mock.calls.some(([q]) => (q as { offset: number }).offset === offset)
-    const counter = () => screen.getByTestId('deck-card').querySelector('[data-side="learning"] .tabular-nums')!.textContent
+    const counter = () => screen.getByTestId('deck-counter').textContent
     for (let n = 0; n < 44; n++) fireEvent.keyDown(window, { key: 'ArrowRight' })
     await waitFor(() => expect(counter()).toBe('45 / 50'))
     expect(asked(48)).toBe(false) // 3 cards are still behind the 45th of 48 loaded
