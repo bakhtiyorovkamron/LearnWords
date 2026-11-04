@@ -20,6 +20,8 @@ const flatGray = image(() => 128)
 const textLike = image((x, y) => ((Math.floor(x / 2) + Math.floor(y / 3)) % 3 === 0 ? 0 : 255))
 // The same page photographed softly: the sharp pattern replaced by a gentle gradient.
 const softPage = image((x) => 190 + Math.round(20 * Math.sin(x / 20)))
+// A dark-theme screenshot: white "text" bars on black, 1 pixel in 8 lit — mean 30, p95 240.
+const darkMode = image((x, y) => ((Math.floor(x / 2) + Math.floor(y / 3)) % 8 === 0 ? 240 : 0))
 
 describe('assessPixels', () => {
   it('a 400 px image is too small, whatever it shows', () => {
@@ -30,6 +32,19 @@ describe('assessPixels', () => {
 
   it('a black image is too dark', () => {
     expect(assessPixels(1200, 900, black, W, H)).toBe('too_dark')
+  })
+
+  it('a uniformly dark image is too dark', () => {
+    expect(assessPixels(1200, 900, image(() => 25), W, H)).toBe('too_dark')
+  })
+
+  it('a dark gray low-contrast image is too dark, even with sharp noise in it', () => {
+    const murky = image((x, y) => 40 + ((x * 7 + y * 13) % 16)) // 40–55
+    expect(assessPixels(1200, 900, murky, W, H)).toBe('too_dark')
+  })
+
+  it('a dark-theme screenshot passes: low mean, but bright sharp text', () => {
+    expect(assessPixels(1200, 900, darkMode, W, H)).toBe('ok')
   })
 
   it('a flat gray image without any detail is blurry', () => {
@@ -43,6 +58,11 @@ describe('assessPixels', () => {
   it('a dim but sharp page still passes (conservative)', () => {
     const dim = image((x, y) => ((Math.floor(x / 2) + Math.floor(y / 3)) % 3 === 0 ? 20 : 120))
     expect(assessPixels(1200, 900, dim, W, H)).toBe('ok')
+  })
+
+  it('nothing bright is not enough for too dark: the contrast must be missing too', () => {
+    const dimmer = image((x, y) => ((Math.floor(x / 2) + Math.floor(y / 3)) % 3 === 0 ? 15 : 80)) // p95 80, contrast 65
+    expect(assessPixels(1200, 900, dimmer, W, H)).toBe('ok')
   })
 
   it('a very soft, low-contrast picture is blurry', () => {

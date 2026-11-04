@@ -8,7 +8,10 @@ const MAX_SIDE = 2400
 
 // Quality thresholds — deliberately conservative: a slightly soft but readable page must pass.
 export const MIN_SIDE_PX = 600          // shorter side of the original image
-export const MIN_MEAN_LUMINANCE = 40    // 0-255, of the grayscale copy
+// Too dark = nothing bright AND no contrast. Not the mean: a dark-theme screenshot has a low mean
+// but bright, sharp text. Both are 0-255, on the grayscale copy.
+export const MIN_BRIGHT_P95 = 90        // 95th percentile: below it, nothing in the image is bright
+export const MIN_CONTRAST = 25          // p95 - p5: below it, the image has no contrast
 export const MIN_LAPLACIAN_VARIANCE = 15 // sharpness of the grayscale copy
 export const ANALYSIS_WIDTH = 256       // width of the grayscale copy
 
@@ -24,13 +27,29 @@ export class PhotoQualityError extends Error {
   }
 }
 
-/** Mean luminance (0-255) of an RGBA buffer. */
+/** Luminance (0-255) of each pixel of an RGBA buffer. */
 function grayscale(rgba: ArrayLike<number>, count: number): Float32Array {
   const g = new Float32Array(count)
   for (let i = 0; i < count; i++) {
     g[i] = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]
   }
   return g
+}
+
+/** The 5th and 95th percentiles (0-255) of a grayscale copy, from a 256-bin histogram. */
+function percentiles(gray: Float32Array): { p5: number; p95: number } {
+  const bins = new Uint32Array(256)
+  for (const v of gray) bins[Math.round(v)]++
+  const at = (q: number) => {
+    const target = q * gray.length
+    let seen = 0
+    for (let i = 0; i < 256; i++) {
+      seen += bins[i]
+      if (seen >= target) return i
+    }
+    return 255
+  }
+  return { p5: at(0.05), p95: at(0.95) }
 }
 
 /** Variance of the Laplacian (4-neighbour kernel) over the interior: low = blurry/flat. */
@@ -57,9 +76,8 @@ function laplacianVariance(gray: Float32Array, w: number, h: number): number {
 export function assessPixels(width: number, height: number, rgba: ArrayLike<number>, thumbW: number, thumbH: number): PhotoQuality {
   if (Math.min(width, height) < MIN_SIDE_PX) return 'too_small'
   const gray = grayscale(rgba, thumbW * thumbH)
-  let mean = 0
-  for (const v of gray) mean += v
-  if (mean / gray.length < MIN_MEAN_LUMINANCE) return 'too_dark'
+  const { p5, p95 } = percentiles(gray)
+  if (p95 < MIN_BRIGHT_P95 && p95 - p5 < MIN_CONTRAST) return 'too_dark'
   if (laplacianVariance(gray, thumbW, thumbH) < MIN_LAPLACIAN_VARIANCE) return 'blurry'
   return 'ok'
 }
