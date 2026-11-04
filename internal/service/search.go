@@ -108,6 +108,7 @@ type AddInput struct {
 	Pronunciation      string
 	ExampleSentence    string
 	ExampleTranslation string
+	ExampleGapAnswer   string // what ___ stands for, if the sentence already has the gap
 	FolderID           *uuid.UUID
 	// The search result is already a checked dictionary form — its grammar is stored as is.
 	Grammar *domain.WordGrammar
@@ -135,13 +136,17 @@ func (s *SearchService) Add(ctx context.Context, userID uuid.UUID, in AddInput) 
 		return nil, fmt.Errorf("%w: word is already in the collection", domain.ErrAlreadyExists)
 	}
 	// Example from the search result: the gap-fill format needs "___" instead of the word.
-	example := gapExample(in.ExampleSentence, word)
+	example, gapAnswer := gapExample(in.ExampleSentence, word)
+	if gapAnswer == "" {
+		gapAnswer = in.ExampleGapAnswer
+	}
 	return s.contexts.Create(ctx, userID, CreateContextInput{
 		Text:               word,
 		Meaning:            in.Translation,
 		Pronunciation:      in.Pronunciation,
 		ExampleSentence:    example,
 		ExampleTranslation: in.ExampleTranslation,
+		ExampleGapAnswer:   gapAnswer,
 		Language:           domain.LangFrom(ctx),
 		FolderID:           in.FolderID,
 		Grammar:            in.Grammar,
@@ -158,12 +163,13 @@ func isArticle(s string) bool {
 	return false
 }
 
-// gapExample replaces the word (without article, case-insensitive) in the sentence with "___".
-// If the word isn't found literally (e.g. a conjugated verb form), the sentence is kept as is.
-func gapExample(sentence, word string) string {
+// gapExample replaces the word (without article, case-insensitive) in the sentence with "___" and
+// returns the text it cut out, as written in the sentence. If the word isn't found literally
+// (e.g. a conjugated verb form), the sentence is kept as is and the answer is "".
+func gapExample(sentence, word string) (string, string) {
 	sentence = strings.TrimSpace(sentence)
 	if sentence == "" || strings.Contains(sentence, "___") {
-		return sentence
+		return sentence, ""
 	}
 	core := word
 	if f := strings.Fields(word); len(f) == 2 && isArticle(f[0]) {
@@ -171,7 +177,7 @@ func gapExample(sentence, word string) string {
 	}
 	idx := strings.Index(strings.ToLower(sentence), strings.ToLower(core))
 	if idx < 0 || core == "" {
-		return sentence
+		return sentence, ""
 	}
-	return sentence[:idx] + "___" + sentence[idx+len(core):]
+	return sentence[:idx] + "___" + sentence[idx+len(core):], sentence[idx : idx+len(core)]
 }

@@ -40,7 +40,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 		       w.language, w.created_at, COALESCE(p.box_level, 1),
-		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), w.folder_id
+		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), COALESCE(w.example_gap_answer, ''), w.folder_id
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		WHERE w.user_id = $1
@@ -61,7 +61,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		var d domain.DueCard
 		err := row.Scan(&d.ID, &d.ContextID, &d.UserID, &d.Word, &d.Translation, &d.Transcription,
 			&d.AudioURL, &d.Language, &d.CreatedAt, &d.BoxLevel,
-			&d.ExampleSentence, &d.ExampleTranslation, &d.FolderID)
+			&d.ExampleSentence, &d.ExampleTranslation, &d.ExampleGapAnswer, &d.FolderID)
 		// Gap-fill questions need a sentence that actually contains the ___ gap.
 		d.HasExample = strings.Contains(d.ExampleSentence, "___")
 		return d, err
@@ -192,7 +192,7 @@ func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, 
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
 		       w.language, w.created_at, COALESCE(p.box_level, 1),
-		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), w.folder_id
+		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), COALESCE(w.example_gap_answer, ''), w.folder_id
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
 		LEFT JOIN (
@@ -211,7 +211,7 @@ func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, 
 		var d domain.DueCard
 		err := row.Scan(&d.ID, &d.ContextID, &d.UserID, &d.Word, &d.Translation, &d.Transcription,
 			&d.AudioURL, &d.Language, &d.CreatedAt, &d.BoxLevel,
-			&d.ExampleSentence, &d.ExampleTranslation, &d.FolderID)
+			&d.ExampleSentence, &d.ExampleTranslation, &d.ExampleGapAnswer, &d.FolderID)
 		d.HasExample = strings.Contains(d.ExampleSentence, "___")
 		return d, err
 	})

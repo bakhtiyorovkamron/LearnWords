@@ -42,7 +42,9 @@ type CreateContextInput struct {
 	// Optional example sentence entered (or already generated) by the user.
 	ExampleSentence    string
 	ExampleTranslation string
-	Language           string
+	// ExampleGapAnswer: the text ___ stands for in ExampleSentence ("schmeckt"); "" = the word itself/unknown.
+	ExampleGapAnswer string
+	Language         string
 	// Optional folder for the card (ignored if it isn't the user's folder).
 	FolderID *uuid.UUID
 	// Grammar from the word check (lemma, article, plural, part of speech) the user agreed to.
@@ -94,6 +96,7 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 		Transcription:       strings.TrimSpace(in.Pronunciation),
 		ExampleSentence:     strings.TrimSpace(in.ExampleSentence),
 		ExampleTranslation:  strings.TrimSpace(in.ExampleTranslation),
+		ExampleGapAnswer:    gapAnswerFor(in.ExampleSentence, in.ExampleGapAnswer),
 	}
 	card.SetGrammar(in.Grammar)
 	if card.ExampleTranslation != "" { // typed or generated just now, in the language of this request
@@ -118,6 +121,14 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 }
 
 func ptrString(s string) *string { return &s }
+
+// gapAnswerFor keeps a gap form only for a sentence that has the gap.
+func gapAnswerFor(sentence, answer string) string {
+	if !strings.Contains(sentence, "___") {
+		return ""
+	}
+	return strings.TrimSpace(answer)
+}
 
 func (s *ContextService) Cards(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.WordCard, error) {
 	return s.cards.ListByUser(ctx, userID, limit, offset)

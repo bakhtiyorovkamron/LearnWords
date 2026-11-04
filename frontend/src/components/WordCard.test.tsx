@@ -79,6 +79,17 @@ describe('WordCardView row', () => {
     expect(screen.queryByLabelText('Listen')).toBeNull()
   })
 
+  it('the sheet fills the gap with example_gap_answer, or with the word when there is none', () => {
+    const gap = { ...card, word: 'schmecken', example_sentence: 'Die Suppe ___ gut.' }
+    const { unmount } = view({ ...gap, example_gap_answer: 'schmeckt' })
+    fireEvent.click(screen.getAllByRole('button')[0])
+    expect(screen.getByRole('dialog').textContent).toContain('Die Suppe schmeckt gut.')
+    unmount()
+    view(gap)
+    fireEvent.click(screen.getAllByRole('button')[0])
+    expect(screen.getByRole('dialog').textContent).toContain('Die Suppe schmecken gut.')
+  })
+
   it('a click opens the sheet with the example; Edit and Move open their dialogs', () => {
     view(card)
     expect(screen.queryByRole('dialog')).toBeNull()

@@ -28,7 +28,7 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	todayArg := q.arg(today)
 	sql := `SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
-	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''),
+	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), COALESCE(w.example_gap_answer, ''),
 	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id, w.translation_language, w.example_translation_language,
 	             COALESCE(p.next_review_at, ` + todayArg + `::date)::timestamp,
 	             COALESCE(p.last_reviewed_at >= ` + todayArg + `::date::timestamp AT TIME ZONE 'UTC', false)` +
@@ -40,7 +40,7 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.CollectionCard, error) {
 		var c domain.CollectionCard
 		err := row.Scan(&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL,
-			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.BoxLevel, &c.IsLearned, &c.FolderID, &c.TranslationLanguage, &c.ExampleTranslationLanguage,
+			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.ExampleGapAnswer, &c.BoxLevel, &c.IsLearned, &c.FolderID, &c.TranslationLanguage, &c.ExampleTranslationLanguage,
 			&c.NextReviewAt, &c.ReviewedToday)
 		return c, err
 	})

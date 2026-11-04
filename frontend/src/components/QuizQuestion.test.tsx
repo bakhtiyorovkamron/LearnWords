@@ -336,6 +336,47 @@ describe('the gap format', () => {
   })
 })
 
+describe('the gap shows the real form that was cut out', () => {
+  const inflected = card(1, {
+    word: 'schmecken', example_sentence: 'Die Suppe ___ sehr gut.', example_gap_answer: 'schmeckt', has_example: true,
+  })
+
+  it('after the answer the sentence has "schmeckt", with the hint; the options stay dictionary forms', async () => {
+    setup({ format: 'gap', card: inflected })
+    await screen.findByTestId('gap-blank')
+    expect(screen.queryByTestId('gap-form-hint')).toBeNull() // nothing is given away before the answer
+    expect(optionButtons().map((b) => b.textContent)).toContain('schmecken')
+
+    fireEvent.click(optionByText('schmecken'))
+    expect(screen.getByTestId('gap-answer').textContent).toBe('schmeckt')
+    expect(screen.getByTestId('gap-answer').parentElement!.textContent).toBe('Die Suppe schmeckt sehr gut.')
+    expect(screen.getByTestId('gap-form-hint').textContent).toBe('schmeckt ← schmecken')
+  })
+
+  it('a wrong pick shows the real form as well', async () => {
+    setup({ format: 'gap', card: inflected })
+    await screen.findByTestId('gap-blank')
+    fireEvent.click(optionButtons().find((b) => b.textContent !== 'schmecken')!)
+    expect(screen.getByTestId('gap-answer').textContent).toBe('schmeckt')
+  })
+
+  it('without example_gap_answer the word fills the gap, as before — and there is no hint', async () => {
+    setup({ format: 'gap', card: { ...inflected, example_gap_answer: undefined } })
+    await screen.findByTestId('gap-blank')
+    fireEvent.click(optionByText('schmecken'))
+    expect(screen.getByTestId('gap-answer').textContent).toBe('schmecken')
+    expect(screen.queryByTestId('gap-form-hint')).toBeNull()
+  })
+
+  it('a form equal to the word needs no hint', async () => {
+    setup({ format: 'gap', card: { ...inflected, word: 'Hund', example_sentence: 'Der ___ bellt.', example_gap_answer: 'Hund' } })
+    await screen.findByTestId('gap-blank')
+    fireEvent.click(optionByText('Hund'))
+    expect(screen.getByTestId('gap-answer').textContent).toBe('Hund')
+    expect(screen.queryByTestId('gap-form-hint')).toBeNull()
+  })
+})
+
 describe('listening in other languages', () => {
   const enCard = card(1, { word: 'the house', language: 'en', translation: 'дом' })
   const stub = (voices: { lang: string }[] = []) => {

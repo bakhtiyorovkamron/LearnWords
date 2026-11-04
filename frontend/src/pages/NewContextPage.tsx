@@ -23,6 +23,7 @@ export function NewContextPage() {
   const [meaning, setMeaning] = useState('')
   const [pronunciation, setPronunciation] = useState('')
   const [exampleSentence, setExampleSentence] = useState('')
+  const [exampleGapAnswer, setExampleGapAnswer] = useState('') // what ___ stands for in a generated sentence
   const [exampleTranslation, setExampleTranslation] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
   const textRef = useRef<HTMLTextAreaElement>(null)
@@ -42,6 +43,7 @@ export function NewContextPage() {
     onSuccess: (r) => {
       // Fill the fields; the user can still edit them before saving.
       setExampleSentence(r.example_sentence)
+      setExampleGapAnswer(r.example_gap_answer ?? '')
       setExampleTranslation(r.example_translation)
     },
   })
@@ -50,7 +52,7 @@ export function NewContextPage() {
     mutationFn: (grammar: WordGrammar | null) =>
       contextsApi.create({
         text: text.trim(), meaning: meaning.trim(), pronunciation: pronunciation.trim(), language: learning.code,
-        exampleSentence: exampleSentence.trim(), exampleTranslation: exampleTranslation.trim(),
+        exampleSentence: exampleSentence.trim(), exampleTranslation: exampleTranslation.trim(), exampleGapAnswer,
         folderId: folderId || undefined, grammar,
       }),
     onSuccess: (res) => {
@@ -61,7 +63,7 @@ export function NewContextPage() {
       qc.invalidateQueries({ queryKey: ['collection'] })
       // Stay on the page for the next word: clear everything but the chosen folder.
       const added = folderId
-      setText(''); setMeaning(''); setPronunciation(''); setExampleSentence(''); setExampleTranslation('')
+      setText(''); setMeaning(''); setPronunciation(''); setExampleSentence(''); setExampleGapAnswer(''); setExampleTranslation('')
       setNeedDecision(false)
       textRef.current?.focus()
       toast(t('newContext.added', { word: res.cards[0]?.word ?? res.context.source_text }), {
@@ -187,7 +189,7 @@ export function NewContextPage() {
           {!canGenerate && <p className="text-xs text-muted">{t('newContext.hintNeedTranslation')}</p>}
           <input
             value={exampleSentence}
-            onChange={(e) => setExampleSentence(e.target.value.slice(0, 500))}
+            onChange={(e) => { setExampleSentence(e.target.value.slice(0, 500)); setExampleGapAnswer('') }}
             placeholder={learning.gapPlaceholder}
             className="field"
           />

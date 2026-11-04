@@ -55,12 +55,12 @@ func insertContext(ctx context.Context, tx pgx.Tx, c *domain.Context, cards []do
 		batch.Queue(`INSERT INTO word_cards
 			(id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
 			 example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech, translation_language,
-			 example_translation_language, paused)
+			 example_translation_language, paused, example_gap_answer)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-			        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3), $13, $14, $15, $16, $17, $18, $19)`,
+			        (SELECT f.id FROM folders f WHERE f.id = $12 AND f.user_id = $3), $13, $14, $15, $16, $17, $18, $19, NULLIF($20, ''))`,
 			w.ID, w.ContextID, w.UserID, w.Word, w.Translation, w.Transcription, w.AudioURL, w.Language, w.CreatedAt,
 			w.ExampleSentence, w.ExampleTranslation, w.FolderID, w.Lemma, w.Article, w.Plural, w.PartOfSpeech, w.TranslationLanguage,
-			w.ExampleTranslationLanguage, w.Paused)
+			w.ExampleTranslationLanguage, w.Paused, w.ExampleGapAnswer)
 		// The same translation is the cache entry for its own language (training reads it from there).
 		// (the example translation only when it is written in that same language)
 		if w.TranslationLanguage != nil && strings.TrimSpace(w.Translation) != "" {

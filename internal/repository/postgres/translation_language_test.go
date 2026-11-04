@@ -146,7 +146,7 @@ func TestUpdateExample_KeepsTheOwnLanguageCacheInSync(t *testing.T) {
 	card := f.createWord(t, "ru", "still", "тихий")
 	f.exec(t, `INSERT INTO word_translations (word_id, language, translation, example_translation) VALUES ($1, 'en', 'quiet', 'old')`, card.ID)
 
-	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Тише!", "ru"); err != nil {
+	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "", "Тише!", "ru"); err != nil {
 		t.Fatal(err)
 	}
 	var ex string
@@ -285,7 +285,7 @@ func TestCreate_StoresTheLanguageTheExampleWasWrittenIn(t *testing.T) {
 func TestUpdateExample_StoresItsLanguage_AndKeepsAForeignOneOutOfTheOwnCache(t *testing.T) {
 	f := newTrFixture(t)
 	card := f.createWord(t, "uz", "still", "tinch") // word: uz
-	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Тише!", "ru"); err != nil {
+	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "", "Тише!", "ru"); err != nil {
 		t.Fatal(err)
 	}
 	if !equalLang(f.exampleLang(t, card.ID), "ru") {
@@ -296,7 +296,7 @@ func TestUpdateExample_StoresItsLanguage_AndKeepsAForeignOneOutOfTheOwnCache(t *
 	if ex != "" {
 		t.Errorf("the uz cache entry holds the Russian example %q", ex)
 	}
-	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "Jim bo‘l!", "uz"); err != nil {
+	if err := f.cards.UpdateExample(context.Background(), f.user, card.ID, "Sei ___!", "", "Jim bo‘l!", "uz"); err != nil {
 		t.Fatal(err)
 	}
 	if !equalLang(f.exampleLang(t, card.ID), "uz") {

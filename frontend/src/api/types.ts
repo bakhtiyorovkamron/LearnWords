@@ -31,6 +31,7 @@ export interface WordCard {
   created_at: string
   example_sentence?: string
   example_translation?: string
+  example_gap_answer?: string // what ___ stands for in example_sentence ("schmeckt"); empty/absent = the word itself
   folder_id?: string | null // optional folder; null = no folder
   translation_language?: string | null // language `translation` is written in (ru | en | uz)
   // Grammar from the word check, stored next to the typed text; null = not checked.

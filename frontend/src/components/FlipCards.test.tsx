@@ -74,6 +74,12 @@ describe('FlipCards: the two sides', () => {
     expect(within(front).getByText('Tap to see the translation')).toBeTruthy()
   })
 
+  it('the filled example uses example_gap_answer, the word itself when there is none', () => {
+    view({ cards: [card(1, { word: 'schmecken', example_sentence: 'Die Suppe ___ gut.', example_gap_answer: 'schmeckt' }), card(2)] })
+    expect(within(visible()).getByTestId('gap-answer').textContent).toBe('schmeckt')
+    expect(visible().textContent).toContain('Die Suppe schmeckt gut.')
+  })
+
   it('a click flips: the back has the translation and its example, never the word or the sentence', () => {
     view()
     fireEvent.click(cardButton())

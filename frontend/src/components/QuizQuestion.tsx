@@ -9,6 +9,7 @@ import {
   buildOptions, checkTyped, countsAsCorrect, pickDistractors,
   type QuizItem, type Verdict,
 } from '../lib/quiz'
+import { formDiffers, gapForm } from '../lib/gap'
 import { useLearningLang } from '../lib/learningLang'
 import { speak, useCanSpeak } from '../lib/speech'
 import { GapSentence } from './GapSentence'
@@ -93,6 +94,9 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
 
   const almost = verdict === 'almost_article' || verdict === 'almost_typo'
   const correctOption = options.find((o) => o.correct)?.text ?? card.word
+  // The gap shows the form that was cut out of the sentence; the options stay dictionary forms.
+  const filled = card.example_gap_answer?.trim() ? gapForm(card) : correctOption
+  const showFormHint = format === 'gap' && answered && formDiffers(filled, card.word)
   const doneShare = ((position - (answered ? 0 : 1)) / total) * 100
   const listenable = canSpeak && (format === 'de_ru' || answered) // listening would give the answer away otherwise
 
@@ -120,7 +124,12 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
         {(format === 'ru_de' || format === 'ru_de_type') && <p className="text-[26px] font-semibold text-fg">{card.translation}</p>}
         {format === 'gap' && (
           <p className="font-serif text-[28px] leading-snug text-fg" lang={learning.code}>
-            <GapSentence sentence={card.example_sentence ?? ''} answered={answered} answer={correctOption} />
+            <GapSentence sentence={card.example_sentence ?? ''} answered={answered} answer={filled} />
+          </p>
+        )}
+        {showFormHint && (
+          <p data-testid="gap-form-hint" className="mt-2 text-[15px] text-muted" lang={learning.code}>
+            <span className="font-serif">{filled}</span> ← <span className="font-serif">{card.word}</span>
           </p>
         )}
         {format === 'gap' && card.example_translation && <p className="mt-2 text-[15px] text-muted">{card.example_translation}</p>}

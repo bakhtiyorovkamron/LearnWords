@@ -78,6 +78,48 @@ describe('EditWordModal save', () => {
     expect(qc.getQueryData(['collection', 'grand-total'])).toBe(2) // untouched
   })
 
+  it('the gap field appears for a sentence with ___, prefilled with the word; a sentence change sends it', async () => {
+    const withGap = { ...card, word: 'schmecken', example_sentence: 'Die Suppe ___ gut.' } as CollectionCard
+    vi.mocked(wordsApi.update).mockResolvedValue(withGap)
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const onClose = vi.fn()
+    render(<QueryClientProvider client={qc}><EditWordModal card={withGap} onClose={onClose} /></QueryClientProvider>)
+
+    const gap = screen.getByLabelText('Форма в предложении') as HTMLInputElement
+    expect(gap.value).toBe('schmecken')
+    fireEvent.change(screen.getByLabelText(/^Пример предложения/), { target: { value: 'Das Eis ___ süß.' } })
+    fireEvent.change(gap, { target: { value: 'schmeckt' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(wordsApi.update).toHaveBeenCalledWith('w1', { example_sentence: 'Das Eis ___ süß.', example_gap_answer: 'schmeckt' })
+  })
+
+  it('no gap in the sentence → no field; an untouched form is not sent; the word itself is sent as empty', async () => {
+    const stored = { ...card, word: 'schmecken', example_sentence: 'Die Suppe ___ gut.', example_gap_answer: 'schmeckt' } as CollectionCard
+    vi.mocked(wordsApi.update).mockResolvedValue(stored)
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const onClose = vi.fn()
+    render(<QueryClientProvider client={qc}><EditWordModal card={stored} onClose={onClose} /></QueryClientProvider>)
+    expect((screen.getByLabelText('Форма в предложении') as HTMLInputElement).value).toBe('schmeckt') // the stored form
+    fireEvent.change(screen.getByLabelText(/^Перевод \*/), { target: { value: 'быть вкусным' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(wordsApi.update).toHaveBeenLastCalledWith('w1', { translation: 'быть вкусным' }) // form untouched → not sent
+
+    cleanup()
+    onClose.mockClear()
+    render(<QueryClientProvider client={qc}><EditWordModal card={stored} onClose={onClose} /></QueryClientProvider>)
+    fireEvent.change(screen.getByLabelText('Форма в предложении'), { target: { value: 'schmecken' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(wordsApi.update).toHaveBeenLastCalledWith('w1', { example_gap_answer: '' })
+
+    cleanup()
+    render(<QueryClientProvider client={qc}><EditWordModal card={{ ...stored, example_sentence: 'Das Eis ist süß.' }} onClose={onClose} /></QueryClientProvider>)
+    expect(screen.queryByLabelText('Форма в предложении')).toBeNull()
+  })
+
   it('folder change → the card leaves the old folder view at once, the new view is re-read', async () => {
     vi.mocked(wordsApi.update).mockResolvedValue({ ...card, folder_id: 'f-new' } as CollectionCard)
     const { qc, onClose } = setup()

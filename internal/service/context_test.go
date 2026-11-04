@@ -107,7 +107,7 @@ type exampleCards struct {
 	saved              chan string // the language the example was stored in
 }
 
-func (c exampleCards) UpdateExample(_ context.Context, _, _ uuid.UUID, _, _, lang string) error {
+func (c exampleCards) UpdateExample(_ context.Context, _, _ uuid.UUID, _, _, _, lang string) error {
 	c.saved <- lang
 	return nil
 }

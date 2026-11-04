@@ -9,6 +9,7 @@ type WordCardUpdate struct {
 	Transcription      *string `json:"transcription"`
 	ExampleSentence    *string `json:"example_sentence"`
 	ExampleTranslation *string `json:"example_translation"`
+	ExampleGapAnswer   *string `json:"example_gap_answer"`
 	// folder_id: absent/null = keep, "" = remove from folder, UUID = move to that folder.
 	FolderID *string `json:"folder_id"`
 

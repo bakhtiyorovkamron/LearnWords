@@ -28,5 +28,6 @@ func (h *ContextHandler) GenerateExample(c *gin.Context) {
 		"example_sentence":    ex.SentenceWithGap,
 		"example_translation": ex.Translation,
 		"full_sentence":       ex.FullSentence,
+		"example_gap_answer":  ex.GapAnswer,
 	})
 }

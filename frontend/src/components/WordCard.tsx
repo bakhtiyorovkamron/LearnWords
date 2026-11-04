@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { WordCard } from '../api/types'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
 import { useDeleteWords } from '../lib/deleteWords'
+import { fillGap } from '../lib/gap'
 import { useMoveWords } from '../lib/moveWords'
 import { EditWordModal } from './EditWordModal'
 import { FolderPicker } from './FolderPicker'
@@ -229,7 +230,7 @@ export function WordCardView({ card, progress, selection }: {
           </div>
           {card.example_sentence && (
             <div className="mt-4 space-y-0.5 border-t border-divider pt-3">
-              <p className="font-serif italic text-fg" lang={card.language}>{card.example_sentence}</p>
+              <p className="font-serif italic text-fg" lang={card.language}>{fillGap(card)}</p>
               {card.example_translation && <p className="text-sm text-muted">{card.example_translation}</p>}
             </div>
           )}

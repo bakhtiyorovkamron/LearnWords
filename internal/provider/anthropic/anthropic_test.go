@@ -102,3 +102,58 @@ func TestGenerate_UsesTheContextsTranslationLanguage(t *testing.T) {
 		t.Errorf("the request does not ask for Uzbek: %s", sent)
 	}
 }
+
+func TestParseExample_GapAnswer(t *testing.T) {
+	parse := func(gap, full, answer string) string {
+		raw, _ := json.Marshal(map[string]string{"sentence_with_gap": gap, "full_sentence": full, "translation": "x", "gap_answer": answer})
+		ex, err := ParseExample(string(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ex.GapAnswer
+	}
+	// the model's own answer is kept when it fits the sentence
+	if got := parse("Die Suppe ___ sehr gut.", "Die Suppe schmeckt sehr gut.", "schmeckt"); got != "schmeckt" {
+		t.Errorf("valid answer: %q", got)
+	}
+	// a phrase with an article
+	if got := parse("Ich putze ___.", "Ich putze den Tisch.", "den Tisch"); got != "den Tisch" {
+		t.Errorf("phrase: %q", got)
+	}
+	// the answer is the dictionary form, the sentence is not → derived from the sentences
+	if got := parse("Die Suppe ___ sehr gut.", "Die Suppe schmeckt sehr gut.", "schmecken"); got != "schmeckt" {
+		t.Errorf("diff fallback: %q", got)
+	}
+	// no answer at all → derived
+	if got := parse("Die Suppe ___ sehr gut.", "Die Suppe schmeckt sehr gut.", ""); got != "schmeckt" {
+		t.Errorf("missing answer: %q", got)
+	}
+	// gap at the very start / end of the sentence
+	if got := parse("___ ist kalt.", "Wasser ist kalt.", ""); got != "Wasser" {
+		t.Errorf("gap at start: %q", got)
+	}
+	// nothing agrees (full sentence differs around the gap) → unknown, not a guess
+	if got := parse("Die Suppe ___ sehr gut.", "Das Essen schmeckt sehr gut.", "schmecken"); got != "" {
+		t.Errorf("both fail: %q", got)
+	}
+	// no full sentence, no gap → unknown
+	if got := parse("Die Suppe ist gut.", "Die Suppe ist gut.", "gut"); got != "" {
+		t.Errorf("no gap: %q", got)
+	}
+}
+
+func TestParseGapForm(t *testing.T) {
+	for raw, want := range map[string]string{
+		`{"gap_answer": "schmeckt"}`:                     "schmeckt",
+		"```json\n{\"gap_answer\":\" den Tisch \"}\n```": "den Tisch",
+	} {
+		if got, err := ParseGapForm(raw); err != nil || got != want {
+			t.Errorf("%q: got %q, %v", raw, got, err)
+		}
+	}
+	for _, bad := range []string{`{"gap_answer": ""}`, `{"gap_answer": "a\nb"}`, `{"gap_answer": "___"}`, `nope`} {
+		if _, err := ParseGapForm(bad); err == nil {
+			t.Errorf("%q must be rejected", bad)
+		}
+	}
+}

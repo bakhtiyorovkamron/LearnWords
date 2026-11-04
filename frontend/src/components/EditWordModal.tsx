@@ -7,6 +7,7 @@ import { wordsApi, type WordUpdate } from '../api/endpoints'
 import { isRateLimited, rateLimitMessage } from '../api/client'
 import type { CollectionCard, WordCard } from '../api/types'
 import { toast } from './Toaster'
+import { gapForm } from '../lib/gap'
 import { useLearningLang } from '../lib/learningLang'
 import { FolderSelect } from './Folders'
 
@@ -74,6 +75,8 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
     transcription: card.transcription ?? '',
     example_sentence: card.example_sentence ?? '',
     example_translation: card.example_translation ?? '',
+    // What ___ stands for; offered with the word in it until a form is known.
+    gap_answer: gapForm(card),
   })
   const [folderId, setFolderId] = useState(card.folder_id ?? '') // '' = no folder
   const [localError, setLocalError] = useState<string | null>(null)
@@ -85,6 +88,7 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
       ...f,
       example_sentence: r.example_sentence,
       example_translation: r.example_translation,
+      gap_answer: r.example_gap_answer?.trim() || f.word.trim(),
     })),
   })
   const canGenerate = !!form.word.trim() && !!form.translation.trim()
@@ -126,10 +130,18 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
     const original: Record<keyof typeof form, string> = {
       word: card.word, translation: card.translation, transcription: card.transcription ?? '',
       example_sentence: card.example_sentence ?? '', example_translation: card.example_translation ?? '',
+      gap_answer: gapForm(card),
     }
     const changes: WordUpdate = {}
     for (const k of Object.keys(form) as (keyof typeof form)[]) {
+      if (k === 'gap_answer') continue
       if (form[k].trim() !== original[k].trim()) changes[k] = form[k].trim()
+    }
+    // The form belongs to the sentence: it is sent whenever either changed (the server forgets the
+    // old form for a new sentence). The word itself is stored as "unknown" — it is the default.
+    if (changes.example_sentence !== undefined || form.gap_answer.trim() !== original.gap_answer.trim()) {
+      const g = form.gap_answer.trim()
+      changes.example_gap_answer = g && g.toLowerCase() !== form.word.trim().toLowerCase() ? g : ''
     }
     if (folderId !== (card.folder_id ?? '')) changes.folder_id = folderId
     if (!Object.keys(changes).length) return onClose()
@@ -179,6 +191,13 @@ export function EditWordModal({ card, onClose }: { card: WordCard; onClose: () =
           </div>
           <textarea id="ew-ex" rows={2} className="field" value={form.example_sentence} onChange={set('example_sentence')}
             placeholder={learning.gapPlaceholder} maxLength={500} />
+          {form.example_sentence.includes('___') && (
+            <div className="mt-2">
+              <label className={label} htmlFor="ew-gap">{t('editWord.gapAnswer')}</label>
+              <input id="ew-gap" className="field font-serif" value={form.gap_answer} onChange={set('gap_answer')}
+                maxLength={200} lang={learning.code} autoComplete="off" autoCapitalize="off" spellCheck={false} />
+            </div>
+          )}
           {generate.error && (
             <p className="mt-1 text-xs text-danger">
               {isRateLimited(generate.error)

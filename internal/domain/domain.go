@@ -62,6 +62,9 @@ type WordCard struct {
 
 	ExampleSentence    string `json:"example_sentence"`    // sentence with the word replaced by ___
 	ExampleTranslation string `json:"example_translation"` // translation of the full sentence (see ExampleTranslationLanguage)
+	// ExampleGapAnswer: the exact text ___ stands for in ExampleSentence ("schmeckt", "den Tisch").
+	// "" = unknown (an old card) — show the word itself then.
+	ExampleGapAnswer string `json:"example_gap_answer"`
 
 	FolderID *uuid.UUID `json:"folder_id"` // optional grouping; nil = no folder
 
@@ -107,6 +110,7 @@ type Example struct {
 	SentenceWithGap string `json:"sentence_with_gap"`
 	FullSentence    string `json:"full_sentence"`
 	Translation     string `json:"translation"`
+	GapAnswer       string `json:"gap_answer"` // what ___ replaced; "" = unknown
 }
 
 type ContextWithCards struct {

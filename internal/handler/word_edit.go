@@ -24,7 +24,7 @@ func NewWordEditHandler(store WordCardUpdater) *WordEditHandler {
 // field limits (runes)
 var wordFieldLimits = map[string]int{
 	"word": 100, "translation": 500, "transcription": 200,
-	"example_sentence": 500, "example_translation": 500,
+	"example_sentence": 500, "example_translation": 500, "example_gap_answer": 200,
 }
 
 // Update handles PATCH /api/words/:id — edits word/translation/pronunciation/example.
@@ -43,6 +43,7 @@ func (h *WordEditHandler) Update(c *gin.Context) {
 	fields := map[string]*string{
 		"word": u.Word, "translation": u.Translation, "transcription": u.Transcription,
 		"example_sentence": u.ExampleSentence, "example_translation": u.ExampleTranslation,
+		"example_gap_answer": u.ExampleGapAnswer,
 	}
 	changed := false
 	for name, p := range fields {

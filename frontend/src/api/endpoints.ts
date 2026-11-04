@@ -87,7 +87,7 @@ export const wordFixesApi = {
 export const contextsApi = {
   create(input: {
     text: string; meaning?: string; pronunciation?: string; language?: string
-    exampleSentence?: string; exampleTranslation?: string; folderId?: string
+    exampleSentence?: string; exampleTranslation?: string; exampleGapAnswer?: string; folderId?: string
     grammar?: WordGrammar | null
   }) {
     const fd = new FormData()
@@ -96,6 +96,7 @@ export const contextsApi = {
     fd.append('pronunciation', input.pronunciation ?? '')
     fd.append('example_sentence', input.exampleSentence ?? '')
     fd.append('example_translation', input.exampleTranslation ?? '')
+    fd.append('example_gap_answer', input.exampleGapAnswer ?? '')
     if (input.language) fd.append('language', input.language) // backend uses the account language
     if (input.folderId) fd.append('folder_id', input.folderId)
     appendGrammar(fd, input.grammar)
@@ -106,7 +107,7 @@ export const contextsApi = {
 export const wordsApi = {
   generateExample: (word: string, translation: string) =>
     api
-      .post<{ example_sentence: string; example_translation: string; full_sentence: string }>(
+      .post<{ example_sentence: string; example_translation: string; full_sentence: string; example_gap_answer?: string }>(
         '/words/generate-example',
         { word, translation },
         { timeout: 45_000 },
@@ -130,6 +131,7 @@ export interface MoveResult {
 export interface WordUpdate {
   word?: string; translation?: string; transcription?: string
   example_sentence?: string; example_translation?: string
+  example_gap_answer?: string // '' = unknown (the word itself is shown)
   folder_id?: string // '' = remove from folder
 }
 

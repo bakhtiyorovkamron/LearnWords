@@ -58,6 +58,7 @@ func (h *SearchHandler) Add(c *gin.Context) {
 		Pronunciation      string `json:"pronunciation" binding:"max=200"`
 		ExampleSentence    string `json:"example_sentence" binding:"max=500"`
 		ExampleTranslation string `json:"example_translation" binding:"max=500"`
+		ExampleGapAnswer   string `json:"example_gap_answer" binding:"max=200"`
 		FolderID           string `json:"folder_id"`
 		// Language the search result's translation is written in (info.translation_language);
 		// the user may have switched the interface since searching.
@@ -79,7 +80,7 @@ func (h *SearchHandler) Add(c *gin.Context) {
 	}
 	res, err := h.svc.Add(ctx, userID(c), service.AddInput{
 		Word: req.Word, Translation: req.Translation, Pronunciation: req.Pronunciation,
-		ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, FolderID: folder,
+		ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, ExampleGapAnswer: req.ExampleGapAnswer, FolderID: folder,
 		Grammar: req.grammar(),
 	})
 	if err != nil {

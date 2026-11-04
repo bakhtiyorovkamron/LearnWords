@@ -22,6 +22,7 @@ type createContextJSON struct {
 	Pronunciation      string `json:"pronunciation" binding:"max=200"`
 	ExampleSentence    string `json:"example_sentence" binding:"max=500"`
 	ExampleTranslation string `json:"example_translation" binding:"max=500"`
+	ExampleGapAnswer   string `json:"example_gap_answer" binding:"max=200"`
 	Language           string `json:"language"`
 	FolderID           string `json:"folder_id"`
 	grammarJSON
@@ -75,6 +76,7 @@ func (h *ContextHandler) Create(c *gin.Context) {
 		in.Pronunciation = c.PostForm("pronunciation")
 		in.ExampleSentence = c.PostForm("example_sentence")
 		in.ExampleTranslation = c.PostForm("example_translation")
+		in.ExampleGapAnswer = c.PostForm("example_gap_answer")
 		in.Language = c.PostForm("language")
 		folder = c.PostForm("folder_id")
 		in.Grammar = grammarJSON{Lemma: c.PostForm("lemma"), Article: c.PostForm("article"),
@@ -90,7 +92,7 @@ func (h *ContextHandler) Create(c *gin.Context) {
 			return
 		}
 		in = service.CreateContextInput{Text: req.Text, Meaning: req.Meaning, Pronunciation: req.Pronunciation,
-			ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, Language: req.Language,
+			ExampleSentence: req.ExampleSentence, ExampleTranslation: req.ExampleTranslation, ExampleGapAnswer: req.ExampleGapAnswer, Language: req.Language,
 			Grammar: req.grammar()}
 		folder = req.FolderID
 	}

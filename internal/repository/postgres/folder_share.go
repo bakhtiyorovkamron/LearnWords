@@ -248,11 +248,13 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 			lemma, article, plural, partOfSpeech       *string
 			translationLanguage                        *string
 			exampleTranslationLanguage                 *string
+			exampleGapAnswer                           string
 		}
 		rows, err = tx.Query(ctx, `
 			SELECT id, word, translation, transcription, audio_url, language,
 			       COALESCE(example_sentence, ''), COALESCE(example_translation, ''),
-			       lemma, article, plural, part_of_speech, translation_language, example_translation_language
+			       lemma, article, plural, part_of_speech, translation_language, example_translation_language,
+			       COALESCE(example_gap_answer, '')
 			FROM word_cards WHERE folder_id = $1
 			ORDER BY created_at, id LIMIT $2`, srcID, domain.MaxSharedWords)
 		if err != nil {
@@ -261,7 +263,7 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 		words, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (src, error) {
 			var s src
 			err := row.Scan(&s.id, &s.word, &s.translation, &s.transcription, &s.audioURL, &s.language,
-				&s.exampleSentence, &s.exampleTranslation, &s.lemma, &s.article, &s.plural, &s.partOfSpeech, &s.translationLanguage, &s.exampleTranslationLanguage)
+				&s.exampleSentence, &s.exampleTranslation, &s.lemma, &s.article, &s.plural, &s.partOfSpeech, &s.translationLanguage, &s.exampleTranslationLanguage, &s.exampleGapAnswer)
 			return s, err
 		})
 		if err != nil {
@@ -295,11 +297,11 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 				INSERT INTO word_cards
 				  (id, context_id, user_id, word, translation, transcription, audio_url, language, created_at,
 				   example_sentence, example_translation, folder_id, lemma, article, plural, part_of_speech, translation_language,
-				   example_translation_language)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+				   example_translation_language, example_gap_answer)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULLIF($19, ''))`,
 				cardID, ctxID, callerID, s.word, s.translation, s.transcription, s.audioURL, s.language, created,
 				s.exampleSentence, s.exampleTranslation, res.FolderID, s.lemma, s.article, s.plural, s.partOfSpeech, s.translationLanguage,
-				s.exampleTranslationLanguage); err != nil {
+				s.exampleTranslationLanguage, s.exampleGapAnswer); err != nil {
 				return err
 			}
 			if _, err := tx.Exec(ctx, `

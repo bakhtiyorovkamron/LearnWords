@@ -40,11 +40,13 @@ func New(apiKey, model string) *Client {
 const promptTemplate = `Write one simple sentence in {{lang}} (level A1-A2) that uses the word or phrase "{{word}}" (meaning: "{{translation}}").
 In "sentence_with_gap" replace the word or phrase with three underscores: ___ — exactly as it appears in the sentence. If it is inflected or has an article (for example "den Tisch" for "der Tisch"), the whole phrase as written in the sentence, article included, becomes ___.
 "full_sentence" is the same sentence with the word or phrase filled in.
+"gap_answer" is exactly the text that ___ replaced, as it is written in the sentence (for example "schmeckt" or "den Tisch") — replacing ___ with it must give "full_sentence" exactly.
 "translation" is the translation of the full sentence in {{native}} — ONLY the translation, with no explanations in brackets and no grammar comments.
 Return ONLY this JSON, without markdown or other text:
 {
   "sentence_with_gap": "...",
   "full_sentence": "...",
+  "gap_answer": "...",
   "translation": "..."
 }`
 
@@ -151,5 +153,24 @@ func ParseExample(s string) (domain.Example, error) {
 	if ex.SentenceWithGap == "" || ex.Translation == "" {
 		return domain.Example{}, errors.New("example is incomplete")
 	}
+	ex.GapAnswer = ResolveGapAnswer(ex.SentenceWithGap, ex.FullSentence, ex.GapAnswer)
 	return ex, nil
+}
+
+// ResolveGapAnswer returns the text that "___" in gap stands for, or "" when it cannot be told.
+// The model's own answer is trusted only if putting it back gives exactly full; otherwise the
+// answer is what sits in full between the text before and after the gap.
+func ResolveGapAnswer(gap, full, answer string) string {
+	gap, full, answer = strings.TrimSpace(gap), strings.TrimSpace(full), strings.TrimSpace(answer)
+	if full == "" || strings.Count(gap, "___") != 1 {
+		return ""
+	}
+	if answer != "" && strings.Replace(gap, "___", answer, 1) == full {
+		return answer
+	}
+	before, after, _ := strings.Cut(gap, "___")
+	if len(full) < len(before)+len(after) || !strings.HasPrefix(full, before) || !strings.HasSuffix(full, after) {
+		return ""
+	}
+	return strings.TrimSpace(full[len(before) : len(full)-len(after)])
 }

@@ -227,6 +227,7 @@
     "pronunciation": "Pronunciation",
     "example": "Example sentence (with a ___ gap)",
     "exampleTranslation": "Example translation",
+    "gapAnswer": "Form in the sentence",
     "progressKept": "Learning progress for this word is kept.",
     "save": "Save",
     "saving": "Saving…",

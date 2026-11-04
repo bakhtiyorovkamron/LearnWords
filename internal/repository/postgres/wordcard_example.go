@@ -14,15 +14,15 @@ import (
 // owned by the user. When the card's own translation language is that same language, the example is
 // also in its cache entry; cached translations into other languages (of the previous example) are
 // dropped to be regenerated.
-func (r *WordCardRepository) UpdateExample(ctx context.Context, userID, id uuid.UUID, sentence, translation, exampleLang string) error {
+func (r *WordCardRepository) UpdateExample(ctx context.Context, userID, id uuid.UUID, sentence, gapAnswer, translation, exampleLang string) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var lang *string
 		var cardTranslation string
 		err := tx.QueryRow(ctx, `
-			UPDATE word_cards SET example_sentence = $1, example_translation = $2,
+			UPDATE word_cards SET example_sentence = $1, example_translation = $2, example_gap_answer = NULLIF($6, ''),
 			  example_translation_language = CASE WHEN btrim($2) <> '' THEN $5 END
 			WHERE id = $3 AND user_id = $4
-			RETURNING translation_language, translation`, sentence, translation, id, userID, exampleLang).Scan(&lang, &cardTranslation)
+			RETURNING translation_language, translation`, sentence, translation, id, userID, exampleLang, gapAnswer).Scan(&lang, &cardTranslation)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrNotFound
 		}

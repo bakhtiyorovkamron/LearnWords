@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, RotateCw, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
+import { gapForm } from '../lib/gap'
 import { useLearningLang } from '../lib/learningLang'
 import { speak, useCanSpeak } from '../lib/speech'
 import { GapSentence } from './GapSentence'
@@ -147,7 +148,7 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
         <>
           <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
           <span className={`${EXAMPLE_FIT} font-serif text-xl leading-snug text-fg`} lang={card.language}>
-            <GapSentence answered answer={card.word} sentence={card.example_sentence} />
+            <GapSentence answered answer={gapForm(card)} sentence={card.example_sentence} />
           </span>
         </>
       )}
