@@ -7,13 +7,19 @@ const SHRINK_ABOVE = 4 * 1024 * 1024
 const MAX_SIDE = 2400
 
 // Quality thresholds — deliberately conservative: a slightly soft but readable page must pass.
-export const MIN_SIDE_PX = 600          // shorter side of the original image
+// Size of the original image. A crop of one or two lines (780×150) is fine; a whole page photographed
+// is big anyway, so only the long side and a bare minimum of the short one are checked.
+export const MIN_LONG_SIDE_PX = 400     // longer side: below it, there is too little of anything
+export const MIN_SHORT_SIDE_PX = 60     // shorter side: one line of text needs ~20 px of letter height, 60 leaves room
 // Too dark = nothing bright AND no contrast. Not the mean: a dark-theme screenshot has a low mean
 // but bright, sharp text. Both are 0-255, on the grayscale copy.
 export const MIN_BRIGHT_P95 = 90        // 95th percentile: below it, nothing in the image is bright
 export const MIN_CONTRAST = 25          // p95 - p5: below it, the image has no contrast
 export const MIN_LAPLACIAN_VARIANCE = 15 // sharpness of the grayscale copy
-export const ANALYSIS_WIDTH = 256       // width of the grayscale copy
+export const ANALYSIS_WIDTH = 256       // preferred width of the grayscale copy
+export const ANALYSIS_MIN_SHORT = 64    // the copy's shorter side is at least this (thin strips stay readable)
+export const ANALYSIS_MAX_LONG = 1024   // ... but its longer side is never above this
+export const BLUR_MIN_SHORT = 100       // a copy shorter than this is a text strip: the blur check is skipped
 
 const TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 export const isPhotoType = (type: string) => TYPES.includes(type)
@@ -25,6 +31,22 @@ export class PhotoQualityError extends Error {
   constructor(public reason: Exclude<PhotoQuality, 'ok'>) {
     super(`photo rejected: ${reason}`)
   }
+}
+
+/** Whether an original of this size is too small to be useful. */
+const isTooSmall = (width: number, height: number) =>
+  Math.max(width, height) < MIN_LONG_SIDE_PX || Math.min(width, height) < MIN_SHORT_SIDE_PX
+
+/**
+ * Size of the grayscale copy: ANALYSIS_WIDTH wide, but with the shorter side at least
+ * ANALYSIS_MIN_SHORT (a 780×150 strip would be mush at 256×49), the longer side at most
+ * ANALYSIS_MAX_LONG, and never larger than the original.
+ */
+export function analysisSize(width: number, height: number): { w: number; h: number } {
+  let scale = ANALYSIS_WIDTH / width
+  if (Math.min(width, height) * scale < ANALYSIS_MIN_SHORT) scale = ANALYSIS_MIN_SHORT / Math.min(width, height)
+  scale = Math.min(scale, ANALYSIS_MAX_LONG / Math.max(width, height), 1)
+  return { w: Math.max(1, Math.round(width * scale)), h: Math.max(1, Math.round(height * scale)) }
 }
 
 /** Luminance (0-255) of each pixel of an RGBA buffer. */
@@ -74,23 +96,23 @@ function laplacianVariance(gray: Float32Array, w: number, h: number): number {
  * (`thumbW`×`thumbH`, RGBA bytes) of it. Pure — the canvas work is in checkPhotoQuality.
  */
 export function assessPixels(width: number, height: number, rgba: ArrayLike<number>, thumbW: number, thumbH: number): PhotoQuality {
-  if (Math.min(width, height) < MIN_SIDE_PX) return 'too_small'
+  if (isTooSmall(width, height)) return 'too_small'
   const gray = grayscale(rgba, thumbW * thumbH)
   const { p5, p95 } = percentiles(gray)
   if (p95 < MIN_BRIGHT_P95 && p95 - p5 < MIN_CONTRAST) return 'too_dark'
+  if (Math.min(thumbW, thumbH) < BLUR_MIN_SHORT) return 'ok' // a text strip: sharp by nature, the server/AI judges the rest
   if (laplacianVariance(gray, thumbW, thumbH) < MIN_LAPLACIAN_VARIANCE) return 'blurry'
   return 'ok'
 }
 
-/** Draws a 256 px wide copy of the decoded image and judges it. 'ok' when the canvas is unavailable. */
+/** Draws a downscaled copy (see analysisSize) of the decoded image and judges it. 'ok' when the canvas is unavailable. */
 export function checkPhotoQuality(bitmap: { width: number; height: number } & CanvasImageSource): PhotoQuality {
-  const w = Math.min(ANALYSIS_WIDTH, bitmap.width)
-  const h = Math.max(1, Math.round(bitmap.height * (w / bitmap.width)))
+  const { w, h } = analysisSize(bitmap.width, bitmap.height)
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return Math.min(bitmap.width, bitmap.height) < MIN_SIDE_PX ? 'too_small' : 'ok'
+  if (!ctx) return isTooSmall(bitmap.width, bitmap.height) ? 'too_small' : 'ok'
   ctx.drawImage(bitmap, 0, 0, w, h)
   return assessPixels(bitmap.width, bitmap.height, ctx.getImageData(0, 0, w, h).data, w, h)
 }
