@@ -137,7 +137,8 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
   const filled = card.is_learned ? 5 : Math.min(Math.max(card.box_level, 0), 5)
   const translation = card.translation || '—'
   const nativeLang = card.translation_language ?? i18n.language
-  const hint = (key: string) => showHints && (
+  // Only the current card carries small UI (box bars, hints): a neighbour shows just its word and example.
+  const hint = (key: string) => current && showHints && (
     <span className="absolute bottom-6 flex items-center gap-1.5 text-[13px] text-faint">
       <RotateCw size={14} aria-hidden="true" />{t(key)}
     </span>
@@ -145,11 +146,13 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
 
   const learningSide = (
     <Face className="bg-surface">
-      <span className="absolute left-6 top-6 flex gap-1" data-testid="deck-box" aria-hidden="true">
-        {Array.from({ length: 5 }, (_, k) => (
-          <span key={k} data-filled={k < filled} className={`h-[5px] w-4 rounded-full ${k < filled ? 'bg-accent' : 'bg-dot-off'}`} />
-        ))}
-      </span>
+      {current && (
+        <span className="absolute left-6 top-6 flex gap-1" data-testid="deck-box" aria-hidden="true">
+          {Array.from({ length: 5 }, (_, k) => (
+            <span key={k} data-filled={k < filled} className={`h-[5px] w-4 rounded-full ${k < filled ? 'bg-accent' : 'bg-dot-off'}`} />
+          ))}
+        </span>
+      )}
       <span className={label}>{t('cards.sideLearning', learning.vars)}</span>
       <span lang={card.language} className="block">
         {article && <span className={`mt-4 block font-serif text-[26px] ${ARTICLE_COLOR[article]}`}>{article}</span>}
@@ -484,9 +487,10 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const circle = 'place-items-center rounded-full border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* The stage takes the height that is left, 320–620 px; the card width stays as it was. */}
+      {/* The stage takes the height that is left, 320–620 px; the card width stays as it was. From md up it
+          is centred and only as wide as the card plus a thin peek of each neighbour (420 card → 412 + ~30). */}
       <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage"
-        className="relative -mx-4 max-h-[620px] min-h-[320px] flex-1 overflow-hidden md:mx-0"
+        className="relative -mx-4 max-h-[620px] min-h-[320px] flex-1 overflow-hidden md:mx-auto md:w-full md:max-w-[500px]"
         style={{ touchAction: 'pan-y' }}>
         {/* Its own GPU layer; moved only by write() — React never sets its transform, so a render leaves it be. */}
         <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>

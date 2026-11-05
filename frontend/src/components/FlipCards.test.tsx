@@ -229,6 +229,27 @@ describe('FlipCards: moving', () => {
     expect(screen.queryByTestId('deck-next')).toBeNull()
   })
 
+  it('from md up the stage is centred and capped at 500 px: only a thin peek of each neighbour', () => {
+    view()
+    const cls = screen.getByTestId('deck-stage').classList
+    for (const c of ['md:mx-auto', 'md:w-full', 'md:max-w-[500px]', '-mx-4']) expect(cls.contains(c)).toBe(true)
+  })
+
+  it('a neighbour has no small UI (box bars, hints) but keeps its word for the slide', async () => {
+    view()
+    fireEvent.click(screen.getByTestId('deck-next'))
+    settle()
+    const prev = screen.getByTestId('deck-prev'), next = screen.getByTestId('deck-next')
+    for (const n of [prev, next]) {
+      expect(n.querySelector('[data-testid="deck-box"]')).toBeNull()
+      expect(within(n).queryByText('Tap to see the translation')).toBeNull()
+      expect(within(n).queryByText('Tap to see the word')).toBeNull()
+      expect(n.querySelector('[data-testid="deck-word"]')?.textContent).toBeTruthy()
+    }
+    expect(cardButton().querySelectorAll('[data-testid="deck-box"]').length).toBe(1)
+    expect(within(cardButton()).queryByText('Tap to see the translation')).not.toBeNull()
+  })
+
   it('Space (and Enter) flip; the keys are ignored while typing', () => {
     view()
     fireEvent.keyDown(window, { key: ' ' })
