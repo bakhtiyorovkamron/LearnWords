@@ -1,0 +1,1 @@
+-- Cache entries are regenerated on demand; nothing to restore.

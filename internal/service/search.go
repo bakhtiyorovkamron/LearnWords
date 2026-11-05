@@ -48,7 +48,9 @@ func NormalizeQuery(q string) string { return strings.ToLower(strings.TrimSpace(
 // validation, fixing native-language words (e.g. Uzbek "sen") leaking into "word" unresolved.
 // v5: "translation"/"example_translation" validated against parenthetical explanations
 // (e.g. "sen (odam bilan rasmiy bo'lmagan o'zbek tili)"); such remarks now go into "note".
-const searchCacheVersion = "v5"
+// SearchCacheKey: "v6:<learning>:<native>:<normalized query>", e.g. "v6:de:uz:men".
+// v5 entries had wrong answers cached (men → der Mensch, daftar → Daftar).
+// v6: the prompt requires matching by meaning in native_language ("men" → ich, not der Mensch);
 
 // SearchCacheKey: "v5:<learning>:<native>:<normalized query>", e.g. "v5:de:uz:men".
 func SearchCacheKey(learningLang, nativeLang, query string) string {
