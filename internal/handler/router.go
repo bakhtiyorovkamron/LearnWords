@@ -36,6 +36,7 @@ type RouterDeps struct {
 	Hero        *HeroHandler
 	Practice    *PracticeHandler
 	WordCheck   *WordCheckHandler
+	Purchases   *PurchaseHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -54,6 +55,9 @@ const (
 	adminPushPerMin      = 5   // admin: send a push notification
 	generalPerUserPerMin = 100 // everything else under /api
 )
+
+// purchasePerUserPerHour: new purchase requests (also capped at 3 pending ones).
+const purchasePerUserPerHour = 5
 
 func NewRouter(d RouterDeps) *gin.Engine {
 	r := gin.New()
@@ -75,6 +79,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	photoLimit := RateLimitByUser(NewRateLimiter(ctx, "photo-import", photoPerUserPerMin, time.Minute))
 	adminPushLimit := RateLimitByUser(NewRateLimiter(ctx, "admin-push", adminPushPerMin, time.Minute))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
+	purchaseLimit := RateLimitByUser(NewRateLimiter(ctx, "purchase", purchasePerUserPerHour, time.Hour))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
 		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/words/check", "/api/photo-import")
 
@@ -160,6 +165,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/settings", d.Settings.Get)
 		protected.PUT("/me/settings", d.Settings.Update)
 		protected.GET("/me", d.Admin.Me)
+		protected.GET("/me/purchases", d.Purchases.Overview)
+		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)
+		protected.DELETE("/me/purchases/:id", d.Purchases.Cancel)
 		protected.GET("/hero", d.Hero.Get)
 		protected.POST("/hero/stage-seen", d.Hero.StageSeen)
 		protected.POST("/hero/intro-seen", d.Hero.IntroSeen)
@@ -177,6 +185,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.PATCH("/users/:id/ban", d.Admin.Ban)
 		admin.GET("/users/:id/features", d.Admin.UserFeatures)
 		admin.PUT("/users/:id/features/:feature", d.Admin.SetUserFeature)
+		admin.POST("/users/:id/credits", d.Purchases.Grant)
+		admin.GET("/purchases", d.Purchases.AdminList)
+		admin.POST("/purchases/:id/approve", d.Purchases.Approve)
+		admin.POST("/purchases/:id/reject", d.Purchases.Reject)
 		admin.POST("/word-check", d.WordCheck.StartJob)
 		admin.GET("/word-check", d.WordCheck.JobStatus)
 	}

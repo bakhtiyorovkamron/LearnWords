@@ -68,11 +68,11 @@ func TestFeatures_Postgres_FirstInsertChecksLimit_ResetRefundSet(t *testing.T) {
 	}
 
 	// refund, floor at 0
-	_ = svc.Refund(ctx, f.user, domain.FeaturePhotoImport, 1)
+	_ = svc.Refund(ctx, f.user, domain.FeaturePhotoImport, domain.ConsumeResult{FromDaily: 1})
 	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != photoLimit-1 {
 		t.Errorf("after refund: %+v", st)
 	}
-	_ = svc.Refund(ctx, f.user, domain.FeaturePhotoImport, 99)
+	_ = svc.Refund(ctx, f.user, domain.FeaturePhotoImport, domain.ConsumeResult{FromDaily: 99})
 	if st, _ := svc.State(ctx, f.user, domain.FeaturePhotoImport); st.UsedToday != 0 {
 		t.Errorf("refund floor: %+v", st)
 	}
@@ -80,8 +80,8 @@ func TestFeatures_Postgres_FirstInsertChecksLimit_ResetRefundSet(t *testing.T) {
 	// resets on the next Tashkent day: 19:30 UTC is already the next day there
 	_, _ = svc.Consume(ctx, f.user, domain.FeaturePhotoImport, photoLimit)
 	now = time.Date(2026, 10, 29, 19, 30, 0, 0, time.UTC)
-	if rem, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 1); err != nil || *rem != photoLimit-1 {
-		t.Errorf("next day: %v %v", rem, err)
+	if res, err := svc.Consume(ctx, f.user, domain.FeaturePhotoImport, 1); err != nil || *res.DailyRemaining != photoLimit-1 {
+		t.Errorf("next day: %+v %v", res, err)
 	}
 
 	// override upsert, and an unknown user

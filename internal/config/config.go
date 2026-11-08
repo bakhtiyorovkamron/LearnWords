@@ -27,6 +27,11 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string // e.g. mailto:admin@yodla.fun
+	// Buying photo credits (manual card transfer). Server env only, never in the repo. Without a
+	// card number the purchase endpoints answer 503 payments_unavailable.
+	PaymentCardNumber string // PAYMENT_CARD_NUMBER
+	PaymentCardHolder string // PAYMENT_CARD_HOLDER
+	PaymentTelegram   string // PAYMENT_TELEGRAM: username for payment questions, without @
 }
 
 func Load() (*Config, error) {
@@ -48,6 +53,10 @@ func Load() (*Config, error) {
 		VAPIDPublicKey:  strings.TrimSpace(os.Getenv("VAPID_PUBLIC_KEY")),
 		VAPIDPrivateKey: strings.TrimSpace(os.Getenv("VAPID_PRIVATE_KEY")),
 		VAPIDSubject:    env("VAPID_SUBJECT", "mailto:admin@yodla.fun"),
+
+		PaymentCardNumber: strings.TrimSpace(os.Getenv("PAYMENT_CARD_NUMBER")),
+		PaymentCardHolder: strings.TrimSpace(os.Getenv("PAYMENT_CARD_HOLDER")),
+		PaymentTelegram:   strings.TrimPrefix(strings.TrimSpace(os.Getenv("PAYMENT_TELEGRAM")), "@"),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")

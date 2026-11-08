@@ -50,7 +50,8 @@ func IsFeature(name string) bool {
 }
 
 // FeatureState is a feature as one user sees it. DailyLimit is the effective limit (override or
-// default); LimitOverride is what the admin set (nil = the default applies).
+// default); LimitOverride is what the admin set (nil = the default applies). Remaining is what is
+// left of today's free units; Credits is the purchased balance, spent once those run out.
 type FeatureState struct {
 	Feature       string `json:"feature"`
 	Enabled       bool   `json:"enabled"`
@@ -59,6 +60,19 @@ type FeatureState struct {
 	LimitOverride *int   `json:"limit_override"`
 	UsedToday     int    `json:"used_today"`
 	Remaining     *int   `json:"remaining"`
+	Credits       int    `json:"credits"`
+}
+
+// ConsumeResult says where the units of one Consume came from, so a Refund can give each back to
+// its own source. DailyRemaining is what is left of today's free units afterwards (nil = the
+// feature is unlimited); Credits is the purchased balance afterwards.
+type ConsumeResult struct {
+	FromDaily      int
+	FromCredits    int
+	DailyRemaining *int
+	Credits        int
+	// Day is the usage day the daily units were taken from (a refund after midnight returns them there).
+	Day string
 }
 
 // FeatureOverride is a row of user_features.
@@ -72,8 +86,12 @@ var (
 	ErrDailyLimit      = errors.New("daily limit reached")
 )
 
-// DailyLimitError is ErrDailyLimit carrying the limit that was hit.
-type DailyLimitError struct{ Limit int }
+// DailyLimitError is ErrDailyLimit carrying the limit that was hit and the purchased balance, which
+// did not cover the rest either.
+type DailyLimitError struct {
+	Limit   int
+	Credits int
+}
 
 func (e *DailyLimitError) Error() string        { return fmt.Sprintf("daily limit reached (%d)", e.Limit) }
 func (e *DailyLimitError) Is(target error) bool { return target == ErrDailyLimit }
@@ -83,6 +101,15 @@ func DailyLimitOf(err error) (int, bool) {
 	var d *DailyLimitError
 	if errors.As(err, &d) {
 		return d.Limit, true
+	}
+	return 0, false
+}
+
+// CreditsOf extracts the purchased balance from an ErrDailyLimit.
+func CreditsOf(err error) (int, bool) {
+	var d *DailyLimitError
+	if errors.As(err, &d) {
+		return d.Credits, true
 	}
 	return 0, false
 }

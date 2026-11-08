@@ -16,6 +16,7 @@ import (
 
 	"learnwords/internal/auth"
 	"learnwords/internal/config"
+	"learnwords/internal/domain"
 	"learnwords/internal/handler"
 	"learnwords/internal/provider/anthropic"
 	"learnwords/internal/repository/postgres"
@@ -108,11 +109,18 @@ func run() error {
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)
-	featureSvc := service.NewFeatureService(postgres.NewFeatureRepository(pool))
+	featureRepo := postgres.NewFeatureRepository(pool)
+	featureSvc := service.NewFeatureService(featureRepo)
 	feedbackRepo := postgres.NewFeedbackRepository(pool)
 	pushSvc := service.NewPushService(postgres.NewPushRepository(pool), cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject)
 	if !pushSvc.Enabled() {
 		slog.Warn("VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set: Web Push is disabled (generate keys with `go run ./cmd/vapidkeys`)")
+	}
+	purchaseSvc := service.NewPurchaseService(postgres.NewPurchaseRepository(pool), featureRepo, pushSvc, domain.PaymentInfo{
+		CardNumber: cfg.PaymentCardNumber, CardHolder: cfg.PaymentCardHolder, Telegram: cfg.PaymentTelegram,
+	})
+	if !purchaseSvc.Available() {
+		slog.Warn("PAYMENT_CARD_NUMBER is not set: buying photos is off (purchase endpoints answer 503)")
 	}
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
@@ -162,6 +170,7 @@ func run() error {
 		Push:        handler.NewPushHandler(pushSvc),
 		Photo:       handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
 		Hero:        handler.NewHeroHandler(heroSvc),
+		Purchases:   handler.NewPurchaseHandler(purchaseSvc),
 		UserStatus:  adminRepo,
 		Ctx:         ctx,
 		HealthCheck: func() error {
@@ -199,5 +208,7 @@ func run() error {
 	slog.Info("shutting down")
 	shCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	return srv.Shutdown(shCtx)
+	err = srv.Shutdown(shCtx)
+	purchaseSvc.Wait() // purchase pushes still on their way
+	return err
 }

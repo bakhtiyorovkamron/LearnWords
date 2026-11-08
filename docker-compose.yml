@@ -40,6 +40,10 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@yodla.fun}
+      # Buying photos (manual card transfer). Empty card number = off (503). Real values only in the server's .env.
+      PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER:-}
+      PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER:-}
+      PAYMENT_TELEGRAM: ${PAYMENT_TELEGRAM:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GIN_MODE: ${GIN_MODE:-release}
     ports: ["127.0.0.1:${BACKEND_PORT:-18080}:8080"]

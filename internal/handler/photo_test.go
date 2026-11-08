@@ -58,7 +58,7 @@ func TestPhotoImport_Success(t *testing.T) {
 	w := upload(r, "image", png)
 	m := decode(t, w)
 	words, _ := m["words"].([]any)
-	if w.Code != 200 || len(words) != 1 || m["remaining"] != float64(defaultPhotoLimit-1) {
+	if w.Code != 200 || len(words) != 1 || m["remaining"] != float64(defaultPhotoLimit-1) || m["credits"] != float64(0) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	if first := words[0].(map[string]any); first["full_word"] != "der Hund" || first["already_added"] != false {
@@ -91,7 +91,7 @@ func TestPhotoImport_Errors(t *testing.T) {
 		}
 	}
 	w := upload(r, "image", png)
-	if m := decode(t, w); w.Code != 429 || m["code"] != "daily_limit" || m["limit"] != float64(defaultPhotoLimit) {
+	if m := decode(t, w); w.Code != 429 || m["code"] != "daily_limit" || m["limit"] != float64(defaultPhotoLimit) || m["credits"] != float64(0) {
 		t.Errorf("limit: %d %s", w.Code, w.Body)
 	}
 
@@ -125,5 +125,37 @@ func TestPhotoImport_RejectedPhotoIs422_AndNotCharged(t *testing.T) {
 		if st.UsedToday != 0 || *st.Remaining != defaultPhotoLimit {
 			t.Errorf("%s: %+v", status, st)
 		}
+	}
+}
+
+// After the free photos of the day the purchased ones are spent; when both are gone it is a 429
+// with the limit and the (empty) balance.
+func TestPhotoImport_SpendsCreditsAfterTheFreeOnes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	user := uuid.New()
+	mem := &memFeatures{ov: map[string]domain.FeatureOverride{}}
+	if _, err := mem.AddCredits(context.Background(), user, domain.FeaturePhotoImport, 2, domain.CreditPurchase, nil, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	feats := service.NewFeatureService(mem)
+	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set(userIDKey, user) }, NativeLang())
+	r.POST("/photo-import", NewPhotoHandler(service.NewPhotoImportService(okReader{}, noWords{}, feats)).Import)
+
+	for i := range defaultPhotoLimit {
+		w := upload(r, "image", png)
+		if m := decode(t, w); w.Code != 200 || m["remaining"] != float64(defaultPhotoLimit-1-i) || m["credits"] != float64(2) {
+			t.Fatalf("free photo %d: %d %s", i+1, w.Code, w.Body)
+		}
+	}
+	for _, left := range []float64{1, 0} {
+		w := upload(r, "image", png)
+		if m := decode(t, w); w.Code != 200 || m["remaining"] != float64(0) || m["credits"] != left {
+			t.Fatalf("purchased photo, %v left: %d %s", left, w.Code, w.Body)
+		}
+	}
+	w := upload(r, "image", png)
+	if m := decode(t, w); w.Code != 429 || m["code"] != "daily_limit" || m["limit"] != float64(defaultPhotoLimit) || m["credits"] != float64(0) {
+		t.Errorf("both used up: %d %s", w.Code, w.Body)
 	}
 }

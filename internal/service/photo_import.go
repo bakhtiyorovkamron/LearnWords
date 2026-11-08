@@ -23,10 +23,10 @@ type PhotoReader interface {
 	ExtractPhotoWords(ctx context.Context, image []byte, mediaType string) (domain.PhotoReading, error)
 }
 
-// PhotoQuota is the user's daily photo quota (FeatureService).
+// PhotoQuota is the user's photo quota: free daily units, then purchased credits (FeatureService).
 type PhotoQuota interface {
-	Consume(ctx context.Context, userID uuid.UUID, feature string, n int) (*int, error)
-	Refund(ctx context.Context, userID uuid.UUID, feature string, n int) error
+	Consume(ctx context.Context, userID uuid.UUID, feature string, n int) (domain.ConsumeResult, error)
+	Refund(ctx context.Context, userID uuid.UUID, feature string, res domain.ConsumeResult) error
 }
 
 type PhotoImportService struct {
@@ -41,8 +41,9 @@ func NewPhotoImportService(ai PhotoReader, words WordExistence, quota PhotoQuota
 
 var photoTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true, "image/gif": true}
 
-// Import reads the words off a photo. One photo = one unit of the user's daily photo_import quota,
-// taken just before the AI call and given back if that call fails. Everything that can be refused
+// Import reads the words off a photo. One photo = one unit of the user's photo_import quota (a free
+// daily unit, or a purchased credit once those are used up), taken just before the AI call and
+// given back to the same source if that call fails. Everything that can be refused
 // without the AI (bad image, no API key, feature off, limit reached) happens before any AI cost.
 func (s *PhotoImportService) Import(ctx context.Context, userID uuid.UUID, image []byte) (*domain.PhotoImportResult, error) {
 	if len(image) == 0 {
@@ -59,22 +60,22 @@ func (s *PhotoImportService) Import(ctx context.Context, userID uuid.UUID, image
 		return nil, domain.ErrUnavailable
 	}
 
-	remaining, err := s.quota.Consume(ctx, userID, domain.FeaturePhotoImport, 1)
+	spent, err := s.quota.Consume(ctx, userID, domain.FeaturePhotoImport, 1)
 	if err != nil {
 		return nil, err
 	}
 	reading, err := s.ai.ExtractPhotoWords(ctx, image, mediaType)
 	if err != nil {
-		s.refund(ctx, userID)
+		s.refund(ctx, userID, spent)
 		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
 	// A photo the AI cannot use is rejected like a failed call: the unit is given back.
 	switch reading.Status {
 	case domain.PhotoNotDocument:
-		s.refund(ctx, userID)
+		s.refund(ctx, userID, spent)
 		return nil, domain.ErrPhotoNotDocument
 	case domain.PhotoUnreadable:
-		s.refund(ctx, userID)
+		s.refund(ctx, userID, spent)
 		return nil, domain.ErrPhotoUnreadable
 	}
 	found := reading.Words
@@ -84,12 +85,12 @@ func (s *PhotoImportService) Import(ctx context.Context, userID uuid.UUID, image
 		return nil, err
 	}
 	slog.InfoContext(ctx, "photo-import", "user_id", userID, "found", len(found), "words", len(words))
-	return &domain.PhotoImportResult{Words: words, Remaining: remaining}, nil
+	return &domain.PhotoImportResult{Words: words, Remaining: spent.DailyRemaining, Credits: spent.Credits}, nil
 }
 
-// refund gives the photo's quota unit back (also when the request was cancelled).
-func (s *PhotoImportService) refund(ctx context.Context, userID uuid.UUID) {
-	if err := s.quota.Refund(context.WithoutCancel(ctx), userID, domain.FeaturePhotoImport, 1); err != nil {
+// refund gives the photo's unit back to where it came from (also when the request was cancelled).
+func (s *PhotoImportService) refund(ctx context.Context, userID uuid.UUID, spent domain.ConsumeResult) {
+	if err := s.quota.Refund(context.WithoutCancel(ctx), userID, domain.FeaturePhotoImport, spent); err != nil {
 		slog.ErrorContext(ctx, "photo import: refund failed", "user_id", userID, "err", err)
 	}
 }

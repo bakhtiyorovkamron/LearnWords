@@ -42,13 +42,15 @@ type photoEnv struct {
 	svc   *PhotoImportService
 	ai    *fakeReader
 	feats *FeatureService
+	repo  *memFeatureRepo
 	user  uuid.UUID
 }
 
 func newPhotoEnv(words []domain.PhotoWord, aiErr error) photoEnv {
 	ai := &fakeReader{words: words, err: aiErr}
-	feats := NewFeatureService(newMemFeatureRepo())
-	return photoEnv{NewPhotoImportService(ai, fakeExists{"katze": true}, feats), ai, feats, uuid.New()}
+	repo := newMemFeatureRepo()
+	feats := NewFeatureService(repo)
+	return photoEnv{NewPhotoImportService(ai, fakeExists{"katze": true}, feats), ai, feats, repo, uuid.New()}
 }
 
 func (e photoEnv) used(t *testing.T) int {
@@ -85,8 +87,8 @@ func TestPhotoImport_OnePhotoOneUnit_ResultCleaned(t *testing.T) {
 	if res.Words[2].FullWord != "laufen" || res.Words[2].Article != nil {
 		t.Errorf("verb: %+v", res.Words[2])
 	}
-	if res.Remaining == nil || *res.Remaining != defaultPhotoLimit-1 || e.used(t) != 1 {
-		t.Errorf("one photo = one unit: remaining %v, used %d", res.Remaining, e.used(t))
+	if res.Remaining == nil || *res.Remaining != defaultPhotoLimit-1 || e.used(t) != 1 || res.Credits != 0 {
+		t.Errorf("one photo = one unit: remaining %v, credits %d, used %d", res.Remaining, res.Credits, e.used(t))
 	}
 }
 
@@ -194,16 +196,55 @@ func TestPhotoImport_RefundIsCalledOnce(t *testing.T) {
 	if q.consumed != 1 || q.refunded != 1 {
 		t.Errorf("consumed %d, refunded %d", q.consumed, q.refunded)
 	}
+	if r := q.refundedWith; r.FromCredits != 1 || r.FromDaily != 0 || r.Day != "2026-10-29" {
+		t.Errorf("the refund must carry what Consume took: %+v", r)
+	}
 }
 
-type countingQuota struct{ consumed, refunded int }
+type countingQuota struct {
+	consumed, refunded int
+	refundedWith       domain.ConsumeResult
+}
 
-func (q *countingQuota) Consume(context.Context, uuid.UUID, string, int) (*int, error) {
+func (q *countingQuota) Consume(context.Context, uuid.UUID, string, int) (domain.ConsumeResult, error) {
 	q.consumed++
 	n := 3
-	return &n, nil
+	return domain.ConsumeResult{FromCredits: 1, DailyRemaining: &n, Credits: 7, Day: "2026-10-29"}, nil
 }
-func (q *countingQuota) Refund(context.Context, uuid.UUID, string, int) error {
+func (q *countingQuota) Refund(_ context.Context, _ uuid.UUID, _ string, res domain.ConsumeResult) error {
 	q.refunded++
+	q.refundedWith = res
 	return nil
+}
+
+// After the free photos of the day the purchased ones are used; a failed AI call gives the credit
+// back, and when both are gone it is the daily limit with the balance.
+func TestPhotoImport_CreditsAfterTheFreePhotos(t *testing.T) {
+	ctx := context.Background()
+	e := newPhotoEnv([]domain.PhotoWord{{Word: "Hund", Translation: "собака"}}, nil)
+	e.repo.setCredits(domain.FeaturePhotoImport, 2)
+	for range defaultPhotoLimit {
+		if _, err := e.svc.Import(ctx, e.user, pngBytes); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err := e.svc.Import(ctx, e.user, pngBytes)
+	if err != nil || *res.Remaining != 0 || res.Credits != 1 {
+		t.Fatalf("first credit: %+v %v", res, err)
+	}
+	e.ai.err = errors.New("boom")
+	if _, err := e.svc.Import(ctx, e.user, pngBytes); !errors.Is(err, domain.ErrUpstream) {
+		t.Fatal(err)
+	}
+	if st, _ := e.feats.State(ctx, e.user, domain.FeaturePhotoImport); st.Credits != 1 || st.UsedToday != defaultPhotoLimit {
+		t.Fatalf("the failed call's credit is back: %+v", st)
+	}
+	e.ai.err = nil
+	if res, err := e.svc.Import(ctx, e.user, pngBytes); err != nil || res.Credits != 0 {
+		t.Fatalf("last credit: %+v %v", res, err)
+	}
+	_, err = e.svc.Import(ctx, e.user, pngBytes)
+	if n, ok := domain.CreditsOf(err); !errors.Is(err, domain.ErrDailyLimit) || !ok || n != 0 {
+		t.Fatalf("all used: %v", err)
+	}
 }

@@ -17,11 +17,12 @@ type PhotoWord struct {
 	AlreadyAdded bool   `json:"already_added"` // already in the user's collection
 }
 
-// PhotoImportResult is the answer of a photo import. Remaining is what is left of today's
-// photo quota (nil = unlimited).
+// PhotoImportResult is the answer of a photo import. Remaining is what is left of today's free
+// photo quota (nil = unlimited); Credits is the purchased photo balance left.
 type PhotoImportResult struct {
 	Words     []PhotoWord `json:"words"`
 	Remaining *int        `json:"remaining"`
+	Credits   int         `json:"credits"`
 }
 
 // Full returns the stored spelling of w: the article joins nouns only.

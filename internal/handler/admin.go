@@ -55,7 +55,7 @@ func (h *AdminHandler) Me(c *gin.Context) {
 	}
 	features := make(map[string]gin.H, len(states))
 	for _, st := range states {
-		features[st.Feature] = gin.H{"enabled": st.Enabled, "daily_limit": st.DailyLimit, "remaining": st.Remaining}
+		features[st.Feature] = gin.H{"enabled": st.Enabled, "daily_limit": st.DailyLimit, "remaining": st.Remaining, "credits": st.Credits}
 	}
 	ask, err := askFeedback(c.Request.Context(), h.feedback, u, h.now())
 	if err != nil {

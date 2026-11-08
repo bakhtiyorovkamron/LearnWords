@@ -19,10 +19,12 @@ func NewPhotoHandler(svc *service.PhotoImportService) *PhotoHandler { return &Ph
 const photoFormOverhead = 1 << 20
 
 // Import handles POST /api/photo-import (multipart, field "image": JPEG/PNG/WebP/GIF, ≤ 5 MB)
-// → {words: [{word, article, word_type, translation, full_word, already_added}], remaining}.
+// → {words: [{word, article, word_type, translation, full_word, already_added}], remaining, credits}
+// (remaining: today's free photos left, null = unlimited; credits: purchased photos left).
 // The words are NOT saved: the client shows them, and the chosen ones are saved with
-// POST /api/search-word/add. Costs one unit of the daily photo_import quota (403 feature_disabled,
-// 429 daily_limit); the unit is given back if the AI call fails.
+// POST /api/search-word/add. Costs one unit of photo_import: a free daily one, or a purchased
+// credit once those are used up (403 feature_disabled, 429 daily_limit when neither is left); the
+// unit is given back to its source if the AI call fails.
 func (h *PhotoHandler) Import(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, service.MaxPhotoBytes+photoFormOverhead)
 	fh, err := c.FormFile("image")

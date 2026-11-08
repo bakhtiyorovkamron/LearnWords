@@ -20,6 +20,8 @@ type errorResponse struct {
 	FolderID string `json:"folder_id,omitempty"`
 	// Limit: with daily_limit — the daily limit that was reached.
 	Limit *int `json:"limit,omitempty"`
+	// Credits: with daily_limit — the purchased balance (always present there, also when 0).
+	Credits *int `json:"credits,omitempty"`
 }
 
 // requestLogAttrs: what an operator needs to find a failed request — error text, method, path
@@ -66,7 +68,18 @@ func writeError(c *gin.Context, err error) {
 		if n, ok := domain.DailyLimitOf(err); ok {
 			resp.Limit = &n
 		}
+		credits, _ := domain.CreditsOf(err)
+		resp.Credits = &credits
 		c.AbortWithStatusJSON(http.StatusTooManyRequests, resp)
+		return
+	case errors.Is(err, domain.ErrTooManyPending):
+		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "too many pending purchase requests", Code: "too_many_pending"})
+		return
+	case errors.Is(err, domain.ErrPurchaseDecided):
+		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "purchase request is already decided", Code: "already_decided"})
+		return
+	case errors.Is(err, domain.ErrPaymentsUnavailable):
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, errorResponse{Error: "payments are not configured", Code: "payments_unavailable"})
 		return
 	case errors.Is(err, domain.ErrAlreadyExists):
 		status, msg = http.StatusConflict, "already exists"

@@ -13,13 +13,18 @@ import (
 type FeatureRepository interface {
 	Overrides(ctx context.Context, userID uuid.UUID) (map[string]domain.FeatureOverride, error)
 	Usage(ctx context.Context, userID uuid.UUID, day string) (map[string]int, error)
-	// Consume adds n atomically unless the day's total would exceed limit (ok=false, nothing changed).
-	Consume(ctx context.Context, userID uuid.UUID, feature, day string, n, limit int) (count int, ok bool, err error)
-	Refund(ctx context.Context, userID uuid.UUID, feature, day string, n int) error
+	// Credits returns the purchased balances by feature.
+	Credits(ctx context.Context, userID uuid.UUID) (map[string]int, error)
+	// Consume takes n units atomically: the day's free units first (up to limit), then purchased
+	// credits. ok=false → n does not fit into both together; nothing changed, res.Credits is the balance.
+	Consume(ctx context.Context, userID uuid.UUID, feature, day string, n, limit int) (res domain.ConsumeResult, ok bool, err error)
+	// Refund gives res back to the sources it was taken from.
+	Refund(ctx context.Context, userID uuid.UUID, feature, day string, res domain.ConsumeResult) error
 	SetOverride(ctx context.Context, userID uuid.UUID, feature string, enabled bool, dailyLimit *int) error
 }
 
-// FeatureService decides what a user may do: per-user on/off switches and daily limits.
+// FeatureService decides what a user may do: per-user on/off switches and daily limits, with
+// purchased credits spent once a day's free units run out.
 type FeatureService struct {
 	repo FeatureRepository
 	now  func() time.Time
@@ -43,8 +48,9 @@ func NewFeatureService(repo FeatureRepository, opts ...FeatureOption) *FeatureSe
 
 func (s *FeatureService) day() string { return domain.FeatureDay(s.now()) }
 
-func buildState(spec domain.FeatureSpec, ov map[string]domain.FeatureOverride, usage map[string]int) domain.FeatureState {
-	st := domain.FeatureState{Feature: spec.Name, Enabled: !spec.DisabledByDefault, DefaultLimit: spec.DefaultLimit, DailyLimit: spec.DefaultLimit, UsedToday: usage[spec.Name]}
+func buildState(spec domain.FeatureSpec, ov map[string]domain.FeatureOverride, usage, credits map[string]int) domain.FeatureState {
+	st := domain.FeatureState{Feature: spec.Name, Enabled: !spec.DisabledByDefault, DefaultLimit: spec.DefaultLimit, DailyLimit: spec.DefaultLimit,
+		UsedToday: usage[spec.Name], Credits: credits[spec.Name]}
 	if o, ok := ov[spec.Name]; ok {
 		st.Enabled = o.Enabled
 		if o.DailyLimit != nil {
@@ -59,7 +65,8 @@ func buildState(spec domain.FeatureSpec, ov map[string]domain.FeatureOverride, u
 	return st
 }
 
-// States returns every catalog feature merged with the user's overrides and today's usage.
+// States returns every catalog feature merged with the user's overrides, today's usage and the
+// purchased balances.
 func (s *FeatureService) States(ctx context.Context, userID uuid.UUID) ([]domain.FeatureState, error) {
 	ov, err := s.repo.Overrides(ctx, userID)
 	if err != nil {
@@ -69,9 +76,13 @@ func (s *FeatureService) States(ctx context.Context, userID uuid.UUID) ([]domain
 	if err != nil {
 		return nil, err
 	}
+	credits, err := s.repo.Credits(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]domain.FeatureState, 0, len(domain.FeatureCatalog))
 	for _, spec := range domain.FeatureCatalog {
-		out = append(out, buildState(spec, ov, usage))
+		out = append(out, buildState(spec, ov, usage, credits))
 	}
 	return out, nil
 }
@@ -123,33 +134,46 @@ func (s *FeatureService) Require(ctx context.Context, userID uuid.UUID, feature 
 	return err
 }
 
-// Consume uses n units of today's quota atomically. nil remaining = the feature has no limit
-// (nothing is recorded). Over the limit → ErrDailyLimit (carrying the limit), nothing is charged.
-func (s *FeatureService) Consume(ctx context.Context, userID uuid.UUID, feature string, n int) (*int, error) {
+// Consume uses n units atomically: today's free units first, then purchased credits. An
+// unlimited feature records nothing and never touches the credits (res.DailyRemaining is nil).
+// When n does not fit into what is left of today plus the credits → ErrDailyLimit (carrying the
+// limit and the balance) and nothing is charged.
+func (s *FeatureService) Consume(ctx context.Context, userID uuid.UUID, feature string, n int) (domain.ConsumeResult, error) {
 	if n <= 0 {
-		return nil, fmt.Errorf("%w: n must be positive", domain.ErrValidation)
+		return domain.ConsumeResult{}, fmt.Errorf("%w: n must be positive", domain.ErrValidation)
 	}
 	limit, err := s.effective(ctx, userID, feature)
-	if err != nil || limit == nil {
-		return nil, err
-	}
-	count, ok, err := s.repo.Consume(ctx, userID, feature, s.day(), n, *limit)
 	if err != nil {
-		return nil, err
+		return domain.ConsumeResult{}, err
+	}
+	if limit == nil {
+		credits, err := s.repo.Credits(ctx, userID)
+		if err != nil {
+			return domain.ConsumeResult{}, err
+		}
+		return domain.ConsumeResult{Credits: credits[feature]}, nil
+	}
+	res, ok, err := s.repo.Consume(ctx, userID, feature, s.day(), n, *limit)
+	if err != nil {
+		return domain.ConsumeResult{}, err
 	}
 	if !ok {
-		return nil, &domain.DailyLimitError{Limit: *limit}
+		return domain.ConsumeResult{}, &domain.DailyLimitError{Limit: *limit, Credits: res.Credits}
 	}
-	rem := *limit - count
-	return &rem, nil
+	return res, nil
 }
 
-// Refund gives n units back (a failed AI call must not cost the user quota). Never below 0.
-func (s *FeatureService) Refund(ctx context.Context, userID uuid.UUID, feature string, n int) error {
-	if n <= 0 || !domain.IsFeature(feature) {
+// Refund gives a Consume back (a failed AI call must not cost the user anything): the free units
+// to the day they were taken from, the credits to the balance.
+func (s *FeatureService) Refund(ctx context.Context, userID uuid.UUID, feature string, res domain.ConsumeResult) error {
+	if (res.FromDaily <= 0 && res.FromCredits <= 0) || !domain.IsFeature(feature) {
 		return nil
 	}
-	return s.repo.Refund(ctx, userID, feature, s.day(), n)
+	day := res.Day
+	if day == "" {
+		day = s.day()
+	}
+	return s.repo.Refund(ctx, userID, feature, day, res)
 }
 
 // Set stores the admin override; dailyLimit nil = use the default limit.
