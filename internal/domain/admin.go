@@ -17,6 +17,9 @@ type AdminUser struct {
 	LastActivityAt *time.Time `json:"last_activity_at"`
 	Rating         *int       `json:"rating"`       // the user's feedback rating; nil = none (or dismissed)
 	PushDevices    int        `json:"push_devices"` // browsers/devices subscribed to Web Push
+	FullName       *string    `json:"full_name"`    // profile, read-only for the admin
+	Phone          *string    `json:"phone"`
+	Telegram       Telegram   `json:"telegram"`
 }
 
 // AdminStats are service-wide totals for the admin dashboard.
@@ -30,4 +33,10 @@ type AdminStats struct {
 	TrainingSessions int `json:"training_sessions"` // distinct (user, day) with at least one answer
 	TotalStories     int `json:"total_stories"`     // AI stories generated (Anthropic usage)
 	Stories30d       int `json:"stories_30d"`
+}
+
+// Telegram is the connection status of a user's Telegram (the username is set by the bot).
+type Telegram struct {
+	Connected bool    `json:"connected"`
+	Username  *string `json:"username"`
 }

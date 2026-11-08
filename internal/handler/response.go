@@ -78,6 +78,12 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrPurchaseDecided):
 		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "purchase request is already decided", Code: "already_decided"})
 		return
+	case errors.Is(err, domain.ErrInvalidName):
+		c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "name must be 2 to 80 characters", Code: "invalid_name"})
+		return
+	case errors.Is(err, domain.ErrInvalidPhone):
+		c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "phone must look like +998901234567", Code: "invalid_phone"})
+		return
 	case errors.Is(err, domain.ErrPaymentsUnavailable):
 		c.AbortWithStatusJSON(http.StatusServiceUnavailable, errorResponse{Error: "payments are not configured", Code: "payments_unavailable"})
 		return

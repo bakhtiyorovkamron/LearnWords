@@ -31,6 +31,7 @@ export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: ()
             <p>{t('admin.userCard.registered', { date: date(user.created_at) })}</p>
             <p>{t('admin.userCard.words', { n: user.words_count })}</p>
             {user.rating ? <p className="flex items-center gap-1.5">{t('admin.feedback.userRating', { rating: user.rating })}<Stars rating={user.rating} /></p> : null}
+            <ProfileLines user={user} />
             <PushLine user={user} />
             <p>{t('admin.userCard.lastActive', { date: user.last_activity_at ? date(user.last_activity_at) : t('admin.userCard.never') })}</p>
           </div>
@@ -174,6 +175,20 @@ function CreditsForm({ userId, state }: { userId: string; state: FeatureState })
 
 // Fixed test text: only for checking that notifications reach this user's devices.
 const TEST_PUSH = { title: 'yodla', body: 'Test notification' }
+
+/** The user's own profile data, read-only: name, phone, Telegram. */
+function ProfileLines({ user }: { user: AdminUser }) {
+  const { t } = useTranslation()
+  const dash = '—'
+  const tg = user.telegram
+  return (
+    <>
+      <p>{t('profile.name')}: {user.full_name || dash}</p>
+      <p>{t('profile.phone')}: {user.phone || dash}</p>
+      <p>{t('profile.telegram')}: {tg?.connected ? (tg.username ? `@${tg.username}` : t('profile.telegramConnected')) : t('profile.telegramNotConnected')}</p>
+    </>
+  )
+}
 
 function PushLine({ user }: { user: AdminUser }) {
   const { t } = useTranslation()

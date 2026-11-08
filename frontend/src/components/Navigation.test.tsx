@@ -144,11 +144,11 @@ describe('bottom navigation', () => {
     expect(within(sheet).getByRole('link', { name: /Statistics/ })).toBeTruthy()
   })
 
-  it('the desktop header: yodla, Home, Cards, My words, Add, Search, Daily Story, Statistics', () => {
+  it('the desktop header: yodla, Home, Cards, My words, Add, Search, Daily Story, Statistics, Profile', () => {
     renderLayout('/')
     const header = screen.getAllByRole('navigation')[0]
     const names = within(header).getAllByRole('link').map((a) => a.textContent)
-    expect(names).toEqual(['yodla' /* the logo */, 'Home', 'Cards', 'My words', 'Add', 'Search', 'Daily Story', 'Statistics'])
+    expect(names).toEqual(['yodla' /* the logo */, 'Home', 'Cards', 'My words', 'Add', 'Search', 'Daily Story', 'Statistics', 'Profile'])
     expect(within(header).getAllByRole('link')[0].getAttribute('href')).toBe('/') // the logo
     expect(within(header).getByRole('link', { name: 'My words' }).getAttribute('href')).toBe('/words')
   })

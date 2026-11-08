@@ -22,6 +22,7 @@ type RouterDeps struct {
 	Stats       *StatsHandler
 	Stories     *StoryHandler
 	Settings    *SettingsHandler
+	Profile     *ProfileHandler
 	Admin       *AdminHandler
 	Collection  *CollectionHandler
 	WordEdit    *WordEditHandler
@@ -164,6 +165,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.DELETE("/stories/own/:id", d.Stories.DeleteOwn)
 		protected.GET("/me/settings", d.Settings.Get)
 		protected.PUT("/me/settings", d.Settings.Update)
+		protected.GET("/me/profile", d.Profile.Get)
+		protected.PUT("/me/profile", d.Profile.Update)
 		protected.GET("/me", d.Admin.Me)
 		protected.GET("/me/purchases", d.Purchases.Overview)
 		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)

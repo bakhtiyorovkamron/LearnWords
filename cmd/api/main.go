@@ -158,6 +158,7 @@ func run() error {
 		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		Stories:     handler.NewStoryHandler(storySvc, featureSvc),
 		Settings:    handler.NewSettingsHandler(userRepo),
+		Profile:     handler.NewProfileHandler(userRepo),
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo, featureSvc, feedbackRepo),
 		Collection:  handler.NewCollectionHandler(cardRepo),
 		WordEdit:    handler.NewWordEditHandler(cardRepo),

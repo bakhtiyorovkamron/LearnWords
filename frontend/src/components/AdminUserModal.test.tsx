@@ -66,6 +66,21 @@ describe('AdminUserModal', () => {
     expect(screen.getByTestId('usage-photo_import').textContent).toBe('Today: 2 of 6 · custom')
   })
 
+  it('shows the profile read-only: name, phone and Telegram (dashes and "Not connected" when empty)', async () => {
+    renderModal()
+    expect(screen.getByText('Name: —')).toBeTruthy()
+    expect(screen.getByText('Phone: —')).toBeTruthy()
+    expect(screen.getByText('Telegram: Not connected')).toBeTruthy()
+    cleanup()
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const full: AdminUser = { ...user, full_name: 'Anna K', phone: '+998901234567', telegram: { connected: true, username: 'anna_k' } }
+    render(<QueryClientProvider client={qc}><AdminUserModal user={full} onClose={vi.fn()} /></QueryClientProvider>)
+    expect(screen.getByText('Name: Anna K')).toBeTruthy()
+    expect(screen.getByText('Phone: +998901234567')).toBeTruthy()
+    expect(screen.getByText('Telegram: @anna_k')).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull() // nothing to edit
+  })
+
   it('shows the user\'s feedback rating when there is one', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(<QueryClientProvider client={qc}><AdminUserModal user={{ ...user, rating: 4 }} onClose={vi.fn()} /></QueryClientProvider>)

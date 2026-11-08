@@ -275,6 +275,17 @@ export const settingsApi = {
   setDailyGoal: (goal: DailyGoal) => api.put<UserSettings>('/me/settings', { daily_goal: goal }).then((r) => r.data),
 }
 
+export interface Profile {
+  full_name: string | null
+  phone: string | null // +998XXXXXXXXX
+  telegram: { connected: boolean; username: string | null }
+}
+
+export const profileApi = {
+  get: () => api.get<Profile>('/me/profile').then((r) => r.data),
+  update: (body: { full_name: string; phone: string }) => api.put<Profile>('/me/profile', body).then((r) => r.data),
+}
+
 export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker'
 
 /** A feature as the admin sees it for one user. daily_limit is the effective limit (null = unlimited). */
@@ -356,6 +367,9 @@ export interface AdminUser {
   created_at: string; words_count: number; last_activity_at: string | null
   rating?: number | null // the user's feedback rating
   push_devices?: number // browsers/devices subscribed to Web Push
+  full_name?: string | null // profile (read-only here)
+  phone?: string | null
+  telegram?: { connected: boolean; username: string | null }
 }
 
 export interface FeedbackItem { email: string; rating: number; comment: string; created_at: string }
