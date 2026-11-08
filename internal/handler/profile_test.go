@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -22,11 +24,13 @@ func (m *memProfile) SetProfile(_ context.Context, _ uuid.UUID, name string, pho
 	return nil
 }
 
-func profileRouter(m *memProfile) *gin.Engine {
+func profileRouter(m *memProfile) *gin.Engine { return profileRouterBot(m, true) }
+
+func profileRouterBot(m *memProfile, telegramAvailable bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set(userIDKey, uuid.New()) })
-	h := NewProfileHandler(m)
+	h := NewProfileHandler(m, telegramAvailable)
 	r.GET("/me/profile", h.Get)
 	r.PUT("/me/profile", h.Update)
 	return r
@@ -46,7 +50,7 @@ func TestProfile_GetEmpty(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	if got := w.Body.String(); got != `{"full_name":null,"phone":null,"telegram":{"connected":false,"username":null}}` {
+	if got := w.Body.String(); got != `{"full_name":null,"phone":null,"telegram":{"connected":false,"username":null,"available":true,"bonus_offer":2,"bonus":0}}` {
 		t.Errorf("body = %s", got)
 	}
 }
@@ -64,6 +68,37 @@ func TestProfile_TelegramConnected(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &got)
 	if !got.Telegram.Connected || got.Telegram.Username == nil || *got.Telegram.Username != "anna_k" {
 		t.Errorf("telegram = %+v", got.Telegram)
+	}
+}
+
+func getProfileBody(t *testing.T, r *gin.Engine) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/me/profile", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	return w.Body.String()
+}
+
+// The bonus on offer goes once Telegram is connected or the gift was had; without a bot nothing is
+// on offer and available is false.
+func TestProfile_TelegramAvailabilityAndBonus(t *testing.T) {
+	const tg = `"telegram":{"connected":%v,"username":null,"available":%v,"bonus_offer":%d,"bonus":%d}`
+	for _, c := range []struct {
+		name      string
+		p         domain.Profile
+		available bool
+		want      string
+	}{
+		{"no bot", domain.Profile{}, false, fmt.Sprintf(tg, false, false, 0, 0)},
+		{"connected with the gift", domain.Profile{TelegramConnected: true, TelegramBonus: 2}, true, fmt.Sprintf(tg, true, true, 0, 2)},
+		{"connected, no gift (the Telegram had it elsewhere)", domain.Profile{TelegramConnected: true}, true, fmt.Sprintf(tg, true, true, 0, 0)},
+		{"had the gift, Telegram moved away", domain.Profile{TelegramBonus: 2}, true, fmt.Sprintf(tg, false, true, 0, 2)},
+	} {
+		if got := getProfileBody(t, profileRouterBot(&memProfile{p: c.p}, c.available)); !strings.Contains(got, c.want) {
+			t.Errorf("%s: %s, want %s", c.name, got, c.want)
+		}
 	}
 }
 

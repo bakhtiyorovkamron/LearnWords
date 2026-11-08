@@ -25,6 +25,18 @@ type Profile struct {
 	TelegramUsername *string // set by the bot only (nil when the Telegram account has none)
 	// TelegramConnected: the bot has bound a private chat (users.telegram_chat_id is set).
 	TelegramConnected bool
+	// TelegramBonus: photo credits the user got for connecting Telegram (0 = none).
+	TelegramBonus int
+}
+
+// TelegramBonusOffer: the credits connecting Telegram would give now. 0 once connected or once the
+// user has had the gift. (A Telegram account that already earned it elsewhere gets nothing, which
+// is only known when the bot binds it.)
+func (p Profile) TelegramBonusOffer() int {
+	if p.TelegramConnected || p.TelegramBonus > 0 {
+		return 0
+	}
+	return TelegramBonusCredits
 }
 
 var phoneRe = regexp.MustCompile(`^\+998\d{9}$`)

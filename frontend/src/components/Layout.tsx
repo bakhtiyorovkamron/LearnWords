@@ -16,6 +16,7 @@ import { useFeatures } from '../lib/features'
 import { setMoreMenuOpen, useMoreMenuOpen } from '../lib/moreMenu'
 import { isTrainingOpen, useTrainingOpen } from '../lib/trainingState'
 import { FeedbackModal } from './FeedbackModal'
+import { TelegramPromoDialog } from './TelegramPromoDialog'
 import { InAppBanner } from './InAppBanner'
 import { Logo } from './Logo'
 import { PushToggle } from './PushToggle'
@@ -198,6 +199,7 @@ export function Layout() {
 
       <Toaster />
       {askFeedback && feedbackDue && <FeedbackModal />}
+      <TelegramPromoDialog />
       <StageUpOverlay />
       <HeroIntroOverlay />
       <InstallBanner />

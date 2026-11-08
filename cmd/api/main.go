@@ -182,7 +182,7 @@ func run() error {
 		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		Stories:     handler.NewStoryHandler(storySvc, featureSvc),
 		Settings:    handler.NewSettingsHandler(userRepo),
-		Profile:     handler.NewProfileHandler(userRepo),
+		Profile:     handler.NewProfileHandler(userRepo, telegramSvc.Enabled()),
 		Telegram:    handler.NewTelegramHandler(telegramSvc, cfg.TelegramWebhookSecret),
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo, featureSvc, feedbackRepo),
 		Collection:  handler.NewCollectionHandler(cardRepo),

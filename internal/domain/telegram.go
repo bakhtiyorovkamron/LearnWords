@@ -20,6 +20,11 @@ const (
 	LinkCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	// LinkCodeTTL: how long a deep link works.
 	LinkCodeTTL = 10 * time.Minute
+	// TelegramBonusCredits: photo import credits given once for connecting Telegram (once per
+	// Telegram account and once per user).
+	TelegramBonusCredits = 2
+	// CreditReasonTelegram: the credit_ledger reason of that gift.
+	CreditReasonTelegram = "telegram"
 )
 
 // NewLinkCode returns a fresh one-time code read from src (crypto/rand.Reader when nil).

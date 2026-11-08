@@ -10,11 +10,14 @@ import (
 	"learnwords/internal/domain"
 )
 
-// Profile returns the user's name, phone and Telegram username (each nil when not set).
+// Profile returns the user's name, phone and Telegram username (each nil when not set), whether
+// Telegram is connected and the credits connecting it gave.
 func (r *UserRepository) Profile(ctx context.Context, id uuid.UUID) (domain.Profile, error) {
 	var p domain.Profile
-	err := r.pool.QueryRow(ctx, `SELECT full_name, phone, telegram_username, telegram_chat_id IS NOT NULL FROM users WHERE id = $1`, id).
-		Scan(&p.FullName, &p.Phone, &p.TelegramUsername, &p.TelegramConnected)
+	err := r.pool.QueryRow(ctx, `SELECT u.full_name, u.phone, u.telegram_username, u.telegram_chat_id IS NOT NULL,
+		       COALESCE((SELECT b.credits FROM telegram_bonuses b WHERE b.user_id = u.id), 0)
+		FROM users u WHERE u.id = $1`, id).
+		Scan(&p.FullName, &p.Phone, &p.TelegramUsername, &p.TelegramConnected, &p.TelegramBonus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Profile{}, domain.ErrNotFound
 	}

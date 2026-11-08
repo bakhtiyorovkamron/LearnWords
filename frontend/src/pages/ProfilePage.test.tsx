@@ -11,7 +11,8 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn() } }
 })
 
-const empty = { full_name: null, phone: null, telegram: { connected: false, username: null } }
+const tgStatus = { connected: false, username: null, available: true, bonus_offer: 2, bonus: 0 }
+const empty = { full_name: null, phone: null, telegram: tgStatus }
 const apiError = (code: string, status = 400) => Object.assign(new Error(code), { isAxiosError: true, response: { status, data: { error: code, code } } })
 
 function renderPage() {
@@ -70,14 +71,14 @@ describe('ProfilePage', () => {
   })
 
   it('a connected Telegram shows only "Connected · @username" (or just "Connected"): no buttons', async () => {
-    vi.mocked(profileApi.get).mockResolvedValue({ ...empty, telegram: { connected: true, username: 'anna_k' } })
+    vi.mocked(profileApi.get).mockResolvedValue({ ...empty, telegram: { ...tgStatus, connected: true, username: 'anna_k', bonus_offer: 0 } })
     renderPage()
     await waitFor(() => expect(screen.getByTestId('profile-telegram').textContent).toBe('Connected · @anna_k'))
     expect(screen.queryByRole('button', { name: 'Connect' })).toBeNull()
     expect(screen.queryByRole('button', { name: /disconnect/i })).toBeNull()
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Save'])
     cleanup()
-    vi.mocked(profileApi.get).mockResolvedValue({ ...empty, telegram: { connected: true, username: null } })
+    vi.mocked(profileApi.get).mockResolvedValue({ ...empty, telegram: { ...tgStatus, connected: true, bonus_offer: 0 } })
     renderPage()
     await waitFor(() => expect(screen.getByTestId('profile-telegram').textContent).toBe('Connected'))
   })
@@ -85,7 +86,7 @@ describe('ProfilePage', () => {
 
 describe('ProfilePage: connecting Telegram', () => {
   const URL = 'https://t.me/yodla_bot?start=YL-ABC234'
-  const connectedProfile = { ...empty, telegram: { connected: true, username: 'anna_k' } }
+  const connectedProfile = { ...empty, telegram: { ...tgStatus, connected: true, username: 'anna_k', bonus_offer: 0, bonus: 2 } }
   const linkResult = { url: URL, expires_at: '2026-11-08T12:10:00Z' }
   type FakeWindow = { location: { href: string }; opener: unknown; closed: boolean; close: ReturnType<typeof vi.fn> }
   let tab: FakeWindow
@@ -141,6 +142,7 @@ describe('ProfilePage: connecting Telegram', () => {
     await waitFor(() => expect(screen.getByTestId('profile-telegram').textContent).toBe('Connected · @anna_k'))
     expect(screen.queryByTestId('telegram-waiting')).toBeNull()
     expect(screen.queryByRole('button', { name: /disconnect/i })).toBeNull()
+    expect(toaster.toast).toHaveBeenCalledWith('Telegram connected · +2 photos as a gift', { ms: 5000 })
     const after = polls()
     await act(() => vi.advanceTimersByTimeAsync(30_000))
     expect(polls()).toBe(after) // no more polling
@@ -174,6 +176,13 @@ describe('ProfilePage: connecting Telegram', () => {
     expect(screen.queryByTestId('telegram-waiting')).toBeNull()
     expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(false)
     expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('no bot (profile says unavailable): the button is off and says so before any click', async () => {
+    vi.mocked(profileApi.get).mockResolvedValue({ ...empty, telegram: { ...tgStatus, available: false, bonus_offer: 0 } })
+    renderPage()
+    expect(await screen.findByText('Telegram is not available yet')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('503 telegram_unavailable: closes the tab; the button is disabled and says Telegram is not available yet', async () => {

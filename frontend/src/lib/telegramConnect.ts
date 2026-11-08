@@ -4,11 +4,14 @@
 //                ↘ unavailable (503 telegram_unavailable: the button stays off)
 //   waiting → idle after WAIT_MS: polling stops; pressing Connect again makes a fresh link.
 // Whether Telegram IS connected comes from the profile; this only tracks the attempt.
-// useTelegramConnect is the whole flow for any "Connect" button (profile page, banners).
-import { useEffect, useReducer } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+// useTelegramConnect is the whole flow for any "Connect" button (profile page, promo dialog).
+import { useEffect, useReducer, useRef } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { profileApi, telegramApi } from '../api/endpoints'
 import { apiErrorInfo } from '../api/client'
+import { PURCHASES_KEY } from './purchases'
+import { toast } from '../components/Toaster'
 
 export const POLL_MS = 3_000
 export const WAIT_MS = 60_000
@@ -50,10 +53,15 @@ export const isPolling = (s: TgConnect) => s.status === 'waiting'
 /**
  * "Connect" opens the bot right away: the tab is opened inside the click (later, after the request,
  * the browser would block it) and pointed at the deep link once the server has made it. Then the
- * profile is polled every 3 s for up to a minute, until the bot has bound the account.
+ * profile is polled every 3 s for up to a minute, until the bot has bound the account; that
+ * connection is announced with a toast (with the gift, if the bot gave one).
  */
 export function useTelegramConnect() {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
   const [state, dispatch] = useReducer(tgReducer, tgInitial)
+  const stateRef = useRef(state)
+  stateRef.current = state
   const polling = isPolling(state)
   const profile = useQuery({
     queryKey: ['profile'],
@@ -64,7 +72,19 @@ export function useTelegramConnect() {
   const tg = profile.data?.telegram
   const connected = !!tg?.connected
 
-  useEffect(() => { if (connected) dispatch({ type: 'connected' }) }, [connected])
+  const bonus = tg?.bonus ?? 0
+  useEffect(() => {
+    if (!connected) return
+    // Connected while this attempt waited for the bot: say so, and show the gifted photo credits.
+    if (stateRef.current.status === 'waiting') {
+      toast(bonus > 0 ? t('telegramPromo.connectedBonus', { count: bonus }) : t('telegramPromo.connected'), { ms: 5000 })
+      if (bonus > 0) {
+        void qc.invalidateQueries({ queryKey: ['me'] }) // the photo credits
+        void qc.invalidateQueries({ queryKey: PURCHASES_KEY })
+      }
+    }
+    dispatch({ type: 'connected' })
+  }, [connected]) // eslint-disable-line react-hooks/exhaustive-deps -- once, when it turns connected
   // The minute of waiting runs out even when the profile answers the same thing every time.
   const since = state.status === 'waiting' ? state.since : null
   useEffect(() => {
@@ -74,7 +94,8 @@ export function useTelegramConnect() {
   }, [since])
 
   const link = useMutation({ mutationFn: telegramApi.link })
-  const unavailable = state.status === 'unavailable'
+  // No bot: known from the profile up front, or from a 503 on the link request.
+  const unavailable = state.status === 'unavailable' || tg?.available === false
 
   const connect = async () => {
     if (unavailable || state.status === 'linking') return
@@ -93,8 +114,12 @@ export function useTelegramConnect() {
   }
 
   return {
+    /** The profile has loaded: connected / unavailable are known. */
+    ready: !!tg,
     connected,
     username: tg?.username ?? null,
+    /** Photo credits connecting would give now (0 = none). */
+    bonusOffer: tg?.bonus_offer ?? 0,
     loading: profile.isLoading,
     pending: link.isPending,
     waiting: state.status === 'waiting',

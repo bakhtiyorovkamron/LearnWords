@@ -16,13 +16,21 @@ type ProfileStore interface {
 	SetProfile(ctx context.Context, id uuid.UUID, fullName string, phone *string) error
 }
 
-type ProfileHandler struct{ store ProfileStore }
+type ProfileHandler struct {
+	store             ProfileStore
+	telegramAvailable bool // the bot is configured (linking works)
+}
 
-func NewProfileHandler(store ProfileStore) *ProfileHandler { return &ProfileHandler{store: store} }
+func NewProfileHandler(store ProfileStore, telegramAvailable bool) *ProfileHandler {
+	return &ProfileHandler{store: store, telegramAvailable: telegramAvailable}
+}
 
 type telegramStatus struct {
-	Connected bool    `json:"connected"`
-	Username  *string `json:"username"`
+	Connected  bool    `json:"connected"`
+	Username   *string `json:"username"`
+	Available  bool    `json:"available"`   // false: no bot, connecting answers 503 telegram_unavailable
+	BonusOffer int     `json:"bonus_offer"` // photo credits connecting would give now (0 = none)
+	Bonus      int     `json:"bonus"`       // photo credits connecting gave (0 = none)
 }
 
 type profileResponse struct {
@@ -31,18 +39,23 @@ type profileResponse struct {
 	Telegram telegramStatus `json:"telegram"`
 }
 
-func newProfileResponse(p domain.Profile) profileResponse {
-	return profileResponse{FullName: p.FullName, Phone: p.Phone, Telegram: telegramStatus{Connected: p.TelegramConnected, Username: p.TelegramUsername}}
+func (h *ProfileHandler) response(p domain.Profile) profileResponse {
+	tg := telegramStatus{Connected: p.TelegramConnected, Username: p.TelegramUsername, Available: h.telegramAvailable, Bonus: p.TelegramBonus}
+	if h.telegramAvailable {
+		tg.BonusOffer = p.TelegramBonusOffer()
+	}
+	return profileResponse{FullName: p.FullName, Phone: p.Phone, Telegram: tg}
 }
 
-// Get handles GET /api/me/profile → {"full_name", "phone", "telegram": {"connected", "username"}}.
+// Get handles GET /api/me/profile →
+// {"full_name", "phone", "telegram": {"connected", "username", "available", "bonus_offer", "bonus"}}.
 func (h *ProfileHandler) Get(c *gin.Context) {
 	p, err := h.store.Profile(c.Request.Context(), userID(c))
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, newProfileResponse(p))
+	c.JSON(http.StatusOK, h.response(p))
 }
 
 // Update handles PUT /api/me/profile {"full_name", "phone"}. The name is required (2..80 characters);

@@ -53,7 +53,7 @@ func TestTelegramRepo_OneActiveCodePerUser(t *testing.T) {
 	if got := codesOf(t, f, f.user); len(got) != 1 || got[0] != second {
 		t.Errorf("codes = %v, want only %s", got, second)
 	}
-	if ok, _ := r.BindTelegram(ctx, first, 1001, nil, time.Now()); ok {
+	if ok, _, _ := r.BindTelegram(ctx, first, 1001, nil, time.Now(), 0); ok {
 		t.Error("the replaced code still binds")
 	}
 }
@@ -66,13 +66,13 @@ func TestTelegramRepo_ExpiredCodeDoesNotBind(t *testing.T) {
 	if err := r.ReplaceLinkCode(ctx, f.user, code, now.Add(10*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := r.BindTelegram(ctx, code, 1002, nil, now.Add(10*time.Minute)); err != nil || ok {
+	if ok, _, err := r.BindTelegram(ctx, code, 1002, nil, now.Add(10*time.Minute), 0); err != nil || ok {
 		t.Errorf("at expires_at: ok=%v err=%v, want not bound", ok, err)
 	}
 	if chat, _ := telegramOf(t, f, f.user); chat != nil {
 		t.Error("expired code bound the account")
 	}
-	if ok, _ := r.BindTelegram(ctx, code, 1002, nil, now.Add(9*time.Minute)); !ok {
+	if ok, _, _ := r.BindTelegram(ctx, code, 1002, nil, now.Add(9*time.Minute), 0); !ok {
 		t.Error("a code inside its 10 minutes must bind")
 	}
 }
@@ -82,10 +82,10 @@ func TestTelegramRepo_BindIsIdempotent(t *testing.T) {
 	r, ctx := NewTelegramRepository(f.pool), context.Background()
 	code, name := uniqueCode(), "anna_k"
 	_ = r.ReplaceLinkCode(ctx, f.user, code, time.Now().Add(10*time.Minute))
-	if ok, err := r.BindTelegram(ctx, code, 1003, &name, time.Now()); err != nil || !ok {
+	if ok, _, err := r.BindTelegram(ctx, code, 1003, &name, time.Now(), 0); err != nil || !ok {
 		t.Fatalf("ok=%v err=%v", ok, err)
 	}
-	if ok, err := r.BindTelegram(ctx, code, 2003, nil, time.Now()); err != nil || ok {
+	if ok, _, err := r.BindTelegram(ctx, code, 2003, nil, time.Now(), 0); err != nil || ok {
 		t.Errorf("second use: ok=%v err=%v", ok, err)
 	}
 	chat, got := telegramOf(t, f, f.user)
@@ -101,10 +101,10 @@ func TestTelegramRepo_ChatMovesToTheNewAccount(t *testing.T) {
 	c1, c2 := uniqueCode(), uniqueCode()
 	_ = r.ReplaceLinkCode(ctx, f.user, c1, time.Now().Add(time.Minute))
 	_ = r.ReplaceLinkCode(ctx, other, c2, time.Now().Add(time.Minute))
-	if ok, err := r.BindTelegram(ctx, c1, 1004, nil, time.Now()); !ok || err != nil {
+	if ok, _, err := r.BindTelegram(ctx, c1, 1004, nil, time.Now(), 0); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	if ok, err := r.BindTelegram(ctx, c2, 1004, nil, time.Now()); !ok || err != nil {
+	if ok, _, err := r.BindTelegram(ctx, c2, 1004, nil, time.Now(), 0); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
 	if chat, _ := telegramOf(t, f, f.user); chat != nil {
@@ -133,14 +133,14 @@ func TestTelegramRepo_BindStampsLinkedAt_MovingTheChatClearsIt(t *testing.T) {
 	c1, c2 := uniqueCode(), uniqueCode()
 	_ = r.ReplaceLinkCode(ctx, f.user, c1, time.Now().Add(time.Minute))
 	_ = r.ReplaceLinkCode(ctx, other, c2, time.Now().Add(time.Minute))
-	if ok, err := r.BindTelegram(ctx, c1, chat, nil, first); !ok || err != nil {
+	if ok, _, err := r.BindTelegram(ctx, c1, chat, nil, first, 0); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
 	if at := linkedAtOf(t, f, f.user); at == nil || !at.Equal(first) {
 		t.Fatalf("linked_at %v, want %v", at, first)
 	}
 	second := first.Add(30 * time.Minute)
-	if ok, err := r.BindTelegram(ctx, c2, chat, nil, second); !ok || err != nil {
+	if ok, _, err := r.BindTelegram(ctx, c2, chat, nil, second, 0); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
 	if at := linkedAtOf(t, f, f.user); at != nil {
@@ -174,5 +174,63 @@ func TestAdminRepo_TelegramStats(t *testing.T) {
 	}
 	if want := domain.NewTelegramStats(after.TotalUsers, after.Connected, after.ConnectedLast7d).Percent; after.Percent != want {
 		t.Errorf("percent %v, want %v", after.Percent, want)
+	}
+}
+
+// The gift for connecting: once per Telegram account and once per user, in the bind's transaction;
+// it lands on the photo credits with a "telegram" ledger row and shows in the profile.
+func TestTelegramRepo_BonusOncePerChatAndPerUser(t *testing.T) {
+	f := newMoveFixture(t)
+	r, ctx := NewTelegramRepository(f.pool), context.Background()
+	credits, users := NewFeatureRepository(f.pool), NewUserRepository(f.pool)
+	a, b, c := f.user, addUser(t, f, "user", false), addUser(t, f, "user", false)
+	chatX, chatY := time.Now().UnixNano(), time.Now().UnixNano()+1
+	t.Cleanup(func() {
+		f.pool.Exec(context.Background(), `DELETE FROM telegram_bonuses WHERE chat_id IN ($1, $2)`, chatX, chatY) //nolint:errcheck
+	})
+	bind := func(user uuid.UUID, chat int64) int {
+		t.Helper()
+		code := uniqueCode()
+		if err := r.ReplaceLinkCode(ctx, user, code, time.Now().Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		ok, granted, err := r.BindTelegram(ctx, code, chat, nil, time.Now(), 2)
+		if err != nil || !ok {
+			t.Fatalf("bind: ok=%v err=%v", ok, err)
+		}
+		return granted
+	}
+	photoCredits := func(user uuid.UUID) int {
+		t.Helper()
+		m, err := credits.Credits(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m[domain.FeaturePhotoImport]
+	}
+
+	if g := bind(a, chatX); g != 2 || photoCredits(a) != 2 {
+		t.Fatalf("first bind: granted %d, credits %d", g, photoCredits(a))
+	}
+	var reason string
+	var delta int
+	if err := f.pool.QueryRow(ctx, `SELECT reason, delta FROM credit_ledger WHERE user_id = $1`, a).Scan(&reason, &delta); err != nil || reason != "telegram" || delta != 2 {
+		t.Errorf("ledger: %q %d %v", reason, delta, err)
+	}
+	if p, err := users.Profile(ctx, a); err != nil || p.TelegramBonus != 2 || !p.TelegramConnected {
+		t.Errorf("profile %+v %v", p, err)
+	}
+	if g := bind(b, chatX); g != 0 || photoCredits(b) != 0 {
+		t.Errorf("the same Telegram on another account: granted %d, credits %d", g, photoCredits(b))
+	}
+	if g := bind(a, chatY); g != 0 || photoCredits(a) != 2 {
+		t.Errorf("the same user with another Telegram: granted %d, credits %d", g, photoCredits(a))
+	}
+	if g := bind(c, chatY+1000); g != 2 {
+		t.Errorf("a new user with a new Telegram: granted %d", g)
+	}
+	f.pool.Exec(ctx, `DELETE FROM telegram_bonuses WHERE chat_id = $1`, chatY+1000) //nolint:errcheck
+	if p, _ := users.Profile(ctx, b); p.TelegramBonus != 0 {
+		t.Errorf("b has bonus %d", p.TelegramBonus)
 	}
 }

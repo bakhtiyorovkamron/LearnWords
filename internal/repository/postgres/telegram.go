@@ -38,10 +38,10 @@ func (r *TelegramRepository) ReplaceLinkCode(ctx context.Context, userID uuid.UU
 // BindTelegram: in one transaction, lock the active code (unused, expires_at > now), mark it used
 // and bind the chat to its user (telegram_linked_at = now). The chat is first taken off any other
 // account (one Telegram account, one user). false when there is no active code — a used one is
-// never bound again.
-func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chatID int64, username *string, now time.Time) (bool, error) {
-	bound := false
-	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+// never bound again. A bound chat also gets `bonus` photo credits, unless this chat or this user
+// had them before; granted is what was given (0 or bonus).
+func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chatID int64, username *string, now time.Time, bonus int) (bound bool, granted int, err error) {
+	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var userID uuid.UUID
 		err := tx.QueryRow(ctx, `SELECT user_id FROM telegram_link_codes
 			WHERE code = $1 AND used_at IS NULL AND expires_at > $2 FOR UPDATE`, code, now).Scan(&userID)
@@ -63,7 +63,23 @@ func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chat
 			return err
 		}
 		bound = true
+		if bonus <= 0 {
+			return nil
+		}
+		// No conflict target: a chat that already earned it and a user who already has it both skip.
+		tag, err := tx.Exec(ctx, `INSERT INTO telegram_bonuses (chat_id, user_id, credits, created_at) VALUES ($1, $2, $3, $4)
+			ON CONFLICT DO NOTHING`, chatID, userID, bonus, now)
+		if err != nil || tag.RowsAffected() == 0 {
+			return err
+		}
+		if _, err := addCredits(ctx, tx, userID, domain.FeaturePhotoImport, bonus, domain.CreditReasonTelegram, nil, nil, ""); err != nil {
+			return err
+		}
+		granted = bonus
 		return nil
 	})
-	return bound, err
+	if err != nil {
+		return false, 0, err
+	}
+	return bound, granted, nil
 }

@@ -19,9 +19,9 @@ type nopTelegramRepo struct{ binds int }
 func (r *nopTelegramRepo) ReplaceLinkCode(context.Context, uuid.UUID, string, time.Time) error {
 	return nil
 }
-func (r *nopTelegramRepo) BindTelegram(context.Context, string, int64, *string, time.Time) (bool, error) {
+func (r *nopTelegramRepo) BindTelegram(context.Context, string, int64, *string, time.Time, int) (bool, int, error) {
 	r.binds++
-	return true, nil
+	return true, 0, nil
 }
 
 type countingBot struct{ sent int }

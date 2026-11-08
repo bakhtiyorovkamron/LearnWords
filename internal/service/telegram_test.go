@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -29,10 +30,14 @@ type memTelegram struct {
 	name  map[uuid.UUID]*string
 	binds int
 	taken map[string]bool // codes another user already has (→ ErrAlreadyExists)
+	// the gift: once per chat, once per user
+	bonusChat map[int64]bool
+	bonusUser map[uuid.UUID]int
 }
 
 func newMemTelegram() *memTelegram {
-	return &memTelegram{codes: map[string]*memLinkCode{}, chat: map[uuid.UUID]int64{}, name: map[uuid.UUID]*string{}, taken: map[string]bool{}}
+	return &memTelegram{codes: map[string]*memLinkCode{}, chat: map[uuid.UUID]int64{}, name: map[uuid.UUID]*string{}, taken: map[string]bool{},
+		bonusChat: map[int64]bool{}, bonusUser: map[uuid.UUID]int{}}
 }
 
 func (m *memTelegram) ReplaceLinkCode(_ context.Context, user uuid.UUID, code string, expires time.Time) error {
@@ -50,17 +55,27 @@ func (m *memTelegram) ReplaceLinkCode(_ context.Context, user uuid.UUID, code st
 	return nil
 }
 
-func (m *memTelegram) BindTelegram(_ context.Context, code string, chatID int64, username *string, now time.Time) (bool, error) {
+func (m *memTelegram) BindTelegram(_ context.Context, code string, chatID int64, username *string, now time.Time, bonus int) (bool, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	c, ok := m.codes[code]
 	if !ok || !domain.LinkCodeActive(c.expires, c.used, now) {
-		return false, nil
+		return false, 0, nil
 	}
 	c.used = &now
+	for u, ch := range m.chat {
+		if ch == chatID && u != c.user {
+			delete(m.chat, u)
+			delete(m.name, u)
+		}
+	}
 	m.chat[c.user], m.name[c.user] = chatID, username
 	m.binds++
-	return true, nil
+	if bonus <= 0 || m.bonusChat[chatID] || m.bonusUser[c.user] > 0 {
+		return true, 0, nil
+	}
+	m.bonusChat[chatID], m.bonusUser[c.user] = true, bonus
+	return true, bonus, nil
 }
 
 type sentMessage struct {
@@ -190,6 +205,42 @@ func TestTelegram_BindStoresChatAndUsername(t *testing.T) {
 	}
 	if len(bot.sent) != 1 || bot.sent[0].chat != 777 || !strings.HasPrefix(bot.sent[0].text, "Готово") {
 		t.Errorf("sent = %+v", bot.sent)
+	}
+}
+
+func TestTelegram_FirstBindGivesTheGift_OncePerTelegramAndPerUser(t *testing.T) {
+	svc, repo, bot, _ := newTelegramFixture()
+	ctx := context.Background()
+	user, other := uuid.New(), uuid.New()
+	link, _ := svc.CreateLink(ctx, user)
+	svc.HandleUpdate(ctx, update(t, "private", "/start "+link.Code, "anna_k", "ru"))
+	if repo.bonusUser[user] != domain.TelegramBonusCredits {
+		t.Fatalf("gift = %d, want %d", repo.bonusUser[user], domain.TelegramBonusCredits)
+	}
+	if want := "Готово! Telegram подключён к вашему аккаунту yodla. В подарок: +2 фото для добавления слов."; bot.sent[0].text != want {
+		t.Errorf("reply %q, want %q", bot.sent[0].text, want)
+	}
+	// The same Telegram on another account: bound, but no second gift and a plain "done".
+	link2, _ := svc.CreateLink(ctx, other)
+	svc.HandleUpdate(ctx, update(t, "private", "/start "+link2.Code, "anna_k", "en"))
+	if repo.chat[other] != 777 || repo.bonusUser[other] != 0 {
+		t.Errorf("chat=%d gift=%d", repo.chat[other], repo.bonusUser[other])
+	}
+	if bot.sent[1].text != "Done! Telegram is now connected to your yodla account." {
+		t.Errorf("second reply %q", bot.sent[1].text)
+	}
+}
+
+func TestTelegram_GiftReplyInEveryLanguage(t *testing.T) {
+	for lang, want := range map[string]string{
+		"ru": "+2 фото",
+		"uz": "Sovg‘a: so‘z qo‘shish uchun +2 ta surat.",
+		"en": "Your gift: +2 photos",
+		"de": "Your gift: +2 photos",
+	} {
+		if got := fmt.Sprintf(botText(lang, botLinkedBonus), 2); !strings.Contains(got, want) {
+			t.Errorf("%s: %q, want it to contain %q", lang, got, want)
+		}
 	}
 }
 

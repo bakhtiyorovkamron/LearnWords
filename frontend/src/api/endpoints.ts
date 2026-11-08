@@ -278,7 +278,11 @@ export const settingsApi = {
 export interface Profile {
   full_name: string | null
   phone: string | null // +998XXXXXXXXX
-  telegram: { connected: boolean; username: string | null }
+  /**
+   * available: the bot is configured (false: connecting answers 503 telegram_unavailable).
+   * bonus_offer: photo credits connecting would give now; bonus: the ones connecting gave (0 = none).
+   */
+  telegram: { connected: boolean; username: string | null; available: boolean; bonus_offer: number; bonus: number }
 }
 
 export const profileApi = {
