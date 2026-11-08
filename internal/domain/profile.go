@@ -22,7 +22,9 @@ const (
 type Profile struct {
 	FullName         *string
 	Phone            *string // E.164, +998XXXXXXXXX
-	TelegramUsername *string // set by the bot only
+	TelegramUsername *string // set by the bot only (nil when the Telegram account has none)
+	// TelegramConnected: the bot has bound a private chat (users.telegram_chat_id is set).
+	TelegramConnected bool
 }
 
 var phoneRe = regexp.MustCompile(`^\+998\d{9}$`)

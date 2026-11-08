@@ -13,8 +13,8 @@ import (
 // Profile returns the user's name, phone and Telegram username (each nil when not set).
 func (r *UserRepository) Profile(ctx context.Context, id uuid.UUID) (domain.Profile, error) {
 	var p domain.Profile
-	err := r.pool.QueryRow(ctx, `SELECT full_name, phone, telegram_username FROM users WHERE id = $1`, id).
-		Scan(&p.FullName, &p.Phone, &p.TelegramUsername)
+	err := r.pool.QueryRow(ctx, `SELECT full_name, phone, telegram_username, telegram_chat_id IS NOT NULL FROM users WHERE id = $1`, id).
+		Scan(&p.FullName, &p.Phone, &p.TelegramUsername, &p.TelegramConnected)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Profile{}, domain.ErrNotFound
 	}

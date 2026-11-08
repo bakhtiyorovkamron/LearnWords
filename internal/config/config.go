@@ -33,6 +33,14 @@ type Config struct {
 	PaymentCardNumber string // PAYMENT_CARD_NUMBER
 	PaymentCardHolder string // PAYMENT_CARD_HOLDER
 	PaymentTelegram   string // PAYMENT_TELEGRAM: a channel or user name, stored without @ / t.me link
+	// Telegram bot (linking accounts). Without the token (or the username) the Telegram endpoints
+	// answer 503 telegram_unavailable. The token never goes to logs or responses.
+	TelegramBotToken      string // TELEGRAM_BOT_TOKEN
+	TelegramBotUsername   string // TELEGRAM_BOT_USERNAME, without @
+	TelegramWebhookSecret string // TELEGRAM_WEBHOOK_SECRET: Telegram sends it back in X-Telegram-Bot-Api-Secret-Token
+	// TelegramWebhookURL: TELEGRAM_WEBHOOK_URL, the public https://<domain>/api/telegram/webhook.
+	// Set → the webhook is registered with Telegram on start.
+	TelegramWebhookURL string
 }
 
 func Load() (*Config, error) {
@@ -58,6 +66,11 @@ func Load() (*Config, error) {
 		PaymentCardNumber: strings.TrimSpace(os.Getenv("PAYMENT_CARD_NUMBER")),
 		PaymentCardHolder: strings.TrimSpace(os.Getenv("PAYMENT_CARD_HOLDER")),
 		PaymentTelegram:   telegramUsername(os.Getenv("PAYMENT_TELEGRAM")),
+
+		TelegramBotToken:      strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
+		TelegramBotUsername:   telegramUsername(os.Getenv("TELEGRAM_BOT_USERNAME")),
+		TelegramWebhookSecret: strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_SECRET")),
+		TelegramWebhookURL:    strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_URL")),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")

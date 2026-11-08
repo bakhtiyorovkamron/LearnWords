@@ -52,3 +52,26 @@ https://beszel.dev/guide/notifications/telegram (бот через @BotFather, U
 | CPU Usage | > 80 %, длительность 10 минут |
 | Memory Usage | > 85 % |
 | Disk Usage | > 80 % |
+
+## Telegram-бот (привязка аккаунта)
+
+Пользователь нажимает «Подключить» в профиле → сайт открывает `https://t.me/<бот>?start=YL-XXXXXX`
+(одноразовый код, 10 минут) → в боте «Start» → бот привязывает Telegram к аккаунту.
+
+Переменные в `.env` на сервере:
+
+```sh
+TELEGRAM_BOT_TOKEN=...            # от @BotFather; никогда не попадает в логи и ответы API
+TELEGRAM_BOT_USERNAME=yodla_bot   # без @
+TELEGRAM_WEBHOOK_SECRET=...       # случайная строка: только A-Z a-z 0-9 _ -, до 256 символов
+TELEGRAM_WEBHOOK_URL=https://yodla.fun/api/telegram/webhook   # это значение по умолчанию в docker-compose
+```
+
+Секрет можно сгенерировать так: `openssl rand -hex 32`.
+
+Публичный адрес вебхука — `https://yodla.fun/api/telegram/webhook` (Caddy проксирует `/api` в бэкенд).
+При старте бэкенд сам вызывает `setWebhook` с этим адресом и секретом; ошибка только пишется в лог.
+Telegram присылает секрет в заголовке `X-Telegram-Bot-Api-Secret-Token`; без совпадения вебхук отвечает 401.
+Без `TELEGRAM_BOT_TOKEN` (или `TELEGRAM_BOT_USERNAME`) привязка выключена: эндпоинты отвечают 503 `telegram_unavailable`.
+
+Проверка: `curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"` — `url` и `last_error_message`.

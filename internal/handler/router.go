@@ -23,6 +23,7 @@ type RouterDeps struct {
 	Stories     *StoryHandler
 	Settings    *SettingsHandler
 	Profile     *ProfileHandler
+	Telegram    *TelegramHandler
 	Admin       *AdminHandler
 	Collection  *CollectionHandler
 	WordEdit    *WordEditHandler
@@ -54,6 +55,7 @@ const (
 	importPerUserPerMin  = 10  // importing a shared folder
 	photoPerUserPerMin   = 5   // photo import (also capped by the daily photo_import quota)
 	adminPushPerMin      = 5   // admin: send a push notification
+	telegramLinkPerHour  = 5   // Telegram deep links, per user per HOUR
 	generalPerUserPerMin = 100 // everything else under /api
 )
 
@@ -79,6 +81,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	importLimit := RateLimitByUser(NewRateLimiter(ctx, "shared-import", importPerUserPerMin, time.Minute))
 	photoLimit := RateLimitByUser(NewRateLimiter(ctx, "photo-import", photoPerUserPerMin, time.Minute))
 	adminPushLimit := RateLimitByUser(NewRateLimiter(ctx, "admin-push", adminPushPerMin, time.Minute))
+	telegramLinkLimit := RateLimitByUser(NewRateLimiter(ctx, "telegram-link", telegramLinkPerHour, time.Hour))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	purchaseLimit := RateLimitByUser(NewRateLimiter(ctx, "purchase", purchasePerUserPerHour, time.Hour))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
@@ -112,6 +115,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	{
 		// Public folder preview: no login, limited per IP.
 		api.GET("/shared/:token", sharedLimit, d.Shared.Get)
+		// Telegram calls this (secret header instead of a login).
+		api.POST("/telegram/webhook", d.Telegram.Webhook)
 		a := api.Group("/auth")
 		a.POST("/register", authLimit, d.Auth.Register)
 		a.POST("/login", authLimit, d.Auth.Login)
@@ -167,6 +172,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.PUT("/me/settings", d.Settings.Update)
 		protected.GET("/me/profile", d.Profile.Get)
 		protected.PUT("/me/profile", d.Profile.Update)
+		protected.POST("/me/telegram/link", telegramLinkLimit, d.Telegram.Link)
+		protected.DELETE("/me/telegram", d.Telegram.Unlink)
 		protected.GET("/me", d.Admin.Me)
 		protected.GET("/me/purchases", d.Purchases.Overview)
 		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)

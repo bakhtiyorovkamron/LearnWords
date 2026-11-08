@@ -19,6 +19,7 @@ import (
 	"learnwords/internal/domain"
 	"learnwords/internal/handler"
 	"learnwords/internal/provider/anthropic"
+	"learnwords/internal/provider/telegram"
 	"learnwords/internal/repository/postgres"
 	"learnwords/internal/service"
 	"learnwords/internal/telemetry"
@@ -122,6 +123,29 @@ func run() error {
 	if !purchaseSvc.Available() {
 		slog.Warn("neither PAYMENT_CARD_NUMBER nor PAYMENT_TELEGRAM is set: buying photos is off (purchase endpoints answer 503)")
 	}
+	var bot service.TelegramBot // nil = no bot: the Telegram endpoints answer 503
+	if cfg.TelegramBotToken != "" {
+		bot = telegram.New(cfg.TelegramBotToken)
+	}
+	telegramSvc := service.NewTelegramService(postgres.NewTelegramRepository(pool), bot, cfg.TelegramBotUsername)
+	if !telegramSvc.Enabled() {
+		slog.Warn("TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME are not set: linking Telegram is disabled")
+	} else if cfg.TelegramWebhookURL != "" {
+		if cfg.TelegramWebhookSecret == "" {
+			slog.Warn("TELEGRAM_WEBHOOK_SECRET is not set: the webhook would reject every update, not registering it")
+		} else {
+			// In the background: a slow or failing Telegram never holds up or stops the server.
+			go func() {
+				c, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				if err := telegramSvc.RegisterWebhook(c, cfg.TelegramWebhookURL, cfg.TelegramWebhookSecret); err != nil {
+					slog.Error("telegram: setWebhook failed", "err", err) // the client already scrubbed the token
+					return
+				}
+				slog.Info("telegram: webhook registered", "url", cfg.TelegramWebhookURL)
+			}()
+		}
+	}
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
 	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
@@ -159,6 +183,7 @@ func run() error {
 		Stories:     handler.NewStoryHandler(storySvc, featureSvc),
 		Settings:    handler.NewSettingsHandler(userRepo),
 		Profile:     handler.NewProfileHandler(userRepo),
+		Telegram:    handler.NewTelegramHandler(telegramSvc, cfg.TelegramWebhookSecret),
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo, featureSvc, feedbackRepo),
 		Collection:  handler.NewCollectionHandler(cardRepo),
 		WordEdit:    handler.NewWordEditHandler(cardRepo),

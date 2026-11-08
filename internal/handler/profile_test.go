@@ -54,7 +54,7 @@ func TestProfile_GetEmpty(t *testing.T) {
 func TestProfile_TelegramConnected(t *testing.T) {
 	u := "anna_k"
 	w := httptest.NewRecorder()
-	profileRouter(&memProfile{p: domain.Profile{TelegramUsername: &u}}).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/me/profile", nil))
+	profileRouter(&memProfile{p: domain.Profile{TelegramUsername: &u, TelegramConnected: true}}).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/me/profile", nil))
 	var got struct {
 		Telegram struct {
 			Connected bool    `json:"connected"`

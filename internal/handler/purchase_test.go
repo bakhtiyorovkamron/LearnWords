@@ -289,6 +289,10 @@ func TestPurchases_CreateListCancel(t *testing.T) {
 	// the admins are told about every new request
 	e.svc.Wait()
 	sent := e.push.all()
+	// Each push goes out in its own goroutine: the order they arrive in is not fixed.
+	if len(sent) == 2 && strings.Contains(sent[0].title, "100 фото") {
+		sent[0], sent[1] = sent[1], sent[0]
+	}
 	if len(sent) != 2 || !slices.Equal(sent[0].to, []uuid.UUID{e.admin}) ||
 		sent[0].title != fmt.Sprintf("Новая заявка %s · 35 фото · 25 000 сум", created["code"]) || sent[0].body == "" ||
 		!strings.HasSuffix(sent[1].title, " · 100 фото · 59 000 сум") {

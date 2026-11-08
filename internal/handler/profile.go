@@ -32,8 +32,7 @@ type profileResponse struct {
 }
 
 func newProfileResponse(p domain.Profile) profileResponse {
-	connected := p.TelegramUsername != nil && *p.TelegramUsername != ""
-	return profileResponse{FullName: p.FullName, Phone: p.Phone, Telegram: telegramStatus{Connected: connected, Username: p.TelegramUsername}}
+	return profileResponse{FullName: p.FullName, Phone: p.Phone, Telegram: telegramStatus{Connected: p.TelegramConnected, Username: p.TelegramUsername}}
 }
 
 // Get handles GET /api/me/profile → {"full_name", "phone", "telegram": {"connected", "username"}}.

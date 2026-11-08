@@ -35,7 +35,8 @@ type AdminStats struct {
 	Stories30d       int `json:"stories_30d"`
 }
 
-// Telegram is the connection status of a user's Telegram (the username is set by the bot).
+// Telegram is the connection status of a user's Telegram: connected = the bot bound a chat; the
+// username (may be nil: not every account has one) is set by the bot.
 type Telegram struct {
 	Connected bool    `json:"connected"`
 	Username  *string `json:"username"`

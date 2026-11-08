@@ -78,6 +78,9 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrPurchaseDecided):
 		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "purchase request is already decided", Code: "already_decided"})
 		return
+	case errors.Is(err, domain.ErrTelegramUnavailable):
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, errorResponse{Error: "telegram is not configured", Code: "telegram_unavailable"})
+		return
 	case errors.Is(err, domain.ErrInvalidName):
 		c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "name must be 2 to 80 characters", Code: "invalid_name"})
 		return

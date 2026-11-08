@@ -40,6 +40,12 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@yodla.fun}
+      # Telegram bot (linking accounts). Empty token = off (the endpoints answer 503).
+      # The webhook URL is public: Caddy proxies /api to the backend.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://yodla.fun/api/telegram/webhook}
       # Buying photos (manual payment): a card and/or a Telegram contact; both empty = off (503). Real values only in the server's .env.
       PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER:-}
       PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER:-}
