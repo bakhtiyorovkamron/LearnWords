@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { foldersApi, meApi, photoApi, searchApi, type Me, type PhotoWord } from '../api/endpoints'
+import { foldersApi, meApi, photoApi, purchasesApi, searchApi, type Me, type PhotoWord, type PurchaseOverview, type PurchaseRequest } from '../api/endpoints'
 import * as photoLib from '../lib/photo'
 import { handOffPhoto, takeHandedOffPhoto } from '../lib/photoHandoff'
 import * as toaster from './Toaster'
@@ -23,16 +23,17 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     photoApi: { import: vi.fn() },
     searchApi: { add: vi.fn() },
     foldersApi: { list: vi.fn(), create: vi.fn() },
+    purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() },
   }
 })
 
-const feature = (enabled: boolean, limit: number | null = null, remaining: number | null = null) =>
-  ({ enabled, daily_limit: limit, remaining })
+const feature = (enabled: boolean, limit: number | null = null, remaining: number | null = null, credits = 0) =>
+  ({ enabled, daily_limit: limit, remaining, credits })
 const LIMIT = 10 // the default daily photo limit
-const me = (photoOn: boolean, remaining = LIMIT, limit = LIMIT): Me => ({
+const me = (photoOn: boolean, remaining = LIMIT, limit = LIMIT, credits = 0): Me => ({
   id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de',
   features: {
-    photo_import: feature(photoOn, limit, remaining), daily_story: feature(true),
+    photo_import: feature(photoOn, limit, remaining, credits), daily_story: feature(true),
     word_search: feature(true), story_autotranslate: feature(true), theme_picker: feature(false),
   },
 })
@@ -51,6 +52,7 @@ const fail = (status: number, data: unknown) =>
 function renderIt() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(<QueryClientProvider client={qc}><MemoryRouter><PhotoImport /></MemoryRouter></QueryClientProvider>)
+  return qc
 }
 const png = () => new File([new Uint8Array(100)], 'page.png', { type: 'image/png' })
 const pick = async (file: File) => fireEvent.change(await screen.findByTestId('photo-input'), { target: { files: [file] } })
@@ -60,8 +62,10 @@ beforeEach(async () => {
   vi.mocked(meApi.get).mockResolvedValue(me(true))
   vi.mocked(foldersApi.list).mockResolvedValue({ folders: [] } as never)
   vi.mocked(foldersApi.create).mockImplementation(async (name) => ({ id: 'new-id', name, color: 'lime' }) as never)
-  vi.mocked(photoApi.import).mockResolvedValue({ words, remaining: 3 })
+  vi.mocked(photoApi.import).mockResolvedValue({ words, remaining: 3, credits: 0 })
   vi.mocked(searchApi.add).mockResolvedValue({} as never)
+  // Buying is off unless a test turns it on (no card on the server): the screen is as before.
+  vi.mocked(purchasesApi.overview).mockRejectedValue(fail(503, { error: 'payments are not configured', code: 'payments_unavailable' }))
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
 })
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks() })
@@ -103,7 +107,7 @@ describe('PhotoImport', () => {
     await waitFor(() => expect(vi.mocked(toaster.toast).mock.calls[0][0]).toMatch(/: 1\. Already there: 1$/))
   })
 
-  it('a used-up daily quota shows the daily-limit text, not the rate-limit one', async () => {
+  it('a used-up daily quota shows the daily-limit text, not the rate-limit one (buying off)', async () => {
     vi.mocked(photoApi.import).mockRejectedValue(fail(429, { error: 'daily limit reached', code: 'daily_limit', limit: 10 }))
     renderIt()
     await pick(png())
@@ -118,7 +122,7 @@ describe('PhotoImport', () => {
   })
 
   it('says so when no words were found, and disables the button when no photos are left', async () => {
-    vi.mocked(photoApi.import).mockResolvedValue({ words: [], remaining: 0 })
+    vi.mocked(photoApi.import).mockResolvedValue({ words: [], remaining: 0, credits: 0 })
     renderIt()
     await pick(png())
     expect(await screen.findByText(/No words to learn were found/)).toBeTruthy()
@@ -349,5 +353,143 @@ describe('PhotoImport: a photo handed off from the Home page', () => {
     await new Promise((r) => setTimeout(r, 30))
     expect(photoApi.import).not.toHaveBeenCalled()
     expect(takeHandedOffPhoto()).toBeNull() // and it is not kept for later
+  })
+})
+
+const PACKS: PurchaseOverview['packs'] = [
+  { id: 'photo_35', feature: 'photo_import', amount: 35, price_uzs: 25000 },
+  { id: 'photo_100', feature: 'photo_import', amount: 100, price_uzs: 59000 },
+]
+const request = (over: Partial<PurchaseRequest> = {}): PurchaseRequest => ({
+  id: 'r1', code: 'YD-1234', pack_id: 'photo_35', amount: 35, price_uzs: 25000, status: 'pending', created_at: '2026-11-08T10:00:00Z', ...over,
+})
+const overview = (requests: PurchaseRequest[] = []): PurchaseOverview => ({
+  packs: PACKS, payment: { card_number: '0000111122223333', card_holder: 'TEST HOLDER', telegram: 'yodla_help' }, requests,
+})
+
+describe('PhotoImport: bought photos', () => {
+  beforeEach(() => { vi.mocked(purchasesApi.overview).mockResolvedValue(overview()) })
+  const choose = () => screen.getByRole('button', { name: /Choose a photo/ }) as HTMLButtonElement
+
+  it('free photos left + bought ones: the dots stay, the line names both, "buy more" is offered', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 3, LIMIT, 7))
+    renderIt()
+    expect((await screen.findByTestId('photo-quota')).textContent).toBe('Left today: 3 of 10 · bought: 7')
+    expect(screen.getAllByTestId('photo-dot')).toHaveLength(10)
+    expect(await screen.findByRole('button', { name: 'Buy more photos' })).toBeTruthy()
+    expect(choose().disabled).toBe(false)
+  })
+
+  it('only bought photos left: no dots, the upload stays on (the server spends a bought photo)', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 0, LIMIT, 4))
+    renderIt()
+    expect((await screen.findByTestId('photo-quota')).textContent).toBe('Free photos used up for today · bought photos left: 4')
+    expect(screen.queryAllByTestId('photo-dot')).toHaveLength(0)
+    expect(choose().disabled).toBe(false)
+    expect(screen.queryByText(/No photos left today/)).toBeNull()
+  })
+
+  it('nothing left: the used-up line, the upload off, and a "Buy photos" button that opens the sheet', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 0, LIMIT, 0))
+    renderIt()
+    expect(await screen.findByText('No photos left today — 10 again tomorrow')).toBeTruthy()
+    expect(choose().disabled).toBe(true)
+    fireEvent.click(await screen.findByRole('button', { name: 'Buy photos' }))
+    const sheet = await screen.findByRole('dialog', { name: "Today's free photos are used up" })
+    expect(sheet.textContent).toContain('You get 10 free photos every day.')
+    expect(screen.queryByRole('button', { name: 'Buy more photos' })).toBeNull() // the button above is enough
+  })
+
+  it('with buying off nothing is offered', async () => {
+    vi.mocked(purchasesApi.overview).mockRejectedValue(fail(503, { code: 'payments_unavailable' }))
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 0, LIMIT, 0))
+    renderIt()
+    await screen.findByText('No photos left today — 10 again tomorrow')
+    await waitFor(() => expect(purchasesApi.overview).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Buy photos' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Buy more photos' })).toBeNull()
+  })
+
+  it('an unlimited photo feature never asks the server about purchases', async () => {
+    vi.mocked(meApi.get).mockResolvedValue({ ...me(true), features: { ...me(true).features!, photo_import: feature(true) } })
+    renderIt()
+    await screen.findByRole('button', { name: /Choose a photo/ })
+    expect(purchasesApi.overview).not.toHaveBeenCalled()
+  })
+
+  it('"Buy more photos" opens the sheet in its voluntary form, with the packs and prices', async () => {
+    renderIt()
+    fireEvent.click(await screen.findByRole('button', { name: 'Buy more photos' }))
+    expect(await screen.findByRole('dialog', { name: 'Buy photos' })).toBeTruthy()
+    expect(screen.getByTestId('pack-photo_35').textContent).toContain('35 photos')
+  })
+
+  it('a 429 daily_limit from the import opens the sheet in "limit" form instead of an error', async () => {
+    vi.mocked(photoApi.import).mockRejectedValue(fail(429, { error: 'daily limit reached', code: 'daily_limit', limit: 10, credits: 0 }))
+    renderIt()
+    await screen.findByRole('button', { name: 'Buy more photos' }) // the packs are known
+    await pick(png())
+    expect(await screen.findByRole('dialog', { name: "Today's free photos are used up" })).toBeTruthy()
+    expect(screen.queryByText("Today's limit is used up — tomorrow you get 10 again.")).toBeNull()
+    expect(toaster.toast).not.toHaveBeenCalled()
+    // the packs, with prices and the best-value badge on the cheaper photo
+    expect(screen.getByTestId('pack-photo_35').textContent?.replace(/\s/g, ' ')).toContain('25,000 UZS')
+    expect(within(screen.getByTestId('pack-photo_100')).getByTestId('best-badge').textContent).toBe('Best value')
+  })
+
+  it('after an import the line shows the bought photos the server reported, and /me is re-read', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 0, LIMIT, 2))
+    renderIt()
+    await screen.findByText('Free photos used up for today · bought photos left: 2')
+    vi.mocked(meApi.get).mockClear()
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 0, LIMIT, 1)) // what the server has now
+    vi.mocked(photoApi.import).mockResolvedValue({ words, remaining: 0, credits: 1 })
+    await pick(png())
+    expect(await screen.findByText('Free photos used up for today · bought photos left: 1')).toBeTruthy()
+    await waitFor(() => expect(meApi.get).toHaveBeenCalled())
+  })
+
+  it('an unpaid request shows a line that opens its payment steps', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request()]))
+    renderIt()
+    fireEvent.click(await screen.findByRole('button', { name: 'Request YD-1234 is waiting for payment' }))
+    await screen.findByRole('dialog', { name: 'How to pay' })
+    expect(screen.getByTestId('buy-code').textContent).toBe('YD-1234')
+    expect(screen.queryByRole('button', { name: 'Buy more photos' })).toBeNull()
+  })
+
+  it('when a request seen waiting becomes paid: a toast with the photos, and /me is re-read', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request()]))
+    const qc = renderIt()
+    await screen.findByRole('button', { name: 'Request YD-1234 is waiting for payment' })
+    vi.mocked(meApi.get).mockClear()
+    vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request({ status: 'paid' })]))
+    await qc.invalidateQueries({ queryKey: ['purchases'] }) // what the 30 s poll does
+    await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('+35 photos added to your account', expect.anything()))
+    await waitFor(() => expect(meApi.get).toHaveBeenCalled())
+    expect(toaster.toast).toHaveBeenCalledTimes(1)
+    await qc.invalidateQueries({ queryKey: ['purchases'] })
+    expect(toaster.toast).toHaveBeenCalledTimes(1) // once
+  })
+
+  it('a request that was already paid when the page opened is not announced', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request({ status: 'paid' })]))
+    renderIt()
+    await screen.findByRole('button', { name: 'Buy more photos' })
+    expect(toaster.toast).not.toHaveBeenCalled()
+  })
+
+  it('polls every 30 s only while a request waits for payment', async () => {
+    const { PENDING_POLL_MS } = await import('../lib/purchases')
+    expect(PENDING_POLL_MS).toBe(30_000)
+    vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request()]))
+    const qc = renderIt()
+    await screen.findByRole('button', { name: 'Request YD-1234 is waiting for payment' })
+    const query = qc.getQueryCache().find({ queryKey: ['purchases'] })!
+    const interval = (query.observers[0].options.refetchInterval as (q: unknown) => number | false)
+    expect(interval(query)).toBe(30_000)
+    expect(query.observers[0].options.refetchIntervalInBackground).toBe(false) // not while the tab is hidden
+    qc.setQueryData(['purchases'], overview([request({ status: 'paid' })]))
+    expect(interval(query)).toBe(false)
   })
 })

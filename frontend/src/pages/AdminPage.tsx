@@ -1,11 +1,13 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, BookOpen, Layers, Library, Phone, ScanSearch, Send, Star, Users, X, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, Layers, Library, Phone, ScanSearch, Send, ShoppingBag, Star, Users, X, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { adminApi, meApi, type AdminUser, type FeedbackSummary, type PushResult } from '../api/endpoints'
-import { errorMessage } from '../api/client'
+import { adminApi, meApi, type AdminPurchaseRequest, type AdminUser, type FeedbackSummary, type PushResult } from '../api/endpoints'
+import { apiErrorInfo, errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
+import { formatUZS } from '../lib/money'
+import { relativeTime } from '../lib/relativeTime'
 import { AdminUserModal, Stars } from '../components/AdminUserModal'
 
 type SortKey = 'email' | 'created_at' | 'words_count' | 'last_activity_at'
@@ -30,6 +32,7 @@ export function AdminPage() {
       <FeedbackBlock />
       <PushPanel />
       <WordCheckJobPanel />
+      <PurchasesBlock />
       <UsersTable myId={me.data!.id} />
     </div>
   )
@@ -252,6 +255,102 @@ function FeedbackBlock() {
         ))}
       </ul>
     </section>
+  )
+}
+
+/** How long the first tap on "Approve" waits for the second one. */
+const APPROVE_CONFIRM_MS = 3000
+
+/**
+ * Photo purchases waiting for the admin: find the transfer by its code, then approve (adds the
+ * photos once and tells the user) or reject. A request someone else decided meanwhile just
+ * disappears on refresh.
+ */
+function PurchasesBlock() {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const list = useQuery({ queryKey: ['admin', 'purchases', 'pending'], queryFn: () => adminApi.purchases('pending') })
+  const refresh = () => {
+    for (const key of [['admin', 'purchases'], ['admin', 'users'], ['admin', 'user-features']]) {
+      void qc.invalidateQueries({ queryKey: key })
+    }
+  }
+  const decide = useMutation({
+    mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
+      approve ? adminApi.approvePurchase(id) : adminApi.rejectPurchase(id),
+    onSuccess: refresh,
+    onError: (e) => { if (apiErrorInfo(e).code === 'already_decided') refresh() },
+  })
+  const failed = decide.error && apiErrorInfo(decide.error).code !== 'already_decided' ? decide.error : null
+  const n = list.data?.length ?? 0
+
+  return (
+    <section className="glass space-y-4 p-6" aria-labelledby="admin-purchases-title">
+      <h2 id="admin-purchases-title" className="flex items-center gap-2 text-lg font-bold text-fg">
+        <ShoppingBag size={18} aria-hidden="true" className="text-accent-text" />{t('admin.purchases.title')}
+        {n > 0 && (
+          <span data-testid="purchases-count" className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold tabular-nums text-on-accent">{n}</span>
+        )}
+      </h2>
+      {list.isLoading && <div className="h-16 animate-pulse rounded-2xl bg-surface-2" />}
+      {list.error && <p className="text-sm text-danger">{errorMessage(list.error)}</p>}
+      {list.data && (n === 0 ? (
+        <p className="text-sm text-muted">{t('admin.purchases.empty')}</p>
+      ) : (
+        <ul className="divide-y divide-divider">
+          {list.data.map((p) => (
+            <PurchaseRow key={p.id} p={p} busy={decide.isPending && decide.variables?.id === p.id}
+              onApprove={() => decide.mutate({ id: p.id, approve: true })}
+              onReject={() => decide.mutate({ id: p.id, approve: false })} />
+          ))}
+        </ul>
+      ))}
+      {failed && <p role="alert" className="text-sm text-danger">{t('admin.actionFailed', { error: errorMessage(failed) })}</p>}
+    </section>
+  )
+}
+
+function PurchaseRow({ p, busy, onApprove, onReject }: {
+  p: AdminPurchaseRequest; busy: boolean; onApprove: () => void; onReject: () => void
+}) {
+  const { t, i18n } = useTranslation()
+  // Approving adds photos for real money: the first tap only arms the button for 3 s.
+  const [armed, setArmed] = useState(false)
+  const timer = useRef<number>()
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  function approve() {
+    window.clearTimeout(timer.current)
+    if (!armed) {
+      setArmed(true)
+      timer.current = window.setTimeout(() => setArmed(false), APPROVE_CONFIRM_MS)
+      return
+    }
+    setArmed(false)
+    onApprove()
+  }
+
+  const btn = 'rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50'
+  return (
+    <li data-testid={`purchase-${p.id}`} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="truncate font-semibold text-fg">{p.user_email}</div>
+        <div className="text-sm text-muted">
+          <span className="font-mono font-semibold text-fg">{p.code}</span>
+          {' · '}{t('buy.pack', { n: p.amount })}{' · '}{formatUZS(p.price_uzs, i18n.language)}{' · '}
+          <time dateTime={p.created_at} title={new Date(p.created_at).toLocaleString(dateLocale())}>{relativeTime(p.created_at)}</time>
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button type="button" disabled={busy} onClick={approve}
+          className={`${btn} ${armed ? 'border-accent bg-accent text-on-accent' : 'border-line text-accent-text hover:bg-surface-2'}`}>
+          {armed ? t('admin.purchases.sure') : t('admin.purchases.approve')}
+        </button>
+        <button type="button" disabled={busy} onClick={onReject} className={`${btn} border-line text-danger hover:bg-surface-2`}>
+          {t('admin.purchases.reject')}
+        </button>
+      </div>
+    </li>
   )
 }
 

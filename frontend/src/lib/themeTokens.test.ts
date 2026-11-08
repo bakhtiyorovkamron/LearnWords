@@ -18,7 +18,8 @@ const SHADOW: Record<ResolvedTheme, string> = {
   light: '0 1px 2px rgb(19 32 26 / 0.06)', sand: '0 1px 2px rgb(19 32 26 / 0.06)',
 }
 
-const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8')
+// CRLF → LF: a Windows checkout (core.autocrlf) must not break the multi-line selectors below.
+const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8').replace(/\r\n/g, '\n')
 
 /** The declarations of the rule whose selector is exactly `selector`. */
 function declarations(selector: string): Record<string, string> {

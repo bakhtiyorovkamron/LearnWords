@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Camera, Check, CircleAlert, Folder as FolderIcon } from 'lucide-react'
+import { Camera, Check, CircleAlert, Clock, Folder as FolderIcon, ShoppingBag } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { foldersApi, photoApi, searchApi, type PhotoImportResult, type PhotoWord } from '../api/endpoints'
+import { foldersApi, photoApi, searchApi, type Me, type PhotoImportResult, type PhotoWord, type PurchaseOverview } from '../api/endpoints'
 import { apiErrorInfo, errorMessage, isFeatureError } from '../api/client'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
 import { PhotoQualityError, isPhotoType, preparePhoto } from '../lib/photo'
 import { takeHandedOffPhoto } from '../lib/photoHandoff'
+import { pendingRequest, usePurchaseOverview } from '../lib/purchases'
+import { BuySheet, type BuyMode } from './BuySheet'
 import { FOLDER_COLORS, FolderSelect, useFolders } from './Folders'
 import { toast } from './Toaster'
 
 /**
  * "Add from a photo": take or choose a picture of a textbook page, review the words found, add the
- * chosen ones. One photo costs one unit of the daily quota (shown); the words are saved only when
- * the user confirms, through the same call as the search page.
+ * chosen ones. One photo costs one unit of the daily quota (shown), or a bought photo once those are
+ * used up; the words are saved only when the user confirms, through the same call as the search page.
  */
 // Which message a rejected photo gets: by the on-device verdict, or by the server's 422 code.
 const REJECTIONS = { too_small: 'photo.errTooSmall', too_dark: 'photo.errTooDark', blurry: 'photo.errBlurry' } as const
@@ -27,6 +29,33 @@ const REJECTION_CODES: Record<string, string> = {
 
 const BIG_DOTS_UP_TO = 5 // quota dots: larger up to this limit, smaller above it
 const MAX_DOTS = 12 // above this the pill shows the text only
+
+/** Puts what an import (or a 429) said about the quota into the /me cache, until /me is re-read. */
+function patchPhotoQuota(m: Me | undefined, q: { remaining?: number | null; credits?: number }): Me | undefined {
+  const f = m?.features?.photo_import
+  if (!m?.features || !f) return m
+  return { ...m, features: { ...m.features, photo_import: {
+    ...f,
+    ...(q.remaining !== undefined && { remaining: q.remaining }),
+    ...(typeof q.credits === 'number' && { credits: q.credits }),
+  } } }
+}
+
+/** Tells the user once when a request they saw waiting is paid, and re-reads /me (the new photos). */
+function usePaidToast(overview: PurchaseOverview | undefined) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const waiting = useRef(new Set<string>())
+  useEffect(() => {
+    for (const r of overview?.requests ?? []) {
+      if (r.status === 'pending') waiting.current.add(r.id)
+      else if (waiting.current.delete(r.id) && r.status === 'paid') {
+        toast(t('buy.paidToast', { n: r.amount }), { icon: ShoppingBag, ms: 6000 })
+        void qc.invalidateQueries({ queryKey: ['me'] })
+      }
+    }
+  }, [overview, qc, t])
+}
 
 /** Today as dd.MM — the default folder is named after the lesson day. */
 function todayLabel(d = new Date()): string {
@@ -39,7 +68,14 @@ export function PhotoImport() {
   const learning = useLearningLang()
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const { isOn, remaining, dailyLimit } = useFeatures()
+  const { isOn, remaining, dailyLimit, credits } = useFeatures()
+  const limit = dailyLimit('photo_import')
+  // Buying only makes sense with a daily limit; a 503 (no card on the server) hides it.
+  const purchases = usePurchaseOverview(isOn('photo_import') && limit !== null)
+  const canBuy = (purchases.data?.packs.length ?? 0) > 0
+  const pending = pendingRequest(purchases.data)
+  const [buying, setBuying] = useState<BuyMode | null>(null)
+  usePaidToast(purchases.data)
   const folders = useFolders()
   const input = useRef<HTMLInputElement>(null)
   const [result, setResult] = useState<PhotoImportResult | null>(null)
@@ -57,11 +93,21 @@ export function PhotoImport() {
       setResult(r)
       setSaved(new Set())
       setPicked(new Set(r.words.filter((w) => !w.already_added).map((w) => w.full_word)))
+      qc.setQueryData<Me>(['me'], (m) => patchPhotoQuota(m, r))
       void qc.invalidateQueries({ queryKey: ['me'] }) // the quota left
     },
     // A photo rejected on this device never reached the server — nothing to refresh. A server-side
-    // rejection (422) was refunded: the refresh keeps the shown quota correct.
-    onError: (e) => { if (!(e instanceof PhotoQualityError)) void qc.invalidateQueries({ queryKey: ['me'] }) },
+    // rejection (422) was refunded: the refresh keeps the shown quota correct. A used-up limit (free
+    // and bought photos both) opens the purchase sheet instead of an error, when buying is on.
+    onError: (e) => {
+      if (e instanceof PhotoQualityError) return
+      const info = apiErrorInfo(e)
+      if (info.code === 'daily_limit') {
+        qc.setQueryData<Me>(['me'], (m) => patchPhotoQuota(m, { remaining: 0, credits: info.credits }))
+        if (canBuy) setBuying('limit')
+      }
+      void qc.invalidateQueries({ queryKey: ['me'] })
+    },
   })
 
   const add = useMutation({
@@ -126,8 +172,8 @@ export function PhotoImport() {
 
   if (!isOn('photo_import')) return null
   const left = result ? result.remaining : remaining('photo_import')
-  const limit = dailyLimit('photo_import')
-  const exhausted = left === 0
+  const bought = credits('photo_import')
+  const exhausted = left === 0 && bought === 0 // with bought photos left the upload stays on
   const hasFolders = (folders.data?.length ?? 0) > 0
   const mode = hasFolders ? folderMode : 'new'
   const seg = (on: boolean) =>
@@ -158,7 +204,8 @@ export function PhotoImport() {
   let shown: string | null = localError
   // Photos rejected before or after the AI look: the daily limit was not used.
   const rejection = err instanceof PhotoQualityError ? REJECTIONS[err.reason] : REJECTION_CODES[apiErrorInfo(err).code ?? '']
-  if (err && !localError) {
+  const limitInSheet = canBuy && apiErrorInfo(err).code === 'daily_limit' // the sheet says it instead
+  if (err && !localError && !limitInSheet) {
     const status = apiErrorInfo(err).status
     shown = rejection ? t(rejection)
       : isFeatureError(err) ? errorMessage(err)
@@ -182,11 +229,22 @@ export function PhotoImport() {
             <><Camera size={18} aria-hidden="true" />{result ? t('photo.another') : t('photo.choose')}</>
           )}
         </button>
-        {limit !== null && left !== null && (exhausted
-          ? <span className="text-sm text-faint">{t('photo.noneLeft', { limit })}</span>
-          : (
+        {limit !== null && left !== null && (exhausted ? (
+          <>
+            <span className="text-sm text-faint">{t('photo.noneLeft', { limit })}</span>
+            {canBuy && (
+              <button type="button" className="btn-primary" onClick={() => setBuying('limit')}>
+                <ShoppingBag size={18} aria-hidden="true" />{t('buy.cta')}
+              </button>
+            )}
+          </>
+        ) : left === 0 ? (
+          <span data-testid="photo-quota" className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm text-muted">
+            {t('photo.creditsOnly', { n: bought })}
+          </span>
+        ) : (
             <span data-testid="photo-quota" className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm text-muted">
-              {t('photo.left', { n: left, limit })}
+              {bought > 0 ? t('photo.leftWithCredits', { n: left, limit, credits: bought }) : t('photo.left', { n: left, limit })}
               {/* Up to 5 photos: roomy dots; up to 12: small ones (10 fit a 360 px screen); more: text only. */}
               {limit <= MAX_DOTS && (
                 <span className={`flex ${limit > BIG_DOTS_UP_TO ? 'gap-1' : 'gap-1.5'}`} aria-hidden="true">
@@ -199,6 +257,19 @@ export function PhotoImport() {
             </span>
           ))}
       </div>
+      {/* An unpaid request (opens its payment steps), else the voluntary "buy more" (the used-up state has its own button). */}
+      {limit !== null && canBuy && (pending ? (
+        <button type="button" onClick={() => setBuying('voluntary')}
+          className="-mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-text hover:underline">
+          <Clock size={14} aria-hidden="true" />{t('buy.pending', { code: pending.code })}
+        </button>
+      ) : !exhausted && (
+        <button type="button" onClick={() => setBuying('voluntary')}
+          className="-mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-text hover:underline">
+          <ShoppingBag size={14} aria-hidden="true" />{t('photo.buyMore')}
+        </button>
+      ))}
+      {buying && <BuySheet mode={buying} limit={limit} onClose={() => setBuying(null)} />}
 
       {read.isPending && <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />}
 

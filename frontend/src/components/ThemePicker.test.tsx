@@ -20,11 +20,11 @@ vi.mock('../api/endpoints', async (importOriginal) => {
 })
 
 const features = (picker: boolean) => ({
-  photo_import: { enabled: true, daily_limit: 10, remaining: 10 },
-  daily_story: { enabled: true, daily_limit: null, remaining: null },
-  word_search: { enabled: true, daily_limit: null, remaining: null },
-  story_autotranslate: { enabled: true, daily_limit: null, remaining: null },
-  theme_picker: { enabled: picker, daily_limit: null, remaining: null },
+  photo_import: { enabled: true, daily_limit: 10, remaining: 10, credits: 0 },
+  daily_story: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+  word_search: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+  story_autotranslate: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+  theme_picker: { enabled: picker, daily_limit: null, remaining: null, credits: 0 },
 })
 const me = (picker: boolean): Me => ({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de', features: features(picker) })
 

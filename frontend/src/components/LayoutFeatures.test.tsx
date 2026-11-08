@@ -17,7 +17,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   }
 })
 
-const feature = (enabled: boolean) => ({ enabled, daily_limit: null, remaining: null })
+const feature = (enabled: boolean) => ({ enabled, daily_limit: null, remaining: null, credits: 0 })
 const me = (wordSearch: boolean): Me => ({
   id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de',
   features: {

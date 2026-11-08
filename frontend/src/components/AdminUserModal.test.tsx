@@ -8,7 +8,7 @@ import { AdminUserModal } from './AdminUserModal'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, adminApi: { userFeatures: vi.fn(), setUserFeature: vi.fn(), sendPush: vi.fn() } }
+  return { ...mod, adminApi: { userFeatures: vi.fn(), setUserFeature: vi.fn(), sendPush: vi.fn(), grantCredits: vi.fn() } }
 })
 
 const user: AdminUser = {
@@ -17,7 +17,7 @@ const user: AdminUser = {
 }
 const feat = (over: Partial<FeatureState>): FeatureState => ({
   feature: 'daily_story', enabled: true, daily_limit: null, default_limit: null, limit_override: null,
-  used_today: 0, remaining: null, ...over,
+  used_today: 0, remaining: null, credits: 0, ...over,
 })
 const features: FeatureState[] = [
   feat({ feature: 'photo_import', daily_limit: 6, default_limit: 5, limit_override: 6, used_today: 2, remaining: 4 }),
@@ -58,11 +58,11 @@ describe('AdminUserModal', () => {
     expect(await screen.findAllByRole('switch')).toHaveLength(4)
     expect(screen.getByRole('switch', { name: 'Textbook photo' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('switch', { name: 'Auto-translation of own stories' }).getAttribute('aria-checked')).toBe('false')
-    // only the feature with a default limit has the number input
-    const limit = screen.getAllByRole('spinbutton')
-    expect(limit).toHaveLength(1)
-    expect((limit[0] as HTMLInputElement).value).toBe('6')
-    expect(limit[0].getAttribute('placeholder')).toBe('5') // just the default number
+    // only the feature with a default limit has number inputs: its limit, and (photos) the bought-photos amount
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(2)
+    const limit = screen.getByLabelText('Daily limit') as HTMLInputElement
+    expect(limit.value).toBe('6')
+    expect(limit.getAttribute('placeholder')).toBe('5') // just the default number
     expect(screen.getByTestId('usage-photo_import').textContent).toBe('Today: 2 of 6 · custom')
   })
 
@@ -85,7 +85,7 @@ describe('AdminUserModal', () => {
 
   it('an empty limit is sent as null (= the default); a number as a number', async () => {
     renderModal()
-    const input = (await screen.findByRole('spinbutton')) as HTMLInputElement
+    const input = (await screen.findByLabelText('Daily limit')) as HTMLInputElement
     fireEvent.change(input, { target: { value: '' } })
     fireEvent.blur(input)
     await waitFor(() => expect(adminApi.setUserFeature).toHaveBeenCalledWith('u1', 'photo_import', { enabled: true, daily_limit: null }))
@@ -116,7 +116,7 @@ describe('AdminUserModal: the effective photo limit', () => {
   // A user without an override: the default of 5 applies, 1 photo used today.
   const plain = feat({ feature: 'photo_import', daily_limit: 5, default_limit: 5, limit_override: null, used_today: 1, remaining: 4 })
   const usage = () => screen.getByTestId('usage-photo_import').textContent
-  const input = async () => (await screen.findByRole('spinbutton')) as HTMLInputElement
+  const input = async () => (await screen.findByLabelText('Daily limit')) as HTMLInputElement
 
   beforeEach(() => {
     vi.mocked(adminApi.userFeatures).mockResolvedValue([plain, feat({ feature: 'daily_story' })])
@@ -170,8 +170,9 @@ describe('AdminUserModal: the effective photo limit', () => {
   it('the unlimited features have no usage line and no input', async () => {
     renderModal()
     await input()
-    expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(2) // both on the photo row
     expect(screen.queryByTestId('usage-daily_story')).toBeNull()
+    expect(screen.queryByTestId('credits-daily_story')).toBeNull()
   })
 })
 
@@ -199,5 +200,63 @@ describe('AdminUserModal: push devices', () => {
       target: 'users', user_ids: ['u1'], title: 'yodla', body: 'Test notification',
     }))
     await waitFor(() => expect(toaster.toast).toHaveBeenCalledWith('Sent: 2, failed: 0, expired removed: 0'))
+  })
+})
+
+describe('AdminUserModal: bought photos', () => {
+  const photo = feat({ feature: 'photo_import', daily_limit: 5, default_limit: 5, used_today: 5, remaining: 0, credits: 12 })
+  const amount = () => screen.getByLabelText('Photos (can be negative)') as HTMLInputElement
+  const note = () => screen.getByLabelText('Note (optional)') as HTMLInputElement
+  const add = () => screen.getByRole('button', { name: 'Add' }) as HTMLButtonElement
+
+  beforeEach(() => {
+    vi.mocked(adminApi.userFeatures).mockResolvedValue([photo, feat({ feature: 'daily_story' })])
+  })
+
+  it('shows the balance on the photo row only', async () => {
+    renderModal()
+    expect((await screen.findByTestId('credits-photo_import')).textContent).toBe('Bought photos: 12')
+    expect(screen.getAllByRole('button', { name: 'Add' })).toHaveLength(1)
+  })
+
+  it('posts the amount (negative too) and the trimmed note, then shows the new balance', async () => {
+    vi.mocked(adminApi.grantCredits).mockImplementation(async () => {
+      // the server now has the new balance too (the modal re-reads the features after a grant)
+      vi.mocked(adminApi.userFeatures).mockResolvedValue([{ ...photo, credits: 7 }, feat({ feature: 'daily_story' })])
+      return { balance: 7 }
+    })
+    renderModal()
+    await screen.findByTestId('credits-photo_import')
+    fireEvent.change(amount(), { target: { value: '-5' } })
+    fireEvent.change(note(), { target: { value: '  money back  ' } })
+    fireEvent.click(add())
+    await waitFor(() => expect(adminApi.grantCredits).toHaveBeenCalledWith('u1', { feature: 'photo_import', amount: -5, note: 'money back' }))
+    await waitFor(() => expect(screen.getByTestId('credits-photo_import').textContent).toBe('Bought photos: 7'))
+    expect(toaster.toast).toHaveBeenCalledWith('Balance: 7')
+    expect(amount().value).toBe('') // the form is cleared
+  })
+
+  it('without a note none is sent; 0, a fraction or nothing cannot be sent', async () => {
+    vi.mocked(adminApi.grantCredits).mockResolvedValue({ balance: 47 })
+    renderModal()
+    await screen.findByTestId('credits-photo_import')
+    expect(add().disabled).toBe(true)
+    for (const bad of ['0', '1.5']) {
+      fireEvent.change(amount(), { target: { value: bad } })
+      expect(add().disabled).toBe(true)
+    }
+    fireEvent.change(amount(), { target: { value: '35' } })
+    fireEvent.click(add())
+    await waitFor(() => expect(adminApi.grantCredits).toHaveBeenCalledWith('u1', { feature: 'photo_import', amount: 35 }))
+  })
+
+  it('a refused grant (below 0) shows the error and keeps the balance', async () => {
+    vi.mocked(adminApi.grantCredits).mockRejectedValue(new Error('the balance cannot go below 0'))
+    renderModal()
+    await screen.findByTestId('credits-photo_import')
+    fireEvent.change(amount(), { target: { value: '-99' } })
+    fireEvent.click(add())
+    expect((await screen.findByRole('alert')).textContent).toContain('below 0')
+    expect(screen.getByTestId('credits-photo_import').textContent).toBe('Bought photos: 12')
   })
 })

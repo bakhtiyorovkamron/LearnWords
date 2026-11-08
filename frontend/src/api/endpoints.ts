@@ -186,10 +186,12 @@ export interface PhotoWord {
   full_word: string // "der Hund" for nouns, otherwise the word — what is saved
   already_added: boolean
 }
-export interface PhotoImportResult { words: PhotoWord[]; remaining: number | null }
+/** remaining: free photos left today (null = unlimited); credits: bought photos left. */
+export interface PhotoImportResult { words: PhotoWord[]; remaining: number | null; credits: number }
 
 export const photoApi = {
-  // Vision AI call → generous timeout. Costs one unit of the daily photo quota; nothing is saved.
+  // Vision AI call → generous timeout. Costs one photo: a free one of the day, or a bought one once
+  // those are used up; nothing is saved.
   import: (image: Blob) => {
     const form = new FormData()
     form.append('image', image, 'photo.jpg')
@@ -284,9 +286,10 @@ export interface FeatureState {
   limit_override: number | null
   used_today: number
   remaining: number | null
+  credits: number // bought units left (spent once the free ones of the day run out)
 }
 
-export type MeFeatures = Record<FeatureName, { enabled: boolean; daily_limit: number | null; remaining: number | null }>
+export type MeFeatures = Record<FeatureName, { enabled: boolean; daily_limit: number | null; remaining: number | null; credits: number }>
 
 export interface Me {
   id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang
@@ -296,6 +299,29 @@ export interface Me {
 
 export const meApi = {
   get: () => api.get<Me>('/me').then((r) => r.data),
+}
+
+// Buying photos: the user picks a pack, transfers the money to a card with the request's code in the
+// comment, and an admin approves it. Card data only ever comes from the server (payment).
+export interface Pack { id: string; feature: FeatureName; amount: number; price_uzs: number }
+export interface PaymentInfo { card_number: string; card_holder: string; telegram: string } // telegram: username without @
+export type PurchaseStatus = 'pending' | 'paid' | 'rejected' | 'cancelled'
+export interface PurchaseRequest {
+  id: string; code: string; pack_id: string; amount: number; price_uzs: number
+  status: PurchaseStatus; created_at: string
+}
+export interface PurchaseOverview { packs: Pack[]; payment: PaymentInfo; requests: PurchaseRequest[] } // requests: newest first
+export interface AdminPurchaseRequest extends PurchaseRequest {
+  user_id: string; user_email: string; decided_at: string | null; decided_by: string | null
+}
+
+// 503 payments_unavailable when the server has no card configured (buying is off).
+export const purchasesApi = {
+  overview: () => api.get<PurchaseOverview>('/me/purchases').then((r) => r.data),
+  /** 409 too_many_pending: 3 unpaid requests already. */
+  create: (packId: string) => api.post<PurchaseRequest>('/me/purchases', { pack_id: packId }).then((r) => r.data),
+  /** Only the user's own pending request (else 404). */
+  cancel: (id: string) => api.delete(`/me/purchases/${id}`),
 }
 
 export interface HeroPhrase { de: string; translation: string }
@@ -371,6 +397,15 @@ export const adminApi = {
     api.get<{ features: FeatureState[] }>(`/admin/users/${id}/features`).then((r) => r.data.features),
   setUserFeature: (id: string, feature: FeatureName, body: { enabled: boolean; daily_limit: number | null }) =>
     api.put<FeatureState>(`/admin/users/${id}/features/${feature}`, body).then((r) => r.data),
+  /** Newest first. */
+  purchases: (status: PurchaseStatus | 'all' = 'pending') =>
+    api.get<{ requests: AdminPurchaseRequest[] }>('/admin/purchases', { params: { status } }).then((r) => r.data.requests),
+  /** Marks it paid and adds the photos (once). 409 already_decided. */
+  approvePurchase: (id: string) => api.post<AdminPurchaseRequest>(`/admin/purchases/${id}/approve`).then((r) => r.data),
+  rejectPurchase: (id: string) => api.post<AdminPurchaseRequest>(`/admin/purchases/${id}/reject`).then((r) => r.data),
+  /** amount may be negative; the balance never goes below 0 (400). */
+  grantCredits: (userId: string, body: { feature: FeatureName; amount: number; note?: string }) =>
+    api.post<{ balance: number }>(`/admin/users/${userId}/credits`, body).then((r) => r.data),
   wordCheckStatus: () => api.get<WordCheckJob>('/admin/word-check').then((r) => r.data),
   // 202 started, 409 already running — both return the current status.
   startWordCheck: () =>

@@ -24,11 +24,11 @@ const folder = (id: string, name: string, total = 1, extra: object = {}) => ({ i
 const list = (total: number, due: number, folders: object[] = []): FolderList => ({ all: stats(total, due), folders } as unknown as FolderList)
 
 const features = (photo: boolean, remaining = 10) => ({
-  photo_import: { enabled: photo, daily_limit: 10, remaining },
-  daily_story: { enabled: true, daily_limit: null, remaining: null },
-  word_search: { enabled: true, daily_limit: null, remaining: null },
-  story_autotranslate: { enabled: true, daily_limit: null, remaining: null },
-  theme_picker: { enabled: false, daily_limit: null, remaining: null },
+  photo_import: { enabled: photo, daily_limit: 10, remaining, credits: 0 },
+  daily_story: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+  word_search: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+  story_autotranslate: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+  theme_picker: { enabled: false, daily_limit: null, remaining: null, credits: 0 },
 })
 const me = (photo = true, remaining = 10): Me => ({ id: 'u', email: 'a@b.co', role: 'user', learning_language: 'de', features: features(photo, remaining) })
 // A fixed Wednesday, so "Monday..Sunday of this week" has 2 past days, today and 4 days to come.

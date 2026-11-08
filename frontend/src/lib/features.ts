@@ -14,5 +14,7 @@ export function useFeatures() {
     remaining: (name: FeatureName) => features?.[name]?.remaining ?? null,
     /** The user's effective daily limit (null = unlimited). */
     dailyLimit: (name: FeatureName) => features?.[name]?.daily_limit ?? null,
+    /** Bought units left, spent once the free ones of the day run out (0 from an old server). */
+    credits: (name: FeatureName) => features?.[name]?.credits ?? 0,
   }
 }

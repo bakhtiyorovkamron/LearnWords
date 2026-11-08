@@ -130,7 +130,45 @@ function FeatureRow({ userId, state }: { userId: string; state: FeatureState }) 
         </>
       )}
       {save.error && <p role="alert" className="text-sm text-danger">{errorMessage(save.error)}</p>}
+      {state.feature === 'photo_import' && <CreditsForm userId={userId} state={state} />}
     </div>
+  )
+}
+
+/** The user's bought photos, and an admin correction: add (or, negative, take away) some. */
+function CreditsForm({ userId, state }: { userId: string; state: FeatureState }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const n = Number(amount.trim())
+  const valid = amount.trim() !== '' && Number.isInteger(n) && n !== 0
+
+  const grant = useMutation({
+    mutationFn: () => adminApi.grantCredits(userId, { feature: state.feature, amount: n, ...(note.trim() && { note: note.trim() }) }),
+    onSuccess: ({ balance }) => {
+      qc.setQueryData<FeatureState[]>(['admin', 'user-features', userId], (old) =>
+        old?.map((x) => (x.feature === state.feature ? { ...x, credits: balance } : x)))
+      void qc.invalidateQueries({ queryKey: ['admin', 'user-features', userId] })
+      setAmount('')
+      setNote('')
+      toast(t('admin.credits.done', { n: balance }))
+    },
+  })
+
+  return (
+    <form className="space-y-2 border-t border-divider pt-2"
+      onSubmit={(e) => { e.preventDefault(); if (valid && !grant.isPending) grant.mutate() }}>
+      <p data-testid={`credits-${state.feature}`} className="text-sm text-fg">{t('admin.credits.balance', { n: state.credits ?? 0 })}</p>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <input type="number" step={1} inputMode="numeric" className="field !w-28 !py-1.5" value={amount}
+          aria-label={t('admin.credits.amount')} placeholder={t('admin.credits.amount')} onChange={(e) => setAmount(e.target.value)} />
+        <input type="text" maxLength={500} className="field !py-1.5 min-w-0 flex-1" value={note}
+          aria-label={t('admin.credits.note')} placeholder={t('admin.credits.note')} onChange={(e) => setNote(e.target.value)} />
+        <button type="submit" className="btn-ghost !px-3 !py-1.5 text-xs" disabled={!valid || grant.isPending}>{t('admin.credits.grant')}</button>
+      </div>
+      {grant.error && <p role="alert" className="text-sm text-danger">{errorMessage(grant.error)}</p>}
+    </form>
   )
 }
 

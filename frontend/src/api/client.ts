@@ -96,6 +96,7 @@ interface ApiErrorBody {
   message?: string
   retry_after_seconds?: number
   limit?: number // with daily_limit
+  credits?: number // with daily_limit: the bought balance (0 = none left either)
 }
 
 /** True when the backend rejected the request with 429 (rate limit). */
@@ -133,9 +134,9 @@ export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : i18n.t('common.unknownError')
 }
 
-/** HTTP status, machine-readable code and (own_folder) folder id of an API error. */
-export function apiErrorInfo(err: unknown): { status?: number; code?: string; folderId?: string } {
+/** HTTP status, machine-readable code, (own_folder) folder id and (daily_limit) limit and credits of an API error. */
+export function apiErrorInfo(err: unknown): { status?: number; code?: string; folderId?: string; limit?: number; credits?: number } {
   if (!axios.isAxiosError(err)) return {}
   const body = err.response?.data as ApiErrorBody | undefined
-  return { status: err.response?.status, code: body?.code, folderId: body?.folder_id }
+  return { status: err.response?.status, code: body?.code, folderId: body?.folder_id, limit: body?.limit, credits: body?.credits }
 }

@@ -202,11 +202,11 @@ describe('StoryPage: daily_story switched off', () => {
   const withFeatures = (daily: boolean) => ({
     id: 'u', email: 'a@b.co', role: 'user' as const, learning_language: 'de' as const,
     features: {
-      photo_import: { enabled: true, daily_limit: null, remaining: null },
-      daily_story: { enabled: daily, daily_limit: null, remaining: null },
-      word_search: { enabled: true, daily_limit: null, remaining: null },
-      story_autotranslate: { enabled: true, daily_limit: null, remaining: null },
-      theme_picker: { enabled: false, daily_limit: null, remaining: null },
+      photo_import: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+      daily_story: { enabled: daily, daily_limit: null, remaining: null, credits: 0 },
+      word_search: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+      story_autotranslate: { enabled: true, daily_limit: null, remaining: null, credits: 0 },
+      theme_picker: { enabled: false, daily_limit: null, remaining: null, credits: 0 },
     },
   })
   const words = [{ word: 'Hund', translation: 'собака' }] as never

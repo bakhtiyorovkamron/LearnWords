@@ -13,7 +13,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     meApi: { get: vi.fn() },
     adminApi: {
       users: vi.fn(), stats: vi.fn(), feedback: vi.fn(), wordCheckStatus: vi.fn(), startWordCheck: vi.fn(),
-      pushStats: vi.fn(), sendPush: vi.fn(),
+      pushStats: vi.fn(), sendPush: vi.fn(), purchases: vi.fn(async () => []),
     },
   }
 })
