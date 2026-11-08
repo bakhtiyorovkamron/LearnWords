@@ -173,7 +173,6 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/profile", d.Profile.Get)
 		protected.PUT("/me/profile", d.Profile.Update)
 		protected.POST("/me/telegram/link", telegramLinkLimit, d.Telegram.Link)
-		protected.DELETE("/me/telegram", d.Telegram.Unlink)
 		protected.GET("/me", d.Admin.Me)
 		protected.GET("/me/purchases", d.Purchases.Overview)
 		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)

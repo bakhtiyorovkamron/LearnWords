@@ -25,7 +25,8 @@ func TestRemovedRoutesAre404(t *testing.T) {
 		{"DELETE", "/api/contexts/" + id},
 		{"POST", "/api/word-cards/" + id + "/audio"},
 		{"GET", "/api/stories/2026-10-29"},
-		{"POST", "/api/translations"}, // training uses the card's own stored translation
+		{"POST", "/api/translations"},  // training uses the card's own stored translation
+		{"DELETE", "/api/me/telegram"}, // Telegram cannot be disconnected from the site
 	} {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(c.method, c.path, nil))
@@ -41,6 +42,7 @@ func TestRemovedRoutesAre404(t *testing.T) {
 		{"GET", "/api/stories/by-id/" + id},
 		{"GET", "/api/word-cards"},
 		{"DELETE", "/api/word-cards/" + id},
+		{"POST", "/api/me/telegram/link"},
 	} {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(c.method, c.path, nil))

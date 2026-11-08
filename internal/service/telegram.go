@@ -21,7 +21,6 @@ type TelegramRepository interface {
 	// BindTelegram uses an active code (unused, expires_at > now) and binds the chat to its user, in
 	// one transaction. false = no such active code (unknown, expired or used): nothing changes.
 	BindTelegram(ctx context.Context, code string, chatID int64, username *string, now time.Time) (bool, error)
-	UnlinkTelegram(ctx context.Context, userID uuid.UUID) error
 }
 
 // TelegramBot is the Bot API (provider/telegram).
@@ -82,10 +81,6 @@ func (s *TelegramService) CreateLink(ctx context.Context, userID uuid.UUID) (dom
 		}
 		return domain.TelegramLink{Code: code, URL: "https://t.me/" + s.botUsername + "?start=" + code, ExpiresAt: expires}, nil
 	}
-}
-
-func (s *TelegramService) Unlink(ctx context.Context, userID uuid.UUID) error {
-	return s.repo.UnlinkTelegram(ctx, userID)
 }
 
 // RegisterWebhook points the bot at url (no-op when the bot or the url is not configured).

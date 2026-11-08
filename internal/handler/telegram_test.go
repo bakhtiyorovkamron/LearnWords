@@ -23,7 +23,6 @@ func (r *nopTelegramRepo) BindTelegram(context.Context, string, int64, *string, 
 	r.binds++
 	return true, nil
 }
-func (r *nopTelegramRepo) UnlinkTelegram(context.Context, uuid.UUID) error { return nil }
 
 type countingBot struct{ sent int }
 
@@ -39,7 +38,6 @@ func telegramRouter(bot service.TelegramBot, repo service.TelegramRepository, se
 	r.POST("/telegram/webhook", h.Webhook)
 	authed := r.Group("", func(c *gin.Context) { c.Set(userIDKey, uuid.New()) })
 	authed.POST("/me/telegram/link", h.Link)
-	authed.DELETE("/me/telegram", h.Unlink)
 	return r
 }
 
@@ -114,12 +112,6 @@ func TestTelegram_UnavailableWithoutBot(t *testing.T) {
 	}
 	if w := postUpdate(r, hookSecret, privateStart); w.Code != http.StatusServiceUnavailable {
 		t.Errorf("webhook: %d", w.Code)
-	}
-	// Disconnecting needs no bot.
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/me/telegram", nil))
-	if w.Code != http.StatusNoContent {
-		t.Errorf("unlink: %d", w.Code)
 	}
 }
 

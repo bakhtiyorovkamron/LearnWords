@@ -38,16 +38,6 @@ func (h *TelegramHandler) Link(c *gin.Context) {
 	c.JSON(http.StatusOK, link)
 }
 
-// Unlink handles DELETE /api/me/telegram → 204. It works without the bot too: forgetting a chat
-// needs no Telegram.
-func (h *TelegramHandler) Unlink(c *gin.Context) {
-	if err := h.svc.Unlink(c.Request.Context(), userID(c)); err != nil {
-		writeError(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
 // Webhook handles POST /api/telegram/webhook (called by Telegram, no user auth). The secret header
 // must match TELEGRAM_WEBHOOK_SECRET (401 otherwise, also when no secret is configured). Any update
 // it accepts is answered 200, whatever happened inside: Telegram resends on anything else.

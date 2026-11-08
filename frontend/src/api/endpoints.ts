@@ -289,7 +289,6 @@ export const profileApi = {
 // Linking Telegram: a one-time deep link to the bot (10 minutes); the bot binds the account.
 export const telegramApi = {
   link: () => api.post<{ url: string; expires_at: string }>('/me/telegram/link').then((r) => r.data),
-  unlink: () => api.delete('/me/telegram'),
 }
 
 export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker'

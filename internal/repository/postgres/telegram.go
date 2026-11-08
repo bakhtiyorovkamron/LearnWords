@@ -66,9 +66,3 @@ func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chat
 	})
 	return bound, err
 }
-
-// UnlinkTelegram forgets the user's Telegram (chat id and username).
-func (r *TelegramRepository) UnlinkTelegram(ctx context.Context, userID uuid.UUID) error {
-	_, err := r.pool.Exec(ctx, `UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL, updated_at = now() WHERE id = $1`, userID)
-	return err
-}

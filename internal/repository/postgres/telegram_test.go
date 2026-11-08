@@ -90,12 +90,6 @@ func TestTelegramRepo_BindIsIdempotent(t *testing.T) {
 	if chat == nil || *chat != 1003 || got == nil || *got != "anna_k" {
 		t.Errorf("chat=%v name=%v: the used code must not rebind", chat, got)
 	}
-	if err := r.UnlinkTelegram(ctx, f.user); err != nil {
-		t.Fatal(err)
-	}
-	if chat, got := telegramOf(t, f, f.user); chat != nil || got != nil {
-		t.Error("unlink left the chat or the username")
-	}
 }
 
 func TestTelegramRepo_ChatMovesToTheNewAccount(t *testing.T) {

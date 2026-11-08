@@ -1,10 +1,10 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { profileApi, telegramApi, type Profile } from '../api/endpoints'
+import { profileApi, type Profile } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { formatPhoneInput, phoneForApi } from '../lib/phone'
-import { isPolling, POLL_MS, tgInitial, tgReducer } from '../lib/telegramConnect'
+import { useTelegramConnect } from '../lib/telegramConnect'
 import { ErrorState } from '../components/ErrorState'
 import { toast } from '../components/Toaster'
 
@@ -74,55 +74,10 @@ function ProfileForm({ profile }: { profile: Profile }) {
   )
 }
 
-/**
- * Telegram: "Connect" asks the server for a deep link, opens the bot, and polls the profile every 3 s
- * (for up to a minute) until the bot has bound the account. Connected: "Connected · @username" and
- * "Disconnect".
- */
+/** Telegram: "Connect" opens the bot at once and waits for it; connected: "Connected · @username". */
 function TelegramRow() {
   const { t } = useTranslation()
-  const qc = useQueryClient()
-  const [state, dispatch] = useReducer(tgReducer, tgInitial)
-  const polling = isPolling(state)
-  const profile = useQuery({ queryKey: ['profile'], queryFn: profileApi.get, refetchInterval: polling ? POLL_MS : false })
-  const tg = profile.data?.telegram
-  const connected = !!tg?.connected
-
-  useEffect(() => { if (connected) dispatch({ type: 'connected' }) }, [connected])
-  // The minute of waiting runs out even when the profile answers the same thing every time.
-  useEffect(() => {
-    if (!polling) return
-    const id = window.setInterval(() => dispatch({ type: 'tick', at: Date.now() }), 1000)
-    return () => window.clearInterval(id)
-  }, [polling])
-
-  const link = useMutation({
-    mutationFn: telegramApi.link,
-    onMutate: () => dispatch({ type: 'link' }),
-    onSuccess: ({ url }) => {
-      window.open(url, '_blank', 'noopener')
-      dispatch({ type: 'linked', url, at: Date.now() })
-    },
-    onError: (err) => dispatch({ type: 'failed', unavailable: apiErrorInfo(err).code === 'telegram_unavailable' }),
-  })
-  const unlink = useMutation({
-    mutationFn: telegramApi.unlink,
-    onSuccess: () => {
-      qc.setQueryData<Profile>(['profile'], (p) => p && { ...p, telegram: { connected: false, username: null } })
-      dispatch({ type: 'disconnected' })
-    },
-  })
-
-  const check = () => {
-    dispatch({ type: 'check', at: Date.now() })
-    void profile.refetch()
-  }
-  const disconnect = () => {
-    if (window.confirm(t('profile.telegramDisconnectConfirm'))) unlink.mutate()
-  }
-  const unavailable = state.status === 'unavailable'
-  const waitingUrl = state.status === 'waiting' || state.status === 'timeout' ? state.url : null
-  const error = (link.error && !unavailable ? link.error : null) ?? unlink.error
+  const tg = useTelegramConnect()
 
   return (
     <div className="space-y-3">
@@ -130,28 +85,19 @@ function TelegramRow() {
         <div>
           <div className="text-sm font-medium text-muted">{t('profile.telegram')}</div>
           <div data-testid="profile-telegram" className="mt-0.5 text-fg">
-            {connected
-              ? [t('profile.telegramConnected'), tg?.username && `@${tg.username}`].filter(Boolean).join(' · ')
+            {tg.connected
+              ? [t('profile.telegramConnected'), tg.username && `@${tg.username}`].filter(Boolean).join(' · ')
               : t('profile.telegramNotConnected')}
           </div>
         </div>
-        {connected
-          ? <button type="button" className="btn-ghost" disabled={unlink.isPending} onClick={disconnect}>{t('profile.telegramDisconnect')}</button>
-          : <button type="button" className="btn-ghost" disabled={unavailable || link.isPending || profile.isLoading}
-              onClick={() => link.mutate()}>{t('profile.telegramConnect')}</button>}
+        {!tg.connected && (
+          <button type="button" className="btn-ghost" disabled={tg.unavailable || tg.pending || tg.loading}
+            onClick={() => void tg.connect()}>{t('profile.telegramConnect')}</button>
+        )}
       </div>
-      {!connected && unavailable && <p role="status" className="text-sm text-muted">{t('profile.telegramUnavailable')}</p>}
-      {!connected && waitingUrl && (
-        <div role="status" data-testid="telegram-waiting" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-4 py-3 text-sm">
-          <span className="text-fg">{t('profile.telegramWaiting')}</span>
-          <span className="flex gap-2">
-            {/* If the browser blocked the new tab, the link opens the bot. */}
-            <a href={waitingUrl} target="_blank" rel="noopener noreferrer" className="btn-ghost !px-3 !py-1.5">{t('profile.telegramOpenBot')}</a>
-            <button type="button" className="btn-ghost !px-3 !py-1.5" onClick={check}>{t('profile.telegramCheck')}</button>
-          </span>
-        </div>
-      )}
-      {error && <p role="alert" className="text-sm text-danger">{errorMessage(error)}</p>}
+      {!tg.connected && tg.unavailable && <p role="status" className="text-sm text-muted">{t('profile.telegramUnavailable')}</p>}
+      {!tg.connected && tg.waiting && <p role="status" data-testid="telegram-waiting" className="text-sm text-muted">{t('profile.telegramWaiting')}</p>}
+      {tg.error && <p role="alert" className="text-sm text-danger">{errorMessage(tg.error)}</p>}
     </div>
   )
 }

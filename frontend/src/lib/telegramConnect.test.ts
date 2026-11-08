@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { isPolling, tgInitial, tgReducer, WAIT_MS, type TgConnect, type TgEvent } from './telegramConnect'
 
 const run = (events: TgEvent[], from: TgConnect = tgInitial) => events.reduce(tgReducer, from)
-const URL = 'https://t.me/yodla_bot?start=YL-ABC234'
 
 describe('the Telegram connect state machine', () => {
   it('idle → linking → waiting → connected', () => {
     let s = tgReducer(tgInitial, { type: 'link' })
     expect(s).toEqual({ status: 'linking' })
-    s = tgReducer(s, { type: 'linked', url: URL, at: 1000 })
-    expect(s).toEqual({ status: 'waiting', url: URL, since: 1000 })
+    s = tgReducer(s, { type: 'linked', at: 1000 })
+    expect(s).toEqual({ status: 'waiting', since: 1000 })
     expect(isPolling(s)).toBe(true)
     s = tgReducer(s, { type: 'tick', at: 4000 })
     expect(s.status).toBe('waiting')
@@ -18,22 +17,22 @@ describe('the Telegram connect state machine', () => {
     expect(isPolling(s)).toBe(false)
   })
 
-  it('waiting stops after 60 s (timeout), not before; polling stops with it', () => {
-    const waiting = run([{ type: 'link' }, { type: 'linked', url: URL, at: 0 }])
+  it('waiting ends after 60 s, not before: back to idle, polling stops', () => {
+    const waiting = run([{ type: 'link' }, { type: 'linked', at: 0 }])
     expect(tgReducer(waiting, { type: 'tick', at: WAIT_MS - 1 }).status).toBe('waiting')
-    const timedOut = tgReducer(waiting, { type: 'tick', at: WAIT_MS })
-    expect(timedOut).toEqual({ status: 'timeout', url: URL })
-    expect(isPolling(timedOut)).toBe(false)
+    const over = tgReducer(waiting, { type: 'tick', at: WAIT_MS })
+    expect(over).toEqual({ status: 'idle' })
+    expect(isPolling(over)).toBe(false)
   })
 
-  it('"Check" after a timeout waits again for another 60 s', () => {
-    const s = run([{ type: 'link' }, { type: 'linked', url: URL, at: 0 }, { type: 'tick', at: WAIT_MS }, { type: 'check', at: 100_000 }])
-    expect(s).toEqual({ status: 'waiting', url: URL, since: 100_000 })
-    expect(tgReducer(s, { type: 'tick', at: 100_000 + WAIT_MS - 1 }).status).toBe('waiting')
+  it('Connect again while waiting makes a fresh link and waits another 60 s', () => {
+    const s = run([{ type: 'link' }, { type: 'linked', at: 0 }, { type: 'link' }, { type: 'linked', at: 50_000 }])
+    expect(s).toEqual({ status: 'waiting', since: 50_000 })
+    expect(tgReducer(s, { type: 'tick', at: 50_000 + WAIT_MS - 1 }).status).toBe('waiting')
   })
 
-  it('the bot connected after the timeout: still connected', () => {
-    expect(run([{ type: 'link' }, { type: 'linked', url: URL, at: 0 }, { type: 'tick', at: WAIT_MS }, { type: 'connected' }]).status).toBe('connected')
+  it('the bot connected after the minute ran out: still connected', () => {
+    expect(run([{ type: 'link' }, { type: 'linked', at: 0 }, { type: 'tick', at: WAIT_MS }, { type: 'connected' }]).status).toBe('connected')
   })
 
   it('503 telegram_unavailable: unavailable for good, the button cannot start again', () => {
@@ -49,12 +48,8 @@ describe('the Telegram connect state machine', () => {
   it('a double press while linking does nothing; stray events are ignored', () => {
     const linking = tgReducer(tgInitial, { type: 'link' })
     expect(tgReducer(linking, { type: 'link' })).toBe(linking)
-    expect(tgReducer(tgInitial, { type: 'linked', url: URL, at: 0 })).toBe(tgInitial)
+    expect(tgReducer(tgInitial, { type: 'linked', at: 0 })).toBe(tgInitial)
     expect(tgReducer(tgInitial, { type: 'tick', at: WAIT_MS * 2 })).toBe(tgInitial)
-    expect(tgReducer(tgInitial, { type: 'check', at: 0 })).toBe(tgInitial)
-  })
-
-  it('disconnect goes back to idle', () => {
-    expect(tgReducer({ status: 'connected' }, { type: 'disconnected' })).toEqual({ status: 'idle' })
+    expect(tgReducer(tgInitial, { type: 'failed', unavailable: true })).toBe(tgInitial)
   })
 })

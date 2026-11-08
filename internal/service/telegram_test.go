@@ -63,14 +63,6 @@ func (m *memTelegram) BindTelegram(_ context.Context, code string, chatID int64,
 	return true, nil
 }
 
-func (m *memTelegram) UnlinkTelegram(_ context.Context, user uuid.UUID) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.chat, user)
-	delete(m.name, user)
-	return nil
-}
-
 type sentMessage struct {
 	chat int64
 	text string
@@ -292,20 +284,6 @@ func TestTelegram_IgnoresNonPrivateChatsAndOtherMessages(t *testing.T) {
 	svc.HandleUpdate(ctx, update(t, "private", "/start "+link.Code, "anna", "ru"))
 	if repo.binds != 1 {
 		t.Error("the code must still work in the private chat")
-	}
-}
-
-func TestTelegram_Unlink(t *testing.T) {
-	svc, repo, _, _ := newTelegramFixture()
-	ctx := context.Background()
-	user := uuid.New()
-	link, _ := svc.CreateLink(ctx, user)
-	svc.HandleUpdate(ctx, update(t, "private", "/start "+link.Code, "anna", "ru"))
-	if err := svc.Unlink(ctx, user); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := repo.chat[user]; ok {
-		t.Error("still linked")
 	}
 }
 
