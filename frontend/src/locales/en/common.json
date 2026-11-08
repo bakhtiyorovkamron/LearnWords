@@ -316,6 +316,11 @@
       "stories": "AI stories",
       "stories30d": "last 30 days: {{count}}"
     },
+    "telegramStats": {
+      "title": "Connected Telegram",
+      "of": "{{connected}} of {{total}} ({{percent}}%)",
+      "last7d": "last 7 days: {{count}}"
+    },
     "users": "Users",
     "search": "Search by email or ID…",
     "col": {

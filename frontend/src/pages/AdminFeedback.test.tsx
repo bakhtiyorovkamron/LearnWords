@@ -11,7 +11,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   return {
     ...mod,
     meApi: { get: vi.fn() },
-    adminApi: { users: vi.fn(), stats: vi.fn(), feedback: vi.fn(), wordCheckStatus: vi.fn(), startWordCheck: vi.fn(), purchases: vi.fn(async () => []) },
+    adminApi: { users: vi.fn(), stats: vi.fn(), telegramStats: vi.fn(async () => ({ total_users: 0, connected: 0, percent: 0, connected_last_7d: 0 })), feedback: vi.fn(), wordCheckStatus: vi.fn(), startWordCheck: vi.fn(), purchases: vi.fn(async () => []) },
   }
 })
 

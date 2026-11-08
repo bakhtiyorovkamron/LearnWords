@@ -401,10 +401,14 @@ export interface AdminStats {
   total_stories: number; stories_30d: number
 }
 
+/** How many users connected Telegram; percent is 0–100 with one decimal (0 with no users). */
+export interface TelegramStats { total_users: number; connected: number; percent: number; connected_last_7d: number }
+
 // All of these are additionally guarded on the backend (RequireAdmin → 403 for non-admins).
 export const adminApi = {
   users: () => api.get<{ users: AdminUser[] }>('/admin/users').then((r) => r.data.users),
   stats: () => api.get<AdminStats>('/admin/stats').then((r) => r.data),
+  telegramStats: () => api.get<TelegramStats>('/admin/telegram/stats').then((r) => r.data),
   feedback: () => api.get<FeedbackSummary>('/admin/feedback').then((r) => r.data),
   pushStats: () => api.get<{ devices: number; users: number }>('/admin/push').then((r) => r.data),
   /** "me" = the calling admin, "all" = every device, "users" = the devices of user_ids. A tap always opens /cards. */

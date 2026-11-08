@@ -14,6 +14,8 @@ import (
 type AdminStore interface {
 	ListUsers(ctx context.Context) ([]domain.AdminUser, error)
 	Stats(ctx context.Context) (domain.AdminStats, error)
+	// TelegramStats: users, connected ones, and the ones the bot bound since `since`.
+	TelegramStats(ctx context.Context, since time.Time) (domain.TelegramStats, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	SetBanned(ctx context.Context, id uuid.UUID, banned bool) error
 }
@@ -143,6 +145,17 @@ func (h *AdminHandler) Users(c *gin.Context) {
 // Stats handles GET /api/admin/stats.
 func (h *AdminHandler) Stats(c *gin.Context) {
 	s, err := h.store.Stats(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, s)
+}
+
+// TelegramStats handles GET /api/admin/telegram/stats →
+// {total_users, connected, percent, connected_last_7d}.
+func (h *AdminHandler) TelegramStats(c *gin.Context) {
+	s, err := h.store.TelegramStats(c.Request.Context(), h.now().AddDate(0, 0, -7))
 	if err != nil {
 		writeError(c, err)
 		return

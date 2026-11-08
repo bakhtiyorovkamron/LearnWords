@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"learnwords/internal/domain"
 )
 
 func telegramOf(t *testing.T, f moveFixture, user uuid.UUID) (*int64, *string) {
@@ -110,5 +112,67 @@ func TestTelegramRepo_ChatMovesToTheNewAccount(t *testing.T) {
 	}
 	if chat, _ := telegramOf(t, f, other); chat == nil || *chat != 1004 {
 		t.Error("the second account did not get the chat")
+	}
+}
+
+func linkedAtOf(t *testing.T, f moveFixture, user uuid.UUID) *time.Time {
+	t.Helper()
+	var at *time.Time
+	if err := f.pool.QueryRow(context.Background(), `SELECT telegram_linked_at FROM users WHERE id = $1`, user).Scan(&at); err != nil {
+		t.Fatal(err)
+	}
+	return at
+}
+
+func TestTelegramRepo_BindStampsLinkedAt_MovingTheChatClearsIt(t *testing.T) {
+	f := newMoveFixture(t)
+	other := addUser(t, f, "user", false)
+	r, ctx := NewTelegramRepository(f.pool), context.Background()
+	chat := time.Now().UnixNano()
+	first := time.Now().Add(-time.Hour).UTC().Truncate(time.Microsecond)
+	c1, c2 := uniqueCode(), uniqueCode()
+	_ = r.ReplaceLinkCode(ctx, f.user, c1, time.Now().Add(time.Minute))
+	_ = r.ReplaceLinkCode(ctx, other, c2, time.Now().Add(time.Minute))
+	if ok, err := r.BindTelegram(ctx, c1, chat, nil, first); !ok || err != nil {
+		t.Fatal(ok, err)
+	}
+	if at := linkedAtOf(t, f, f.user); at == nil || !at.Equal(first) {
+		t.Fatalf("linked_at %v, want %v", at, first)
+	}
+	second := first.Add(30 * time.Minute)
+	if ok, err := r.BindTelegram(ctx, c2, chat, nil, second); !ok || err != nil {
+		t.Fatal(ok, err)
+	}
+	if at := linkedAtOf(t, f, f.user); at != nil {
+		t.Errorf("the account that lost the chat still has linked_at %v", at)
+	}
+	if at := linkedAtOf(t, f, other); at == nil || !at.Equal(second) {
+		t.Errorf("new account linked_at %v, want %v", at, second)
+	}
+}
+
+func TestAdminRepo_TelegramStats(t *testing.T) {
+	f := newMoveFixture(t)
+	admin, ctx := NewAdminRepository(f.pool), context.Background()
+	since := time.Now().AddDate(0, 0, -7)
+	before, err := admin.TelegramStats(ctx, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recent, old := addUser(t, f, "user", false), addUser(t, f, "user", false)
+	addUser(t, f, "user", false) // never connected
+	chat := time.Now().UnixNano()
+	f.exec(t, `UPDATE users SET telegram_chat_id = $2, telegram_linked_at = now() - interval '1 day' WHERE id = $1`, recent, chat)
+	f.exec(t, `UPDATE users SET telegram_chat_id = $2, telegram_linked_at = now() - interval '10 days' WHERE id = $1`, old, chat+1)
+
+	after, err := admin.TelegramStats(ctx, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.TotalUsers-before.TotalUsers != 3 || after.Connected-before.Connected != 2 || after.ConnectedLast7d-before.ConnectedLast7d != 1 {
+		t.Errorf("before %+v, after %+v: want +3 users, +2 connected, +1 in 7 days", before, after)
+	}
+	if want := domain.NewTelegramStats(after.TotalUsers, after.Connected, after.ConnectedLast7d).Percent; after.Percent != want {
+		t.Errorf("percent %v, want %v", after.Percent, want)
 	}
 }

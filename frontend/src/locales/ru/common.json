@@ -322,6 +322,11 @@
       "stories": "AI-рассказов",
       "stories30d": "за 30 дней: {{count}}"
     },
+    "telegramStats": {
+      "title": "Telegram подключили",
+      "of": "{{connected}} из {{total}} ({{percent}}%)",
+      "last7d": "за 7 дней: {{count}}"
+    },
     "users": "Пользователи",
     "search": "Поиск по email или ID…",
     "col": {

@@ -316,6 +316,11 @@
       "stories": "AI-hikoyalar",
       "stories30d": "30 kunda: {{count}}"
     },
+    "telegramStats": {
+      "title": "Telegramni ulaganlar",
+      "of": "{{total}} tadan {{connected}} ({{percent}}%)",
+      "last7d": "so‘nggi 7 kunda: {{count}}"
+    },
     "users": "Foydalanuvchilar",
     "search": "Email yoki ID bo‘yicha qidirish…",
     "col": {

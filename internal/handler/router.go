@@ -187,6 +187,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	{
 		admin.GET("/users", d.Admin.Users)
 		admin.GET("/stats", d.Admin.Stats)
+		admin.GET("/telegram/stats", d.Admin.TelegramStats)
 		admin.GET("/feedback", d.Admin.Feedback)
 		admin.GET("/push", d.Push.AdminStats)
 		admin.POST("/push", adminPushLimit, d.Push.AdminSend)

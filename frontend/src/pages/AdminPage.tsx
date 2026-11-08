@@ -78,8 +78,10 @@ function StatsBlock() {
   const { t } = useTranslation()
   const { data, error } = useQuery({ queryKey: ['admin', 'stats'], queryFn: adminApi.stats })
   const feedback = useQuery({ queryKey: ['admin', 'feedback'], queryFn: adminApi.feedback })
+  const tg = useQuery({ queryKey: ['admin', 'telegram-stats'], queryFn: adminApi.telegramStats }).data
   const v = (n?: number) => (n === undefined ? '—' : n)
-  const cards: { icon: LucideIcon; value: string | number; label: string; hint: string }[] = [
+  // wide: the card takes two grid columns (its value is a whole phrase).
+  const cards: { icon: LucideIcon; value: string | number; label: string; hint: string; wide?: boolean }[] = [
     { icon: Users, value: v(data?.total_users), label: t('admin.stats.users'),
       hint: data ? t('admin.stats.usersHint', { new7: data.new_users_7d, banned: data.banned_users }) : '' },
     { icon: Activity, value: v(data?.active_users_7d), label: t('admin.stats.active7d'), hint: '' },
@@ -90,13 +92,15 @@ function StatsBlock() {
       hint: data ? t('admin.stats.stories30d', { count: data.stories_30d }) : '' },
     { icon: Star, value: feedback.data?.count ? feedback.data.average.toFixed(1) : '—', label: t('admin.feedback.tile'),
       hint: feedback.data ? t('admin.feedback.count', { n: feedback.data.count }) : '' },
+    { icon: Send, value: tg ? t('admin.telegramStats.of', { connected: tg.connected, total: tg.total_users, percent: tg.percent }) : '—',
+      label: t('admin.telegramStats.title'), hint: tg ? t('admin.telegramStats.last7d', { count: tg.connected_last_7d }) : '', wide: true },
   ]
   return (
     <section>
       {error && <p className="mb-3 text-danger">{errorMessage(error)}</p>}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {cards.map((c) => (
-          <div key={c.label} className="glass p-4">
+          <div key={c.label} className={`glass p-4${c.wide ? ' col-span-2' : ''}`}>
             <c.icon size={18} aria-hidden="true" className="text-accent-text" />
             <div className="mt-2 text-[28px] font-bold leading-tight tabular-nums text-fg">{c.value}</div>
             <div className="text-sm text-muted">{c.label}</div>

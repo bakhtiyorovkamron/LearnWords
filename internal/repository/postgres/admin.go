@@ -59,6 +59,21 @@ func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, er
 	})
 }
 
+// TelegramStats counts all users, the connected ones and those the bot bound since `since`, in one
+// pass over users.
+func (r *AdminRepository) TelegramStats(ctx context.Context, since time.Time) (domain.TelegramStats, error) {
+	var total, connected, recent int
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*),
+		       count(*) FILTER (WHERE telegram_chat_id IS NOT NULL),
+		       count(*) FILTER (WHERE telegram_chat_id IS NOT NULL AND telegram_linked_at >= $1)
+		FROM users`, since).Scan(&total, &connected, &recent)
+	if err != nil {
+		return domain.TelegramStats{}, err
+	}
+	return domain.NewTelegramStats(total, connected, recent), nil
+}
+
 // Stats returns service-wide totals.
 func (r *AdminRepository) Stats(ctx context.Context) (domain.AdminStats, error) {
 	var s domain.AdminStats

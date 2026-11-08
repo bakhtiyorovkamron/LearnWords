@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,6 +34,23 @@ type AdminStats struct {
 	TrainingSessions int `json:"training_sessions"` // distinct (user, day) with at least one answer
 	TotalStories     int `json:"total_stories"`     // AI stories generated (Anthropic usage)
 	Stories30d       int `json:"stories_30d"`
+}
+
+// TelegramStats: how many users have connected Telegram (admin dashboard).
+type TelegramStats struct {
+	TotalUsers      int     `json:"total_users"`
+	Connected       int     `json:"connected"`         // telegram_chat_id is set
+	Percent         float64 `json:"percent"`           // connected of total_users, 0–100 with one decimal; 0 with no users
+	ConnectedLast7d int     `json:"connected_last_7d"` // connected, and the bot bound them in the last 7 days
+}
+
+// NewTelegramStats fills in the percent (rounded half away from zero to one decimal).
+func NewTelegramStats(total, connected, connectedLast7d int) TelegramStats {
+	s := TelegramStats{TotalUsers: total, Connected: connected, ConnectedLast7d: connectedLast7d}
+	if total > 0 {
+		s.Percent = math.Round(float64(connected)*1000/float64(total)) / 10
+	}
+	return s
 }
 
 // Telegram is the connection status of a user's Telegram: connected = the bot bound a chat; the

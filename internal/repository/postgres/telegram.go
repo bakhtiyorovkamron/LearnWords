@@ -36,8 +36,9 @@ func (r *TelegramRepository) ReplaceLinkCode(ctx context.Context, userID uuid.UU
 }
 
 // BindTelegram: in one transaction, lock the active code (unused, expires_at > now), mark it used
-// and bind the chat to its user. The chat is first taken off any other account (one Telegram
-// account, one user). false when there is no active code — a used one is never bound again.
+// and bind the chat to its user (telegram_linked_at = now). The chat is first taken off any other
+// account (one Telegram account, one user). false when there is no active code — a used one is
+// never bound again.
 func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chatID int64, username *string, now time.Time) (bool, error) {
 	bound := false
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
@@ -53,12 +54,12 @@ func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chat
 		if _, err := tx.Exec(ctx, `UPDATE telegram_link_codes SET used_at = $2 WHERE code = $1`, code, now); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL, updated_at = now()
-			WHERE telegram_chat_id = $1 AND id <> $2`, chatID, userID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL, telegram_linked_at = NULL,
+			updated_at = now() WHERE telegram_chat_id = $1 AND id <> $2`, chatID, userID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE users SET telegram_chat_id = $2, telegram_username = $3, updated_at = now() WHERE id = $1`,
-			userID, chatID, username); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE users SET telegram_chat_id = $2, telegram_username = $3, telegram_linked_at = $4,
+			updated_at = now() WHERE id = $1`, userID, chatID, username, now); err != nil {
 			return err
 		}
 		bound = true
