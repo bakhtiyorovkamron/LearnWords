@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // The numbers here are made up (not real cards).
 func TestLooksLikeCardNumber(t *testing.T) {
@@ -48,16 +51,16 @@ func TestLooksLikeCardNumber(t *testing.T) {
 	}
 }
 
-func TestPurchaseMessage_VisibleTo(t *testing.T) {
-	buyerHidden := PurchaseMessage{AuthorRole: ChatAuthorBuyer, Hidden: true}
-	adminHidden := PurchaseMessage{AuthorRole: ChatAuthorAdmin, Hidden: true}
-	if !buyerHidden.VisibleTo(ChatAuthorBuyer) || !buyerHidden.VisibleTo(ChatAuthorAdmin) {
+func TestChatMessage_VisibleTo(t *testing.T) {
+	buyerHidden := ChatMessage{AuthorRole: ChatAuthorUser, Hidden: true}
+	adminHidden := ChatMessage{AuthorRole: ChatAuthorAdmin, Hidden: true}
+	if !buyerHidden.VisibleTo(ChatAuthorUser) || !buyerHidden.VisibleTo(ChatAuthorAdmin) {
 		t.Error("the buyer's hidden message: the buyer and the admins see it")
 	}
-	if adminHidden.VisibleTo(ChatAuthorBuyer) || !adminHidden.VisibleTo(ChatAuthorAdmin) {
+	if adminHidden.VisibleTo(ChatAuthorUser) || !adminHidden.VisibleTo(ChatAuthorAdmin) {
 		t.Error("an admin's hidden message: only admins see it")
 	}
-	if !(PurchaseMessage{AuthorRole: ChatAuthorAdmin}).VisibleTo(ChatAuthorBuyer) {
+	if !(ChatMessage{AuthorRole: ChatAuthorAdmin}).VisibleTo(ChatAuthorUser) {
 		t.Error("a normal message is seen by both sides")
 	}
 }
@@ -66,6 +69,27 @@ func TestChatOpen(t *testing.T) {
 	for status, open := range map[string]bool{PurchasePending: true, PurchasePaid: true, PurchaseCancelled: false, PurchaseRejected: false} {
 		if ChatOpen(status) != open {
 			t.Errorf("%s: open=%v", status, !open)
+		}
+	}
+}
+
+func TestChatPreview(t *testing.T) {
+	str := func(s string) *string { return &s }
+	long := strings.Repeat("я", 100)
+	for name, c := range map[string]struct {
+		m    ChatMessage
+		want string
+	}{
+		"text":             {ChatMessage{Body: str("Здравствуйте, вопрос")}, "Здравствуйте, вопрос"},
+		"one line":         {ChatMessage{Body: str("  строка\n\nвторая  ")}, "строка вторая"},
+		"cut to 80":        {ChatMessage{Body: str(long)}, strings.Repeat("я", 79) + "…"},
+		"exactly 80":       {ChatMessage{Body: str(strings.Repeat("a", 80))}, strings.Repeat("a", 80)},
+		"hidden":           {ChatMessage{Body: str("8600 1234 5678 9012"), Hidden: true}, "[скрыто]"},
+		"photo only":       {ChatMessage{ImageKey: str("k")}, "[фото]"},
+		"hidden with text": {ChatMessage{Hidden: true}, "[скрыто]"},
+	} {
+		if got := ChatPreview(c.m); got != c.want {
+			t.Errorf("%s: %q, want %q", name, got, c.want)
 		}
 	}
 }

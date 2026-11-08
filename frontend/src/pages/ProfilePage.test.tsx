@@ -128,7 +128,7 @@ describe('ProfilePage: connecting Telegram', () => {
     await act(async () => answer(linkResult))
     await waitFor(() => expect(tab.location.href).toBe(URL))
     expect(screen.getByTestId('telegram-waiting').textContent).toBe('Waiting for confirmation…')
-    expect(screen.queryByRole('link')).toBeNull() // no "Open the bot", no "Check": polling covers it
+    expect(screen.queryByRole('link', { name: /bot/i })).toBeNull() // no "Open the bot", no "Check": polling covers it
     expect(screen.queryByRole('button', { name: 'Check' })).toBeNull()
     expect(open).toHaveBeenCalledTimes(1)
     expect(confirm).not.toHaveBeenCalled()
@@ -220,5 +220,14 @@ describe('ProfilePage: my purchase requests', () => {
     renderPage()
     await screen.findByLabelText('Name')
     expect(screen.queryByRole('region', { name: 'My requests' })).toBeNull()
+  })
+})
+
+describe('ProfilePage: support', () => {
+  it('has the way to support (no purchase needed)', async () => {
+    renderPage()
+    const entry = await screen.findByTestId('support-entry')
+    expect(entry.getAttribute('href')).toBe('/support')
+    expect(entry.textContent).toContain('Contact support')
   })
 })

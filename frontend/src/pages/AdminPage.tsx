@@ -13,6 +13,8 @@ import { AdminUserModal, Stars } from '../components/AdminUserModal'
 import { PurchaseChat } from '../components/PurchaseChat'
 import { CloseButton, useScrimClose } from '../components/Sheet'
 import { CHAT_POLL_MS } from '../lib/purchaseChat'
+import { AdminSupport, useSupportThreads } from '../components/AdminSupport'
+import { Segmented } from '../components/Segmented'
 
 type SortKey = 'email' | 'created_at' | 'words_count' | 'last_activity_at'
 
@@ -25,6 +27,18 @@ export function AdminPage() {
 
   if (me.isLoading) return <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
   if (!isAdmin) return <Navigate to="/" replace />
+  return <AdminTabs myId={me.data!.id} />
+}
+
+type AdminTab = 'overview' | 'support'
+
+// Two tabs: everything that was here (overview) and the support inbox; the support tab shows how
+// many user messages wait unread.
+function AdminTabs({ myId }: { myId: string }) {
+  const { t } = useTranslation()
+  const [tab, setTab] = useState<AdminTab>('overview')
+  const unread = (useSupportThreads().data ?? []).reduce((n, th) => n + th.unread, 0)
+  const supportLabel = unread > 0 ? `${t('admin.tabs.support')} · ${unread}` : t('admin.tabs.support')
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -32,12 +46,18 @@ export function AdminPage() {
         <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('admin.title')}</h1>
         <p className="mt-1 text-[15px] text-muted">{t('admin.subtitle')}</p>
       </div>
-      <StatsBlock />
-      <FeedbackBlock />
-      <PushPanel />
-      <WordCheckJobPanel />
-      <PurchasesBlock />
-      <UsersTable myId={me.data!.id} />
+      <Segmented<AdminTab> value={tab} onChange={setTab} label={t('admin.tabs.label')}
+        options={[['overview', t('admin.tabs.overview')], ['support', supportLabel]] as const} />
+      {tab === 'overview' ? (
+        <>
+          <StatsBlock />
+          <FeedbackBlock />
+          <PushPanel />
+          <WordCheckJobPanel />
+          <PurchasesBlock />
+          <UsersTable myId={myId} />
+        </>
+      ) : <AdminSupport />}
     </div>
   )
 }

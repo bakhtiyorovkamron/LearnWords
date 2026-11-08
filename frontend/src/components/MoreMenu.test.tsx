@@ -81,6 +81,7 @@ describe('the ☰ button in the Home header', () => {
     expect(sheet).not.toBeNull()
     expect(within(sheet).getByRole('link', { name: 'Search' })).toBeTruthy()
     expect(within(sheet).getByRole('link', { name: 'Statistics' })).toBeTruthy()
+    expect(within(sheet).getByRole('link', { name: 'Support' }).getAttribute('href')).toBe('/support')
     expect(screen.getByRole('button', { name: 'More' }).getAttribute('aria-expanded')).toBe('true')
     expect(isMoreMenuOpen()).toBe(true)
   })

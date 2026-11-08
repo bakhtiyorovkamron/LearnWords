@@ -13,7 +13,7 @@ export function PurchaseChatPage() {
         <ArrowLeft size={16} aria-hidden="true" />{t('chat.back')}
       </Link>
       <div className="glass flex min-h-0 flex-1 flex-col p-4">
-        <PurchaseChat side="buyer" requestId={id} />
+        <PurchaseChat side="user" requestId={id} />
       </div>
     </div>
   )

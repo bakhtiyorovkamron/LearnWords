@@ -34,8 +34,10 @@ const codeAttempts = 20
 // collides with single-key locks such as the migration lock).
 const purchaseLockClass = 45
 
+// The last column is the newest chat message of the request's thread (NULL without one).
 const purchaseCols = `p.id, p.user_id, p.code, p.pack_id, p.feature, p.amount, p.price_uzs, p.status,
-	p.created_at, p.decided_at, p.decided_by, p.last_message_at`
+	p.created_at, p.decided_at, p.decided_by,
+	(SELECT t.last_message_at FROM chat_threads t WHERE t.kind = 'purchase' AND t.purchase_request_id = p.id)`
 
 func scanPurchase(row pgx.Row, extra ...any) (domain.PurchaseRequest, error) {
 	var p domain.PurchaseRequest

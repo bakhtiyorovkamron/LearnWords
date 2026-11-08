@@ -337,12 +337,13 @@ export interface AdminPurchaseRequest extends PurchaseRequest {
 }
 
 /**
- * A line of a purchase chat. mine: written by the viewer's side. A hidden message (text that looks
- * like a card number) reaches the buyer's side without body or photo; the admins get everything.
- * System lines carry event (paid / cancelled) to show in the user's language.
+ * A line of a chat with the admins (support or purchase thread). mine: written by the viewer's side.
+ * A hidden message (text that looks like a card number) reaches the user's side without body or
+ * photo; the admins get everything. System lines carry event (paid / cancelled) to show in the
+ * user's language.
  */
 export interface ChatMessage {
-  id: number; author: 'buyer' | 'admin' | 'system'; mine: boolean; body: string | null; has_image: boolean
+  id: number; author: 'user' | 'admin' | 'system'; mine: boolean; body: string | null; has_image: boolean
   hidden: boolean; hidden_reason: string | null; event: 'paid' | 'cancelled' | null; created_at: string
 }
 export interface ChatPage<R extends PurchaseRequest = PurchaseRequest> { request: R; messages: ChatMessage[] }
@@ -374,6 +375,38 @@ function chatApi<R extends PurchaseRequest>(base: string) {
 export const buyerChatApi = chatApi<PurchaseRequest>('/me/purchases')
 export const adminChatApi = chatApi<AdminPurchaseRequest>('/admin/purchases')
 export type ChatApi = ReturnType<typeof chatApi<PurchaseRequest>>
+
+/**
+ * A user's support thread in the admins' list. unread: the user's messages after the admins' last
+ * read; preview: the last message (≤ 80 characters, a hidden one as "[скрыто]", a photo as "[фото]").
+ */
+export interface SupportThread {
+  id: number; user_id: string; user_email: string; unread: number; preview: string | null
+  last_message_at: string | null; created_at: string
+}
+
+/** The caller's own support thread (made on first use): ≤ 50 messages after `after`; 429 too many. */
+export const supportApi = {
+  messages: (after = 0) =>
+    api.get<{ thread_id: number; messages: ChatMessage[] }>('/support/messages', { params: { after } }).then((r) => r.data),
+  post: (draft: ChatDraft) => api.post<ChatMessage>('/support/messages', chatForm(draft), { timeout: 60_000 }).then((r) => r.data),
+  image: (messageId: number) => api.get<Blob>(`/support/messages/${messageId}/image`, { responseType: 'blob' }).then((r) => r.data),
+}
+
+/** The admins' side of support: every thread; reading a thread does not mark it read — read() does. */
+export const adminSupportApi = {
+  threads: (unreadOnly = false) =>
+    api.get<{ threads: SupportThread[] }>('/admin/support/threads', { params: unreadOnly ? { unread: 1 } : {} }).then((r) => r.data.threads),
+  messages: (id: number, after = 0) =>
+    api.get<{ thread: SupportThread; messages: ChatMessage[] }>(`/admin/support/threads/${id}/messages`, { params: { after } }).then((r) => r.data),
+  post: (id: number, draft: ChatDraft) =>
+    api.post<ChatMessage>(`/admin/support/threads/${id}/messages`, chatForm(draft), { timeout: 60_000 }).then((r) => r.data),
+  image: (id: number, messageId: number) =>
+    api.get<Blob>(`/admin/support/threads/${id}/messages/${messageId}/image`, { responseType: 'blob' }).then((r) => r.data),
+  /** Marks the thread read up to upTo (the newest message the admin has seen) → the thread. */
+  read: (id: number, upTo: number) =>
+    api.post<SupportThread>(`/admin/support/threads/${id}/read`, { up_to: upTo }).then((r) => r.data),
+}
 
 // 503 payments_unavailable when the server has no card configured (buying is off).
 export const purchasesApi = {

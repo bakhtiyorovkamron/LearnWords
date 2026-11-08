@@ -10,15 +10,14 @@ import (
 	"learnwords/internal/domain"
 )
 
-const messageCols = `m.id, m.request_id, m.author_role, m.author_user_id, m.body, m.image_key, m.hidden,
-	m.hidden_reason, m.event, m.created_at`
+// A purchase request's chat lives in the shared chat tables: one 'purchase' thread per request,
+// created with its first message (or system line).
 
-func scanMessage(row pgx.Row, extra ...any) (domain.PurchaseMessage, error) {
-	var m domain.PurchaseMessage
-	dest := append([]any{&m.ID, &m.RequestID, &m.AuthorRole, &m.AuthorUserID, &m.Body, &m.ImageKey, &m.Hidden,
-		&m.HiddenReason, &m.Event, &m.CreatedAt}, extra...)
-	return m, row.Scan(dest...)
-}
+// purchaseThreadOf: the request's thread, as a join condition on alias t.
+const purchaseThreadOf = `t.kind = 'purchase' AND t.purchase_request_id = p.id`
+
+// unreadCol: the buyer's messages after the newest one an admin has read (0 without a thread).
+const unreadCol = `COALESCE((SELECT ` + chatUnread + ` FROM chat_threads t WHERE ` + purchaseThreadOf + `), 0)`
 
 // Get returns one request with the user's email and the admins' unread count.
 func (r *PurchaseRepository) Get(ctx context.Context, id uuid.UUID) (domain.PurchaseRequest, error) {
@@ -36,111 +35,90 @@ func (r *PurchaseRepository) Get(ctx context.Context, id uuid.UUID) (domain.Purc
 	return p, err
 }
 
-// unreadCol: the buyer's messages after the newest one an admin has read.
-const unreadCol = `(SELECT count(*) FROM purchase_messages um
-	WHERE um.request_id = p.id AND um.author_role = 'buyer' AND um.id > COALESCE(p.admin_read_message_id, 0))`
-
 // AddMessage stores a buyer's or an admin's message (and its photo) unless the request is cancelled
 // or rejected (ErrChatClosed; a missing one is ErrPurchaseNotFound). The request row is locked
-// FOR SHARE, so a cancel either happens before (the message is refused) or waits for it. An admin's
-// message also marks the chat read up to itself.
-func (r *PurchaseRepository) AddMessage(ctx context.Context, m domain.PurchaseMessage, img *domain.ChatImage) (domain.PurchaseMessage, error) {
+// FOR SHARE, so a cancel either happens before (the message is refused) or waits for it.
+func (r *PurchaseRepository) AddMessage(ctx context.Context, requestID uuid.UUID, m domain.ChatMessage, img *domain.ChatImage) (domain.ChatMessage, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return domain.PurchaseMessage{}, err
+		return domain.ChatMessage{}, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after Commit
-	var status string
-	err = tx.QueryRow(ctx, `SELECT status FROM purchase_requests WHERE id = $1 FOR SHARE`, m.RequestID).Scan(&status)
+	var (
+		status string
+		userID uuid.UUID
+	)
+	err = tx.QueryRow(ctx, `SELECT status, user_id FROM purchase_requests WHERE id = $1 FOR SHARE`, requestID).Scan(&status, &userID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.PurchaseMessage{}, domain.ErrPurchaseNotFound
+		return domain.ChatMessage{}, domain.ErrPurchaseNotFound
 	}
 	if err != nil {
-		return domain.PurchaseMessage{}, err
+		return domain.ChatMessage{}, err
 	}
 	if !domain.ChatOpen(status) {
-		return domain.PurchaseMessage{}, domain.ErrChatClosed
+		return domain.ChatMessage{}, domain.ErrChatClosed
 	}
-	if img != nil {
-		if _, err := tx.Exec(ctx, `INSERT INTO purchase_message_images (key, request_id, content_type, data) VALUES ($1, $2, $3, $4)`,
-			img.Key, m.RequestID, img.ContentType, img.Data); err != nil {
-			return domain.PurchaseMessage{}, err
-		}
-	}
-	saved, err := insertMessage(ctx, tx, m)
+	thread, err := ensurePurchaseThread(ctx, tx, requestID, userID)
 	if err != nil {
-		return domain.PurchaseMessage{}, err
+		return domain.ChatMessage{}, err
 	}
-	if saved.AuthorRole == domain.ChatAuthorAdmin {
-		if err := markAdminRead(ctx, tx, saved.RequestID, saved.ID); err != nil {
-			return domain.PurchaseMessage{}, err
-		}
+	saved, err := addChatMessage(ctx, tx, thread, m, img)
+	if err != nil {
+		return domain.ChatMessage{}, err
 	}
 	return saved, tx.Commit(ctx)
 }
 
-// insertMessage adds a message and moves the request's last_message_at, in the caller's transaction.
-func insertMessage(ctx context.Context, tx pgx.Tx, m domain.PurchaseMessage) (domain.PurchaseMessage, error) {
-	saved, err := scanMessage(tx.QueryRow(ctx, `
-		INSERT INTO purchase_messages AS m (request_id, author_role, author_user_id, body, image_key, hidden, hidden_reason, event)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING `+messageCols,
-		m.RequestID, m.AuthorRole, m.AuthorUserID, m.Body, m.ImageKey, m.Hidden, m.HiddenReason, m.Event))
-	if err != nil {
-		return domain.PurchaseMessage{}, err
-	}
-	if _, err := tx.Exec(ctx, `UPDATE purchase_requests SET last_message_at = $2 WHERE id = $1`, saved.RequestID, saved.CreatedAt); err != nil {
-		return domain.PurchaseMessage{}, err
-	}
-	return saved, nil
-}
-
-// systemMessage writes the line a decision leaves in the chat ("paid" or "cancelled").
+// systemMessage writes the line a decision leaves in the request's chat ("paid" or "cancelled").
 func systemMessage(ctx context.Context, tx pgx.Tx, p domain.PurchaseRequest) error {
 	event, body := domain.ChatEventCancelled, domain.ChatCancelledText
 	if p.Status == domain.PurchasePaid {
 		event, body = domain.ChatEventPaid, domain.ChatPaidText(p.Amount)
 	}
-	_, err := insertMessage(ctx, tx, domain.PurchaseMessage{RequestID: p.ID, AuthorRole: domain.ChatAuthorSystem, Body: &body, Event: &event})
+	thread, err := ensurePurchaseThread(ctx, tx, p.ID, p.UserID)
+	if err != nil {
+		return err
+	}
+	_, err = addChatMessage(ctx, tx, thread, domain.ChatMessage{AuthorRole: domain.ChatAuthorSystem, Body: &body, Event: &event}, nil)
 	return err
 }
 
-// Messages returns up to limit messages after `after` (oldest first) that viewerRole may see: the
-// admins see every message, the buyer's side also its own hidden ones but not the admins'.
-func (r *PurchaseRepository) Messages(ctx context.Context, requestID uuid.UUID, after int64, limit int, viewerRole string) ([]domain.PurchaseMessage, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+messageCols+` FROM purchase_messages m
-		WHERE m.request_id = $1 AND m.id > $2 AND (NOT m.hidden OR $4 = 'admin' OR m.author_role = $4)
-		ORDER BY m.id LIMIT $3`, requestID, after, limit, viewerRole)
-	if err != nil {
+// purchaseThread: the request's thread id; ok = false while it has no messages yet.
+func (r *PurchaseRepository) purchaseThread(ctx context.Context, requestID uuid.UUID) (int64, bool, error) {
+	var id int64
+	err := r.pool.QueryRow(ctx, `SELECT id FROM chat_threads WHERE kind = 'purchase' AND purchase_request_id = $1`, requestID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	return id, err == nil, err
+}
+
+// Messages returns up to limit messages after `after` (oldest first) that viewerRole may see.
+func (r *PurchaseRepository) Messages(ctx context.Context, requestID uuid.UUID, after int64, limit int, viewerRole string) ([]domain.ChatMessage, error) {
+	thread, ok, err := r.purchaseThread(ctx, requestID)
+	if err != nil || !ok {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.PurchaseMessage, error) { return scanMessage(row) })
+	return chatMessages(ctx, r.pool, thread, after, limit, viewerRole)
 }
 
-// MarkAdminRead: the admins have read the chat up to message upTo (it never moves back).
+// MarkAdminRead: the admins have read the request's chat up to message upTo (it never moves back).
 func (r *PurchaseRepository) MarkAdminRead(ctx context.Context, requestID uuid.UUID, upTo int64) error {
-	_, err := r.pool.Exec(ctx, markAdminReadSQL, requestID, upTo)
-	return err
-}
-
-const markAdminReadSQL = `UPDATE purchase_requests
-	SET admin_read_message_id = GREATEST(COALESCE(admin_read_message_id, 0), $2) WHERE id = $1`
-
-func markAdminRead(ctx context.Context, tx pgx.Tx, requestID uuid.UUID, upTo int64) error {
-	_, err := tx.Exec(ctx, markAdminReadSQL, requestID, upTo)
-	return err
+	thread, ok, err := r.purchaseThread(ctx, requestID)
+	if err != nil || !ok {
+		return err
+	}
+	return markChatRead(ctx, r.pool, thread, upTo)
 }
 
 // MessageImage returns a message of the request and its photo (ErrNotFound when either is missing).
-func (r *PurchaseRepository) MessageImage(ctx context.Context, requestID uuid.UUID, messageID int64) (domain.PurchaseMessage, domain.ChatImage, error) {
-	var img domain.ChatImage
-	m, err := scanMessage(r.pool.QueryRow(ctx, `
-		SELECT `+messageCols+`, i.key, i.content_type, i.data
-		FROM purchase_messages m JOIN purchase_message_images i ON i.key = m.image_key
-		WHERE m.id = $1 AND m.request_id = $2`, messageID, requestID), &img.Key, &img.ContentType, &img.Data)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.PurchaseMessage{}, domain.ChatImage{}, domain.ErrNotFound
+func (r *PurchaseRepository) MessageImage(ctx context.Context, requestID uuid.UUID, messageID int64) (domain.ChatMessage, domain.ChatImage, error) {
+	thread, ok, err := r.purchaseThread(ctx, requestID)
+	if err != nil {
+		return domain.ChatMessage{}, domain.ChatImage{}, err
 	}
-	return m, img, err
+	if !ok {
+		return domain.ChatMessage{}, domain.ChatImage{}, domain.ErrNotFound
+	}
+	return chatMessageImage(ctx, r.pool, thread, messageID)
 }

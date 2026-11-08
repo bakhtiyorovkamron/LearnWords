@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, ChartColumn, House, Layers, List, LogOut, MessageCircle, Plus, Search, Shield, UserRound, type LucideIcon } from 'lucide-react'
+import { BookOpen, ChartColumn, House, Layers, LifeBuoy, List, LogOut, MessageCircle, Plus, Search, Shield, UserRound, type LucideIcon } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { authApi, meApi } from '../api/endpoints'
@@ -158,6 +158,7 @@ export function Layout() {
             {searchOn && <NavLink to="/search" className={sheetLink}><Icon icon={Search} size={20} />{t('nav.search')}</NavLink>}
             <NavLink to="/stats" className={sheetLink}><Icon icon={ChartColumn} size={20} />{t('nav.stats')}</NavLink>
             <NavLink to="/profile" className={sheetLink}><Icon icon={UserRound} size={20} />{t('profile.title')}</NavLink>
+            <NavLink to="/support" className={sheetLink}><Icon icon={LifeBuoy} size={20} />{t('support.title')}</NavLink>
             {isAdmin && <NavLink to="/admin" className={sheetLink}><Icon icon={Shield} size={20} />{t('nav.admin')}</NavLink>}
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
               {learningBadge}

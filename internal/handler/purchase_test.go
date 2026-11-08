@@ -36,13 +36,14 @@ var (
 // the postgres rules: decisions write a system line, a closed request refuses messages, hidden
 // messages are filtered by the viewer's side, an admin's message marks the chat read.
 type memPurchases struct {
-	mu     sync.Mutex
-	feats  *memFeatures
-	admins []uuid.UUID
-	reqs   []*domain.PurchaseRequest // in creation order
-	msgs   []domain.PurchaseMessage  // in id order
-	images map[string]domain.ChatImage
-	read   map[uuid.UUID]int64 // request → the newest message an admin has read
+	mu      sync.Mutex
+	feats   *memFeatures
+	admins  []uuid.UUID
+	reqs    []*domain.PurchaseRequest // in creation order
+	msgs    []domain.ChatMessage      // in id order
+	threads map[uuid.UUID]int64       // request → its chat thread (made with the first message)
+	images  map[string]domain.ChatImage
+	read    map[uuid.UUID]int64 // request → the newest message an admin has read
 }
 
 func (m *memPurchases) Create(_ context.Context, u uuid.UUID, pack domain.Pack, maxPending int) (domain.PurchaseRequest, error) {
@@ -154,17 +155,35 @@ func (m *memPurchases) Reject(_ context.Context, id, admin uuid.UUID) (domain.Pu
 
 func (m *memPurchases) AdminIDs(context.Context) ([]uuid.UUID, error) { return m.admins, nil }
 
-// add stores a message (the lock is held).
-func (m *memPurchases) add(msg domain.PurchaseMessage) domain.PurchaseMessage {
+// thread: the request's chat thread, made on first use (the lock is held).
+func (m *memPurchases) thread(req uuid.UUID) int64 {
+	if m.threads == nil {
+		m.threads = map[uuid.UUID]int64{}
+	}
+	if _, ok := m.threads[req]; !ok {
+		m.threads[req] = int64(len(m.threads) + 1)
+	}
+	return m.threads[req]
+}
+
+// inThread: the message belongs to the request's thread.
+func (m *memPurchases) inThread(msg domain.ChatMessage, req uuid.UUID) bool {
+	t, ok := m.threads[req]
+	return ok && msg.ThreadID == t
+}
+
+// add stores a message in the request's thread (the lock is held).
+func (m *memPurchases) add(req uuid.UUID, msg domain.ChatMessage) domain.ChatMessage {
 	msg.ID = int64(len(m.msgs) + 1)
+	msg.ThreadID = m.thread(req)
 	msg.CreatedAt = time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC).Add(time.Duration(msg.ID) * time.Second)
 	m.msgs = append(m.msgs, msg)
-	if p := m.find(msg.RequestID); p != nil {
+	if p := m.find(req); p != nil {
 		at := msg.CreatedAt
 		p.LastMessageAt = &at
 	}
 	if msg.AuthorRole == domain.ChatAuthorAdmin {
-		m.markRead(msg.RequestID, msg.ID)
+		m.markRead(req, msg.ID)
 	}
 	return msg
 }
@@ -174,7 +193,7 @@ func (m *memPurchases) system(p domain.PurchaseRequest) {
 	if p.Status == domain.PurchasePaid {
 		event, body = domain.ChatEventPaid, domain.ChatPaidText(p.Amount)
 	}
-	m.add(domain.PurchaseMessage{RequestID: p.ID, AuthorRole: domain.ChatAuthorSystem, Body: &body, Event: &event})
+	m.add(p.ID, domain.ChatMessage{AuthorRole: domain.ChatAuthorSystem, Body: &body, Event: &event})
 }
 
 func (m *memPurchases) markRead(id uuid.UUID, upTo int64) {
@@ -187,7 +206,7 @@ func (m *memPurchases) markRead(id uuid.UUID, upTo int64) {
 func (m *memPurchases) unread(id uuid.UUID) int {
 	n := 0
 	for _, msg := range m.msgs {
-		if msg.RequestID == id && msg.AuthorRole == domain.ChatAuthorBuyer && msg.ID > m.read[id] {
+		if m.inThread(msg, id) && msg.AuthorRole == domain.ChatAuthorUser && msg.ID > m.read[id] {
 			n++
 		}
 	}
@@ -206,15 +225,15 @@ func (m *memPurchases) Get(_ context.Context, id uuid.UUID) (domain.PurchaseRequ
 	return out, nil
 }
 
-func (m *memPurchases) AddMessage(_ context.Context, msg domain.PurchaseMessage, img *domain.ChatImage) (domain.PurchaseMessage, error) {
+func (m *memPurchases) AddMessage(_ context.Context, req uuid.UUID, msg domain.ChatMessage, img *domain.ChatImage) (domain.ChatMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	p := m.find(msg.RequestID)
+	p := m.find(req)
 	if p == nil {
-		return domain.PurchaseMessage{}, domain.ErrPurchaseNotFound
+		return domain.ChatMessage{}, domain.ErrPurchaseNotFound
 	}
 	if !domain.ChatOpen(p.Status) {
-		return domain.PurchaseMessage{}, domain.ErrChatClosed
+		return domain.ChatMessage{}, domain.ErrChatClosed
 	}
 	if img != nil {
 		if m.images == nil {
@@ -222,15 +241,15 @@ func (m *memPurchases) AddMessage(_ context.Context, msg domain.PurchaseMessage,
 		}
 		m.images[img.Key] = *img
 	}
-	return m.add(msg), nil
+	return m.add(req, msg), nil
 }
 
-func (m *memPurchases) Messages(_ context.Context, id uuid.UUID, after int64, limit int, viewerRole string) ([]domain.PurchaseMessage, error) {
+func (m *memPurchases) Messages(_ context.Context, id uuid.UUID, after int64, limit int, viewerRole string) ([]domain.ChatMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var out []domain.PurchaseMessage
+	var out []domain.ChatMessage
 	for _, msg := range m.msgs {
-		if msg.RequestID == id && msg.ID > after && msg.VisibleTo(viewerRole) && len(out) < limit {
+		if m.inThread(msg, id) && msg.ID > after && msg.VisibleTo(viewerRole) && len(out) < limit {
 			out = append(out, msg)
 		}
 	}
@@ -244,15 +263,15 @@ func (m *memPurchases) MarkAdminRead(_ context.Context, id uuid.UUID, upTo int64
 	return nil
 }
 
-func (m *memPurchases) MessageImage(_ context.Context, id uuid.UUID, mid int64) (domain.PurchaseMessage, domain.ChatImage, error) {
+func (m *memPurchases) MessageImage(_ context.Context, id uuid.UUID, mid int64) (domain.ChatMessage, domain.ChatImage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, msg := range m.msgs {
-		if msg.ID == mid && msg.RequestID == id && msg.ImageKey != nil {
+		if msg.ID == mid && m.inThread(msg, id) && msg.ImageKey != nil {
 			return msg, m.images[*msg.ImageKey], nil
 		}
 	}
-	return domain.PurchaseMessage{}, domain.ChatImage{}, domain.ErrNotFound
+	return domain.ChatMessage{}, domain.ChatImage{}, domain.ErrNotFound
 }
 
 // fakeTelegram records chat notifications; linked = users with a Telegram chat, err = the bot fails.

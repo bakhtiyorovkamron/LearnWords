@@ -154,7 +154,7 @@ describe('AdminPage: the chat of a purchase request', () => {
     vi.mocked(adminApi.purchases).mockResolvedValue([purchase({ unread: 1 })])
     vi.mocked(adminChatApi.messages).mockResolvedValue({
       request: purchase({ unread: 1 }),
-      messages: [{ id: 1, author: 'buyer', mine: false, body: 'Paid, receipt attached', has_image: false, hidden: false,
+      messages: [{ id: 1, author: 'user', mine: false, body: 'Paid, receipt attached', has_image: false, hidden: false,
         hidden_reason: null, event: null, created_at: minutesAgo(1) }],
     })
     renderPage()

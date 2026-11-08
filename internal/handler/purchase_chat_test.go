@@ -106,7 +106,7 @@ func TestPurchaseChat_BuyerAndAdminTalk_UnreadAndNotifications(t *testing.T) {
 	id := e.buy(t, e.user, "photo_35")
 
 	m := e.say(t, e.user, id, "  Перевёл, чек ниже  ")
-	if m.Author != "buyer" || !m.Mine || m.Body == nil || *m.Body != "Перевёл, чек ниже" || m.Hidden {
+	if m.Author != "user" || !m.Mine || m.Body == nil || *m.Body != "Перевёл, чек ниже" || m.Hidden {
 		t.Fatalf("buyer's message %+v (the text is trimmed)", m)
 	}
 	e.say(t, e.user, id, "Код YD-0001, сумма 25 000")
@@ -422,7 +422,7 @@ func TestPurchaseChat_NeverLogsMessages(t *testing.T) {
 	e.as(e.user, "POST", "/me/purchases/"+id+"/messages", `{"body":"`+strings.Repeat("x", 2000)+secret+`"}`)
 	e.svc.Wait()
 	out := logs.String()
-	if !strings.Contains(out, "telegram notification failed") {
+	if !strings.Contains(out, "chat: telegram notification failed") {
 		t.Fatalf("expected the notification failures in the log, got %q", out)
 	}
 	for _, s := range []string{secret, "8600", "1234 5678", "карта"} {

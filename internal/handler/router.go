@@ -39,6 +39,7 @@ type RouterDeps struct {
 	Practice    *PracticeHandler
 	WordCheck   *WordCheckHandler
 	Purchases   *PurchaseHandler
+	Support     *SupportHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -62,10 +63,12 @@ const (
 // purchasePerUserPerHour: new purchase requests (also capped at 3 pending ones).
 const purchasePerUserPerHour = 5
 
-// Purchase chat: a buyer's messages, per user.
+// Chats with the admins (purchase and support threads): a user's messages, per user and per chat.
 const (
 	purchaseChatLimit  = 20
 	purchaseChatWindow = 10 * time.Minute
+	supportChatLimit   = 20
+	supportChatWindow  = 10 * time.Minute
 )
 
 func NewRouter(d RouterDeps) *gin.Engine {
@@ -91,6 +94,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	purchaseLimit := RateLimitByUser(NewRateLimiter(ctx, "purchase", purchasePerUserPerHour, time.Hour))
 	purchaseChatLimiter := RateLimitByUser(NewRateLimiter(ctx, "purchase-chat", purchaseChatLimit, purchaseChatWindow))
+	supportChatLimiter := RateLimitByUser(NewRateLimiter(ctx, "support-chat", supportChatLimit, supportChatWindow))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
 		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/words/check", "/api/photo-import")
 
@@ -187,6 +191,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/purchases/:id/messages", d.Purchases.BuyerChat)
 		protected.POST("/me/purchases/:id/messages", purchaseChatLimiter, d.Purchases.BuyerPost)
 		protected.GET("/me/purchases/:id/messages/:mid/image", d.Purchases.BuyerImage)
+		protected.GET("/support/messages", d.Support.Messages)
+		protected.POST("/support/messages", supportChatLimiter, d.Support.Post)
+		protected.GET("/support/messages/:mid/image", d.Support.Image)
 		protected.GET("/hero", d.Hero.Get)
 		protected.POST("/hero/stage-seen", d.Hero.StageSeen)
 		protected.POST("/hero/intro-seen", d.Hero.IntroSeen)
@@ -212,6 +219,11 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/purchases/:id/messages", d.Purchases.AdminChat)
 		admin.POST("/purchases/:id/messages", d.Purchases.AdminPost)
 		admin.GET("/purchases/:id/messages/:mid/image", d.Purchases.AdminImage)
+		admin.GET("/support/threads", d.Support.AdminThreads)
+		admin.GET("/support/threads/:id/messages", d.Support.AdminMessages)
+		admin.POST("/support/threads/:id/messages", d.Support.AdminPost)
+		admin.POST("/support/threads/:id/read", d.Support.AdminRead)
+		admin.GET("/support/threads/:id/messages/:mid/image", d.Support.AdminImage)
 		admin.POST("/word-check", d.WordCheck.StartJob)
 		admin.GET("/word-check", d.WordCheck.JobStatus)
 	}

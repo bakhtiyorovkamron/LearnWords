@@ -147,6 +147,7 @@ func run() error {
 	if !purchaseSvc.Available() {
 		slog.Warn("neither PAYMENT_CARD_NUMBER nor PAYMENT_TELEGRAM is set: buying photos is off (purchase endpoints answer 503)")
 	}
+	supportSvc := service.NewSupportService(postgres.NewSupportRepository(pool), pushSvc, telegramSvc)
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
 	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
@@ -198,6 +199,7 @@ func run() error {
 		Photo:       handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),
 		Hero:        handler.NewHeroHandler(heroSvc),
 		Purchases:   handler.NewPurchaseHandler(purchaseSvc),
+		Support:     handler.NewSupportHandler(supportSvc),
 		UserStatus:  adminRepo,
 		Ctx:         ctx,
 		HealthCheck: func() error {
@@ -237,5 +239,6 @@ func run() error {
 	defer cancel()
 	err = srv.Shutdown(shCtx)
 	purchaseSvc.Wait() // purchase pushes still on their way
+	supportSvc.Wait()  // support notifications still on their way
 	return err
 }

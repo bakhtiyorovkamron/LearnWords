@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, LifeBuoy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { profileApi, type Profile } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
@@ -13,7 +13,7 @@ import { ErrorState } from '../components/ErrorState'
 import { StatusPill } from '../components/PurchaseChat'
 import { toast } from '../components/Toaster'
 
-/** The user's own profile: name, phone, the Telegram connection, and their purchase requests. */
+/** The user's own profile: name, phone, the Telegram connection, support and their purchase requests. */
 export function ProfilePage() {
   const { t } = useTranslation()
   const profile = useQuery({ queryKey: ['profile'], queryFn: profileApi.get })
@@ -24,6 +24,14 @@ export function ProfilePage() {
       {profile.error ? <ErrorState error={profile.error} />
         : profile.data ? <ProfileForm profile={profile.data} />
         : <div className="glass h-64 animate-pulse" />}
+      <Link to="/support" data-testid="support-entry" className="glass flex items-center gap-3 p-5 transition hover:text-accent-text">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-accent-text"><LifeBuoy size={20} aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold text-fg">{t('support.entry')}</span>
+          <span className="block text-sm text-muted">{t('support.entryHint')}</span>
+        </span>
+        <ChevronRight size={18} aria-hidden="true" className="text-faint" />
+      </Link>
       <MyRequests />
     </div>
   )

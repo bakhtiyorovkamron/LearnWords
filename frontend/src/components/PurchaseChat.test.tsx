@@ -22,14 +22,14 @@ const request = (status: PurchaseRequest['status'] = 'pending'): PurchaseRequest
 })
 let seq = 0
 const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
-  id: ++seq, author: 'buyer', mine: true, body: 'hello', has_image: false, hidden: false, hidden_reason: null,
+  id: ++seq, author: 'user', mine: true, body: 'hello', has_image: false, hidden: false, hidden_reason: null,
   event: null, created_at: '2026-11-08T10:00:00Z', ...over,
 })
 const page = (messages: ChatMessage[], status: PurchaseRequest['status'] = 'pending'): ChatPage => ({ request: request(status), messages })
 const fail = (status: number, data: unknown = {}) =>
   new AxiosError('x', String(status), undefined, undefined, { status, data, headers: {}, statusText: '', config: {} as never } as AxiosResponse)
 
-function renderChat(side: 'buyer' | 'admin' = 'buyer') {
+function renderChat(side: 'user' | 'admin' = 'user') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(<QueryClientProvider client={qc}><PurchaseChat side={side} requestId="r1" /></QueryClientProvider>)
 }

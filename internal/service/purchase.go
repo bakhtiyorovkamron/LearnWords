@@ -40,12 +40,13 @@ type PurchaseRepository interface {
 	// The chat of a request (a decision — approve, reject, cancel — also writes its system line).
 	// Get: ErrPurchaseNotFound when missing; it carries the user's email and the admins' unread count.
 	Get(ctx context.Context, id uuid.UUID) (domain.PurchaseRequest, error)
-	// AddMessage stores a message (and its photo); ErrChatClosed for a cancelled or rejected request.
-	AddMessage(ctx context.Context, m domain.PurchaseMessage, img *domain.ChatImage) (domain.PurchaseMessage, error)
+	// AddMessage stores a message (and its photo) in the request's thread; ErrChatClosed for a
+	// cancelled or rejected request.
+	AddMessage(ctx context.Context, requestID uuid.UUID, m domain.ChatMessage, img *domain.ChatImage) (domain.ChatMessage, error)
 	// Messages: up to limit after `after`, oldest first, those viewerRole may see.
-	Messages(ctx context.Context, requestID uuid.UUID, after int64, limit int, viewerRole string) ([]domain.PurchaseMessage, error)
+	Messages(ctx context.Context, requestID uuid.UUID, after int64, limit int, viewerRole string) ([]domain.ChatMessage, error)
 	MarkAdminRead(ctx context.Context, requestID uuid.UUID, upTo int64) error
-	MessageImage(ctx context.Context, requestID uuid.UUID, messageID int64) (domain.PurchaseMessage, domain.ChatImage, error)
+	MessageImage(ctx context.Context, requestID uuid.UUID, messageID int64) (domain.ChatMessage, domain.ChatImage, error)
 }
 
 // CreditStore changes a purchased balance and records it in the ledger.
