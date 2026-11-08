@@ -24,6 +24,9 @@ type TelegramRepository interface {
 	// A bound chat also gets `bonus` photo credits unless this chat or this user had them before;
 	// granted is what was given (0 or bonus).
 	BindTelegram(ctx context.Context, code string, chatID int64, username *string, now time.Time, bonus int) (bound bool, granted int, err error)
+	// UsedCodeChat reads a code without locking: found = it exists, it was used and its user has a
+	// Telegram chat bound now; chatID is that chat.
+	UsedCodeChat(ctx context.Context, code string) (chatID int64, found bool, err error)
 }
 
 // TelegramBot is the Bot API (provider/telegram).
@@ -130,6 +133,8 @@ func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
 			reply = fmt.Sprintf(botText(lang, botLinkedBonus), granted)
 		case bound:
 			reply = botText(lang, botLinked)
+		case s.alreadyBoundHere(ctx, code, m.Chat.ID):
+			reply = botText(lang, botAlreadyLinked)
 		default:
 			reply = botText(lang, botExpired)
 		}
@@ -141,6 +146,21 @@ func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
 	}
 }
 
+// alreadyBoundHere: the code did not bind, because it was used already, and by this very chat (its
+// user still has this chat): Start pressed again on an old link. Nothing changes. A lookup error
+// counts as no (the "expired" reply).
+func (s *TelegramService) alreadyBoundHere(ctx context.Context, code string, chatID int64) bool {
+	if !domain.IsLinkCode(code) {
+		return false
+	}
+	bound, found, err := s.repo.UsedCodeChat(ctx, code)
+	if err != nil {
+		slog.WarnContext(ctx, "telegram: code lookup failed", "err", err)
+		return false
+	}
+	return found && bound == chatID
+}
+
 type botMessage int
 
 const (
@@ -148,26 +168,30 @@ const (
 	botExpired
 	botHint
 	botLinkedBonus // %d: the photo credits given
+	botAlreadyLinked
 )
 
-var botTexts = map[string][4]string{
+var botTexts = map[string][5]string{
 	"ru": {
 		"Готово! Telegram подключён к вашему аккаунту yodla.",
 		"Код устарел или уже использован. Нажмите «Подключить» в профиле ещё раз.",
 		"Чтобы подключить Telegram, откройте профиль на yodla.fun и нажмите «Подключить».",
 		"Готово! Telegram подключён к вашему аккаунту yodla. В подарок: +%d фото для добавления слов.",
+		"Telegram уже подключён ✅",
 	},
 	"uz": {
 		"Tayyor! Telegram yodla hisobingizga ulandi.",
 		"Kod eskirgan yoki allaqachon ishlatilgan. Profilda «Ulash» tugmasini yana bosing.",
 		"Telegramni ulash uchun yodla.fun saytida profilni oching va «Ulash» tugmasini bosing.",
 		"Tayyor! Telegram yodla hisobingizga ulandi. Sovg‘a: so‘z qo‘shish uchun +%d ta surat.",
+		"Telegram allaqachon ulangan ✅",
 	},
 	"en": {
 		"Done! Telegram is now connected to your yodla account.",
 		"This code has expired or was already used. Press Connect in your profile again.",
 		"To connect Telegram, open your profile on yodla.fun and press Connect.",
 		"Done! Telegram is now connected to your yodla account. Your gift: +%d photos for adding words.",
+		"Telegram is already connected ✅",
 	},
 }
 

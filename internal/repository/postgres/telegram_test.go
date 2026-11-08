@@ -234,3 +234,34 @@ func TestTelegramRepo_BonusOncePerChatAndPerUser(t *testing.T) {
 		t.Errorf("b has bonus %d", p.TelegramBonus)
 	}
 }
+
+// UsedCodeChat: only a used code whose user still has a chat bound is found, with that chat.
+func TestTelegramRepo_UsedCodeChat(t *testing.T) {
+	f := newMoveFixture(t)
+	other := addUser(t, f, "user", false)
+	r, ctx := NewTelegramRepository(f.pool), context.Background()
+	chat := time.Now().UnixNano()
+	code, fresh := uniqueCode(), uniqueCode()
+	_ = r.ReplaceLinkCode(ctx, f.user, code, time.Now().Add(time.Minute))
+	_ = r.ReplaceLinkCode(ctx, other, fresh, time.Now().Add(time.Minute))
+
+	if _, found, err := r.UsedCodeChat(ctx, code); err != nil || found {
+		t.Errorf("unused code: found=%v err=%v", found, err)
+	}
+	if _, found, err := r.UsedCodeChat(ctx, "YL-NOPE00"); err != nil || found {
+		t.Errorf("unknown code: found=%v err=%v", found, err)
+	}
+	if ok, _, err := r.BindTelegram(ctx, code, chat, nil, time.Now(), 0); !ok || err != nil {
+		t.Fatal(ok, err)
+	}
+	if got, found, err := r.UsedCodeChat(ctx, code); err != nil || !found || got != chat {
+		t.Errorf("used code: chat=%d found=%v err=%v", got, found, err)
+	}
+	// The chat moves to the other account: the first user's used code has no chat any more.
+	if ok, _, err := r.BindTelegram(ctx, fresh, chat, nil, time.Now(), 0); !ok || err != nil {
+		t.Fatal(ok, err)
+	}
+	if _, found, err := r.UsedCodeChat(ctx, code); err != nil || found {
+		t.Errorf("after the chat moved: found=%v err=%v", found, err)
+	}
+}

@@ -33,6 +33,7 @@ type memTelegram struct {
 	// the gift: once per chat, once per user
 	bonusChat map[int64]bool
 	bonusUser map[uuid.UUID]int
+	usedErr   error // UsedCodeChat fails with it
 }
 
 func newMemTelegram() *memTelegram {
@@ -76,6 +77,20 @@ func (m *memTelegram) BindTelegram(_ context.Context, code string, chatID int64,
 	}
 	m.bonusChat[chatID], m.bonusUser[c.user] = true, bonus
 	return true, bonus, nil
+}
+
+func (m *memTelegram) UsedCodeChat(_ context.Context, code string) (int64, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.usedErr != nil {
+		return 0, false, m.usedErr
+	}
+	c, ok := m.codes[code]
+	if !ok || c.used == nil {
+		return 0, false, nil
+	}
+	chat, ok := m.chat[c.user]
+	return chat, ok, nil
 }
 
 type sentMessage struct {
@@ -261,7 +276,8 @@ func TestTelegram_BindIsIdempotent(t *testing.T) {
 	user := uuid.New()
 	link, _ := svc.CreateLink(ctx, user)
 	svc.HandleUpdate(ctx, update(t, "private", "/start "+link.Code, "anna", "en"))
-	// Telegram resends, or someone else presses the same link: no second bind, the "expired" reply.
+	// Someone else (another chat) presses the same link: no second bind, the "expired" reply.
+	// (The same chat again gets "already connected", see TestTelegram_StartAgain_….)
 	u := update(t, "private", "/start "+link.Code, "mallory", "en")
 	u.Message.Chat.ID = 999
 	svc.HandleUpdate(ctx, u)
@@ -346,5 +362,115 @@ func TestTelegram_RegisterWebhook(t *testing.T) {
 	_ = svc.RegisterWebhook(context.Background(), "https://yodla.fun/api/telegram/webhook", "s3cret")
 	if bot.hook != [2]string{"https://yodla.fun/api/telegram/webhook", "s3cret"} {
 		t.Errorf("hook = %v", bot.hook)
+	}
+}
+
+// startIn is "/start <code>" sent from the private chat `chat`.
+func startIn(t *testing.T, chat int64, code, lang string) TelegramUpdate {
+	t.Helper()
+	raw, _ := json.Marshal(map[string]any{"update_id": 1, "message": map[string]any{
+		"message_id": 1, "text": "/start " + code, "chat": map[string]any{"id": chat, "type": "private"},
+		"from": map[string]any{"id": chat, "language_code": lang},
+	}})
+	var u TelegramUpdate
+	if err := json.Unmarshal(raw, &u); err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+const (
+	expiredRU = "Код устарел или уже использован. Нажмите «Подключить» в профиле ещё раз."
+	alreadyRU = "Telegram уже подключён ✅"
+)
+
+func TestTelegram_StartAgain_FirstBindsThenAlreadyConnected(t *testing.T) {
+	svc, repo, bot, now := newTelegramFixture()
+	ctx := context.Background()
+	user := uuid.New()
+	link, _ := svc.CreateLink(ctx, user)
+
+	svc.HandleUpdate(ctx, startIn(t, 777, link.Code, "ru"))
+	if repo.chat[user] != 777 || repo.binds != 1 || !strings.HasPrefix(bot.sent[0].text, "Готово! Telegram подключён") {
+		t.Fatalf("first start: chat=%d binds=%d sent=%+v", repo.chat[user], repo.binds, bot.sent)
+	}
+	if repo.bonusUser[user] != domain.TelegramBonusCredits {
+		t.Fatalf("gift = %d", repo.bonusUser[user])
+	}
+
+	// The same chat, the same code: already connected, nothing changes, no second gift.
+	svc.HandleUpdate(ctx, startIn(t, 777, link.Code, "ru"))
+	if len(bot.sent) != 2 || bot.sent[1].chat != 777 || bot.sent[1].text != alreadyRU {
+		t.Fatalf("second start: %+v", bot.sent)
+	}
+	if repo.binds != 1 || repo.bonusUser[user] != domain.TelegramBonusCredits || repo.chat[user] != 777 {
+		t.Errorf("binds=%d gift=%d chat=%d: nothing may change", repo.binds, repo.bonusUser[user], repo.chat[user])
+	}
+
+	// Pressed again much later (the code has expired meanwhile): still "already connected", by language.
+	*now = now.Add(24 * time.Hour)
+	for lang, want := range map[string]string{
+		"en":    "Telegram is already connected ✅",
+		"uz":    "Telegram allaqachon ulangan ✅",
+		"ru-RU": alreadyRU,
+		"":      "Telegram is already connected ✅",
+	} {
+		svc.HandleUpdate(ctx, startIn(t, 777, link.Code, lang))
+		if got := bot.sent[len(bot.sent)-1].text; got != want {
+			t.Errorf("lang %q: %q, want %q", lang, got, want)
+		}
+	}
+	if repo.binds != 1 {
+		t.Errorf("binds = %d", repo.binds)
+	}
+}
+
+func TestTelegram_StartWithExpiredCodeFromUnboundChat_SaysExpired(t *testing.T) {
+	svc, repo, bot, now := newTelegramFixture()
+	ctx := context.Background()
+	user := uuid.New()
+	link, _ := svc.CreateLink(ctx, user)
+	*now = now.Add(domain.LinkCodeTTL + time.Second)
+
+	svc.HandleUpdate(ctx, startIn(t, 888, link.Code, "ru"))
+	if len(bot.sent) != 1 || bot.sent[0].text != expiredRU {
+		t.Errorf("sent = %+v", bot.sent)
+	}
+	if repo.binds != 0 {
+		t.Errorf("binds = %d", repo.binds)
+	}
+}
+
+func TestTelegram_StartWithCodeUsedByAnotherChat_SaysExpired_NoRebind(t *testing.T) {
+	svc, repo, bot, _ := newTelegramFixture()
+	ctx := context.Background()
+	user := uuid.New()
+	link, _ := svc.CreateLink(ctx, user)
+	svc.HandleUpdate(ctx, startIn(t, 777, link.Code, "ru"))
+
+	svc.HandleUpdate(ctx, startIn(t, 888, link.Code, "ru"))
+	if len(bot.sent) != 2 || bot.sent[1].chat != 888 || bot.sent[1].text != expiredRU {
+		t.Fatalf("sent = %+v", bot.sent)
+	}
+	if repo.chat[user] != 777 || repo.binds != 1 || repo.bonusUser[user] != domain.TelegramBonusCredits {
+		t.Errorf("chat=%d binds=%d gift=%d: the other chat must change nothing", repo.chat[user], repo.binds, repo.bonusUser[user])
+	}
+}
+
+func TestTelegram_UnknownCodeSaysExpired_LookupErrorToo(t *testing.T) {
+	svc, repo, bot, _ := newTelegramFixture()
+	ctx := context.Background()
+	svc.HandleUpdate(ctx, startIn(t, 777, "YL-ABC234", "ru")) // well-formed, never issued
+	svc.HandleUpdate(ctx, startIn(t, 777, "nonsense", "ru"))  // not even a code
+	repo.usedErr = errors.New("db down")
+	link, _ := svc.CreateLink(ctx, uuid.New())
+	svc.HandleUpdate(ctx, startIn(t, 777, link.Code, "ru")) // binds
+	svc.HandleUpdate(ctx, startIn(t, 777, link.Code, "ru")) // already connected, but the lookup fails
+	texts := []string{}
+	for _, m := range bot.sent {
+		texts = append(texts, m.text)
+	}
+	if len(texts) != 4 || texts[0] != expiredRU || texts[1] != expiredRU || texts[3] != expiredRU {
+		t.Errorf("replies %q", texts)
 	}
 }

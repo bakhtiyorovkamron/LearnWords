@@ -35,6 +35,21 @@ func (r *TelegramRepository) ReplaceLinkCode(ctx context.Context, userID uuid.UU
 	})
 }
 
+// UsedCodeChat reads a code without a lock: found when it exists, was used, and its user has a
+// Telegram chat bound now (chatID).
+func (r *TelegramRepository) UsedCodeChat(ctx context.Context, code string) (int64, bool, error) {
+	var chatID int64
+	err := r.pool.QueryRow(ctx, `SELECT u.telegram_chat_id FROM telegram_link_codes c JOIN users u ON u.id = c.user_id
+		WHERE c.code = $1 AND c.used_at IS NOT NULL AND u.telegram_chat_id IS NOT NULL`, code).Scan(&chatID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return chatID, true, nil
+}
+
 // BindTelegram: in one transaction, lock the active code (unused, expires_at > now), mark it used
 // and bind the chat to its user (telegram_linked_at = now). The chat is first taken off any other
 // account (one Telegram account, one user). false when there is no active code — a used one is

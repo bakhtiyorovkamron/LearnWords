@@ -24,6 +24,10 @@ func (r *nopTelegramRepo) BindTelegram(context.Context, string, int64, *string, 
 	return true, 0, nil
 }
 
+func (r *nopTelegramRepo) UsedCodeChat(context.Context, string) (int64, bool, error) {
+	return 0, false, nil
+}
+
 type countingBot struct{ sent int }
 
 func (b *countingBot) SendMessage(context.Context, int64, string) error { b.sent++; return nil }
