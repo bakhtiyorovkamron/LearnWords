@@ -23,9 +23,10 @@ function bestPack(packs: Pack[]): Pack | null {
 }
 
 /**
- * Buying photos, paid by a manual card transfer. Step A: choose a pack (creates a request). Step B:
- * how to pay — the card, the request's code for the transfer comment. A user with an unpaid
- * request opens straight at step B for it. Card data only comes from the server.
+ * Buying photos, paid manually. Step A: choose a pack (creates a request). Step B: how to pay —
+ * the card and the request's code for the transfer comment; or, when the server has no card, the
+ * code to send in Telegram, where the payment is arranged. A user with an unpaid request opens
+ * straight at step B for it. Payment data only comes from the server.
  */
 export function BuySheet({ mode, limit, onClose }: { mode: BuyMode; limit: number | null; onClose: () => void }) {
   const { t, i18n } = useTranslation()
@@ -68,7 +69,9 @@ export function BuySheet({ mode, limit, onClose }: { mode: BuyMode; limit: numbe
     },
   })
 
-  const title = request ? t('buy.payTitle') : mode === 'limit' ? t('buy.title') : t('buy.titleVoluntary')
+  const byCard = Boolean(overview.data?.payment.card_number)
+  const title = request ? t(byCard ? 'buy.payTitle' : 'buy.payTitleTg')
+    : mode === 'limit' ? t('buy.title') : t('buy.titleVoluntary')
   const failure = overview.error ?? create.error ?? cancel.error
   const failureText = !failure ? null
     : isPaymentsUnavailable(failure) ? t('buy.unavailable')
@@ -129,6 +132,7 @@ function PackCard({ pack, best, busy, disabled, lang, onChoose }: {
   )
 }
 
+/** Step B. With a card: transfer to it, the code in the comment. Without one: send the code in Telegram. */
 function PayStep({ request, payment, lang, cancelling, onCancel, onDone }: {
   request: PurchaseRequest; payment: PaymentInfo; lang: string; cancelling: boolean; onCancel: () => void; onDone: () => void
 }) {
@@ -136,41 +140,45 @@ function PayStep({ request, payment, lang, cancelling, onCancel, onDone }: {
   const cardId = useId()
   const codeId = useId()
   const telegram = payment.telegram.replace(/^@/, '')
-  const num = (n: number) => (
-    <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-on-accent">{n}</span>
+  const amount = formatUZS(request.price_uzs, lang)
+  const byCard = payment.card_number !== ''
+
+  const codeBox = (
+    <div className="flex items-center justify-between gap-2 rounded-2xl bg-surface-2 p-3">
+      <span id={codeId} data-testid="buy-code" className="select-all font-mono text-2xl font-bold tracking-wider text-fg">{request.code}</span>
+      <CopyButton value={request.code} describedBy={codeId} />
+    </div>
   )
+  const steps = byCard ? [
+    <>
+      <p className="text-fg">{t('buy.step1', { amount })}</p>
+      <div className="rounded-2xl bg-surface-2 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span id={cardId} data-testid="buy-card" className="select-all whitespace-nowrap font-mono text-xl font-semibold tabular-nums tracking-wide text-fg">
+            {groupCard(payment.card_number)}
+          </span>
+          <CopyButton value={payment.card_number.replace(/\D/g, '')} describedBy={cardId} />
+        </div>
+        {payment.card_holder && <p data-testid="buy-holder" className="mt-1 text-sm text-muted">{payment.card_holder}</p>}
+      </div>
+    </>,
+    <><p className="text-fg">{t('buy.step2', { code: request.code })}</p>{codeBox}</>,
+    <p className="text-fg">{t('buy.step3')}</p>,
+  ] : [
+    <p className="text-fg">{t('buy.tgStep1')}</p>,
+    <><p className="text-fg">{t('buy.tgStep2', { code: request.code })}</p>{codeBox}</>,
+    <p className="text-fg">{t('buy.tgStep3', { amount })}</p>,
+  ]
+
   return (
     <div className="space-y-5">
       <ol className="space-y-4">
-        <li className="flex gap-3">
-          {num(1)}
-          <div className="min-w-0 flex-1 space-y-2">
-            <p className="text-fg">{t('buy.step1', { amount: formatUZS(request.price_uzs, lang) })}</p>
-            <div className="rounded-2xl bg-surface-2 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span id={cardId} data-testid="buy-card" className="select-all whitespace-nowrap font-mono text-xl font-semibold tabular-nums tracking-wide text-fg">
-                  {groupCard(payment.card_number)}
-                </span>
-                <CopyButton value={payment.card_number.replace(/\D/g, '')} describedBy={cardId} />
-              </div>
-              {payment.card_holder && <p data-testid="buy-holder" className="mt-1 text-sm text-muted">{payment.card_holder}</p>}
-            </div>
-          </div>
-        </li>
-        <li className="flex gap-3">
-          {num(2)}
-          <div className="min-w-0 flex-1 space-y-2">
-            <p className="text-fg">{t('buy.step2', { code: request.code })}</p>
-            <div className="flex items-center justify-between gap-2 rounded-2xl bg-surface-2 p-3">
-              <span id={codeId} data-testid="buy-code" className="select-all font-mono text-2xl font-bold tracking-wider text-fg">{request.code}</span>
-              <CopyButton value={request.code} describedBy={codeId} />
-            </div>
-          </div>
-        </li>
-        <li className="flex gap-3">
-          {num(3)}
-          <p className="min-w-0 flex-1 text-fg">{t('buy.step3')}</p>
-        </li>
+        {steps.map((step, i) => (
+          <li key={i} className="flex gap-3">
+            <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-on-accent">{i + 1}</span>
+            <div className="min-w-0 flex-1 space-y-2">{step}</div>
+          </li>
+        ))}
       </ol>
 
       <div className="flex flex-col gap-2">

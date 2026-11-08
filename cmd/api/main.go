@@ -120,7 +120,7 @@ func run() error {
 		CardNumber: cfg.PaymentCardNumber, CardHolder: cfg.PaymentCardHolder, Telegram: cfg.PaymentTelegram,
 	})
 	if !purchaseSvc.Available() {
-		slog.Warn("PAYMENT_CARD_NUMBER is not set: buying photos is off (purchase endpoints answer 503)")
+		slog.Warn("neither PAYMENT_CARD_NUMBER nor PAYMENT_TELEGRAM is set: buying photos is off (purchase endpoints answer 503)")
 	}
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))

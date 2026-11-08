@@ -24,6 +24,14 @@ import (
 // testCard is an obviously fake card number: real ones are server env only, never in the repo.
 const testCard = "0000 0000 0000 0000"
 
+// The ways to pay a server can have: a card and Telegram, one of them, or none (buying off).
+var (
+	cardAndTelegram = domain.PaymentInfo{CardNumber: testCard, CardHolder: "TEST HOLDER", Telegram: "yodla_help"}
+	cardOnly        = domain.PaymentInfo{CardNumber: testCard, CardHolder: "TEST HOLDER"}
+	telegramOnly    = domain.PaymentInfo{Telegram: "yodla_pay"}
+	noPayment       = domain.PaymentInfo{}
+)
+
 // memPurchases is an in-memory service.PurchaseRepository; approvals credit feats.
 type memPurchases struct {
 	mu     sync.Mutex
@@ -175,8 +183,8 @@ type purchaseEnv struct {
 }
 
 // newPurchaseEnv: the purchase routes as in the router; the caller is e.user unless X-Test-User
-// says otherwise, and e.admin is the only admin. card "" = payments not configured.
-func newPurchaseEnv(card string) purchaseEnv {
+// says otherwise, and e.admin is the only admin. noPayment = buying is off.
+func newPurchaseEnv(payment domain.PaymentInfo) purchaseEnv {
 	gin.SetMode(gin.TestMode)
 	e := purchaseEnv{user: uuid.New(), other: uuid.New(), admin: uuid.New(), push: &fakeNotifier{}}
 	e.feats = &memFeatures{ov: map[string]domain.FeatureOverride{}}
@@ -185,7 +193,7 @@ func newPurchaseEnv(card string) purchaseEnv {
 	}
 	e.fs = service.NewFeatureService(e.feats)
 	repo := &memPurchases{feats: e.feats, admins: []uuid.UUID{e.admin}}
-	e.svc = service.NewPurchaseService(repo, e.feats, e.push, domain.PaymentInfo{CardNumber: card, CardHolder: "TEST HOLDER", Telegram: "yodla_help"})
+	e.svc = service.NewPurchaseService(repo, e.feats, e.push, payment)
 	h := NewPurchaseHandler(e.svc)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -243,7 +251,7 @@ func (e purchaseEnv) photoCredits(t *testing.T, u uuid.UUID) int {
 var codeRe = regexp.MustCompile(`^YD-\d{4}$`)
 
 func TestPurchases_CreateListCancel(t *testing.T) {
-	e := newPurchaseEnv(testCard)
+	e := newPurchaseEnv(cardAndTelegram)
 
 	w := e.as(e.user, "GET", "/me/purchases", "")
 	m := decode(t, w)
@@ -328,7 +336,7 @@ func TestPurchases_CreateListCancel(t *testing.T) {
 }
 
 func TestPurchases_FourthPendingIs409(t *testing.T) {
-	e := newPurchaseEnv(testCard)
+	e := newPurchaseEnv(cardAndTelegram)
 	var ids []string
 	for range 3 {
 		ids = append(ids, e.buy(t, e.user, "photo_35"))
@@ -346,7 +354,7 @@ func TestPurchases_FourthPendingIs409(t *testing.T) {
 }
 
 func TestPurchases_AdminApproveReject(t *testing.T) {
-	e := newPurchaseEnv(testCard)
+	e := newPurchaseEnv(cardAndTelegram)
 	paid := e.buy(t, e.user, "photo_35")
 	rejected := e.buy(t, e.user, "photo_100")
 	e.svc.Wait()
@@ -439,7 +447,7 @@ func TestPurchases_AdminApproveReject(t *testing.T) {
 }
 
 func TestPurchases_AdminGrant(t *testing.T) {
-	e := newPurchaseEnv(testCard)
+	e := newPurchaseEnv(cardAndTelegram)
 	path := "/admin/users/" + e.user.String() + "/credits"
 	for _, c := range []struct {
 		body string
@@ -476,8 +484,34 @@ func TestPurchases_AdminGrant(t *testing.T) {
 	}
 }
 
-func TestPurchases_NoCardNumberIs503(t *testing.T) {
-	e := newPurchaseEnv("")
+// Either way to pay is enough: a card, or a Telegram contact where the payment is arranged. The
+// one that is not set comes back as "".
+func TestPurchases_CardOrTelegramIsEnough(t *testing.T) {
+	for name, c := range map[string]struct {
+		payment          domain.PaymentInfo
+		card, holder, tg string
+	}{
+		"telegram only": {telegramOnly, "", "", "yodla_pay"},
+		"card only":     {cardOnly, testCard, "TEST HOLDER", ""},
+	} {
+		e := newPurchaseEnv(c.payment)
+		w := e.as(e.user, "GET", "/me/purchases", "")
+		if w.Code != 200 {
+			t.Fatalf("%s: overview %d %s", name, w.Code, w.Body)
+		}
+		pay := decode(t, w)["payment"].(map[string]any)
+		if pay["card_number"] != c.card || pay["card_holder"] != c.holder || pay["telegram"] != c.tg {
+			t.Errorf("%s: payment %v", name, pay)
+		}
+		id := e.buy(t, e.user, "photo_35")
+		if w := e.as(e.user, "DELETE", "/me/purchases/"+id, ""); w.Code != 204 {
+			t.Errorf("%s: cancel %d", name, w.Code)
+		}
+	}
+}
+
+func TestPurchases_NoCardNorTelegramIs503(t *testing.T) {
+	e := newPurchaseEnv(noPayment)
 	for _, c := range []struct{ method, path, body string }{
 		{"GET", "/me/purchases", ""},
 		{"POST", "/me/purchases", `{"pack_id":"photo_35"}`},
@@ -499,7 +533,7 @@ func TestPurchases_NoCardNumberIs503(t *testing.T) {
 
 // Push switched off or failing never fails the purchase itself.
 func TestPurchases_PushOffOrFailingIsIgnored(t *testing.T) {
-	e := newPurchaseEnv(testCard)
+	e := newPurchaseEnv(cardAndTelegram)
 	e.push.off = true
 	id := e.buy(t, e.user, "photo_35")
 	if w := e.as(e.admin, "POST", "/admin/purchases/"+id+"/approve", ""); w.Code != 200 {
@@ -510,7 +544,7 @@ func TestPurchases_PushOffOrFailingIsIgnored(t *testing.T) {
 		t.Errorf("push off must send nothing: %+v", e.push.all())
 	}
 
-	e2 := newPurchaseEnv(testCard)
+	e2 := newPurchaseEnv(cardAndTelegram)
 	e2.push.err = errors.New("push service down")
 	id = e2.buy(t, e2.user, "photo_35")
 	if w := e2.as(e2.admin, "POST", "/admin/purchases/"+id+"/approve", ""); w.Code != 200 {
@@ -536,7 +570,7 @@ func (a activeUsers) UserStatus(_ context.Context, id uuid.UUID) (string, string
 // user may create 5 requests an hour.
 func TestPurchaseRoutes_AuthAdminAndRateLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	e := newPurchaseEnv(testCard)
+	e := newPurchaseEnv(cardAndTelegram)
 	tokens := auth.NewTokenManager(strings.Repeat("k", 32), "test", time.Minute, time.Hour)
 	r := NewRouter(RouterDeps{
 		CORSOrigins: []string{"http://localhost"}, Tokens: tokens, Ctx: context.Background(),

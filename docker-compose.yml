@@ -40,7 +40,7 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@yodla.fun}
-      # Buying photos (manual card transfer). Empty card number = off (503). Real values only in the server's .env.
+      # Buying photos (manual payment): a card and/or a Telegram contact; both empty = off (503). Real values only in the server's .env.
       PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER:-}
       PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER:-}
       PAYMENT_TELEGRAM: ${PAYMENT_TELEGRAM:-}

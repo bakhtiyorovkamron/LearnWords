@@ -27,11 +27,12 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string // e.g. mailto:admin@yodla.fun
-	// Buying photo credits (manual card transfer). Server env only, never in the repo. Without a
-	// card number the purchase endpoints answer 503 payments_unavailable.
+	// Buying photo credits (manual payment). Server env only, never in the repo. Paid by a card
+	// transfer, or arranged in Telegram; with neither set the purchase endpoints answer 503
+	// payments_unavailable.
 	PaymentCardNumber string // PAYMENT_CARD_NUMBER
 	PaymentCardHolder string // PAYMENT_CARD_HOLDER
-	PaymentTelegram   string // PAYMENT_TELEGRAM: username for payment questions, without @
+	PaymentTelegram   string // PAYMENT_TELEGRAM: a channel or user name, stored without @ / t.me link
 }
 
 func Load() (*Config, error) {
@@ -56,7 +57,7 @@ func Load() (*Config, error) {
 
 		PaymentCardNumber: strings.TrimSpace(os.Getenv("PAYMENT_CARD_NUMBER")),
 		PaymentCardHolder: strings.TrimSpace(os.Getenv("PAYMENT_CARD_HOLDER")),
-		PaymentTelegram:   strings.TrimPrefix(strings.TrimSpace(os.Getenv("PAYMENT_TELEGRAM")), "@"),
+		PaymentTelegram:   telegramUsername(os.Getenv("PAYMENT_TELEGRAM")),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")
@@ -78,6 +79,25 @@ func duration(key string, def time.Duration) time.Duration {
 		}
 	}
 	return def
+}
+
+// telegramUsername turns what an operator may paste ("@yodla", "https://t.me/yodla",
+// "t.me/yodla/") into the bare username "yodla".
+func telegramUsername(v string) string {
+	v = strings.TrimSpace(v)
+	lower := strings.ToLower(v)
+	for _, scheme := range []string{"https://", "http://"} {
+		if strings.HasPrefix(lower, scheme) {
+			v, lower = v[len(scheme):], lower[len(scheme):]
+		}
+	}
+	for _, host := range []string{"www.t.me/", "t.me/", "telegram.me/"} {
+		if strings.HasPrefix(lower, host) {
+			v = v[len(host):]
+			break
+		}
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(v, "@"), "/")
 }
 
 // isOff: "false", "0", "no", "off" (any case).

@@ -178,6 +178,57 @@ describe('BuySheet: an unpaid request', () => {
   })
 })
 
+describe('BuySheet: Telegram instead of a card', () => {
+  const noCard = (requests: PurchaseRequest[] = []): PurchaseOverview =>
+    ({ ...overview(requests), payment: { card_number: '', card_holder: '', telegram: 'yodla_pay' } })
+
+  it('step B: open Telegram, send the code, we reply how to pay — and no card block at all', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue(noCard([request()]))
+    renderSheet()
+    expect(await screen.findByRole('dialog', { name: 'Pay via Telegram' })).toBeTruthy()
+    expect(screen.queryByTestId('buy-card')).toBeNull()
+    expect(screen.queryByTestId('buy-holder')).toBeNull()
+    const steps = screen.getAllByRole('listitem').map(text)
+    expect(steps).toHaveLength(3)
+    expect(steps[0]).toContain('Open our Telegram with the button below.')
+    expect(steps[1]).toContain('Send us this request code there:')
+    expect(steps[2]).toContain("We'll reply with how to pay 25,000 UZS. Once it's paid, the photos appear on your account.")
+    expect(screen.getByTestId('buy-code').textContent).toBe('YD-1234')
+
+    // the code is the only thing to copy
+    const copy = screen.getAllByRole('button', { name: 'Copy' })
+    expect(copy).toHaveLength(1)
+    fireEvent.click(copy[0])
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('YD-1234'))
+
+    // Telegram is the main button, "Done" the secondary one
+    const tg = screen.getByRole('link', { name: 'Message us on Telegram' })
+    expect(tg.getAttribute('href')).toBe('https://t.me/yodla_pay')
+    expect(tg.className).toContain('btn-primary')
+    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-ghost')
+  })
+
+  it('choosing a pack leads to the Telegram steps for the new request', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue(noCard())
+    vi.mocked(purchasesApi.create).mockResolvedValue(request({ code: 'YD-7777', amount: 100, price_uzs: 59000 }))
+    renderSheet()
+    fireEvent.click(await screen.findByTestId('pack-photo_100'))
+    await screen.findByRole('dialog', { name: 'Pay via Telegram' })
+    expect(screen.getByTestId('buy-code').textContent).toBe('YD-7777')
+    expect(text(screen.getAllByRole('listitem')[2])).toContain('how to pay 59,000 UZS')
+    expect(screen.queryByTestId('buy-card')).toBeNull()
+  })
+
+  it('with a card the card steps stay as they were', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request()]))
+    renderSheet()
+    expect(await screen.findByRole('dialog', { name: 'How to pay' })).toBeTruthy()
+    expect(screen.getByTestId('buy-card').textContent).toBe('0000 1111 2222 3333')
+    expect(screen.getAllByRole('button', { name: 'Copy' })).toHaveLength(2)
+    expect(text(screen.getAllByRole('listitem')[0])).toContain('Transfer 25,000 UZS to this card:')
+  })
+})
+
 describe('BuySheet: the request is decided while the sheet is open', () => {
   it('paid → the sheet closes (the page announces the photos)', async () => {
     vi.mocked(purchasesApi.overview).mockResolvedValue(overview([request()]))

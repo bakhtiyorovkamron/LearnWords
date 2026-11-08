@@ -49,8 +49,9 @@ type Notifier interface {
 	SendTo(ctx context.Context, target PushTarget, title, body string) (domain.PushResult, error)
 }
 
-// PurchaseService sells packs of credits paid by a manual card transfer: the user creates a
-// request, transfers the money with the request's code in the comment, and an admin approves it.
+// PurchaseService sells packs of credits paid manually: the user creates a request, transfers
+// the money to the card with the request's code in the comment (or, without a card, sends the
+// code in Telegram and is told how to pay there), and an admin approves it.
 type PurchaseService struct {
 	repo    PurchaseRepository
 	credits CreditStore
@@ -63,9 +64,12 @@ func NewPurchaseService(repo PurchaseRepository, credits CreditStore, push Notif
 	return &PurchaseService{repo: repo, credits: credits, push: push, payment: payment}
 }
 
-// Available: a card number to pay to is configured. Without one the user's purchase endpoints
-// answer ErrPaymentsUnavailable (the admin's keep working, to settle what is left).
-func (s *PurchaseService) Available() bool { return s.payment.CardNumber != "" }
+// Available: there is a way to pay — a card to transfer to, or a Telegram contact where the
+// payment is arranged. With neither the user's purchase endpoints answer ErrPaymentsUnavailable
+// (the admin's keep working, to settle what is left).
+func (s *PurchaseService) Available() bool {
+	return s.payment.CardNumber != "" || s.payment.Telegram != ""
+}
 
 // Overview is the purchase page: the packs, where to pay and the user's latest requests.
 func (s *PurchaseService) Overview(ctx context.Context, userID uuid.UUID) (domain.PurchaseOverview, error) {
