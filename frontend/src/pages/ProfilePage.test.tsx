@@ -1,14 +1,15 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { profileApi, telegramApi } from '../api/endpoints'
+import { profileApi, purchasesApi, telegramApi } from '../api/endpoints'
 import * as toaster from '../components/Toaster'
 import { ProfilePage } from './ProfilePage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn() } }
+  return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn() }, purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() } }
 })
 
 const tgStatus = { connected: false, username: null, available: true, bonus_offer: 2, bonus: 0 }
@@ -17,12 +18,13 @@ const apiError = (code: string, status = 400) => Object.assign(new Error(code), 
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={qc}><ProfilePage /></QueryClientProvider>)
+  render(<QueryClientProvider client={qc}><MemoryRouter><ProfilePage /></MemoryRouter></QueryClientProvider>)
 }
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.mocked(profileApi.get).mockResolvedValue(empty)
+  vi.mocked(purchasesApi.overview).mockRejectedValue(apiError('payments_unavailable', 503))
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks() })
@@ -193,5 +195,30 @@ describe('ProfilePage: connecting Telegram', () => {
     expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(true)
     expect(tab.close).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('ProfilePage: my purchase requests', () => {
+  const req = (id: string, code: string, status: 'pending' | 'paid' | 'cancelled' | 'rejected') =>
+    ({ id, code, pack_id: 'photo_35', amount: 35, price_uzs: 25000, status, created_at: '2026-11-08T10:00:00Z' })
+
+  it('lists them (code, pack, price, status), each opening its chat', async () => {
+    vi.mocked(purchasesApi.overview).mockResolvedValue({
+      packs: [], payment: { card_number: '', card_holder: '', telegram: 'yodla' },
+      requests: [req('r2', 'YD-0002', 'pending'), req('r1', 'YD-0001', 'paid')],
+    })
+    renderPage()
+    const list = await screen.findByRole('region', { name: 'My requests' })
+    const first = await within(list).findByTestId('my-request-r2')
+    expect(first.getAttribute('href')).toBe('/purchases/r2')
+    expect(first.textContent).toContain('YD-0002')
+    expect(first.textContent).toContain('Awaiting payment')
+    expect(within(list).getByTestId('my-request-r1').textContent).toContain('Paid')
+  })
+
+  it('no requests, or buying is off: no block', async () => {
+    renderPage()
+    await screen.findByLabelText('Name')
+    expect(screen.queryByRole('region', { name: 'My requests' })).toBeNull()
   })
 })

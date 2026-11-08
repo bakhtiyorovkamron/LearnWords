@@ -32,12 +32,17 @@ var (
 	noPayment       = domain.PaymentInfo{}
 )
 
-// memPurchases is an in-memory service.PurchaseRepository; approvals credit feats.
+// memPurchases is an in-memory service.PurchaseRepository; approvals credit feats. Its chat follows
+// the postgres rules: decisions write a system line, a closed request refuses messages, hidden
+// messages are filtered by the viewer's side, an admin's message marks the chat read.
 type memPurchases struct {
 	mu     sync.Mutex
 	feats  *memFeatures
 	admins []uuid.UUID
 	reqs   []*domain.PurchaseRequest // in creation order
+	msgs   []domain.PurchaseMessage  // in id order
+	images map[string]domain.ChatImage
+	read   map[uuid.UUID]int64 // request → the newest message an admin has read
 }
 
 func (m *memPurchases) Create(_ context.Context, u uuid.UUID, pack domain.Pack, maxPending int) (domain.PurchaseRequest, error) {
@@ -65,7 +70,7 @@ func (m *memPurchases) newestFirst(keep func(*domain.PurchaseRequest) bool, limi
 	for i := len(m.reqs) - 1; i >= 0 && len(out) < limit; i-- {
 		if keep(m.reqs[i]) {
 			p := *m.reqs[i]
-			p.UserEmail = p.UserID.String()[:8] + "@test"
+			p.UserEmail, p.Unread = p.UserID.String()[:8]+"@test", m.unread(p.ID)
 			out = append(out, p)
 		}
 	}
@@ -106,6 +111,7 @@ func (m *memPurchases) Cancel(_ context.Context, u, id uuid.UUID) error {
 	}
 	now := time.Now()
 	p.Status, p.DecidedAt = domain.PurchaseCancelled, &now
+	m.system(*p)
 	return nil
 }
 
@@ -119,6 +125,7 @@ func (m *memPurchases) decide(id, admin uuid.UUID, status string) (*domain.Purch
 	}
 	now := time.Now()
 	p.Status, p.DecidedAt, p.DecidedBy = status, &now, &admin
+	m.system(*p)
 	return p, nil
 }
 
@@ -146,6 +153,134 @@ func (m *memPurchases) Reject(_ context.Context, id, admin uuid.UUID) (domain.Pu
 }
 
 func (m *memPurchases) AdminIDs(context.Context) ([]uuid.UUID, error) { return m.admins, nil }
+
+// add stores a message (the lock is held).
+func (m *memPurchases) add(msg domain.PurchaseMessage) domain.PurchaseMessage {
+	msg.ID = int64(len(m.msgs) + 1)
+	msg.CreatedAt = time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC).Add(time.Duration(msg.ID) * time.Second)
+	m.msgs = append(m.msgs, msg)
+	if p := m.find(msg.RequestID); p != nil {
+		at := msg.CreatedAt
+		p.LastMessageAt = &at
+	}
+	if msg.AuthorRole == domain.ChatAuthorAdmin {
+		m.markRead(msg.RequestID, msg.ID)
+	}
+	return msg
+}
+
+func (m *memPurchases) system(p domain.PurchaseRequest) {
+	event, body := domain.ChatEventCancelled, domain.ChatCancelledText
+	if p.Status == domain.PurchasePaid {
+		event, body = domain.ChatEventPaid, domain.ChatPaidText(p.Amount)
+	}
+	m.add(domain.PurchaseMessage{RequestID: p.ID, AuthorRole: domain.ChatAuthorSystem, Body: &body, Event: &event})
+}
+
+func (m *memPurchases) markRead(id uuid.UUID, upTo int64) {
+	if m.read == nil {
+		m.read = map[uuid.UUID]int64{}
+	}
+	m.read[id] = max(m.read[id], upTo)
+}
+
+func (m *memPurchases) unread(id uuid.UUID) int {
+	n := 0
+	for _, msg := range m.msgs {
+		if msg.RequestID == id && msg.AuthorRole == domain.ChatAuthorBuyer && msg.ID > m.read[id] {
+			n++
+		}
+	}
+	return n
+}
+
+func (m *memPurchases) Get(_ context.Context, id uuid.UUID) (domain.PurchaseRequest, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p := m.find(id)
+	if p == nil {
+		return domain.PurchaseRequest{}, domain.ErrPurchaseNotFound
+	}
+	out := *p
+	out.UserEmail, out.Unread = p.UserID.String()[:8]+"@test", m.unread(id)
+	return out, nil
+}
+
+func (m *memPurchases) AddMessage(_ context.Context, msg domain.PurchaseMessage, img *domain.ChatImage) (domain.PurchaseMessage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p := m.find(msg.RequestID)
+	if p == nil {
+		return domain.PurchaseMessage{}, domain.ErrPurchaseNotFound
+	}
+	if !domain.ChatOpen(p.Status) {
+		return domain.PurchaseMessage{}, domain.ErrChatClosed
+	}
+	if img != nil {
+		if m.images == nil {
+			m.images = map[string]domain.ChatImage{}
+		}
+		m.images[img.Key] = *img
+	}
+	return m.add(msg), nil
+}
+
+func (m *memPurchases) Messages(_ context.Context, id uuid.UUID, after int64, limit int, viewerRole string) ([]domain.PurchaseMessage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []domain.PurchaseMessage
+	for _, msg := range m.msgs {
+		if msg.RequestID == id && msg.ID > after && msg.VisibleTo(viewerRole) && len(out) < limit {
+			out = append(out, msg)
+		}
+	}
+	return out, nil
+}
+
+func (m *memPurchases) MarkAdminRead(_ context.Context, id uuid.UUID, upTo int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.markRead(id, upTo)
+	return nil
+}
+
+func (m *memPurchases) MessageImage(_ context.Context, id uuid.UUID, mid int64) (domain.PurchaseMessage, domain.ChatImage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, msg := range m.msgs {
+		if msg.ID == mid && msg.RequestID == id && msg.ImageKey != nil {
+			return msg, m.images[*msg.ImageKey], nil
+		}
+	}
+	return domain.PurchaseMessage{}, domain.ChatImage{}, domain.ErrNotFound
+}
+
+// fakeTelegram records chat notifications; linked = users with a Telegram chat, err = the bot fails.
+type fakeTelegram struct {
+	mu     sync.Mutex
+	linked map[uuid.UUID]bool
+	err    error
+	sent   []sentPush // title = the text, body unused
+}
+
+func (f *fakeTelegram) NotifyUser(_ context.Context, u uuid.UUID, text string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.linked[u] {
+		return false, nil
+	}
+	if f.err != nil {
+		return false, f.err
+	}
+	f.sent = append(f.sent, sentPush{to: []uuid.UUID{u}, title: text})
+	return true, nil
+}
+
+func (f *fakeTelegram) all() []sentPush {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.sent)
+}
 
 type sentPush struct {
 	to          []uuid.UUID
@@ -179,6 +314,8 @@ type purchaseEnv struct {
 	fs                 *service.FeatureService
 	svc                *service.PurchaseService
 	push               *fakeNotifier
+	tg                 *fakeTelegram
+	repo               *memPurchases
 	user, other, admin uuid.UUID
 }
 
@@ -186,14 +323,15 @@ type purchaseEnv struct {
 // says otherwise, and e.admin is the only admin. noPayment = buying is off.
 func newPurchaseEnv(payment domain.PaymentInfo) purchaseEnv {
 	gin.SetMode(gin.TestMode)
-	e := purchaseEnv{user: uuid.New(), other: uuid.New(), admin: uuid.New(), push: &fakeNotifier{}}
+	e := purchaseEnv{user: uuid.New(), other: uuid.New(), admin: uuid.New(), push: &fakeNotifier{}, tg: &fakeTelegram{linked: map[uuid.UUID]bool{}}}
 	e.feats = &memFeatures{ov: map[string]domain.FeatureOverride{}}
 	for _, u := range []uuid.UUID{e.user, e.other, e.admin} {
 		e.feats.knowUser(u)
 	}
 	e.fs = service.NewFeatureService(e.feats)
 	repo := &memPurchases{feats: e.feats, admins: []uuid.UUID{e.admin}}
-	e.svc = service.NewPurchaseService(repo, e.feats, e.push, payment)
+	e.repo = repo
+	e.svc = service.NewPurchaseService(repo, e.feats, e.push, e.tg, payment)
 	h := NewPurchaseHandler(e.svc)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -211,7 +349,13 @@ func newPurchaseEnv(payment domain.PaymentInfo) purchaseEnv {
 	r.GET("/me/purchases", h.Overview)
 	r.POST("/me/purchases", h.Create)
 	r.DELETE("/me/purchases/:id", h.Cancel)
+	r.GET("/me/purchases/:id/messages", h.BuyerChat)
+	r.POST("/me/purchases/:id/messages", h.BuyerPost)
+	r.GET("/me/purchases/:id/messages/:mid/image", h.BuyerImage)
 	admin := r.Group("/admin", RequireAdmin())
+	admin.GET("/purchases/:id/messages", h.AdminChat)
+	admin.POST("/purchases/:id/messages", h.AdminPost)
+	admin.GET("/purchases/:id/messages/:mid/image", h.AdminImage)
 	admin.GET("/purchases", h.AdminList)
 	admin.POST("/purchases/:id/approve", h.Approve)
 	admin.POST("/purchases/:id/reject", h.Reject)

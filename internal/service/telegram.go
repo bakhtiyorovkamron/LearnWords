@@ -27,6 +27,8 @@ type TelegramRepository interface {
 	// UsedCodeChat reads a code without locking: found = it exists, it was used and its user has a
 	// Telegram chat bound now; chatID is that chat.
 	UsedCodeChat(ctx context.Context, code string) (chatID int64, found bool, err error)
+	// ChatID: the private chat the bot bound to the user (found = false when none).
+	ChatID(ctx context.Context, userID uuid.UUID) (chatID int64, found bool, err error)
 }
 
 // TelegramBot is the Bot API (provider/telegram).
@@ -87,6 +89,22 @@ func (s *TelegramService) CreateLink(ctx context.Context, userID uuid.UUID) (dom
 		}
 		return domain.TelegramLink{Code: code, URL: "https://t.me/" + s.botUsername + "?start=" + code, ExpiresAt: expires}, nil
 	}
+}
+
+// NotifyUser writes text to the user's linked Telegram chat. sent = false (no error) when the bot
+// is not configured or the user has no chat linked.
+func (s *TelegramService) NotifyUser(ctx context.Context, userID uuid.UUID, text string) (bool, error) {
+	if !s.Enabled() {
+		return false, nil
+	}
+	chat, found, err := s.repo.ChatID(ctx, userID)
+	if err != nil || !found {
+		return false, err
+	}
+	if err := s.bot.SendMessage(ctx, chat, text); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // RegisterWebhook points the bot at url (no-op when the bot or the url is not configured).

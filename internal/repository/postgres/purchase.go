@@ -35,12 +35,12 @@ const codeAttempts = 20
 const purchaseLockClass = 45
 
 const purchaseCols = `p.id, p.user_id, p.code, p.pack_id, p.feature, p.amount, p.price_uzs, p.status,
-	p.created_at, p.decided_at, p.decided_by`
+	p.created_at, p.decided_at, p.decided_by, p.last_message_at`
 
 func scanPurchase(row pgx.Row, extra ...any) (domain.PurchaseRequest, error) {
 	var p domain.PurchaseRequest
 	dest := append([]any{&p.ID, &p.UserID, &p.Code, &p.PackID, &p.Feature, &p.Amount, &p.PriceUZS, &p.Status,
-		&p.CreatedAt, &p.DecidedAt, &p.DecidedBy}, extra...)
+		&p.CreatedAt, &p.DecidedAt, &p.DecidedBy, &p.LastMessageAt}, extra...)
 	err := row.Scan(dest...)
 	return p, err
 }
@@ -112,36 +112,49 @@ func (r *PurchaseRepository) ListByUser(ctx context.Context, userID uuid.UUID, l
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.PurchaseRequest, error) { return scanPurchase(row) })
 }
 
-// ListByStatus returns requests in one status ("" = any), newest first, with the user's email.
+// ListByStatus returns requests in one status ("" = any), newest first, with the user's email and
+// the chat messages from the buyer no admin has read yet.
 func (r *PurchaseRepository) ListByStatus(ctx context.Context, status string, limit int) ([]domain.PurchaseRequest, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT `+purchaseCols+`, u.email FROM purchase_requests p JOIN users u ON u.id = p.user_id
+		SELECT `+purchaseCols+`, u.email, `+unreadCol+` FROM purchase_requests p JOIN users u ON u.id = p.user_id
 		WHERE $1::text = '' OR p.status = $1::text
 		ORDER BY p.created_at DESC, p.id LIMIT $2`, status, limit)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.PurchaseRequest, error) {
-		var email string
-		p, err := scanPurchase(row, &email)
-		p.UserEmail = email
+		var (
+			email  string
+			unread int
+		)
+		p, err := scanPurchase(row, &email, &unread)
+		p.UserEmail, p.Unread = email, unread
 		return p, err
 	})
 }
 
-// Cancel withdraws the user's own pending request. Someone else's, a decided or a missing one is
-// ErrPurchaseNotFound.
+// Cancel withdraws the user's own pending request and leaves "cancelled" in its chat. Someone
+// else's, a decided or a missing one is ErrPurchaseNotFound.
 func (r *PurchaseRepository) Cancel(ctx context.Context, userID, id uuid.UUID) error {
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE purchase_requests SET status = 'cancelled', decided_at = now()
-		WHERE id = $1 AND user_id = $2 AND status = 'pending'`, id, userID)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after Commit
+	p, err := scanPurchase(tx.QueryRow(ctx, `
+		UPDATE purchase_requests p SET status = 'cancelled', decided_at = now()
+		WHERE p.id = $1 AND p.user_id = $2 AND p.status = 'pending'
+		RETURNING `+purchaseCols, id, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrPurchaseNotFound
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	if err := systemMessage(ctx, tx, p); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // Approve marks a pending request paid and adds its credits (ledger reason "purchase") in one
@@ -188,6 +201,10 @@ func decide(ctx context.Context, tx pgx.Tx, id, adminID uuid.UUID, status string
 		WHERE p.id = $1 AND p.status = 'pending' AND u.id = p.user_id
 		RETURNING `+purchaseCols+`, u.email`, id, adminID, status), &email)
 	p.UserEmail = email
+	if err == nil {
+		// The decision is written into the request's chat in the same transaction.
+		return p, systemMessage(ctx, tx, p)
+	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return p, err
 	}

@@ -1,14 +1,19 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { profileApi, type Profile } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { formatPhoneInput, phoneForApi } from '../lib/phone'
 import { useTelegramConnect } from '../lib/telegramConnect'
+import { formatUZS } from '../lib/money'
+import { usePurchaseOverview } from '../lib/purchases'
 import { ErrorState } from '../components/ErrorState'
+import { StatusPill } from '../components/PurchaseChat'
 import { toast } from '../components/Toaster'
 
-/** The user's own profile: name, phone and the Telegram connection. Nothing else lives here. */
+/** The user's own profile: name, phone, the Telegram connection, and their purchase requests. */
 export function ProfilePage() {
   const { t } = useTranslation()
   const profile = useQuery({ queryKey: ['profile'], queryFn: profileApi.get })
@@ -19,7 +24,37 @@ export function ProfilePage() {
       {profile.error ? <ErrorState error={profile.error} />
         : profile.data ? <ProfileForm profile={profile.data} />
         : <div className="glass h-64 animate-pulse" />}
+      <MyRequests />
     </div>
+  )
+}
+
+/**
+ * The user's latest purchase requests, each opening its chat with the admins. Nothing when there
+ * are none, or buying is off on this server.
+ */
+function MyRequests() {
+  const { t, i18n } = useTranslation()
+  const requests = usePurchaseOverview().data?.requests ?? []
+  if (requests.length === 0) return null
+  return (
+    <section className="glass space-y-2 p-5" aria-labelledby="my-requests-title">
+      <h2 id="my-requests-title" className="text-lg font-bold text-fg">{t('chat.myRequests')}</h2>
+      <ul className="divide-y divide-divider">
+        {requests.map((r) => (
+          <li key={r.id}>
+            <Link to={`/purchases/${r.id}`} data-testid={`my-request-${r.id}`}
+              className="flex items-center justify-between gap-3 py-3 text-sm transition hover:text-accent-text">
+              <span className="min-w-0 text-muted">
+                <span className="font-mono font-semibold text-fg">{r.code}</span>
+                {' · '}{t('buy.pack', { n: r.amount })}{' · '}{formatUZS(r.price_uzs, i18n.language)}
+              </span>
+              <span className="flex shrink-0 items-center gap-1"><StatusPill status={r.status} /><ChevronRight size={16} aria-hidden="true" className="text-faint" /></span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

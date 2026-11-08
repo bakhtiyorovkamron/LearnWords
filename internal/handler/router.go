@@ -62,6 +62,12 @@ const (
 // purchasePerUserPerHour: new purchase requests (also capped at 3 pending ones).
 const purchasePerUserPerHour = 5
 
+// Purchase chat: a buyer's messages, per user.
+const (
+	purchaseChatLimit  = 20
+	purchaseChatWindow = 10 * time.Minute
+)
+
 func NewRouter(d RouterDeps) *gin.Engine {
 	r := gin.New()
 	r.MaxMultipartMemory = 12 << 20
@@ -84,6 +90,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	telegramLinkLimit := RateLimitByUser(NewRateLimiter(ctx, "telegram-link", telegramLinkPerHour, time.Hour))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	purchaseLimit := RateLimitByUser(NewRateLimiter(ctx, "purchase", purchasePerUserPerHour, time.Hour))
+	purchaseChatLimiter := RateLimitByUser(NewRateLimiter(ctx, "purchase-chat", purchaseChatLimit, purchaseChatWindow))
 	generalLimit := RateLimitByUserExcept(NewRateLimiter(ctx, "general", generalPerUserPerMin, time.Minute),
 		"/api/search-word", "/api/words/generate-example", "/api/stories/generate", "/api/words/check", "/api/photo-import")
 
@@ -177,6 +184,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/purchases", d.Purchases.Overview)
 		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)
 		protected.DELETE("/me/purchases/:id", d.Purchases.Cancel)
+		protected.GET("/me/purchases/:id/messages", d.Purchases.BuyerChat)
+		protected.POST("/me/purchases/:id/messages", purchaseChatLimiter, d.Purchases.BuyerPost)
+		protected.GET("/me/purchases/:id/messages/:mid/image", d.Purchases.BuyerImage)
 		protected.GET("/hero", d.Hero.Get)
 		protected.POST("/hero/stage-seen", d.Hero.StageSeen)
 		protected.POST("/hero/intro-seen", d.Hero.IntroSeen)
@@ -199,6 +209,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/purchases", d.Purchases.AdminList)
 		admin.POST("/purchases/:id/approve", d.Purchases.Approve)
 		admin.POST("/purchases/:id/reject", d.Purchases.Reject)
+		admin.GET("/purchases/:id/messages", d.Purchases.AdminChat)
+		admin.POST("/purchases/:id/messages", d.Purchases.AdminPost)
+		admin.GET("/purchases/:id/messages/:mid/image", d.Purchases.AdminImage)
 		admin.POST("/word-check", d.WordCheck.StartJob)
 		admin.GET("/word-check", d.WordCheck.JobStatus)
 	}

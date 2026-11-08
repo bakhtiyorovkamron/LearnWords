@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, BookOpen, Layers, Library, Phone, ScanSearch, Send, ShoppingBag, Star, Users, X, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, Layers, Library, MessageCircle, Phone, ScanSearch, Send, ShoppingBag, Star, Users, X, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { adminApi, meApi, type AdminPurchaseRequest, type AdminUser, type FeedbackSummary, type PushResult } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
@@ -9,6 +10,9 @@ import { dateLocale } from '../i18n'
 import { formatUZS } from '../lib/money'
 import { relativeTime } from '../lib/relativeTime'
 import { AdminUserModal, Stars } from '../components/AdminUserModal'
+import { PurchaseChat } from '../components/PurchaseChat'
+import { CloseButton, useScrimClose } from '../components/Sheet'
+import { CHAT_POLL_MS } from '../lib/purchaseChat'
 
 type SortKey = 'email' | 'created_at' | 'words_count' | 'last_activity_at'
 
@@ -273,7 +277,12 @@ const APPROVE_CONFIRM_MS = 3000
 function PurchasesBlock() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const list = useQuery({ queryKey: ['admin', 'purchases', 'pending'], queryFn: () => adminApi.purchases('pending') })
+  // Re-read every 30 s while visible: new requests and the chats' unread badges come in by themselves.
+  const list = useQuery({
+    queryKey: ['admin', 'purchases', 'pending'], queryFn: () => adminApi.purchases('pending'),
+    refetchInterval: CHAT_POLL_MS, refetchIntervalInBackground: false,
+  })
+  const [chat, setChat] = useState<AdminPurchaseRequest | null>(null)
   const refresh = () => {
     for (const key of [['admin', 'purchases'], ['admin', 'users'], ['admin', 'user-features']]) {
       void qc.invalidateQueries({ queryKey: key })
@@ -305,17 +314,43 @@ function PurchasesBlock() {
           {list.data.map((p) => (
             <PurchaseRow key={p.id} p={p} busy={decide.isPending && decide.variables?.id === p.id}
               onApprove={() => decide.mutate({ id: p.id, approve: true })}
-              onReject={() => decide.mutate({ id: p.id, approve: false })} />
+              onReject={() => decide.mutate({ id: p.id, approve: false })}
+              onChat={() => setChat(p)} />
           ))}
         </ul>
       ))}
       {failed && <p role="alert" className="text-sm text-danger">{t('admin.actionFailed', { error: errorMessage(failed) })}</p>}
+      {chat && <ChatPanel request={chat} onClose={() => { setChat(null); refresh() }} />}
     </section>
   )
 }
 
-function PurchaseRow({ p, busy, onApprove, onReject }: {
-  p: AdminPurchaseRequest; busy: boolean; onApprove: () => void; onReject: () => void
+/** A request's chat in a panel on the right (full screen on phones): the same thread, the admin's composer. */
+function ChatPanel({ request, onClose }: { request: AdminPurchaseRequest; onClose: () => void }) {
+  const { t } = useTranslation()
+  const scrim = useScrimClose(onClose)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" {...scrim}>
+      <aside role="dialog" aria-modal="true" aria-label={t('chat.title')}
+        className="animate-rise flex h-full w-full max-w-md flex-col gap-2 border-l border-line bg-surface p-4 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between gap-2">
+          <span className="min-w-0 truncate text-sm font-semibold text-muted">{request.user_email}</span>
+          <CloseButton onClose={onClose} />
+        </div>
+        <div className="min-h-0 flex-1"><PurchaseChat side="admin" requestId={request.id} /></div>
+      </aside>
+    </div>,
+    document.body,
+  )
+}
+
+function PurchaseRow({ p, busy, onApprove, onReject, onChat }: {
+  p: AdminPurchaseRequest; busy: boolean; onApprove: () => void; onReject: () => void; onChat: () => void
 }) {
   const { t, i18n } = useTranslation()
   // Approving adds photos for real money: the first tap only arms the button for 3 s.
@@ -346,6 +381,15 @@ function PurchaseRow({ p, busy, onApprove, onReject }: {
         </div>
       </div>
       <div className="flex shrink-0 gap-2">
+        <button type="button" onClick={onChat} className={`${btn} inline-flex items-center gap-1.5 border-line text-fg hover:bg-surface-2`}>
+          <MessageCircle size={14} aria-hidden="true" />{t('chat.open')}
+          {p.unread > 0 && (
+            <span data-testid={`unread-${p.id}`} title={t('chat.unread', { count: p.unread })}
+              className="rounded-full bg-accent px-1.5 text-[10px] font-bold tabular-nums text-on-accent">
+              {p.unread}<span className="sr-only"> · {t('chat.unread', { count: p.unread })}</span>
+            </span>
+          )}
+        </button>
         <button type="button" disabled={busy} onClick={approve}
           className={`${btn} ${armed ? 'border-accent bg-accent text-on-accent' : 'border-line text-accent-text hover:bg-surface-2'}`}>
           {armed ? t('admin.purchases.sure') : t('admin.purchases.approve')}

@@ -70,8 +70,11 @@ type PurchaseRequest struct {
 	CreatedAt time.Time
 	DecidedAt *time.Time
 	DecidedBy *uuid.UUID
-	// UserEmail is filled in the admin listing only.
+	// LastMessageAt: the newest chat message (nil = no chat yet).
+	LastMessageAt *time.Time
+	// UserEmail and Unread (the buyer's chat messages no admin has read) are filled for the admins.
 	UserEmail string
+	Unread    int
 }
 
 // PaymentInfo is where to send the money (server configuration).

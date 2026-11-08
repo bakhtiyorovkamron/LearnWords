@@ -27,6 +27,9 @@ func (r *nopTelegramRepo) BindTelegram(context.Context, string, int64, *string, 
 func (r *nopTelegramRepo) UsedCodeChat(context.Context, string) (int64, bool, error) {
 	return 0, false, nil
 }
+func (r *nopTelegramRepo) ChatID(context.Context, uuid.UUID) (int64, bool, error) {
+	return 0, false, nil
+}
 
 type countingBot struct{ sent int }
 

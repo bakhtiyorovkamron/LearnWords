@@ -11,6 +11,7 @@ import { TrainPage } from './pages/TrainPage'
 import { StatsPage } from './pages/StatsPage'
 import { StoryPage } from './pages/StoryPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { PurchaseChatPage } from './pages/PurchaseChatPage'
 import { AdminPage } from './pages/AdminPage'
 import { SearchPage } from './pages/SearchPage'
 import { SharedFolderPage } from './pages/SharedFolderPage'
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/story" element={<StoryPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/purchases/:id" element={<PurchaseChatPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Route>

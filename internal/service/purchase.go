@@ -36,6 +36,16 @@ type PurchaseRepository interface {
 	Approve(ctx context.Context, id, adminID uuid.UUID) (domain.PurchaseRequest, error)
 	Reject(ctx context.Context, id, adminID uuid.UUID) (domain.PurchaseRequest, error)
 	AdminIDs(ctx context.Context) ([]uuid.UUID, error)
+
+	// The chat of a request (a decision — approve, reject, cancel — also writes its system line).
+	// Get: ErrPurchaseNotFound when missing; it carries the user's email and the admins' unread count.
+	Get(ctx context.Context, id uuid.UUID) (domain.PurchaseRequest, error)
+	// AddMessage stores a message (and its photo); ErrChatClosed for a cancelled or rejected request.
+	AddMessage(ctx context.Context, m domain.PurchaseMessage, img *domain.ChatImage) (domain.PurchaseMessage, error)
+	// Messages: up to limit after `after`, oldest first, those viewerRole may see.
+	Messages(ctx context.Context, requestID uuid.UUID, after int64, limit int, viewerRole string) ([]domain.PurchaseMessage, error)
+	MarkAdminRead(ctx context.Context, requestID uuid.UUID, upTo int64) error
+	MessageImage(ctx context.Context, requestID uuid.UUID, messageID int64) (domain.PurchaseMessage, domain.ChatImage, error)
 }
 
 // CreditStore changes a purchased balance and records it in the ledger.
@@ -53,15 +63,16 @@ type Notifier interface {
 // the money to the card with the request's code in the comment (or, without a card, sends the
 // code in Telegram and is told how to pay there), and an admin approves it.
 type PurchaseService struct {
-	repo    PurchaseRepository
-	credits CreditStore
-	push    Notifier // nil = no notifications
-	payment domain.PaymentInfo
-	wg      sync.WaitGroup // notifications in flight
+	repo     PurchaseRepository
+	credits  CreditStore
+	push     Notifier         // nil = no notifications
+	telegram TelegramNotifier // nil = chat notifications by push only
+	payment  domain.PaymentInfo
+	wg       sync.WaitGroup // notifications in flight
 }
 
-func NewPurchaseService(repo PurchaseRepository, credits CreditStore, push Notifier, payment domain.PaymentInfo) *PurchaseService {
-	return &PurchaseService{repo: repo, credits: credits, push: push, payment: payment}
+func NewPurchaseService(repo PurchaseRepository, credits CreditStore, push Notifier, telegram TelegramNotifier, payment domain.PaymentInfo) *PurchaseService {
+	return &PurchaseService{repo: repo, credits: credits, push: push, telegram: telegram, payment: payment}
 }
 
 // Available: there is a way to pay — a card to transfer to, or a Telegram contact where the

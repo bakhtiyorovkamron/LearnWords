@@ -75,6 +75,9 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrTooManyPending):
 		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "too many pending purchase requests", Code: "too_many_pending"})
 		return
+	case errors.Is(err, domain.ErrChatClosed):
+		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "the purchase request is cancelled", Code: "chat_closed"})
+		return
 	case errors.Is(err, domain.ErrPurchaseDecided):
 		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "purchase request is already decided", Code: "already_decided"})
 		return

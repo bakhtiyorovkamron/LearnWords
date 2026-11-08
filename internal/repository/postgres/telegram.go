@@ -35,6 +35,19 @@ func (r *TelegramRepository) ReplaceLinkCode(ctx context.Context, userID uuid.UU
 	})
 }
 
+// ChatID returns the Telegram chat bound to the user (found = false when none, or no such user).
+func (r *TelegramRepository) ChatID(ctx context.Context, userID uuid.UUID) (int64, bool, error) {
+	var chat *int64
+	err := r.pool.QueryRow(ctx, `SELECT telegram_chat_id FROM users WHERE id = $1`, userID).Scan(&chat)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && chat == nil) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return *chat, true, nil
+}
+
 // UsedCodeChat reads a code without a lock: found when it exists, was used, and its user has a
 // Telegram chat bound now (chatID).
 func (r *TelegramRepository) UsedCodeChat(ctx context.Context, code string) (int64, bool, error) {

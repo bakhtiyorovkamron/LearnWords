@@ -328,12 +328,52 @@ export interface PaymentInfo { card_number: string; card_holder: string; telegra
 export type PurchaseStatus = 'pending' | 'paid' | 'rejected' | 'cancelled'
 export interface PurchaseRequest {
   id: string; code: string; pack_id: string; amount: number; price_uzs: number
-  status: PurchaseStatus; created_at: string
+  status: PurchaseStatus; created_at: string; last_message_at?: string | null
 }
 export interface PurchaseOverview { packs: Pack[]; payment: PaymentInfo; requests: PurchaseRequest[] } // requests: newest first
 export interface AdminPurchaseRequest extends PurchaseRequest {
   user_id: string; user_email: string; decided_at: string | null; decided_by: string | null
+  unread: number // the buyer's chat messages no admin has read
 }
+
+/**
+ * A line of a purchase chat. mine: written by the viewer's side. A hidden message (text that looks
+ * like a card number) reaches the buyer's side without body or photo; the admins get everything.
+ * System lines carry event (paid / cancelled) to show in the user's language.
+ */
+export interface ChatMessage {
+  id: number; author: 'buyer' | 'admin' | 'system'; mine: boolean; body: string | null; has_image: boolean
+  hidden: boolean; hidden_reason: string | null; event: 'paid' | 'cancelled' | null; created_at: string
+}
+export interface ChatPage<R extends PurchaseRequest = PurchaseRequest> { request: R; messages: ChatMessage[] }
+/** body and/or image (JPEG/PNG/WebP/GIF ≤ 5 MB). */
+export interface ChatDraft { body: string; image: File | null }
+
+function chatForm({ body, image }: ChatDraft): FormData {
+  const form = new FormData()
+  if (body) form.append('body', body)
+  if (image) form.append('image', image)
+  return form
+}
+
+/**
+ * The chat of one purchase request, for the buyer (/me/purchases) or an admin (/admin/purchases).
+ * messages: ≤ 50 after `after`, oldest first. post: 409 chat_closed (cancelled), 413 photo too
+ * large, 429 too many messages. image: the photo as a Blob (it needs the login header).
+ */
+function chatApi<R extends PurchaseRequest>(base: string) {
+  return {
+    messages: (id: string, after = 0) =>
+      api.get<ChatPage<R>>(`${base}/${id}/messages`, { params: { after } }).then((r) => r.data),
+    post: (id: string, draft: ChatDraft) =>
+      api.post<ChatMessage>(`${base}/${id}/messages`, chatForm(draft), { timeout: 60_000 }).then((r) => r.data),
+    image: (id: string, messageId: number) =>
+      api.get<Blob>(`${base}/${id}/messages/${messageId}/image`, { responseType: 'blob' }).then((r) => r.data),
+  }
+}
+export const buyerChatApi = chatApi<PurchaseRequest>('/me/purchases')
+export const adminChatApi = chatApi<AdminPurchaseRequest>('/admin/purchases')
+export type ChatApi = ReturnType<typeof chatApi<PurchaseRequest>>
 
 // 503 payments_unavailable when the server has no card configured (buying is off).
 export const purchasesApi = {

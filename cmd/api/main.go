@@ -117,12 +117,6 @@ func run() error {
 	if !pushSvc.Enabled() {
 		slog.Warn("VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set: Web Push is disabled (generate keys with `go run ./cmd/vapidkeys`)")
 	}
-	purchaseSvc := service.NewPurchaseService(postgres.NewPurchaseRepository(pool), featureRepo, pushSvc, domain.PaymentInfo{
-		CardNumber: cfg.PaymentCardNumber, CardHolder: cfg.PaymentCardHolder, Telegram: cfg.PaymentTelegram,
-	})
-	if !purchaseSvc.Available() {
-		slog.Warn("neither PAYMENT_CARD_NUMBER nor PAYMENT_TELEGRAM is set: buying photos is off (purchase endpoints answer 503)")
-	}
 	var bot service.TelegramBot // nil = no bot: the Telegram endpoints answer 503
 	if cfg.TelegramBotToken != "" {
 		bot = telegram.New(cfg.TelegramBotToken)
@@ -145,6 +139,13 @@ func run() error {
 				slog.Info("telegram: webhook registered", "url", cfg.TelegramWebhookURL)
 			}()
 		}
+	}
+	// After the Telegram service: an admin's chat message reaches the buyer in Telegram when linked.
+	purchaseSvc := service.NewPurchaseService(postgres.NewPurchaseRepository(pool), featureRepo, pushSvc, telegramSvc, domain.PaymentInfo{
+		CardNumber: cfg.PaymentCardNumber, CardHolder: cfg.PaymentCardHolder, Telegram: cfg.PaymentTelegram,
+	})
+	if !purchaseSvc.Available() {
+		slog.Warn("neither PAYMENT_CARD_NUMBER nor PAYMENT_TELEGRAM is set: buying photos is off (purchase endpoints answer 503)")
 	}
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
 	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))

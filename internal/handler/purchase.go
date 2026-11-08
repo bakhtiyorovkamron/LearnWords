@@ -20,32 +20,34 @@ func NewPurchaseHandler(svc *service.PurchaseService) *PurchaseHandler {
 
 // purchaseView is a request as its owner sees it.
 type purchaseView struct {
-	ID        uuid.UUID  `json:"id"`
-	Code      string     `json:"code"`
-	PackID    string     `json:"pack_id"`
-	Feature   string     `json:"feature"`
-	Amount    int        `json:"amount"`
-	PriceUZS  int        `json:"price_uzs"`
-	Status    string     `json:"status"`
-	CreatedAt time.Time  `json:"created_at"`
-	DecidedAt *time.Time `json:"decided_at"`
+	ID            uuid.UUID  `json:"id"`
+	Code          string     `json:"code"`
+	PackID        string     `json:"pack_id"`
+	Feature       string     `json:"feature"`
+	Amount        int        `json:"amount"`
+	PriceUZS      int        `json:"price_uzs"`
+	Status        string     `json:"status"`
+	CreatedAt     time.Time  `json:"created_at"`
+	DecidedAt     *time.Time `json:"decided_at"`
+	LastMessageAt *time.Time `json:"last_message_at"`
 }
 
 func newPurchaseView(p domain.PurchaseRequest) purchaseView {
 	return purchaseView{ID: p.ID, Code: p.Code, PackID: p.PackID, Feature: p.Feature, Amount: p.Amount,
-		PriceUZS: p.PriceUZS, Status: p.Status, CreatedAt: p.CreatedAt, DecidedAt: p.DecidedAt}
+		PriceUZS: p.PriceUZS, Status: p.Status, CreatedAt: p.CreatedAt, DecidedAt: p.DecidedAt, LastMessageAt: p.LastMessageAt}
 }
 
-// adminPurchaseView adds whose request it is and who decided it.
+// adminPurchaseView adds whose request it is, who decided it and the chat's unread count.
 type adminPurchaseView struct {
 	purchaseView
 	UserID    uuid.UUID  `json:"user_id"`
 	UserEmail string     `json:"user_email"`
 	DecidedBy *uuid.UUID `json:"decided_by"`
+	Unread    int        `json:"unread"` // the buyer's chat messages no admin has read
 }
 
 func newAdminPurchaseView(p domain.PurchaseRequest) adminPurchaseView {
-	return adminPurchaseView{purchaseView: newPurchaseView(p), UserID: p.UserID, UserEmail: p.UserEmail, DecidedBy: p.DecidedBy}
+	return adminPurchaseView{purchaseView: newPurchaseView(p), UserID: p.UserID, UserEmail: p.UserEmail, DecidedBy: p.DecidedBy, Unread: p.Unread}
 }
 
 func mapSlice[T, V any](in []T, f func(T) V) []V {

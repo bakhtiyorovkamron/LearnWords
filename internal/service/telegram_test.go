@@ -79,6 +79,13 @@ func (m *memTelegram) BindTelegram(_ context.Context, code string, chatID int64,
 	return true, bonus, nil
 }
 
+func (m *memTelegram) ChatID(_ context.Context, user uuid.UUID) (int64, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	chat, ok := m.chat[user]
+	return chat, ok, nil
+}
+
 func (m *memTelegram) UsedCodeChat(_ context.Context, code string) (int64, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -472,5 +479,25 @@ func TestTelegram_UnknownCodeSaysExpired_LookupErrorToo(t *testing.T) {
 	}
 	if len(texts) != 4 || texts[0] != expiredRU || texts[1] != expiredRU || texts[3] != expiredRU {
 		t.Errorf("replies %q", texts)
+	}
+}
+
+func TestTelegram_NotifyUser(t *testing.T) {
+	svc, repo, bot, _ := newTelegramFixture()
+	ctx := context.Background()
+	linked, unlinked := uuid.New(), uuid.New()
+	repo.chat[linked] = 555
+	if sent, err := svc.NotifyUser(ctx, linked, "hello"); !sent || err != nil {
+		t.Fatalf("linked: sent=%v err=%v", sent, err)
+	}
+	if len(bot.sent) != 1 || bot.sent[0].chat != 555 || bot.sent[0].text != "hello" {
+		t.Errorf("sent %+v", bot.sent)
+	}
+	if sent, err := svc.NotifyUser(ctx, unlinked, "hello"); sent || err != nil {
+		t.Errorf("not linked: sent=%v err=%v", sent, err)
+	}
+	off := NewTelegramService(repo, nil, "")
+	if sent, err := off.NotifyUser(ctx, linked, "hello"); sent || err != nil {
+		t.Errorf("no bot: sent=%v err=%v", sent, err)
 	}
 }

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AxiosError, type AxiosResponse } from 'axios'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { purchasesApi, type PurchaseOverview, type PurchaseRequest } from '../api/endpoints'
@@ -32,7 +33,7 @@ const text = (el: Element | null) => (el?.textContent ?? '').replace(/\s/g, ' ')
 
 function renderSheet(mode: BuyMode = 'limit', onClose = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={qc}><BuySheet mode={mode} limit={5} onClose={onClose} /></QueryClientProvider>)
+  render(<QueryClientProvider client={qc}><MemoryRouter><BuySheet mode={mode} limit={5} onClose={onClose} /></MemoryRouter></QueryClientProvider>)
   return { onClose, qc }
 }
 

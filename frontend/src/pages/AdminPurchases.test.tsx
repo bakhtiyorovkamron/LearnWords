@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { adminApi, meApi, type AdminPurchaseRequest } from '../api/endpoints'
+import { adminApi, adminChatApi, meApi, type AdminPurchaseRequest } from '../api/endpoints'
 import { AdminPage } from './AdminPage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -16,13 +16,14 @@ vi.mock('../api/endpoints', async (importOriginal) => {
       users: vi.fn(), stats: vi.fn(), telegramStats: vi.fn(async () => ({ total_users: 0, connected: 0, percent: 0, connected_last_7d: 0 })), feedback: vi.fn(), wordCheckStatus: vi.fn(), startWordCheck: vi.fn(),
       pushStats: vi.fn(), sendPush: vi.fn(), purchases: vi.fn(), approvePurchase: vi.fn(), rejectPurchase: vi.fn(),
     },
+    adminChatApi: { messages: vi.fn(), post: vi.fn(), image: vi.fn() },
   }
 })
 
 const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString()
 const purchase = (over: Partial<AdminPurchaseRequest>): AdminPurchaseRequest => ({
   id: 'p1', code: 'YD-1234', pack_id: 'photo_35', amount: 35, price_uzs: 25000, status: 'pending',
-  created_at: minutesAgo(5), user_id: 'u1', user_email: 'anna@x.co', decided_at: null, decided_by: null, ...over,
+  created_at: minutesAgo(5), user_id: 'u1', user_email: 'anna@x.co', decided_at: null, decided_by: null, unread: 0, ...over,
 })
 const PENDING = [
   purchase({}),
@@ -135,5 +136,51 @@ describe('AdminPage: purchase requests', () => {
     renderPage()
     expect(await screen.findByText('No pending requests')).toBeTruthy()
     expect(screen.queryByTestId('purchases-count')).toBeNull()
+  })
+})
+
+describe('AdminPage: the chat of a purchase request', () => {
+  it('"Open chat" shows the unread badge (buyer messages after the last admin read)', async () => {
+    vi.mocked(adminApi.purchases).mockResolvedValue([purchase({ unread: 3 }), purchase({ id: 'p2', code: 'YD-0042', user_email: 'bob@x.co' })])
+    renderPage()
+    await waitFor(() => expect(row('p1')).toBeTruthy())
+    expect(screen.getByTestId('unread-p1').textContent).toBe('3 · New: 3')
+    expect(within(row('p1')).getByRole('button', { name: /Open chat/ })).toBeTruthy()
+    expect(screen.queryByTestId('unread-p2')).toBeNull() // nothing unread: no badge
+    expect(within(row('p2')).getByRole('button', { name: 'Open chat' })).toBeTruthy()
+  })
+
+  it('opens the thread in a side panel with the admin composer; closing re-reads the list (the badge)', async () => {
+    vi.mocked(adminApi.purchases).mockResolvedValue([purchase({ unread: 1 })])
+    vi.mocked(adminChatApi.messages).mockResolvedValue({
+      request: purchase({ unread: 1 }),
+      messages: [{ id: 1, author: 'buyer', mine: false, body: 'Paid, receipt attached', has_image: false, hidden: false,
+        hidden_reason: null, event: null, created_at: minutesAgo(1) }],
+    })
+    renderPage()
+    await waitFor(() => expect(row('p1')).toBeTruthy())
+    fireEvent.click(within(row('p1')).getByRole('button', { name: /Open chat/ }))
+    const panel = await screen.findByRole('dialog', { name: 'Request chat' })
+    expect(within(panel).getByText('anna@x.co')).toBeTruthy()
+    expect(await within(panel).findByText('Paid, receipt attached')).toBeTruthy()
+    expect(adminChatApi.messages).toHaveBeenCalledWith('p1', 0)
+    expect(within(panel).getByRole('textbox', { name: 'Message…' })).toBeTruthy()
+
+    const before = vi.mocked(adminApi.purchases).mock.calls.length
+    vi.mocked(adminApi.purchases).mockResolvedValue([purchase({ unread: 0 })])
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Request chat' })).toBeNull())
+    await waitFor(() => expect(vi.mocked(adminApi.purchases).mock.calls.length).toBeGreaterThan(before))
+    await waitFor(() => expect(screen.queryByTestId('unread-p1')).toBeNull())
+  })
+
+  it('the list re-reads itself every 30 s, so new unread messages show up', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.mocked(adminApi.purchases).mockResolvedValue([purchase({ unread: 0 })])
+    renderPage()
+    await waitFor(() => expect(row('p1')).toBeTruthy())
+    vi.mocked(adminApi.purchases).mockResolvedValue([purchase({ unread: 2 })])
+    await act(() => vi.advanceTimersByTimeAsync(30_000))
+    await waitFor(() => expect(screen.getByTestId('unread-p1')).toBeTruthy())
   })
 })

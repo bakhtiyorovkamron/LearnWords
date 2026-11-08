@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Loader2, Send } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Check, Copy, Loader2, MessageCircle, Send } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { purchasesApi, type Pack, type PaymentInfo, type PurchaseOverview, type PurchaseRequest } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
@@ -100,7 +101,7 @@ export function BuySheet({ mode, limit, onClose }: { mode: BuyMode; limit: numbe
 
         {overview.data && request && (
           <PayStep request={request} payment={overview.data.payment} lang={i18n.language}
-            cancelling={cancel.isPending} onCancel={() => cancel.mutate(request.id)} onDone={onClose} />
+            cancelling={cancel.isPending} onCancel={() => cancel.mutate(request.id)} onDone={onClose} onOpenChat={onClose} />
         )}
 
         {failureText && <p role="alert" className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">{failureText}</p>}
@@ -133,8 +134,9 @@ function PackCard({ pack, best, busy, disabled, lang, onChoose }: {
 }
 
 /** Step B. With a card: transfer to it, the code in the comment. Without one: send the code in Telegram. */
-function PayStep({ request, payment, lang, cancelling, onCancel, onDone }: {
+function PayStep({ request, payment, lang, cancelling, onCancel, onDone, onOpenChat }: {
   request: PurchaseRequest; payment: PaymentInfo; lang: string; cancelling: boolean; onCancel: () => void; onDone: () => void
+  onOpenChat: () => void
 }) {
   const { t } = useTranslation()
   const cardId = useId()
@@ -188,6 +190,10 @@ function PayStep({ request, payment, lang, cancelling, onCancel, onDone }: {
           </a>
         )}
         <button type="button" className={telegram ? 'btn-ghost !py-3' : 'btn-primary'} onClick={onDone}>{t('buy.done')}</button>
+        {/* Questions about this payment: the request's chat with the admins (the sheet closes). */}
+        <Link to={`/purchases/${request.id}`} onClick={onOpenChat} className="btn-ghost !py-3">
+          <MessageCircle size={18} aria-hidden="true" />{t('chat.open')}
+        </Link>
         <button type="button" disabled={cancelling} onClick={onCancel}
           className="self-center rounded-lg px-3 py-2 text-sm font-semibold text-muted transition hover:text-danger disabled:opacity-60">
           {t('buy.cancel')}
