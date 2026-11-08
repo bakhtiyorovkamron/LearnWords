@@ -29,11 +29,11 @@ export function StatusPill({ status }: { status: PurchaseStatus }) {
  */
 export function PurchaseChat({ side, requestId }: { side: ChatSide; requestId: string }) {
   const { t, i18n } = useTranslation()
-  const { thread, send, api } = usePurchaseChat(side, requestId)
+  const { thread, send, messages, api } = usePurchaseChat(side, requestId)
 
   if (thread.error && !thread.data) return <ErrorState error={thread.error} />
   if (!thread.data) return <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
-  const { meta: r, messages } = thread.data
+  const r = thread.data.meta
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">

@@ -93,8 +93,8 @@ function ThreadRow({ th, active, onOpen }: { th: SupportThread; active: boolean;
 function AdminSupportThread({ id }: { id: number }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const { thread, send } = useAdminSupportThread(id)
-  const lastId = thread.data?.messages.at(-1)?.id ?? 0
+  const { thread, send, messages } = useAdminSupportThread(id)
+  const lastId = messages.at(-1)?.id ?? 0
 
   // Read up to the newest message on screen: when opened, and as new ones arrive.
   useEffect(() => {
@@ -105,7 +105,7 @@ function AdminSupportThread({ id }: { id: number }) {
   if (thread.error && !thread.data) return <p className="text-sm text-danger">{errorMessage(thread.error)}</p>
   if (!thread.data) return <div className="h-48 animate-pulse rounded-2xl bg-surface-2" />
   return (
-    <ChatThreadView side="admin" messages={thread.data.messages} send={send} open
+    <ChatThreadView side="admin" messages={messages} send={send} open
       otherLabel={t('chat.user')}
       photo={{ key: ['admin-support-image', id], load: (mid) => adminSupportApi.image(id, mid) }}
       texts={{

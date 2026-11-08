@@ -608,3 +608,27 @@ func TestSupportRoutes_RateLimit(t *testing.T) {
 		t.Errorf("without login: %d", w.Code)
 	}
 }
+
+// The bug report "admin replies show only after a reload": reading after the user's own message
+// must bring the admin's reply (ids ascending, admin messages included).
+func TestSupport_UserSeesTheAdminReplyAfterTheirMessage(t *testing.T) {
+	e := newSupportEnv()
+	mine := e.write(t, e.user, 0, "Где мои фото?")
+	thread := e.threads(t, "")[0].ID // the admin replies in the thread from the list
+	reply := e.write(t, e.admin, thread, "Уже начислили")
+	second := e.write(t, e.admin, thread, "Проверьте, пожалуйста")
+
+	got := e.mine(t, e.user, mine.ID)
+	if got.ThreadID != thread {
+		t.Fatalf("the user reads thread %d, the admin wrote to %d", got.ThreadID, thread)
+	}
+	if len(got.Messages) != 2 || got.Messages[0].ID != reply.ID || got.Messages[1].ID != second.ID {
+		t.Fatalf("after %d: %+v", mine.ID, got.Messages)
+	}
+	if got.Messages[0].Author != "admin" || got.Messages[0].Mine || *got.Messages[0].Body != "Уже начислили" {
+		t.Errorf("reply %+v", got.Messages[0])
+	}
+	if latest := e.mine(t, e.user, second.ID); len(latest.Messages) != 0 {
+		t.Errorf("after the newest: %+v", latest.Messages)
+	}
+}

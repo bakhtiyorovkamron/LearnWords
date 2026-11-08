@@ -6,6 +6,9 @@ import type { ChatDraft, ChatMessage } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { CHAT_MAX_BODY, CHAT_MAX_IMAGE, type ChatSide } from '../lib/chatThread'
 
+/** Within this many pixels of the bottom counts as "at the bottom": new messages scroll into view. */
+export const NEAR_BOTTOM_PX = 80
+
 /** The texts that differ between the chats (support / purchase). */
 export interface ChatTexts {
   placeholder: string
@@ -18,8 +21,9 @@ export interface ChatTexts {
 
 /**
  * A chat thread with the admins, shared by support and the purchase chats: the messages (newest at
- * the bottom, scrolled to on every new one) and, while open, the composer — text and/or one photo,
- * sending disabled while both are empty. A hidden message (card-like text) is the warning for its
+ * the bottom) and, while open, the composer — text and/or one photo, sending disabled while both are
+ * empty. New messages scroll into view when the reader is at the bottom already (or wrote the newest
+ * one), not while they read further up. A hidden message (card-like text) is the warning for its
  * author and a badge with "Show" for the admins.
  */
 export function ChatThreadView({ side, messages, send, open, texts, otherLabel, photo, systemText }: {
@@ -36,13 +40,24 @@ export function ChatThreadView({ side, messages, send, open, texts, otherLabel, 
   systemText?: (m: ChatMessage) => string | null
 }) {
   const { t } = useTranslation()
+  const box = useRef<HTMLDivElement>(null)
   const end = useRef<HTMLDivElement>(null)
-  // Every new message brings the newest into view (also the first load).
-  useEffect(() => { end.current?.scrollIntoView?.({ block: 'end' }) }, [messages.length])
+  const atBottom = useRef(true)
+  const shown = useRef(0)
+  function onScroll() {
+    const el = box.current
+    if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
+  }
+  useEffect(() => {
+    const first = shown.current === 0
+    const added = messages.length > shown.current
+    shown.current = messages.length
+    if (added && (first || atBottom.current || messages.at(-1)?.mine)) end.current?.scrollIntoView?.({ block: 'end' })
+  }, [messages])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div role="log" aria-label={t('chat.title')} className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-2xl bg-surface-2/40 p-3">
+      <div ref={box} onScroll={onScroll} role="log" aria-label={t('chat.title')} className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-2xl bg-surface-2/40 p-3">
         {messages.length === 0 && <p data-testid="chat-empty" className="py-6 text-center text-sm text-muted">{texts.empty}</p>}
         {messages.map((m) => (
           <Bubble key={m.id} m={m} side={side} otherLabel={otherLabel} hiddenCard={texts.hiddenCard} photo={photo}

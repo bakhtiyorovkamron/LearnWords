@@ -4,7 +4,7 @@ import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { supportApi, type ChatMessage } from '../api/endpoints'
-import { CHAT_POLL_MS } from '../lib/chatThread'
+import { SUPPORT_POLL_MS } from '../lib/supportChat'
 import { SupportPage } from './SupportPage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -85,29 +85,113 @@ describe('SupportPage', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Too many messages. Please wait a few minutes.')
   })
 
-  it('polls every 30 s while visible, pauses while the page is hidden, catches up when it is back', async () => {
+  it('a new admin reply appears after one poll tick (5 s), asked for after the newest id in the list', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const first = msg({ body: 'my question' })
-    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([first])).mockResolvedValue(page([]))
+    const mine = msg({ body: 'my question' })
+    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([mine])).mockResolvedValue(page([]))
     renderPage()
     expect(await within(await screen.findByRole('log')).findByText('my question')).toBeTruthy()
+    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([msg({ author: 'admin', mine: false, body: 'We are on it' })]))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    expect(supportApi.messages).toHaveBeenLastCalledWith(mine.id)
+    expect(await within(screen.getByRole('log')).findByText('We are on it')).toBeTruthy()
+    expect(within(screen.getByRole('log')).getByText('my question')).toBeTruthy() // merged, not replaced
+  })
+
+  it('the same message twice (the server repeats an id) is shown once', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const first = msg({ body: 'only once' })
+    vi.mocked(supportApi.messages).mockResolvedValue(page([first]))
+    renderPage()
+    expect(await within(await screen.findByRole('log')).findByText('only once')).toBeTruthy()
+    vi.mocked(supportApi.messages).mockResolvedValue(page([first, msg({ author: 'admin', mine: false, body: 'reply' })]))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    expect(await within(screen.getByRole('log')).findByText('reply')).toBeTruthy()
+    expect(within(screen.getByRole('log')).getAllByText('only once')).toHaveLength(1)
+    expect(within(screen.getByRole('log')).getAllByText('reply')).toHaveLength(1)
+  })
+
+  it('after sending: the message shows at once, and the re-read (after the newest read id) brings a reply that came meanwhile', async () => {
+    const q = msg({ body: 'question' }) // id 1
+    const reply = msg({ author: 'admin', mine: false, body: 'reply in between' }) // id 2, not read yet
+    const sent = msg({ body: 'one more thing' }) // id 3
+    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([q]))
+    let answer!: (m: ChatMessage) => void
+    vi.mocked(supportApi.post).mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    renderPage()
+    expect(await within(await screen.findByRole('log')).findByText('question')).toBeTruthy()
+    vi.mocked(supportApi.messages).mockResolvedValue(page([reply, sent]))
+    fireEvent.change(box(), { target: { value: 'one more thing' } })
+    fireEvent.click(sendBtn())
+    await act(async () => answer(sent))
+    expect(await within(screen.getByRole('log')).findByText('one more thing')).toBeTruthy()
+    await waitFor(() => expect(supportApi.messages).toHaveBeenLastCalledWith(q.id)) // not after the sent id 3
+    expect(await within(screen.getByRole('log')).findByText('reply in between')).toBeTruthy()
+    expect(within(screen.getByRole('log')).getAllByText('one more thing')).toHaveLength(1)
+  })
+
+  it('polls every 5 s while visible; paused while hidden; reads at once when the page or the window comes back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    renderPage()
+    await screen.findByTestId('chat-empty')
     const calls = () => vi.mocked(supportApi.messages).mock.calls.length
     expect(calls()).toBe(1)
-
-    await act(() => vi.advanceTimersByTimeAsync(CHAT_POLL_MS))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
     expect(calls()).toBe(2)
-    expect(supportApi.messages).toHaveBeenLastCalledWith(first.id) // only what came after
 
     act(() => setVisibility('hidden'))
-    await act(() => vi.advanceTimersByTimeAsync(CHAT_POLL_MS * 4))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS * 6))
     expect(calls()).toBe(2) // paused
 
-    const reply = msg({ author: 'admin', mine: false, body: 'answer' })
-    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([reply]))
     act(() => setVisibility('visible'))
-    await waitFor(() => expect(calls()).toBe(3)) // at once, not at the next tick
-    expect(await within(screen.getByRole('log')).findByText('answer')).toBeTruthy()
-    await act(() => vi.advanceTimersByTimeAsync(CHAT_POLL_MS))
+    await waitFor(() => expect(calls()).toBe(3)) // at once
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
     expect(calls()).toBe(4) // and the interval goes on
+
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    await waitFor(() => expect(calls()).toBe(5)) // the window got the focus back
+  })
+
+  it('polling stops when the screen is left', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(<QueryClientProvider client={qc}><SupportPage /></QueryClientProvider>)
+    await screen.findByTestId('chat-empty')
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    const before = vi.mocked(supportApi.messages).mock.calls.length
+    view.unmount()
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS * 10))
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    expect(vi.mocked(supportApi.messages).mock.calls.length).toBe(before)
+  })
+
+  it('new messages scroll into view only when the reader is at the bottom (or wrote it)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([msg({ body: 'first' })])).mockResolvedValue(page([]))
+    renderPage()
+    const log = await screen.findByRole('log')
+    await within(log).findByText('first')
+    expect(scroll).toHaveBeenCalledTimes(1) // the first load goes to the bottom
+
+    // The reader scrolled up: 1000 px of messages, a 300 px window at the top.
+    Object.defineProperty(log, 'scrollHeight', { configurable: true, value: 1000 })
+    Object.defineProperty(log, 'clientHeight', { configurable: true, value: 300 })
+    Object.defineProperty(log, 'scrollTop', { configurable: true, writable: true, value: 0 })
+    fireEvent.scroll(log)
+    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([msg({ author: 'admin', mine: false, body: 'reply 1' })]))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    await within(log).findByText('reply 1')
+    expect(scroll).toHaveBeenCalledTimes(1) // not pulled down while reading above
+
+    // Back at the bottom: the next reply scrolls into view.
+    log.scrollTop = 650
+    fireEvent.scroll(log)
+    vi.mocked(supportApi.messages).mockResolvedValueOnce(page([msg({ author: 'admin', mine: false, body: 'reply 2' })]))
+    await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+    await within(log).findByText('reply 2')
+    expect(scroll).toHaveBeenCalledTimes(2)
   })
 })

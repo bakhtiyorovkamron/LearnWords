@@ -6,11 +6,12 @@ import { useSupportChat } from '../lib/supportChat'
 
 /**
  * The user's own chat with the admin team — no purchase needed. Text and photos; card numbers are
- * hidden like in the order chat. Re-read every 30 s while the page is open and visible.
+ * hidden like in the order chat. Re-read every 5 s while the screen is open and visible, and when
+ * the page or the window comes back.
  */
 export function SupportPage() {
   const { t } = useTranslation()
-  const { thread, send } = useSupportChat()
+  const { thread, send, messages } = useSupportChat()
 
   return (
     <div className="mx-auto flex h-[calc(100dvh-12rem)] min-h-[26rem] max-w-xl flex-col gap-3">
@@ -19,7 +20,7 @@ export function SupportPage() {
         {thread.error && !thread.data ? <ErrorState error={thread.error} />
           : !thread.data ? <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
           : (
-            <ChatThreadView side="user" messages={thread.data.messages} send={send} open
+            <ChatThreadView side="user" messages={messages} send={send} open
               otherLabel={t('chat.support')}
               photo={{ key: ['support-chat-image'], load: (mid) => supportApi.image(mid) }}
               texts={{
