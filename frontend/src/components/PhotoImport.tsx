@@ -20,11 +20,13 @@ import { toast } from './Toaster'
  * chosen ones. One photo costs one unit of the daily quota (shown), or a bought photo once those are
  * used up; the words are saved only when the user confirms, through the same call as the search page.
  */
-// Which message a rejected photo gets: by the on-device verdict, or by the server's 422 code.
+// Which message a rejected photo gets: by the on-device verdict, or by the server's code (422, or
+// 502 photo_too_slow for a page too dense to read in time). All of them were not charged.
 const REJECTIONS = { too_small: 'photo.errTooSmall', too_dark: 'photo.errTooDark', blurry: 'photo.errBlurry' } as const
 const REJECTION_CODES: Record<string, string> = {
   photo_not_document: 'photo.errNotDocument',
   photo_unreadable: 'photo.errUnreadable',
+  photo_too_slow: 'photo.errTooSlow',
 }
 
 const BIG_DOTS_UP_TO = 5 // quota dots: larger up to this limit, smaller above it

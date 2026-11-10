@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -52,4 +53,7 @@ type PhotoReading struct {
 var (
 	ErrPhotoNotDocument = errors.New("photo is not study material")
 	ErrPhotoUnreadable  = errors.New("photo text is unreadable")
+	// ErrPhotoTooSlow: the AI did not finish reading the photo in time (a very dense page). It is an
+	// upstream error, so it is also errors.Is(err, ErrUpstream).
+	ErrPhotoTooSlow = fmt.Errorf("%w: the photo took too long to read", ErrUpstream)
 )

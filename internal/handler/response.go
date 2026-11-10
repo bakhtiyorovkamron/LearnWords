@@ -57,6 +57,10 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrPhotoUnreadable):
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, errorResponse{Error: "the text in the photo cannot be read", Code: "photo_unreadable"})
 		return
+	case errors.Is(err, domain.ErrPhotoTooSlow): // before ErrUpstream: it is one, with its own code
+		slog.ErrorContext(c.Request.Context(), "upstream failed", requestLogAttrs(c, err)...)
+		c.AbortWithStatusJSON(http.StatusBadGateway, errorResponse{Error: "the photo took too long to read", Code: "photo_too_slow"})
+		return
 	case errors.Is(err, domain.ErrPushDisabled):
 		c.AbortWithStatusJSON(http.StatusServiceUnavailable, errorResponse{Error: "push notifications are not configured", Code: "push_disabled"})
 		return

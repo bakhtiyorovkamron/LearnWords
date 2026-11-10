@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -246,5 +247,73 @@ func TestPhotoImport_CreditsAfterTheFreePhotos(t *testing.T) {
 	_, err = e.svc.Import(ctx, e.user, pngBytes)
 	if n, ok := domain.CreditsOf(err); !errors.Is(err, domain.ErrDailyLimit) || !ok || n != 0 {
 		t.Fatalf("all used: %v", err)
+	}
+}
+
+// blockingReader stands for an AI call still running when the client disconnects: it waits for
+// ctx to be cancelled and fails with ctx's error, as the HTTP call does.
+type blockingReader struct{ started chan struct{} }
+
+func (r blockingReader) ExtractPhotoWords(ctx context.Context, _ []byte, _ string) (domain.PhotoReading, error) {
+	close(r.started)
+	<-ctx.Done()
+	return domain.PhotoReading{}, ctx.Err()
+}
+
+// liveCtxQuota is countingQuota that also checks Refund gets a ctx that is not cancelled (the
+// database would refuse to run the refund with a cancelled one).
+type liveCtxQuota struct {
+	countingQuota
+	refundCtxErr error
+}
+
+func (q *liveCtxQuota) Refund(ctx context.Context, u uuid.UUID, f string, res domain.ConsumeResult) error {
+	q.refundCtxErr = ctx.Err()
+	return q.countingQuota.Refund(ctx, u, f, res)
+}
+
+func TestPhotoImport_ClientDisconnectDuringAICallRefunds(t *testing.T) {
+	ai := blockingReader{started: make(chan struct{})}
+	q := &liveCtxQuota{}
+	svc := NewPhotoImportService(ai, fakeExists{}, q)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { <-ai.started; cancel() }() // the client goes away while the AI is reading
+
+	_, err := svc.Import(ctx, uuid.New(), pngBytes)
+	if !errors.Is(err, domain.ErrUpstream) || errors.Is(err, domain.ErrPhotoTooSlow) {
+		t.Fatalf("error: %v", err)
+	}
+	if q.consumed != 1 || q.refunded != 1 {
+		t.Errorf("consumed %d, refunded %d: a cancelled request must give the unit back", q.consumed, q.refunded)
+	}
+	if q.refundCtxErr != nil {
+		t.Errorf("refund ran with a cancelled ctx: %v", q.refundCtxErr)
+	}
+	if r := q.refundedWith; r.FromCredits != 1 || r.Day != "2026-10-29" {
+		t.Errorf("the refund must carry what Consume took: %+v", r)
+	}
+
+	// the same with the real quota: the unit is back
+	e := newPhotoEnv(nil, nil)
+	ai2 := blockingReader{started: make(chan struct{})}
+	e.svc = NewPhotoImportService(ai2, fakeExists{}, e.feats)
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	go func() { <-ai2.started; cancel2() }()
+	if _, err := e.svc.Import(ctx2, e.user, pngBytes); err == nil {
+		t.Fatal("a cancelled request must fail")
+	}
+	if e.used(t) != 0 {
+		t.Errorf("used %d after a cancelled request, want 0", e.used(t))
+	}
+}
+
+func TestPhotoImport_TooSlowIsRefundedAndKeepsItsError(t *testing.T) {
+	e := newPhotoEnv(nil, fmt.Errorf("%w: anthropic request: context deadline exceeded", domain.ErrPhotoTooSlow))
+	_, err := e.svc.Import(context.Background(), e.user, pngBytes)
+	if !errors.Is(err, domain.ErrPhotoTooSlow) || !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error: %v", err)
+	}
+	if e.used(t) != 0 {
+		t.Errorf("used %d: a timed-out call must not cost quota", e.used(t))
 	}
 }

@@ -1,10 +1,13 @@
 // Photos are checked in the browser before anything is sent: a photo that cannot work is
 // rejected here, with no request — so it never costs the daily quota.
 
-// Phone photos are often bigger than the server accepts (5 MB): such a photo is shrunk first.
+// Phone photos are often bigger than the server accepts (5 MB) and bigger than the AI uses: such a
+// photo is shrunk first. The AI scales anything above ~1568 px on the long side down anyway, so a
+// larger photo only makes the upload slower, with nothing more for the AI to read.
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024
 const SHRINK_ABOVE = 4 * 1024 * 1024
-const MAX_SIDE = 2400
+export const MAX_SIDE = 1568
+const JPEG_QUALITY = 0.85
 
 // Quality thresholds — deliberately conservative: a slightly soft but readable page must pass.
 // Size of the original image. A crop of one or two lines (780×150) is fine; a whole page photographed
@@ -119,8 +122,9 @@ export function checkPhotoQuality(bitmap: { width: number; height: number } & Ca
 
 /**
  * The file ready to upload: checked (throws PhotoQualityError for a photo that cannot work) and,
- * when too big, a JPEG scaled down to MAX_SIDE. If the browser cannot decode the file the checks
- * are skipped and the file goes as it is — the server and the AI still judge it.
+ * when too big (over SHRINK_ABOVE bytes, or over MAX_SIDE on the long side), a JPEG scaled down to
+ * MAX_SIDE. If the browser cannot decode the file the checks are skipped and the file goes as it
+ * is — the server and the AI still judge it.
  */
 export async function preparePhoto(file: Blob): Promise<Blob> {
   let bitmap: ImageBitmap
@@ -132,15 +136,16 @@ export async function preparePhoto(file: Blob): Promise<Blob> {
   try {
     const quality = checkPhotoQuality(bitmap)
     if (quality !== 'ok') throw new PhotoQualityError(quality)
-    if (file.size <= SHRINK_ABOVE) return file
-    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+    const longSide = Math.max(bitmap.width, bitmap.height)
+    if (file.size <= SHRINK_ABOVE && longSide <= MAX_SIDE) return file
+    const scale = Math.min(1, MAX_SIDE / longSide)
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(bitmap.width * scale)
     canvas.height = Math.round(bitmap.height * scale)
     const ctx = canvas.getContext('2d')
     if (!ctx) return file
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/jpeg', 0.85))
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/jpeg', JPEG_QUALITY))
     return blob && blob.size < file.size ? blob : file
   } finally {
     bitmap.close?.()

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -66,7 +67,11 @@ func (s *PhotoImportService) Import(ctx context.Context, userID uuid.UUID, image
 	}
 	reading, err := s.ai.ExtractPhotoWords(ctx, image, mediaType)
 	if err != nil {
+		// Also when ctx was cancelled (the client went away): refund does not use the cancelled ctx.
 		s.refund(ctx, userID, spent)
+		if errors.Is(err, domain.ErrPhotoTooSlow) {
+			return nil, err // already an upstream error, with its own message for the client
+		}
 		return nil, fmt.Errorf("%w: %v", domain.ErrUpstream, err)
 	}
 	// A photo the AI cannot use is rejected like a failed call: the unit is given back.

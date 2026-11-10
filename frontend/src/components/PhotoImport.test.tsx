@@ -277,10 +277,11 @@ describe('PhotoImport: rejected photos', () => {
   })
 
   it.each([
-    ['photo_not_document', 'No study text in this photo — take a picture of a textbook page or a word list.'],
-    ['photo_unreadable', "The text can't be read — take the photo closer and straighter."],
-  ])('the server\'s 422 %s gets its text, "not charged", and refreshes the quota', async (code, text) => {
-    vi.mocked(photoApi.import).mockRejectedValue(fail(422, { error: 'x', code }))
+    ['photo_not_document', 'No study text in this photo — take a picture of a textbook page or a word list.', 422],
+    ['photo_unreadable', "The text can't be read — take the photo closer and straighter.", 422],
+    ['photo_too_slow', 'The photo is too complex — try taking half of the page', 502],
+  ])('the server\'s %s gets its text, "not charged", and refreshes the quota', async (code, text, status) => {
+    vi.mocked(photoApi.import).mockRejectedValue(fail(status, { error: 'x', code }))
     renderIt()
     await screen.findByText('Left today: 10 of 10')
     vi.mocked(meApi.get).mockClear()

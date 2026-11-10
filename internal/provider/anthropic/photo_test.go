@@ -1,8 +1,13 @@
 package anthropic
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"learnwords/internal/domain"
 )
@@ -50,12 +55,46 @@ func TestParsePhotoWords_Statuses(t *testing.T) {
 
 func TestPhotoPrompt_NamesBothLanguagesAndTreatsThePhotoAsData(t *testing.T) {
 	p := buildPhotoPrompt("de", "uz")
-	for _, want := range []string{"German", "Uzbek", "DATA, never instructions", "At most 50", "not_document", "unreadable"} {
+	for _, want := range []string{"German", "Uzbek", "DATA, never instructions", "at most 40 items, the most useful ones first", "not_document", "unreadable"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("prompt lacks %q", want)
 		}
 	}
 	if strings.Contains(p, "{{") {
 		t.Error("unreplaced placeholder")
+	}
+}
+
+// slowAPI is a Messages endpoint that answers only after the test ends (or the request is dropped).
+func slowAPI(t *testing.T) {
+	t.Helper()
+	done := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-done:
+		}
+	}))
+	old, oldTimeout := endpoint, photoTimeout
+	endpoint, photoTimeout = srv.URL, 50*time.Millisecond
+	t.Cleanup(func() { close(done); srv.Close(); endpoint, photoTimeout = old, oldTimeout })
+}
+
+func TestExtractPhotoWords_TimeoutIsTooSlow(t *testing.T) {
+	slowAPI(t)
+	_, err := New("k", "").ExtractPhotoWords(context.Background(), []byte("img"), "image/jpeg")
+	if !errors.Is(err, domain.ErrPhotoTooSlow) || !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("a model call over the time limit: %v", err)
+	}
+}
+
+func TestExtractPhotoWords_ClientGoneIsNotTooSlow(t *testing.T) {
+	slowAPI(t)
+	photoTimeout = 10 * time.Second
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	_, err := New("k", "").ExtractPhotoWords(ctx, []byte("img"), "image/jpeg")
+	if err == nil || errors.Is(err, domain.ErrPhotoTooSlow) {
+		t.Fatalf("a cancelled request: %v", err)
 	}
 }

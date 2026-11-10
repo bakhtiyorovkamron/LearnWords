@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { analysisSize, assessPixels, checkPhotoQuality, preparePhoto, PhotoQualityError } from './photo'
+import { analysisSize, assessPixels, checkPhotoQuality, MAX_SIDE, preparePhoto, PhotoQualityError } from './photo'
 
 // Synthetic thumbnails (RGBA), 128×120 (tall enough for the blur check).
 const W = 128, H = 120
@@ -99,18 +99,36 @@ describe('assessPixels', () => {
   })
 })
 
-// A canvas that answers with a prepared thumbnail, whatever is drawn on it.
-function stubCanvas(data: Uint8ClampedArray) {
+// A canvas that answers with a prepared thumbnail, whatever is drawn on it, and encodes to a tiny
+// blob. Returns the canvases made, in order: [0] the quality check's copy, [1] the shrunk photo.
+type StubCanvas = { width: number; height: number; toBlob: ReturnType<typeof vi.fn> }
+function stubCanvas(data: Uint8ClampedArray): StubCanvas[] {
+  const made: StubCanvas[] = []
   const real = document.createElement.bind(document)
   vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
     if (tag !== 'canvas') return real(tag)
-    return {
+    const c = {
       width: 0, height: 0,
       getContext: () => ({ drawImage: vi.fn(), getImageData: () => ({ data }) }),
-    } as unknown as HTMLCanvasElement
+      toBlob: vi.fn((done: (b: Blob | null) => void, type: string) => done(new Blob(['jpeg'], { type }))),
+    }
+    made.push(c)
+    return c as unknown as HTMLCanvasElement
   }) as typeof document.createElement)
+  return made
 }
 const bitmap = (width: number, height: number) => ({ width, height, close: vi.fn() })
+
+// Text-like pixels for a 256×192 copy: what a 4:3 photo (1200×900, 2000×1500, 4000×3000) is analysed as.
+function page4x3(): Uint8ClampedArray {
+  const buf = new Uint8ClampedArray(256 * 192 * 4)
+  for (let y = 0; y < 192; y++) for (let x = 0; x < 256; x++) {
+    const i = (y * 256 + x) * 4, v = (Math.floor(x / 2) + Math.floor(y / 3)) % 3 === 0 ? 0 : 255
+    buf[i] = buf[i + 1] = buf[i + 2] = v
+    buf[i + 3] = 255
+  }
+  return buf
+}
 
 describe('checkPhotoQuality / preparePhoto', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -129,16 +147,49 @@ describe('checkPhotoQuality / preparePhoto', () => {
   })
 
   it('preparePhoto passes a good small file through untouched', async () => {
-    // A 1200×900 bitmap is analysed as a 256×192 copy: give the stub exactly that many pixels.
-    const wide = new Uint8ClampedArray(256 * 192 * 4)
-    for (let y = 0; y < 192; y++) for (let x = 0; x < 256; x++) {
-      const i = (y * 256 + x) * 4, v = (Math.floor(x / 2) + Math.floor(y / 3)) % 3 === 0 ? 0 : 255
-      wide[i] = wide[i + 1] = wide[i + 2] = v
-      wide[i + 3] = 255
-    }
-    stubCanvas(wide)
+    stubCanvas(page4x3())
     vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bitmap(1200, 900)))
     const file = new Blob(['x'])
+    expect(await preparePhoto(file)).toBe(file)
+  })
+
+  it('the long side is capped at 1568 px: what the AI uses at most', () => {
+    expect(MAX_SIDE).toBe(1568)
+  })
+
+  it('a file over 4 MB is shrunk to 1568 px on the long side, as a JPEG at quality 0.85', async () => {
+    const canvases = stubCanvas(page4x3())
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bitmap(4000, 3000)))
+    const file = new Blob([new Uint8Array(4 * 1024 * 1024 + 1)], { type: 'image/jpeg' })
+    const out = await preparePhoto(file)
+    const shrunk = canvases[1]
+    expect([shrunk.width, shrunk.height]).toEqual([1568, 1176])
+    expect(shrunk.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.85)
+    expect(out).not.toBe(file)
+    expect(out.type).toBe('image/jpeg')
+  })
+
+  it('a small file that is over 1568 px on the long side is shrunk too', async () => {
+    const canvases = stubCanvas(page4x3())
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bitmap(2000, 1500)))
+    const file = new Blob(['x'.repeat(1000)], { type: 'image/png' })
+    const out = await preparePhoto(file)
+    expect([canvases[1].width, canvases[1].height]).toEqual([1568, 1176])
+    expect(out.type).toBe('image/jpeg')
+  })
+
+  it('a small file at exactly 1568 px goes as it is', async () => {
+    const canvases = stubCanvas(page4x3())
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bitmap(1568, 1176)))
+    const file = new Blob(['x'])
+    expect(await preparePhoto(file)).toBe(file)
+    expect(canvases).toHaveLength(1) // only the quality check's copy
+  })
+
+  it('the shrunk JPEG is used only when it is smaller than the original', async () => {
+    stubCanvas(page4x3())
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bitmap(2000, 1500)))
+    const file = new Blob(['x']) // 1 byte: the 4-byte "JPEG" is bigger
     expect(await preparePhoto(file)).toBe(file)
   })
 

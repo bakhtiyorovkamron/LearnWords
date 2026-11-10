@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"mime/multipart"
 	"net/http/httptest"
 	"testing"
@@ -157,5 +158,30 @@ func TestPhotoImport_SpendsCreditsAfterTheFreeOnes(t *testing.T) {
 	w := upload(r, "image", png)
 	if m := decode(t, w); w.Code != 429 || m["code"] != "daily_limit" || m["limit"] != float64(defaultPhotoLimit) || m["credits"] != float64(0) {
 		t.Errorf("both used up: %d %s", w.Code, w.Body)
+	}
+}
+
+type tooSlowReader struct{}
+
+func (tooSlowReader) ExtractPhotoWords(context.Context, []byte, string) (domain.PhotoReading, error) {
+	return domain.PhotoReading{}, fmt.Errorf("%w: anthropic request: Client.Timeout exceeded", domain.ErrPhotoTooSlow)
+}
+
+// A page the AI could not read in time: 502 with its own code (the client says "take half the
+// page"), no internals in the message, and the unit is not spent.
+func TestPhotoImport_TooSlowIs502WithCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	user := uuid.New()
+	feats := service.NewFeatureService(&memFeatures{ov: map[string]domain.FeatureOverride{}})
+	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set(userIDKey, user) }, NativeLang())
+	r.POST("/photo-import", NewPhotoHandler(service.NewPhotoImportService(tooSlowReader{}, noWords{}, feats)).Import)
+
+	w := upload(r, "image", png)
+	if m := decode(t, w); w.Code != 502 || m["code"] != "photo_too_slow" || m["error"] != "the photo took too long to read" {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if st, _ := feats.State(context.Background(), user, domain.FeaturePhotoImport); st.UsedToday != 0 {
+		t.Errorf("used %d, want 0", st.UsedToday)
 	}
 }

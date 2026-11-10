@@ -190,12 +190,14 @@ export interface PhotoWord {
 export interface PhotoImportResult { words: PhotoWord[]; remaining: number | null; credits: number }
 
 export const photoApi = {
-  // Vision AI call → generous timeout. Costs one photo: a free one of the day, or a bought one once
-  // those are used up; nothing is saved.
+  // Vision AI call → generous timeout. It covers the upload too, and stays above the server's own
+  // limit for the AI call (70 s), so a slow page ends with the server's answer (photo_too_slow),
+  // not a bare timeout here. Costs one photo: a free one of the day, or a bought one once those are
+  // used up; nothing is saved.
   import: (image: Blob) => {
     const form = new FormData()
     form.append('image', image, 'photo.jpg')
-    return api.post<PhotoImportResult>('/photo-import', form, { timeout: 120_000 }).then((r) => r.data)
+    return api.post<PhotoImportResult>('/photo-import', form, { timeout: 150_000 }).then((r) => r.data)
   },
 }
 
