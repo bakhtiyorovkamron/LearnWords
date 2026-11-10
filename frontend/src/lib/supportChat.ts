@@ -18,7 +18,7 @@ export function useSupportChat() {
   const source = useMemo(() => ({
     fetch: async (after: number) => {
       const page = await supportApi.messages(after)
-      return { meta: { threadId: page.thread_id }, messages: page.messages }
+      return { meta: { threadId: page.thread_id, readMarker: page.read_message_id }, messages: page.messages }
     },
     post: (draft: ChatDraft) => supportApi.post(draft),
   }), [])

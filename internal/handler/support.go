@@ -61,7 +61,21 @@ func (h *SupportHandler) Messages(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"thread_id": t.ID, "messages": chatViews(msgs, v)})
+	c.JSON(http.StatusOK, chatMessagesResponse(msgs, v, t.ReadMarkers, gin.H{"thread_id": t.ID}))
+}
+
+// Read handles POST /api/support/read {up_to: message id} → 204: the caller has read their thread up
+// to that message (never backwards, never past its newest one). Reading the messages does not.
+func (h *SupportHandler) Read(c *gin.Context) {
+	upTo, ok := readUpTo(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.UserRead(c.Request.Context(), userID(c), upTo); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 // Post handles POST /api/support/messages: JSON {body} or multipart ("body" and/or the file "image",
@@ -122,7 +136,7 @@ func (h *SupportHandler) AdminMessages(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"thread": newSupportThreadView(t), "messages": chatViews(msgs, viewer(c, true))})
+	c.JSON(http.StatusOK, chatMessagesResponse(msgs, viewer(c, true), t.ReadMarkers, gin.H{"thread": newSupportThreadView(t)}))
 }
 
 // AdminPost handles POST /api/admin/support/threads/:id/messages, the same body as the user's; the

@@ -12,11 +12,14 @@ import { usePurchaseOverview } from '../lib/purchases'
 import { ErrorState } from '../components/ErrorState'
 import { StatusPill } from '../components/PurchaseChat'
 import { toast } from '../components/Toaster'
+import { UnreadBadge } from '../components/UnreadBadge'
+import { useChatUnread } from '../lib/chatUnread'
 
 /** The user's own profile: name, phone, the Telegram connection, support and their purchase requests. */
 export function ProfilePage() {
   const { t } = useTranslation()
   const profile = useQuery({ queryKey: ['profile'], queryFn: profileApi.get })
+  const unreadSupport = useChatUnread().data?.support ?? 0
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -30,6 +33,7 @@ export function ProfilePage() {
           <span className="block font-semibold text-fg">{t('support.entry')}</span>
           <span className="block text-sm text-muted">{t('support.entryHint')}</span>
         </span>
+        <UnreadBadge count={unreadSupport} testId="badge-support" />
         <ChevronRight size={18} aria-hidden="true" className="text-faint" />
       </Link>
       <MyRequests />
@@ -44,6 +48,7 @@ export function ProfilePage() {
 function MyRequests() {
   const { t, i18n } = useTranslation()
   const requests = usePurchaseOverview().data?.requests ?? []
+  const unread = useChatUnread().data?.purchases ?? []
   if (requests.length === 0) return null
   return (
     <section className="glass space-y-2 p-5" aria-labelledby="my-requests-title">
@@ -57,7 +62,8 @@ function MyRequests() {
                 <span className="font-mono font-semibold text-fg">{r.code}</span>
                 {' · '}{t('buy.pack', { n: r.amount })}{' · '}{formatUZS(r.price_uzs, i18n.language)}
               </span>
-              <span className="flex shrink-0 items-center gap-1"><StatusPill status={r.status} /><ChevronRight size={16} aria-hidden="true" className="text-faint" /></span>
+              <span className="flex shrink-0 items-center gap-1">
+                <UnreadBadge count={unread.find((u) => u.id === r.id)?.unread ?? 0} testId={`badge-request-${r.id}`} /><StatusPill status={r.status} /><ChevronRight size={16} aria-hidden="true" className="text-faint" /></span>
             </Link>
           </li>
         ))}

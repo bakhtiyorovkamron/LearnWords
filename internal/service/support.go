@@ -27,6 +27,9 @@ type SupportRepository interface {
 	Messages(ctx context.Context, threadID, after int64, limit int, viewerRole string) ([]domain.ChatMessage, error)
 	// MarkRead marks the thread read for the admins up to upTo (0 = its newest message).
 	MarkRead(ctx context.Context, threadID, upTo int64) error
+	// MarkUserRead marks the user's own thread read for them up to upTo (never backwards); ErrNotFound
+	// when the thread is not theirs.
+	MarkUserRead(ctx context.Context, userID uuid.UUID, threadID, upTo int64) error
 	MessageImage(ctx context.Context, threadID, messageID int64) (domain.ChatMessage, domain.ChatImage, error)
 }
 
@@ -63,6 +66,18 @@ func (s *SupportService) UserMessages(ctx context.Context, userID uuid.UUID, aft
 	}
 	msgs, err := s.repo.Messages(ctx, t.ID, after, domain.ChatPageSize, domain.ChatAuthorUser)
 	return t, msgs, err
+}
+
+// UserRead: the user has read their thread up to upTo (the read marker of their own thread only).
+func (s *SupportService) UserRead(ctx context.Context, userID uuid.UUID, upTo int64) error {
+	if err := validAfter(upTo); err != nil {
+		return fmt.Errorf("%w: up_to must not be negative", domain.ErrValidation)
+	}
+	t, err := s.repo.EnsureThread(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return s.repo.MarkUserRead(ctx, userID, t.ID, upTo)
 }
 
 // UserPost adds the user's message to their thread. Message texts are never logged.

@@ -39,6 +39,32 @@ func newChatMessageView(m domain.ChatMessage, v service.ChatViewer) chatMessageV
 	return out
 }
 
+// chatMessagesResponse is the body of every "messages" endpoint: the viewer's own read marker and
+// the other side's next to the messages (0 = none yet).
+func chatMessagesResponse(msgs []domain.ChatMessage, v service.ChatViewer, markers domain.ChatReadMarkers, extra gin.H) gin.H {
+	own, other := markers.For(v.Admin)
+	out := gin.H{"messages": chatViews(msgs, v), "read_message_id": own, "other_read_message_id": other}
+	for k, val := range extra {
+		out[k] = val
+	}
+	return out
+}
+
+// readUpTo reads {up_to: message id} of a read endpoint (missing = 0). false = answered already.
+func readUpTo(c *gin.Context) (int64, bool) {
+	var req struct {
+		UpTo int64 `json:"up_to"`
+	}
+	if !bindSmallJSON(c, &req) {
+		return 0, false
+	}
+	if req.UpTo < 0 {
+		badRequest(c, "up_to must not be negative")
+		return 0, false
+	}
+	return req.UpTo, true
+}
+
 func viewer(c *gin.Context, admin bool) service.ChatViewer {
 	return service.ChatViewer{UserID: userID(c), Admin: admin}
 }
@@ -126,4 +152,44 @@ func writeChatImage(c *gin.Context, img domain.ChatImage) {
 
 func chatViews(msgs []domain.ChatMessage, v service.ChatViewer) []chatMessageView {
 	return mapSlice(msgs, func(m domain.ChatMessage) chatMessageView { return newChatMessageView(m, v) })
+}
+
+// ChatUnreadHandler: the unread badges' numbers.
+type ChatUnreadHandler struct{ svc *service.ChatUnreadService }
+
+func NewChatUnreadHandler(svc *service.ChatUnreadService) *ChatUnreadHandler {
+	return &ChatUnreadHandler{svc: svc}
+}
+
+// Mine handles GET /api/me/chats/unread → {support, purchases: [{id, code, unread}], total}: the
+// admins' and system messages the caller has not read.
+func (h *ChatUnreadHandler) Mine(c *gin.Context) {
+	u, err := h.svc.ForUser(c.Request.Context(), userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	type purchase struct {
+		ID     string `json:"id"`
+		Code   string `json:"code"`
+		Unread int    `json:"unread"`
+	}
+	total := u.Support
+	ps := make([]purchase, 0, len(u.Purchases))
+	for _, p := range u.Purchases {
+		ps = append(ps, purchase{ID: p.ID.String(), Code: p.Code, Unread: p.Unread})
+		total += p.Unread
+	}
+	c.JSON(http.StatusOK, gin.H{"support": u.Support, "purchases": ps, "total": total})
+}
+
+// Admin handles GET /api/admin/chats/unread → {support, purchases, total}: the users' messages no
+// admin has read yet.
+func (h *ChatUnreadHandler) Admin(c *gin.Context) {
+	u, err := h.svc.ForAdmins(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"support": u.Support, "purchases": u.Purchases, "total": u.Support + u.Purchases})
 }

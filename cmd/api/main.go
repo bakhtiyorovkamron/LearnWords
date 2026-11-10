@@ -200,6 +200,7 @@ func run() error {
 		Hero:        handler.NewHeroHandler(heroSvc),
 		Purchases:   handler.NewPurchaseHandler(purchaseSvc),
 		Support:     handler.NewSupportHandler(supportSvc),
+		ChatUnread:  handler.NewChatUnreadHandler(service.NewChatUnreadService(postgres.NewChatUnreadRepository(pool))),
 		UserStatus:  adminRepo,
 		Ctx:         ctx,
 		HealthCheck: func() error {

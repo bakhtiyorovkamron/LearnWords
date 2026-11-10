@@ -72,7 +72,7 @@ describe('AdminPage: the Support tab', () => {
   })
 
   it('opening a thread shows it with the admin composer and marks it read up to the newest message', async () => {
-    vi.mocked(adminSupportApi.messages).mockResolvedValue({
+    vi.mocked(adminSupportApi.messages).mockResolvedValue({ read_message_id: 0, other_read_message_id: 0,
       thread: thread({ id: 1, unread: 2 }),
       messages: [message({ id: 10, body: 'The photos do not come' }), message({ id: 11, body: 'Since yesterday' })],
     })
@@ -97,7 +97,7 @@ describe('AdminPage: the Support tab', () => {
   })
 
   it('a hidden message: the badge, the text behind "Show"', async () => {
-    vi.mocked(adminSupportApi.messages).mockResolvedValue({
+    vi.mocked(adminSupportApi.messages).mockResolvedValue({ read_message_id: 0, other_read_message_id: 0,
       thread: thread({ id: 2 }),
       messages: [message({ id: 20, hidden: true, hidden_reason: 'card_number', body: 'card 8600 0000 0000 0000' })],
     })

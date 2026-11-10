@@ -24,17 +24,34 @@ func (h *PurchaseHandler) chat(c *gin.Context, admin bool) {
 		return
 	}
 	v := viewer(c, admin)
-	p, msgs, err := h.svc.Chat(c.Request.Context(), v, id, after)
+	p, msgs, markers, err := h.svc.Chat(c.Request.Context(), v, id, after)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	views := chatViews(msgs, v)
 	if admin {
-		c.JSON(http.StatusOK, gin.H{"request": newAdminPurchaseView(p), "messages": views})
+		c.JSON(http.StatusOK, chatMessagesResponse(msgs, v, markers, gin.H{"request": newAdminPurchaseView(p)}))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"request": newPurchaseView(p), "messages": views})
+	c.JSON(http.StatusOK, chatMessagesResponse(msgs, v, markers, gin.H{"request": newPurchaseView(p)}))
+}
+
+// BuyerRead handles POST /api/me/purchases/:id/read {up_to: message id} → 204: the buyer has read
+// the chat up to that message (never backwards). Someone else's request is a 404.
+func (h *PurchaseHandler) BuyerRead(c *gin.Context) {
+	id, ok := pathUUID(c, "id")
+	if !ok {
+		return
+	}
+	upTo, ok := readUpTo(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.UserRead(c.Request.Context(), userID(c), id, upTo); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 // BuyerPost handles POST /api/me/purchases/:id/messages: JSON {body} or multipart (field "body" and/or

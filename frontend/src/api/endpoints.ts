@@ -346,7 +346,12 @@ export interface ChatMessage {
   id: number; author: 'user' | 'admin' | 'system'; mine: boolean; body: string | null; has_image: boolean
   hidden: boolean; hidden_reason: string | null; event: 'paid' | 'cancelled' | null; created_at: string
 }
-export interface ChatPage<R extends PurchaseRequest = PurchaseRequest> { request: R; messages: ChatMessage[] }
+/**
+ * What every messages response carries next to the messages: the viewer's own read marker and the
+ * other side's (the newest message each has read; 0 = none). Reading never moves a marker.
+ */
+export interface ChatReadMarkers { read_message_id: number; other_read_message_id: number }
+export interface ChatPage<R extends PurchaseRequest = PurchaseRequest> extends ChatReadMarkers { request: R; messages: ChatMessage[] }
 /** body and/or image (JPEG/PNG/WebP/GIF ≤ 5 MB). */
 export interface ChatDraft { body: string; image: File | null }
 
@@ -372,9 +377,20 @@ function chatApi<R extends PurchaseRequest>(base: string) {
       api.get<Blob>(`${base}/${id}/messages/${messageId}/image`, { responseType: 'blob' }).then((r) => r.data),
   }
 }
-export const buyerChatApi = chatApi<PurchaseRequest>('/me/purchases')
+/** The buyer marks a request's chat read up to upTo (204; someone else's request is 404). */
+const buyerRead = (id: string, upTo: number) => api.post(`/me/purchases/${id}/read`, { up_to: upTo }).then(() => undefined)
+export const buyerChatApi = { ...chatApi<PurchaseRequest>('/me/purchases'), read: buyerRead }
 export const adminChatApi = chatApi<AdminPurchaseRequest>('/admin/purchases')
 export type ChatApi = ReturnType<typeof chatApi<PurchaseRequest>>
+
+/** The caller's unread chat messages (the admins' and system ones): support, and per purchase request. */
+export interface ChatUnread { support: number; purchases: { id: string; code: string; unread: number }[]; total: number }
+/** The users' messages no admin has read yet (support and purchase chats). */
+export interface AdminChatUnread { support: number; purchases: number; total: number }
+export const chatUnreadApi = {
+  mine: () => api.get<ChatUnread>('/me/chats/unread').then((r) => r.data),
+  admin: () => api.get<AdminChatUnread>('/admin/chats/unread').then((r) => r.data),
+}
 
 /**
  * A user's support thread in the admins' list. unread: the user's messages after the admins' last
@@ -388,7 +404,9 @@ export interface SupportThread {
 /** The caller's own support thread (made on first use): ≤ 50 messages after `after`; 429 too many. */
 export const supportApi = {
   messages: (after = 0) =>
-    api.get<{ thread_id: number; messages: ChatMessage[] }>('/support/messages', { params: { after } }).then((r) => r.data),
+    api.get<{ thread_id: number; messages: ChatMessage[] } & ChatReadMarkers>('/support/messages', { params: { after } }).then((r) => r.data),
+  /** Marks the thread read up to upTo (204). Reading the messages does not. */
+  read: (upTo: number) => api.post('/support/read', { up_to: upTo }).then(() => undefined),
   post: (draft: ChatDraft) => api.post<ChatMessage>('/support/messages', chatForm(draft), { timeout: 60_000 }).then((r) => r.data),
   image: (messageId: number) => api.get<Blob>(`/support/messages/${messageId}/image`, { responseType: 'blob' }).then((r) => r.data),
 }
@@ -398,7 +416,7 @@ export const adminSupportApi = {
   threads: (unreadOnly = false) =>
     api.get<{ threads: SupportThread[] }>('/admin/support/threads', { params: unreadOnly ? { unread: 1 } : {} }).then((r) => r.data.threads),
   messages: (id: number, after = 0) =>
-    api.get<{ thread: SupportThread; messages: ChatMessage[] }>(`/admin/support/threads/${id}/messages`, { params: { after } }).then((r) => r.data),
+    api.get<{ thread: SupportThread; messages: ChatMessage[] } & ChatReadMarkers>(`/admin/support/threads/${id}/messages`, { params: { after } }).then((r) => r.data),
   post: (id: number, draft: ChatDraft) =>
     api.post<ChatMessage>(`/admin/support/threads/${id}/messages`, chatForm(draft), { timeout: 60_000 }).then((r) => r.data),
   image: (id: number, messageId: number) =>

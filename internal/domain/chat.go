@@ -79,6 +79,41 @@ type ChatThread struct {
 	UserEmail   string
 	Unread      int
 	LastMessage *ChatMessage
+
+	ReadMarkers ChatReadMarkers
+}
+
+// ChatReadMarkers: the newest message each side has read in a thread (0 = none).
+type ChatReadMarkers struct {
+	User  int64
+	Admin int64
+}
+
+// For returns the viewer's own marker and the other side's.
+func (m ChatReadMarkers) For(admin bool) (own, other int64) {
+	if admin {
+		return m.Admin, m.User
+	}
+	return m.User, m.Admin
+}
+
+// UserChatUnread: what a user has not read in their chats with the admins.
+type UserChatUnread struct {
+	Support   int
+	Purchases []PurchaseChatUnread
+}
+
+// PurchaseChatUnread: the unread messages of one purchase request's chat.
+type PurchaseChatUnread struct {
+	ID     uuid.UUID
+	Code   string
+	Unread int
+}
+
+// AdminChatUnread: the users' messages no admin has read yet.
+type AdminChatUnread struct {
+	Support   int
+	Purchases int
 }
 
 // ChatPreview is how the admins' list shows a message: hidden ones as "[скрыто]", a photo alone as

@@ -122,3 +122,25 @@ func (r *PurchaseRepository) MessageImage(ctx context.Context, requestID uuid.UU
 	}
 	return chatMessageImage(ctx, r.pool, thread, messageID)
 }
+
+// ChatMarkers: what each side has read in the request's chat (zeros while it has no thread).
+func (r *PurchaseRepository) ChatMarkers(ctx context.Context, requestID uuid.UUID) (domain.ChatReadMarkers, error) {
+	var m domain.ChatReadMarkers
+	err := r.pool.QueryRow(ctx, `SELECT COALESCE(user_read_message_id, 0), COALESCE(admin_read_message_id, 0)
+		FROM chat_threads WHERE kind = 'purchase' AND purchase_request_id = $1`, requestID).Scan(&m.User, &m.Admin)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ChatReadMarkers{}, nil
+	}
+	return m, err
+}
+
+// MarkUserRead: the buyer has read the request's chat up to upTo (never backwards; nothing to do
+// while it has no thread; never another user's request).
+func (r *PurchaseRepository) MarkUserRead(ctx context.Context, requestID, userID uuid.UUID, upTo int64) error {
+	thread, ok, err := r.purchaseThread(ctx, requestID)
+	if err != nil || !ok {
+		return err
+	}
+	_, err = markUserChatRead(ctx, r.pool, thread, &userID, upTo)
+	return err
+}

@@ -24,25 +24,38 @@ func (s *PurchaseService) chatRequest(ctx context.Context, v ChatViewer, id uuid
 
 // Chat returns the request and up to ChatPageSize of its messages after `after` that the viewer may
 // see (oldest first). The history is readable in every status. An admin reading marks the
-// messages read (the unread badge).
-func (s *PurchaseService) Chat(ctx context.Context, v ChatViewer, id uuid.UUID, after int64) (domain.PurchaseRequest, []domain.ChatMessage, error) {
+// messages read (the unread badge); the buyer's reading does not (UserRead does). Also returns
+// both sides' read markers.
+func (s *PurchaseService) Chat(ctx context.Context, v ChatViewer, id uuid.UUID, after int64) (domain.PurchaseRequest, []domain.ChatMessage, domain.ChatReadMarkers, error) {
 	if after < 0 {
-		return domain.PurchaseRequest{}, nil, fmt.Errorf("%w: after must not be negative", domain.ErrValidation)
+		return domain.PurchaseRequest{}, nil, domain.ChatReadMarkers{}, fmt.Errorf("%w: after must not be negative", domain.ErrValidation)
 	}
 	p, err := s.chatRequest(ctx, v, id)
 	if err != nil {
-		return domain.PurchaseRequest{}, nil, err
+		return domain.PurchaseRequest{}, nil, domain.ChatReadMarkers{}, err
 	}
 	msgs, err := s.repo.Messages(ctx, id, after, domain.ChatPageSize, v.Role())
 	if err != nil {
-		return domain.PurchaseRequest{}, nil, err
+		return domain.PurchaseRequest{}, nil, domain.ChatReadMarkers{}, err
 	}
 	if v.Admin && len(msgs) > 0 {
 		if err := s.repo.MarkAdminRead(ctx, id, msgs[len(msgs)-1].ID); err != nil {
-			return domain.PurchaseRequest{}, nil, err
+			return domain.PurchaseRequest{}, nil, domain.ChatReadMarkers{}, err
 		}
 	}
-	return p, msgs, nil
+	markers, err := s.repo.ChatMarkers(ctx, id)
+	return p, msgs, markers, err
+}
+
+// UserRead: the buyer has read their request's chat up to upTo (404 for someone else's request).
+func (s *PurchaseService) UserRead(ctx context.Context, userID, id uuid.UUID, upTo int64) error {
+	if upTo < 0 {
+		return fmt.Errorf("%w: up_to must not be negative", domain.ErrValidation)
+	}
+	if _, err := s.chatRequest(ctx, ChatViewer{UserID: userID}, id); err != nil {
+		return err
+	}
+	return s.repo.MarkUserRead(ctx, id, userID, upTo)
 }
 
 // PostMessage adds the viewer's message (the shared chat rules: text and/or a photo; a card-like

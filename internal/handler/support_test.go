@@ -31,12 +31,13 @@ type memSupport struct {
 	threads map[int64]*domain.ChatThread
 	msgs    []domain.ChatMessage
 	read    map[int64]int64
+	uread   map[int64]int64
 	images  map[string]domain.ChatImage
 	emails  map[uuid.UUID]string
 }
 
 func newMemSupport() *memSupport {
-	return &memSupport{byUser: map[uuid.UUID]int64{}, threads: map[int64]*domain.ChatThread{}, read: map[int64]int64{},
+	return &memSupport{byUser: map[uuid.UUID]int64{}, threads: map[int64]*domain.ChatThread{}, read: map[int64]int64{}, uread: map[int64]int64{},
 		images: map[string]domain.ChatImage{}, emails: map[uuid.UUID]string{}}
 }
 
@@ -44,7 +45,7 @@ func (m *memSupport) EnsureThread(_ context.Context, u uuid.UUID) (domain.ChatTh
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if id, ok := m.byUser[u]; ok {
-		return *m.threads[id], nil
+		return m.view(id), nil
 	}
 	id := int64(len(m.threads) + 1)
 	m.threads[id] = &domain.ChatThread{ID: id, Kind: domain.ChatKindSupport, UserID: u, CreatedAt: time.Now()}
@@ -65,6 +66,7 @@ func (m *memSupport) unread(id int64) int {
 func (m *memSupport) view(id int64) domain.ChatThread {
 	t := *m.threads[id]
 	t.UserEmail, t.Unread = m.emails[t.UserID], m.unread(id)
+	t.ReadMarkers = domain.ChatReadMarkers{User: m.uread[id], Admin: m.read[id]}
 	for i := len(m.msgs) - 1; i >= 0; i-- {
 		if m.msgs[i].ThreadID == id {
 			last := m.msgs[i]
@@ -117,8 +119,11 @@ func (m *memSupport) AddMessage(_ context.Context, threadID int64, msg domain.Ch
 	m.msgs = append(m.msgs, msg)
 	at := msg.CreatedAt
 	t.LastMessageAt = &at
-	if msg.AuthorRole == domain.ChatAuthorAdmin {
+	switch msg.AuthorRole {
+	case domain.ChatAuthorAdmin:
 		m.read[threadID] = max(m.read[threadID], msg.ID)
+	case domain.ChatAuthorUser:
+		m.uread[threadID] = max(m.uread[threadID], msg.ID)
 	}
 	return msg, nil
 }
@@ -146,6 +151,22 @@ func (m *memSupport) MarkRead(_ context.Context, threadID, upTo int64) error {
 		}
 	}
 	m.read[threadID] = max(m.read[threadID], upTo)
+	return nil
+}
+
+func (m *memSupport) MarkUserRead(_ context.Context, user uuid.UUID, threadID, upTo int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if t := m.threads[threadID]; t == nil || t.UserID != user {
+		return domain.ErrNotFound
+	}
+	newest := int64(0)
+	for _, msg := range m.msgs {
+		if msg.ThreadID == threadID {
+			newest = max(newest, msg.ID)
+		}
+	}
+	m.uread[threadID] = max(m.uread[threadID], min(upTo, newest))
 	return nil
 }
 
@@ -190,6 +211,7 @@ func newSupportEnv() supportEnv {
 	})
 	r.GET("/support/messages", h.Messages)
 	r.POST("/support/messages", h.Post)
+	r.POST("/support/read", h.Read)
 	r.GET("/support/messages/:mid/image", h.Image)
 	admin := r.Group("/admin", RequireAdmin())
 	admin.GET("/support/threads", h.AdminThreads)

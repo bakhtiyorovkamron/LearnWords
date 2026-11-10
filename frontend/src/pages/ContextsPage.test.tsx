@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { foldersApi, meApi, settingsApi, statsApi, type Me } from '../api/endpoints'
+import { chatUnreadApi, foldersApi, meApi, settingsApi, statsApi, type Me } from '../api/endpoints'
 import type { DayStat, FolderList } from '../api/types'
 import { takeHandedOffPhoto } from '../lib/photoHandoff'
 import { ContextsPage } from './ContextsPage'
@@ -16,8 +16,10 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     foldersApi: { list: vi.fn(), create: vi.fn() },
     statsApi: { get: vi.fn() },
     settingsApi: { get: vi.fn(), setDailyGoal: vi.fn() },
+    chatUnreadApi: { mine: vi.fn(), admin: vi.fn() },
   }
 })
+vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: true }) }))
 
 const stats = (total: number, due: number) => ({ total, new_count: 0, learning_count: 0, learned_count: 0, due_today: due })
 const folder = (id: string, name: string, total = 1, extra: object = {}) => ({ id, name, color: 'sky', created_at: '', ...stats(total, 0), ...extra })
@@ -62,6 +64,7 @@ beforeEach(async () => {
   localStorage.clear()
   takeHandedOffPhoto()
   vi.mocked(meApi.get).mockResolvedValue(me())
+  vi.mocked(chatUnreadApi.mine).mockResolvedValue({ support: 0, purchases: [], total: 0 })
   vi.mocked(foldersApi.list).mockResolvedValue(list(40, 12, [folder('f1', 'Tiere', 5)]))
   vi.mocked(statsApi.get).mockResolvedValue(weekOf(3, { 0: { reviewed: 8, active: true } }) as never)
   vi.mocked(settingsApi.get).mockResolvedValue({ interface_language: '', review_session_size: '', theme: '', daily_goal: 20 })
@@ -72,6 +75,22 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 const strip = () => within(screen.getByTestId('week-strip')).getAllByRole('listitem')
 const states = () => strip().map((li) => li.getAttribute('data-state'))
 const waitCard = () => screen.findByTestId('goal-ring')
+
+describe('Home: unread badge on the More button', () => {
+  it('shows the total, "9+" above nine, and nothing for zero', async () => {
+    renderHome()
+    await screen.findByRole('button', { name: 'More' })
+    expect(screen.queryByTestId('badge-more')).toBeNull()
+    cleanup()
+    vi.mocked(chatUnreadApi.mine).mockResolvedValue({ support: 4, purchases: [{ id: 'r', code: 'YD-1', unread: 3 }], total: 7 })
+    renderHome()
+    expect((await screen.findByTestId('badge-more')).textContent).toBe('7')
+    cleanup()
+    vi.mocked(chatUnreadApi.mine).mockResolvedValue({ support: 11, purchases: [], total: 11 })
+    renderHome()
+    expect((await screen.findByTestId('badge-more')).textContent).toBe('9+')
+  })
+})
 
 describe('Home: the goal card', () => {
   it('goal 20, 8 reviewed, 393 due → ring 8/20, 12 words, ≈3 min, Continue, the queue line', async () => {

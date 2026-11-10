@@ -44,6 +44,7 @@ type memPurchases struct {
 	threads map[uuid.UUID]int64       // request → its chat thread (made with the first message)
 	images  map[string]domain.ChatImage
 	read    map[uuid.UUID]int64 // request → the newest message an admin has read
+	uread   map[uuid.UUID]int64 // request → the newest message the buyer has read
 }
 
 func (m *memPurchases) Create(_ context.Context, u uuid.UUID, pack domain.Pack, maxPending int) (domain.PurchaseRequest, error) {
@@ -182,8 +183,11 @@ func (m *memPurchases) add(req uuid.UUID, msg domain.ChatMessage) domain.ChatMes
 		at := msg.CreatedAt
 		p.LastMessageAt = &at
 	}
-	if msg.AuthorRole == domain.ChatAuthorAdmin {
+	switch msg.AuthorRole {
+	case domain.ChatAuthorAdmin:
 		m.markRead(req, msg.ID)
+	case domain.ChatAuthorUser:
+		m.markUserRead(req, msg.ID)
 	}
 	return msg
 }
@@ -201,6 +205,34 @@ func (m *memPurchases) markRead(id uuid.UUID, upTo int64) {
 		m.read = map[uuid.UUID]int64{}
 	}
 	m.read[id] = max(m.read[id], upTo)
+}
+
+func (m *memPurchases) markUserRead(id uuid.UUID, upTo int64) {
+	if m.uread == nil {
+		m.uread = map[uuid.UUID]int64{}
+	}
+	newest := int64(0)
+	for _, msg := range m.msgs {
+		if m.inThread(msg, id) {
+			newest = max(newest, msg.ID)
+		}
+	}
+	m.uread[id] = max(m.uread[id], min(upTo, newest))
+}
+
+func (m *memPurchases) MarkUserRead(_ context.Context, id, user uuid.UUID, upTo int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if p := m.find(id); p != nil && p.UserID == user {
+		m.markUserRead(id, upTo)
+	}
+	return nil
+}
+
+func (m *memPurchases) ChatMarkers(_ context.Context, id uuid.UUID) (domain.ChatReadMarkers, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return domain.ChatReadMarkers{User: m.uread[id], Admin: m.read[id]}, nil
 }
 
 func (m *memPurchases) unread(id uuid.UUID) int {
@@ -370,6 +402,7 @@ func newPurchaseEnv(payment domain.PaymentInfo) purchaseEnv {
 	r.DELETE("/me/purchases/:id", h.Cancel)
 	r.GET("/me/purchases/:id/messages", h.BuyerChat)
 	r.POST("/me/purchases/:id/messages", h.BuyerPost)
+	r.POST("/me/purchases/:id/read", h.BuyerRead)
 	r.GET("/me/purchases/:id/messages/:mid/image", h.BuyerImage)
 	admin := r.Group("/admin", RequireAdmin())
 	admin.GET("/purchases/:id/messages", h.AdminChat)

@@ -12,7 +12,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
   return {
     ...mod,
-    buyerChatApi: { messages: vi.fn(), post: vi.fn(), image: vi.fn() },
+    buyerChatApi: { messages: vi.fn(), post: vi.fn(), image: vi.fn(), read: vi.fn() },
     adminChatApi: { messages: vi.fn(), post: vi.fn(), image: vi.fn() },
   }
 })
@@ -25,7 +25,7 @@ const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
   id: ++seq, author: 'user', mine: true, body: 'hello', has_image: false, hidden: false, hidden_reason: null,
   event: null, created_at: '2026-11-08T10:00:00Z', ...over,
 })
-const page = (messages: ChatMessage[], status: PurchaseRequest['status'] = 'pending'): ChatPage => ({ request: request(status), messages })
+const page = (messages: ChatMessage[], status: PurchaseRequest['status'] = 'pending'): ChatPage => ({ request: request(status), messages, read_message_id: 0, other_read_message_id: 0 })
 const fail = (status: number, data: unknown = {}) =>
   new AxiosError('x', String(status), undefined, undefined, { status, data, headers: {}, statusText: '', config: {} as never } as AxiosResponse)
 
@@ -41,6 +41,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   seq = 0
   vi.mocked(buyerChatApi.messages).mockResolvedValue(page([]))
+  vi.mocked(buyerChatApi.read).mockResolvedValue(undefined)
 })
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
@@ -175,7 +176,7 @@ describe('PurchaseChat', () => {
 
   it('admins: a hidden message has a badge, its text behind "Show"', async () => {
     const adminReq = { ...request(), user_id: 'u1', user_email: 'anna@x.co', decided_at: null, decided_by: null, unread: 1 } as AdminPurchaseRequest
-    vi.mocked(adminChatApi.messages).mockResolvedValue({
+    vi.mocked(adminChatApi.messages).mockResolvedValue({ read_message_id: 0, other_read_message_id: 0,
       request: adminReq,
       messages: [msg({ mine: false, hidden: true, hidden_reason: 'card_number', body: 'card 8600 0000 0000 0000' })],
     })

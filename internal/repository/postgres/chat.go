@@ -35,8 +35,14 @@ func scanChatMessage(row pgx.Row, extra ...any) (domain.ChatMessage, error) {
 const chatUnread = `(SELECT count(*) FROM chat_messages um
 	WHERE um.thread_id = t.id AND um.author_role = 'user' AND um.id > COALESCE(t.admin_read_message_id, 0))`
 
+// chatUserUnread: the admins' and system messages in thread `t` after the newest one the user has
+// read (a message hidden from the user is not counted: they cannot see it).
+const chatUserUnread = `(SELECT count(*) FROM chat_messages am
+	WHERE am.thread_id = t.id AND am.author_role IN ('admin', 'system') AND NOT am.hidden
+	AND am.id > COALESCE(t.user_read_message_id, 0))`
+
 // addChatMessage stores a message (and its photo) in a thread and moves the thread's
-// last_message_at. An admin's message also marks the thread read up to itself.
+// last_message_at. A message also marks the thread read for its own side up to itself.
 func addChatMessage(ctx context.Context, tx pgx.Tx, threadID int64, m domain.ChatMessage, img *domain.ChatImage) (domain.ChatMessage, error) {
 	if img != nil {
 		if _, err := tx.Exec(ctx, `INSERT INTO chat_images (key, thread_id, content_type, data) VALUES ($1, $2, $3, $4)`,
@@ -55,8 +61,13 @@ func addChatMessage(ctx context.Context, tx pgx.Tx, threadID int64, m domain.Cha
 	if _, err := tx.Exec(ctx, `UPDATE chat_threads SET last_message_at = $2 WHERE id = $1`, threadID, saved.CreatedAt); err != nil {
 		return domain.ChatMessage{}, err
 	}
-	if saved.AuthorRole == domain.ChatAuthorAdmin {
+	switch saved.AuthorRole {
+	case domain.ChatAuthorAdmin:
 		if err := markChatRead(ctx, tx, threadID, saved.ID); err != nil {
+			return domain.ChatMessage{}, err
+		}
+	case domain.ChatAuthorUser:
+		if _, err := markUserChatRead(ctx, tx, threadID, nil, saved.ID); err != nil {
 			return domain.ChatMessage{}, err
 		}
 	}
@@ -81,6 +92,16 @@ func markChatRead(ctx context.Context, db chatDB, threadID, upTo int64) error {
 	_, err := db.Exec(ctx, `UPDATE chat_threads
 		SET admin_read_message_id = GREATEST(COALESCE(admin_read_message_id, 0), $2) WHERE id = $1`, threadID, upTo)
 	return err
+}
+
+// markUserChatRead: the user has read the thread up to message upTo (never backwards, never past the
+// thread's newest message). userID != nil limits it to that user's own thread; ok = false when there
+// is no such thread.
+func markUserChatRead(ctx context.Context, db chatDB, threadID int64, userID *uuid.UUID, upTo int64) (bool, error) {
+	tag, err := db.Exec(ctx, `UPDATE chat_threads SET user_read_message_id = GREATEST(COALESCE(user_read_message_id, 0),
+			LEAST($2::bigint, COALESCE((SELECT max(id) FROM chat_messages WHERE thread_id = $1), 0)))
+		WHERE id = $1 AND ($3::uuid IS NULL OR user_id = $3)`, threadID, upTo, userID)
+	return tag.RowsAffected() > 0, err
 }
 
 // chatMessageImage: a message of the thread and its photo (ErrNotFound when either is missing).
@@ -114,11 +135,13 @@ func NewSupportRepository(pool *pgxpool.Pool) *SupportRepository {
 	return &SupportRepository{pool: pool}
 }
 
-const chatThreadCols = `t.id, t.kind, t.user_id, t.purchase_request_id, t.last_message_at, t.created_at`
+const chatThreadCols = `t.id, t.kind, t.user_id, t.purchase_request_id, t.last_message_at, t.created_at,
+	COALESCE(t.user_read_message_id, 0), COALESCE(t.admin_read_message_id, 0)`
 
 func scanChatThread(row pgx.Row, extra ...any) (domain.ChatThread, error) {
 	var t domain.ChatThread
-	dest := append([]any{&t.ID, &t.Kind, &t.UserID, &t.PurchaseRequestID, &t.LastMessageAt, &t.CreatedAt}, extra...)
+	dest := append([]any{&t.ID, &t.Kind, &t.UserID, &t.PurchaseRequestID, &t.LastMessageAt, &t.CreatedAt,
+		&t.ReadMarkers.User, &t.ReadMarkers.Admin}, extra...)
 	return t, row.Scan(dest...)
 }
 
@@ -219,7 +242,69 @@ func (r *SupportRepository) MarkRead(ctx context.Context, threadID, upTo int64) 
 	return markChatRead(ctx, r.pool, threadID, upTo)
 }
 
+// MarkUserRead: the user has read their thread up to upTo (ErrNotFound when it is not theirs).
+func (r *SupportRepository) MarkUserRead(ctx context.Context, userID uuid.UUID, threadID, upTo int64) error {
+	ok, err := markUserChatRead(ctx, r.pool, threadID, &userID, upTo)
+	if err == nil && !ok {
+		return domain.ErrNotFound
+	}
+	return err
+}
+
 // MessageImage: a message of the thread and its photo.
 func (r *SupportRepository) MessageImage(ctx context.Context, threadID, messageID int64) (domain.ChatMessage, domain.ChatImage, error) {
 	return chatMessageImage(ctx, r.pool, threadID, messageID)
+}
+
+// ChatUnreadRepository counts unread chat messages for the badges: one query per side.
+type ChatUnreadRepository struct{ pool *pgxpool.Pool }
+
+func NewChatUnreadRepository(pool *pgxpool.Pool) *ChatUnreadRepository {
+	return &ChatUnreadRepository{pool: pool}
+}
+
+// ForUser: the user's unread support messages and, per purchase request that has a thread with
+// unread messages, the unread ones (the most recently active request first).
+func (r *ChatUnreadRepository) ForUser(ctx context.Context, userID uuid.UUID) (domain.UserChatUnread, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.kind, t.purchase_request_id, COALESCE(p.code, ''), count(*)
+		FROM chat_threads t
+		JOIN chat_messages m ON m.thread_id = t.id AND m.author_role IN ('admin', 'system') AND NOT m.hidden
+		     AND m.id > COALESCE(t.user_read_message_id, 0)
+		LEFT JOIN purchase_requests p ON p.id = t.purchase_request_id
+		WHERE t.user_id = $1
+		GROUP BY t.id, p.code
+		ORDER BY max(m.id) DESC`, userID)
+	if err != nil {
+		return domain.UserChatUnread{}, err
+	}
+	defer rows.Close()
+	out := domain.UserChatUnread{Purchases: []domain.PurchaseChatUnread{}}
+	for rows.Next() {
+		var (
+			kind string
+			req  *uuid.UUID
+			code string
+			n    int
+		)
+		if err := rows.Scan(&kind, &req, &code, &n); err != nil {
+			return domain.UserChatUnread{}, err
+		}
+		if kind == domain.ChatKindSupport || req == nil {
+			out.Support += n
+			continue
+		}
+		out.Purchases = append(out.Purchases, domain.PurchaseChatUnread{ID: *req, Code: code, Unread: n})
+	}
+	return out, rows.Err()
+}
+
+// ForAdmins: the users' messages no admin has read, in support threads and in purchase threads.
+func (r *ChatUnreadRepository) ForAdmins(ctx context.Context) (domain.AdminChatUnread, error) {
+	var out domain.AdminChatUnread
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*) FILTER (WHERE t.kind = 'support'), count(*) FILTER (WHERE t.kind = 'purchase')
+		FROM chat_messages m JOIN chat_threads t ON t.id = m.thread_id
+		WHERE m.author_role = 'user' AND m.id > COALESCE(t.admin_read_message_id, 0)`).Scan(&out.Support, &out.Purchases)
+	return out, err
 }

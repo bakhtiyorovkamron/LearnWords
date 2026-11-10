@@ -5,11 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { supportApi, type ChatMessage } from '../api/endpoints'
 import { SUPPORT_POLL_MS } from '../lib/supportChat'
+import { SEEN_DEBOUNCE_MS } from '../components/ChatThread'
 import { SupportPage } from './SupportPage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, supportApi: { messages: vi.fn(), post: vi.fn(), image: vi.fn() } }
+  return { ...mod, supportApi: { messages: vi.fn(), post: vi.fn(), image: vi.fn(), read: vi.fn() } }
 })
 
 let seq = 0
@@ -17,7 +18,7 @@ const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
   id: ++seq, author: 'user', mine: true, body: 'hello', has_image: false, hidden: false, hidden_reason: null,
   event: null, created_at: '2026-11-08T10:00:00Z', ...over,
 })
-const page = (messages: ChatMessage[]) => ({ thread_id: 7, messages })
+const page = (messages: ChatMessage[], read = 0) => ({ thread_id: 7, messages, read_message_id: read, other_read_message_id: 0 })
 
 let visibility: DocumentVisibilityState = 'visible'
 function setVisibility(v: DocumentVisibilityState) {
@@ -38,6 +39,7 @@ beforeEach(async () => {
   visibility = 'visible'
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility })
   vi.mocked(supportApi.messages).mockResolvedValue(page([]))
+  vi.mocked(supportApi.read).mockResolvedValue(undefined)
 })
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
@@ -193,5 +195,80 @@ describe('SupportPage', () => {
     await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
     await within(log).findByText('reply 2')
     expect(scroll).toHaveBeenCalledTimes(2)
+  })
+
+  describe('marking read', () => {
+    const reply = (over: Partial<ChatMessage> = {}) => msg({ author: 'admin', mine: false, body: 'reply', ...over })
+    /** The log scrolled up (far from the bottom) or back down. */
+    function scrollLog(atBottom: boolean) {
+      const log = screen.getByRole('log')
+      Object.defineProperty(log, 'scrollHeight', { configurable: true, value: 1000 })
+      Object.defineProperty(log, 'clientHeight', { configurable: true, value: 200 })
+      Object.defineProperty(log, 'scrollTop', { configurable: true, value: atBottom ? 800 : 0 })
+      fireEvent.scroll(log)
+    }
+
+    it('marks the thread read up to the newest id once the reader is at the bottom (debounced 500 ms)', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const r = reply()
+      vi.mocked(supportApi.messages).mockResolvedValue(page([r]))
+      renderPage()
+      await within(await screen.findByRole('log')).findByText('reply')
+      expect(supportApi.read).not.toHaveBeenCalled()
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS - 50))
+      expect(supportApi.read).not.toHaveBeenCalled()
+      await act(() => vi.advanceTimersByTimeAsync(100))
+      expect(supportApi.read).toHaveBeenCalledTimes(1)
+      expect(supportApi.read).toHaveBeenCalledWith(r.id)
+    })
+
+    it('not while the reader is scrolled up; at the bottom again it is marked — and only once per id', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const r = reply()
+      vi.mocked(supportApi.messages).mockResolvedValue(page([r]))
+      renderPage()
+      await within(await screen.findByRole('log')).findByText('reply')
+      act(() => scrollLog(false))
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS * 4))
+      expect(supportApi.read).not.toHaveBeenCalled()
+      act(() => scrollLog(true))
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS + 50))
+      expect(supportApi.read).toHaveBeenCalledTimes(1)
+      // the poll re-reads the same messages, and the reader scrolls around: still one call for this id
+      act(() => scrollLog(false))
+      act(() => scrollLog(true))
+      await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS * 2))
+      expect(supportApi.read).toHaveBeenCalledTimes(1)
+      // a newer message: one more call, for the new id
+      const newer = reply({ body: 'newer' })
+      vi.mocked(supportApi.messages).mockResolvedValue(page([newer]))
+      await act(() => vi.advanceTimersByTimeAsync(SUPPORT_POLL_MS))
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS + 50))
+      expect(supportApi.read).toHaveBeenCalledTimes(2)
+      expect(supportApi.read).toHaveBeenLastCalledWith(newer.id)
+    })
+
+    it('not while the page is hidden; shown again, it is marked', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      vi.mocked(supportApi.messages).mockResolvedValue(page([reply()]))
+      setVisibility('hidden')
+      renderPage()
+      await within(await screen.findByRole('log')).findByText('reply')
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS * 2))
+      expect(supportApi.read).not.toHaveBeenCalled()
+      act(() => setVisibility('visible'))
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS + 50))
+      expect(supportApi.read).toHaveBeenCalledTimes(1)
+    })
+
+    it('nothing is sent for what the server already has as read', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const r = reply()
+      vi.mocked(supportApi.messages).mockResolvedValue(page([r], r.id))
+      renderPage()
+      await within(await screen.findByRole('log')).findByText('reply')
+      await act(() => vi.advanceTimersByTimeAsync(SEEN_DEBOUNCE_MS * 2))
+      expect(supportApi.read).not.toHaveBeenCalled()
+    })
   })
 })

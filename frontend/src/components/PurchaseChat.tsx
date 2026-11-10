@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { PurchaseStatus } from '../api/endpoints'
 import { formatUZS } from '../lib/money'
+import { useMarkRead } from '../lib/chatUnread'
 import { chatOpen, usePurchaseChat, type ChatSide } from '../lib/purchaseChat'
 import { ChatThreadView } from './ChatThread'
 import { ErrorState } from './ErrorState'
@@ -30,6 +31,7 @@ export function StatusPill({ status }: { status: PurchaseStatus }) {
 export function PurchaseChat({ side, requestId }: { side: ChatSide; requestId: string }) {
   const { t, i18n } = useTranslation()
   const { thread, send, messages, api } = usePurchaseChat(side, requestId)
+  const markRead = useMarkRead()
 
   if (thread.error && !thread.data) return <ErrorState error={thread.error} />
   if (!thread.data) return <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
@@ -44,6 +46,7 @@ export function PurchaseChat({ side, requestId }: { side: ChatSide; requestId: s
         <StatusPill status={r.status} />
       </header>
       <ChatThreadView side={side} messages={messages} send={send} open={chatOpen(r.status)}
+        {...(side === 'user' ? { seenFloor: r.readMarker, onSeen: (id: number) => { markRead.purchase(r.id, id).catch(() => undefined) } } : {})}
         otherLabel={side === 'admin' ? t('chat.buyer') : t('chat.support')}
         photo={{ key: ['purchase-chat-image', side, r.id], load: (mid) => api.image(r.id, mid) }}
         systemText={(m) => (m.event === 'paid' ? t('chat.systemPaid', { count: r.amount })

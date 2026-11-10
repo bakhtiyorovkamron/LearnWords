@@ -40,6 +40,7 @@ type RouterDeps struct {
 	WordCheck   *WordCheckHandler
 	Purchases   *PurchaseHandler
 	Support     *SupportHandler
+	ChatUnread  *ChatUnreadHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -191,6 +192,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/purchases/:id/messages", d.Purchases.BuyerChat)
 		protected.POST("/me/purchases/:id/messages", purchaseChatLimiter, d.Purchases.BuyerPost)
 		protected.GET("/me/purchases/:id/messages/:mid/image", d.Purchases.BuyerImage)
+		protected.POST("/me/purchases/:id/read", d.Purchases.BuyerRead)
+		protected.GET("/me/chats/unread", d.ChatUnread.Mine)
+		protected.POST("/support/read", d.Support.Read)
 		protected.GET("/support/messages", d.Support.Messages)
 		protected.POST("/support/messages", supportChatLimiter, d.Support.Post)
 		protected.GET("/support/messages/:mid/image", d.Support.Image)
@@ -219,6 +223,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/purchases/:id/messages", d.Purchases.AdminChat)
 		admin.POST("/purchases/:id/messages", d.Purchases.AdminPost)
 		admin.GET("/purchases/:id/messages/:mid/image", d.Purchases.AdminImage)
+		admin.GET("/chats/unread", d.ChatUnread.Admin)
 		admin.GET("/support/threads", d.Support.AdminThreads)
 		admin.GET("/support/threads/:id/messages", d.Support.AdminMessages)
 		admin.POST("/support/threads/:id/messages", d.Support.AdminPost)

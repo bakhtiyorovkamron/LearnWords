@@ -3,14 +3,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { profileApi, purchasesApi, telegramApi } from '../api/endpoints'
+import { chatUnreadApi, profileApi, purchasesApi, telegramApi } from '../api/endpoints'
 import * as toaster from '../components/Toaster'
 import { ProfilePage } from './ProfilePage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn() }, purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() } }
+  return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn() }, purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() }, chatUnreadApi: { mine: vi.fn(), admin: vi.fn() } }
 })
+vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: true }) }))
 
 const tgStatus = { connected: false, username: null, available: true, bonus_offer: 2, bonus: 0 }
 const empty = { full_name: null, phone: null, telegram: tgStatus }
@@ -25,6 +26,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.mocked(profileApi.get).mockResolvedValue(empty)
   vi.mocked(purchasesApi.overview).mockRejectedValue(apiError('payments_unavailable', 503))
+  vi.mocked(chatUnreadApi.mine).mockResolvedValue({ support: 0, purchases: [], total: 0 })
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks() })
@@ -229,5 +231,15 @@ describe('ProfilePage: support', () => {
     const entry = await screen.findByTestId('support-entry')
     expect(entry.getAttribute('href')).toBe('/support')
     expect(entry.textContent).toContain('Contact support')
+  })
+
+  it('unread badges: the support entry, and only the purchase request rows that have unread messages', async () => {
+    const req = (id: string, code: string) => ({ id, code, pack_id: 'photo_35', feature: 'photo_import', amount: 35, price_uzs: 1000, status: 'pending', created_at: '' })
+    vi.mocked(purchasesApi.overview).mockResolvedValue({ requests: [req('r1', 'YD-1'), req('r2', 'YD-2')] } as never)
+    vi.mocked(chatUnreadApi.mine).mockResolvedValue({ support: 12, purchases: [{ id: 'r2', code: 'YD-2', unread: 2 }], total: 14 })
+    renderPage()
+    expect((await screen.findByTestId('badge-support')).textContent).toBe('9+')
+    expect((await screen.findByTestId('badge-request-r2')).textContent).toBe('2')
+    expect(screen.queryByTestId('badge-request-r1')).toBeNull()
   })
 })

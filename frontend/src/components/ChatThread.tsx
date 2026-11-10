@@ -5,9 +5,12 @@ import { useTranslation } from 'react-i18next'
 import type { ChatDraft, ChatMessage } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { CHAT_MAX_BODY, CHAT_MAX_IMAGE, type ChatSide } from '../lib/chatThread'
+import { usePageVisible } from '../lib/pageVisible'
 
 /** Within this many pixels of the bottom counts as "at the bottom": new messages scroll into view. */
 export const NEAR_BOTTOM_PX = 80
+/** The newest message must stay in view this long before it is reported as seen. */
+export const SEEN_DEBOUNCE_MS = 500
 
 /** The texts that differ between the chats (support / purchase). */
 export interface ChatTexts {
@@ -25,8 +28,12 @@ export interface ChatTexts {
  * empty. New messages scroll into view when the reader is at the bottom already (or wrote the newest
  * one), not while they read further up. A hidden message (card-like text) is the warning for its
  * author and a badge with "Show" for the admins.
+ *
+ * onSeen(upToId): the reader has the newest message in view — the screen is open, the page visible
+ * and the list scrolled to the bottom — for 500 ms. Called once per id, and not for messages up to
+ * `seenFloor` (the read marker the server already holds).
  */
-export function ChatThreadView({ side, messages, send, open, texts, otherLabel, photo, systemText }: {
+export function ChatThreadView({ side, messages, send, open, texts, otherLabel, photo, systemText, onSeen, seenFloor = 0 }: {
   side: ChatSide
   messages: ChatMessage[]
   send: UseMutationResult<ChatMessage, Error, ChatDraft>
@@ -38,16 +45,35 @@ export function ChatThreadView({ side, messages, send, open, texts, otherLabel, 
   photo: { key: readonly unknown[]; load: (messageId: number) => Promise<Blob> }
   /** A system line in the user's language (else its stored text). */
   systemText?: (m: ChatMessage) => string | null
+  onSeen?: (upToId: number) => void
+  seenFloor?: number
 }) {
   const { t } = useTranslation()
   const box = useRef<HTMLDivElement>(null)
   const end = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
   const shown = useRef(0)
+  const visible = usePageVisible()
+  const [bottom, setBottom] = useState(true)
   function onScroll() {
     const el = box.current
-    if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
+    if (!el) return
+    atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
+    setBottom(atBottom.current)
   }
+
+  const newest = messages.reduce((n, m) => Math.max(n, m.id), 0)
+  const seen = useRef(0) // the last id reported
+  const onSeenRef = useRef(onSeen)
+  onSeenRef.current = onSeen
+  useEffect(() => {
+    if (!onSeenRef.current || !visible || !bottom || newest <= seenFloor || newest === seen.current) return
+    const timer = setTimeout(() => {
+      seen.current = newest
+      onSeenRef.current?.(newest)
+    }, SEEN_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [newest, visible, bottom, seenFloor])
   useEffect(() => {
     const first = shown.current === 0
     const added = messages.length > shown.current

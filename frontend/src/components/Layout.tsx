@@ -9,6 +9,8 @@ import { HeroIntroOverlay } from './HeroIntroOverlay'
 import { InstallBanner, InstallMenuItem } from './InstallPrompt'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Toaster } from './Toaster'
+import { UnreadBadge } from './UnreadBadge'
+import { useAdminChatUnread, useChatUnread, useChatUnreadToasts } from '../lib/chatUnread'
 import { ContactLinks } from './ContactLinks'
 import { CONTACT, EXTERNAL_LINK } from '../lib/contact'
 import { useLearningLang } from '../lib/learningLang'
@@ -55,6 +57,12 @@ export function Layout() {
   // Only decides whether to show the link; the backend checks the role on every /api/admin request.
   const me = useQuery({ queryKey: ['me'], queryFn: meApi.get, staleTime: 5 * 60_000 })
   const isAdmin = me.data?.role === 'admin'
+  const chatUnread = useChatUnread()
+  const unreadTotal = chatUnread.data?.total ?? 0
+  const unreadSupport = chatUnread.data?.support ?? 0
+  const unreadPurchases = (chatUnread.data?.purchases ?? []).reduce((n, p) => n + p.unread, 0)
+  const adminUnread = useAdminChatUnread(isAdmin).data?.total ?? 0
+  useChatUnreadToasts(chatUnread.data)
   const learning = useLearningLang()
   const { isOn } = useFeatures()
   const searchOn = isOn('word_search')
@@ -126,8 +134,8 @@ export function Layout() {
           {searchOn && <NavLink to="/search" className={link}><Icon icon={Search} />{t('nav.search')}</NavLink>}
           <NavLink to="/story" className={link}><Icon icon={BookOpen} />{t('nav.dailyStory')}</NavLink>
           <NavLink to="/stats" className={link}><Icon icon={ChartColumn} />{t('nav.stats')}</NavLink>
-          <NavLink to="/profile" className={link}><Icon icon={UserRound} />{t('profile.title')}</NavLink>
-          {isAdmin && <NavLink to="/admin" className={link}><Icon icon={Shield} />{t('nav.admin')}</NavLink>}
+          <NavLink to="/profile" className={link}><Icon icon={UserRound} />{t('profile.title')}<UnreadBadge count={unreadTotal} testId="badge-profile" /></NavLink>
+          {isAdmin && <NavLink to="/admin" className={link}><Icon icon={Shield} />{t('nav.admin')}<UnreadBadge count={adminUnread} testId="badge-admin" /></NavLink>}
           <div className="ml-auto flex items-center gap-2">
             {learningBadge}
             <LanguageSwitcher />
@@ -157,9 +165,9 @@ export function Layout() {
           >
             {searchOn && <NavLink to="/search" className={sheetLink}><Icon icon={Search} size={20} />{t('nav.search')}</NavLink>}
             <NavLink to="/stats" className={sheetLink}><Icon icon={ChartColumn} size={20} />{t('nav.stats')}</NavLink>
-            <NavLink to="/profile" className={sheetLink}><Icon icon={UserRound} size={20} />{t('profile.title')}</NavLink>
-            <NavLink to="/support" className={sheetLink}><Icon icon={LifeBuoy} size={20} />{t('support.title')}</NavLink>
-            {isAdmin && <NavLink to="/admin" className={sheetLink}><Icon icon={Shield} size={20} />{t('nav.admin')}</NavLink>}
+            <NavLink to="/profile" className={sheetLink}><Icon icon={UserRound} size={20} />{t('profile.title')}<UnreadBadge count={unreadPurchases} testId="badge-sheet-profile" /></NavLink>
+            <NavLink to="/support" className={sheetLink}><Icon icon={LifeBuoy} size={20} />{t('support.title')}<UnreadBadge count={unreadSupport} testId="badge-sheet-support" /></NavLink>
+            {isAdmin && <NavLink to="/admin" className={sheetLink}><Icon icon={Shield} size={20} />{t('nav.admin')}<UnreadBadge count={adminUnread} testId="badge-sheet-admin" /></NavLink>}
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
               {learningBadge}
               <LanguageSwitcher />
@@ -178,7 +186,10 @@ export function Layout() {
       {/* Bottom navigation: phones only. Padded for the iPhone home indicator (safe area). */}
       {!focus && <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[var(--nav-h)] border-t border-line bg-bg/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <NavLink to="/" end className={({ isActive }) => tab(isActive)}>
-          <Icon icon={House} size={22} stroke={1.75} />{t('nav.home')}
+          <span className="relative">
+            <Icon icon={House} size={22} stroke={1.75} />
+            <UnreadBadge count={unreadTotal} testId="badge-home" className="absolute -right-2.5 -top-1.5" />
+          </span>{t('nav.home')}
         </NavLink>
         <NavLink to="/cards" className={({ isActive }) => tab(isActive)}>
           <Icon icon={Layers} size={22} stroke={1.75} />{t('nav.cards')}

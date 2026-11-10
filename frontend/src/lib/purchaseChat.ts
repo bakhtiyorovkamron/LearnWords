@@ -12,6 +12,9 @@ export const chatOpen = (status: string | undefined) => status !== 'cancelled' &
 
 const pending = (r: PurchaseRequest) => r.status === 'pending'
 
+/** The request with the viewer's read marker (the newest message they have read). */
+export type PurchaseChatMeta = PurchaseRequest & { readMarker: number }
+
 /**
  * One purchase request's chat, for its buyer or an admin. Polled every 30 s (while visible) as long
  * as the request is pending; stops once it is paid or cancelled.
@@ -21,7 +24,7 @@ export function usePurchaseChat(side: ChatSide, id: string) {
   const source = useMemo(() => ({
     fetch: async (after: number) => {
       const page = await api.messages(id, after)
-      return { meta: page.request as PurchaseRequest, messages: page.messages }
+      return { meta: { ...page.request, readMarker: page.read_message_id } as PurchaseChatMeta, messages: page.messages }
     },
     post: (draft: Parameters<ChatApi['post']>[1]) => api.post(id, draft),
   }), [api, id])

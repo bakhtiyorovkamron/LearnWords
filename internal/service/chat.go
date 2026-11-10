@@ -120,3 +120,24 @@ func (n chatNotifier) notify(ctx context.Context, userID uuid.UUID, telegramText
 		}
 	}()
 }
+
+// ChatUnreadRepository counts unread chat messages (support and purchase threads together).
+type ChatUnreadRepository interface {
+	ForUser(ctx context.Context, userID uuid.UUID) (domain.UserChatUnread, error)
+	ForAdmins(ctx context.Context) (domain.AdminChatUnread, error)
+}
+
+// ChatUnreadService feeds the unread badges.
+type ChatUnreadService struct{ repo ChatUnreadRepository }
+
+func NewChatUnreadService(repo ChatUnreadRepository) *ChatUnreadService {
+	return &ChatUnreadService{repo: repo}
+}
+
+func (s *ChatUnreadService) ForUser(ctx context.Context, userID uuid.UUID) (domain.UserChatUnread, error) {
+	return s.repo.ForUser(ctx, userID)
+}
+
+func (s *ChatUnreadService) ForAdmins(ctx context.Context) (domain.AdminChatUnread, error) {
+	return s.repo.ForAdmins(ctx)
+}

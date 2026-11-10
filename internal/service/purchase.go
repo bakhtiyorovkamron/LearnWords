@@ -46,6 +46,11 @@ type PurchaseRepository interface {
 	// Messages: up to limit after `after`, oldest first, those viewerRole may see.
 	Messages(ctx context.Context, requestID uuid.UUID, after int64, limit int, viewerRole string) ([]domain.ChatMessage, error)
 	MarkAdminRead(ctx context.Context, requestID uuid.UUID, upTo int64) error
+	// MarkUserRead: the buyer has read the request's chat up to upTo (never backwards; a no-op while
+	// it has no thread).
+	MarkUserRead(ctx context.Context, requestID, userID uuid.UUID, upTo int64) error
+	// ChatMarkers: what each side has read in the request's chat (zeros without a thread).
+	ChatMarkers(ctx context.Context, requestID uuid.UUID) (domain.ChatReadMarkers, error)
 	MessageImage(ctx context.Context, requestID uuid.UUID, messageID int64) (domain.ChatMessage, domain.ChatImage, error)
 }
 

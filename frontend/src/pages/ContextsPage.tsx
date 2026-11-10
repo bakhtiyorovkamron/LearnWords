@@ -9,6 +9,8 @@ import { TodayCard } from '../components/TodayCard'
 import { useFeatures } from '../lib/features'
 import { useLearningLang } from '../lib/learningLang'
 import { setMoreMenuOpen, useMoreMenuOpen } from '../lib/moreMenu'
+import { useChatUnread } from '../lib/chatUnread'
+import { UnreadBadge } from '../components/UnreadBadge'
 import { handOffPhoto } from '../lib/photoHandoff'
 
 const action = 'glass flex h-16 items-center gap-3 px-4 text-left transition hover:bg-surface-2'
@@ -22,6 +24,7 @@ export function ContextsPage() {
   const folders = useFolderList()
   const fileInput = useRef<HTMLInputElement>(null)
   const menuOpen = useMoreMenuOpen()
+  const unread = useChatUnread().data?.total ?? 0
 
   const all = folders.data?.all
   const words = all?.total ?? 0
@@ -44,8 +47,9 @@ export function ContextsPage() {
         {/* Phones: the "More" sheet (search, statistics, settings) opens from here. */}
         <button type="button" onClick={() => setMoreMenuOpen(true)} aria-label={t('nav.more')} aria-haspopup="dialog"
           aria-controls="more-sheet" aria-expanded={menuOpen}
-          className="ml-auto grid h-11 w-11 place-items-center rounded-full border border-line bg-surface text-fg transition hover:bg-surface-2 md:hidden">
+          className="relative ml-auto grid h-11 w-11 place-items-center rounded-full border border-line bg-surface text-fg transition hover:bg-surface-2 md:hidden">
           <Menu size={20} aria-hidden="true" />
+          <UnreadBadge count={unread} testId="badge-more" className="absolute -right-1 -top-1" />
         </button>
       </div>
 
