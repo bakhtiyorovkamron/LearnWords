@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -37,6 +37,10 @@ type AdminTab = 'overview' | 'support'
 function AdminTabs({ myId }: { myId: string }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<AdminTab>('overview')
+  // A user whose thread to open: set by the user card's "Write", taken over by the support tab.
+  const [writeTo, setWriteTo] = useState<string | null>(null)
+  const write = (userId: string) => { setWriteTo(userId); setTab('support') }
+  const written = useCallback(() => setWriteTo(null), [])
   const unread = (useSupportThreads().data ?? []).reduce((n, th) => n + th.unread, 0)
   const supportLabel = unread > 0 ? `${t('admin.tabs.support')} · ${unread}` : t('admin.tabs.support')
 
@@ -55,9 +59,9 @@ function AdminTabs({ myId }: { myId: string }) {
           <PushPanel />
           <WordCheckJobPanel />
           <PurchasesBlock />
-          <UsersTable myId={myId} />
+          <UsersTable myId={myId} onWrite={write} />
         </>
-      ) : <AdminSupport />}
+      ) : <AdminSupport startWith={writeTo} onStarted={written} />}
     </div>
   )
 }
@@ -422,7 +426,7 @@ function PurchaseRow({ p, busy, onApprove, onReject, onChat }: {
   )
 }
 
-function UsersTable({ myId }: { myId: string }) {
+function UsersTable({ myId, onWrite }: { myId: string; onWrite: (userId: string) => void }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['admin', 'users'], queryFn: adminApi.users })
@@ -549,7 +553,7 @@ function UsersTable({ myId }: { myId: string }) {
           {!rows.length && <p className="py-6 text-center text-muted">{t('admin.nothingFound')}</p>}
         </div>
       )}
-      {opened && <AdminUserModal user={opened} onClose={() => setOpened(null)} />}
+      {opened && <AdminUserModal user={opened} onClose={() => setOpened(null)} onWrite={onWrite} />}
     </section>
   )
 }

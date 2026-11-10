@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Camera, Languages, Palette, Search, Send, Star, type LucideIcon } from 'lucide-react'
+import { BookOpen, Camera, Languages, Palette, Pencil, Search, Send, Star, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { adminApi, type AdminUser, type FeatureState } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -9,7 +9,7 @@ import { dateLocale } from '../i18n'
 import { toast } from './Toaster'
 
 /** Card of one user in the admin panel: facts about the account and the per-user features. */
-export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+export function AdminUserModal({ user, onClose, onWrite }: { user: AdminUser; onClose: () => void; onWrite?: (userId: string) => void }) {
   const { t } = useTranslation()
   const features = useQuery({ queryKey: ['admin', 'user-features', user.id], queryFn: () => adminApi.userFeatures(user.id) })
   const date = (iso: string) => new Date(iso).toLocaleDateString(dateLocale())
@@ -44,7 +44,12 @@ export function AdminUserModal({ user, onClose }: { user: AdminUser; onClose: ()
           {features.data?.map((f) => <FeatureRow key={f.feature} userId={user.id} state={f} />)}
         </section>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {onWrite && (
+            <button type="button" className="btn-primary" onClick={() => { onClose(); onWrite(user.id) }}>
+              <Pencil size={16} aria-hidden="true" />{t('support.write')}
+            </button>
+          )}
           <button type="button" className="btn-ghost" onClick={onClose}>{t('admin.userCard.close')}</button>
         </div>
       </div>

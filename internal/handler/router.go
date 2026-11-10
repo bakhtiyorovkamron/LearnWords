@@ -225,6 +225,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/purchases/:id/messages/:mid/image", d.Purchases.AdminImage)
 		admin.GET("/chats/unread", d.ChatUnread.Admin)
 		admin.GET("/support/threads", d.Support.AdminThreads)
+		admin.POST("/support/threads", d.Support.AdminOpen)
 		admin.GET("/support/threads/:id/messages", d.Support.AdminMessages)
 		admin.POST("/support/threads/:id/messages", d.Support.AdminPost)
 		admin.POST("/support/threads/:id/read", d.Support.AdminRead)

@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { adminSupportApi, type SupportThread } from '../api/endpoints'
+import { adminApi, adminSupportApi, type SupportThread } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
 import { CHAT_POLL_MS } from '../lib/chatThread'
 import { usePageVisible } from '../lib/pageVisible'
 import { shortTime } from '../lib/chatLayout'
 import { SUPPORT_THREADS_KEY, useAdminSupportThread } from '../lib/supportChat'
+import { AdminSupportPicker } from './AdminSupportPicker'
 import { ChatAvatar, ChatThreadView } from './ChatThread'
 
 /** The support threads, re-read every 30 s while the page is visible (also for the tab's badge). */
@@ -26,27 +28,54 @@ export function useSupportThreads() {
  * message) and the open thread with the admin composer. Opening a thread marks it read, and so does
  * every new message that arrives while it is open.
  */
-export function AdminSupport() {
+export function AdminSupport({ startWith, onStarted }: { startWith?: string | null; onStarted?: () => void }) {
   const { t } = useTranslation()
   const threads = useSupportThreads()
   const [openId, setOpenId] = useState<number | null>(null)
+  const [picking, setPicking] = useState(false)
+  // The same users query as the users table (same key), read only while the picker is open.
+  const users = useQuery({ queryKey: ['admin', 'users'], queryFn: adminApi.users, enabled: picking, staleTime: 30_000 })
+  const withThread = useMemo(() => new Set((threads.data ?? []).map((th) => th.user_id)), [threads.data])
+
+  // Open (and create, when the user never wrote) the thread with a user: the picker and the user card use this.
+  const open = useMutation({ mutationFn: adminSupportApi.open, onSuccess: (th) => setOpenId(th.id) })
+  const openFor = open.mutate
+
+  const started = useRef<string | null>(null)
+  useEffect(() => {
+    if (!startWith) { started.current = null; return }
+    if (started.current === startWith) return
+    started.current = startWith
+    openFor(startWith)
+    onStarted?.()
+  }, [startWith, openFor, onStarted])
 
   return (
     <section aria-labelledby="admin-support-title" className="glass p-4 sm:p-6">
-      <h2 id="admin-support-title" className="mb-4 text-lg font-bold text-fg">{t('support.title')}</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 id="admin-support-title" className="text-lg font-bold text-fg">{t('support.title')}</h2>
+        <button type="button" onClick={() => setPicking(true)} className="btn-primary">
+          <Pencil size={16} aria-hidden="true" />{t('support.write')}
+        </button>
+      </div>
       {threads.error && <p className="text-sm text-danger">{errorMessage(threads.error)}</p>}
+      {open.error && <p role="alert" className="mb-2 text-sm text-danger">{errorMessage(open.error)}</p>}
       {threads.isLoading && <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />}
-      {threads.data && (threads.data.length === 0 ? (
-        <p className="text-sm text-muted">{t('support.threadsEmpty')}</p>
-      ) : (
+      {threads.data && (
         <div className="grid gap-4 md:grid-cols-[18rem_minmax(0,1fr)]">
-          <ul aria-label={t('support.title')} className={`divide-y divide-divider ${openId !== null ? 'max-md:hidden' : ''}`}>
-            {threads.data.map((th) => (
-              <li key={th.id}>
-                <ThreadRow th={th} active={th.id === openId} onOpen={() => setOpenId(th.id)} />
-              </li>
-            ))}
-          </ul>
+          <div className={openId !== null ? 'max-md:hidden' : ''}>
+            {threads.data.length === 0 ? (
+              <p className="text-sm text-muted">{t('support.threadsEmpty')}</p>
+            ) : (
+              <ul aria-label={t('support.title')} className="divide-y divide-divider">
+                {threads.data.map((th) => (
+                  <li key={th.id}>
+                    <ThreadRow th={th} active={th.id === openId} onOpen={() => setOpenId(th.id)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           {openId !== null ? (
             <div className="flex h-[70dvh] min-h-[24rem] flex-col gap-2">
               <AdminSupportThread key={openId} id={openId} onBack={() => setOpenId(null)} />
@@ -55,7 +84,12 @@ export function AdminSupport() {
             <p className="text-sm text-muted max-md:hidden">{t('support.pickThread')}</p>
           )}
         </div>
-      ))}
+      )}
+      {picking && (
+        <AdminSupportPicker users={users.data} loading={users.isLoading} withThread={withThread}
+          onClose={() => setPicking(false)}
+          onPick={(id) => { setPicking(false); openFor(id) }} />
+      )}
     </section>
   )
 }
@@ -98,7 +132,8 @@ function AdminSupportThread({ id, onBack }: { id: number; onBack: () => void }) 
   // Read up to the newest message on screen: when opened, and as new ones arrive.
   useEffect(() => {
     if (!lastId) return
-    void adminSupportApi.read(id, lastId).then(() => qc.invalidateQueries({ queryKey: SUPPORT_THREADS_KEY })).catch(() => undefined)
+    // Also what brings a thread that was empty into the inbox after the admin's first message.
+    void adminSupportApi.read(id, lastId).catch(() => undefined).then(() => qc.invalidateQueries({ queryKey: SUPPORT_THREADS_KEY }))
   }, [id, lastId, qc])
 
   if (thread.error && !thread.data) return <p className="text-sm text-danger">{errorMessage(thread.error)}</p>
@@ -110,7 +145,7 @@ function AdminSupportThread({ id, onBack }: { id: number; onBack: () => void }) 
       otherLabel={t('chat.user')}
       photo={{ key: ['admin-support-image', id], load: (mid) => adminSupportApi.image(id, mid) }}
       texts={{
-        placeholder: t('support.placeholder'), empty: t('support.empty'), hint: t('support.hintNoCards'),
+        placeholder: t('support.placeholder'), empty: t('support.emptyAdmin'), hint: t('support.hintNoCards'),
         hiddenCard: t('support.hiddenCard'), rateLimited: t('support.rateLimited'), closed: '',
       }} />
   )

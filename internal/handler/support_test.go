@@ -34,6 +34,7 @@ type memSupport struct {
 	uread   map[int64]int64
 	images  map[string]domain.ChatImage
 	emails  map[uuid.UUID]string
+	missing map[uuid.UUID]bool // users that do not exist (as the thread's foreign key says)
 }
 
 func newMemSupport() *memSupport {
@@ -44,6 +45,9 @@ func newMemSupport() *memSupport {
 func (m *memSupport) EnsureThread(_ context.Context, u uuid.UUID) (domain.ChatThread, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.missing[u] {
+		return domain.ChatThread{}, domain.ErrNotFound
+	}
 	if id, ok := m.byUser[u]; ok {
 		return m.view(id), nil
 	}
@@ -215,6 +219,7 @@ func newSupportEnv() supportEnv {
 	r.GET("/support/messages/:mid/image", h.Image)
 	admin := r.Group("/admin", RequireAdmin())
 	admin.GET("/support/threads", h.AdminThreads)
+	admin.POST("/support/threads", h.AdminOpen)
 	admin.GET("/support/threads/:id/messages", h.AdminMessages)
 	admin.POST("/support/threads/:id/messages", h.AdminPost)
 	admin.POST("/support/threads/:id/read", h.AdminRead)
@@ -652,5 +657,79 @@ func TestSupport_UserSeesTheAdminReplyAfterTheirMessage(t *testing.T) {
 	}
 	if latest := e.mine(t, e.user, second.ID); len(latest.Messages) != 0 {
 		t.Errorf("after the newest: %+v", latest.Messages)
+	}
+}
+
+func TestSupport_AdminOpensAThreadWithAnyUser(t *testing.T) {
+	e := newSupportEnv()
+	body := fmt.Sprintf(`{"user_id":"%s"}`, e.other)
+
+	w := e.as(e.admin, "POST", "/admin/support/threads", body)
+	if w.Code != 200 {
+		t.Fatalf("open: %d %s", w.Code, w.Body)
+	}
+	var first struct {
+		ID        int64   `json:"id"`
+		UserID    string  `json:"user_id"`
+		UserEmail string  `json:"user_email"`
+		Unread    int     `json:"unread"`
+		Preview   *string `json:"preview"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &first)
+	if first.ID == 0 || first.UserID != e.other.String() || first.UserEmail != "bob@x.co" || first.Unread != 0 || first.Preview != nil {
+		t.Fatalf("thread %+v", first)
+	}
+
+	// Idempotent; nothing sent; no message created.
+	w = e.as(e.admin, "POST", "/admin/support/threads", body)
+	var again struct {
+		ID int64 `json:"id"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &again)
+	if w.Code != 200 || again.ID != first.ID {
+		t.Errorf("second open: %d %s", w.Code, w.Body)
+	}
+	e.svc.Wait()
+	if len(e.push.all()) != 0 || len(e.tg.all()) != 0 || len(e.repo.msgs) != 0 {
+		t.Error("opening a thread sent or wrote something")
+	}
+	// The user's own screen shows the same thread.
+	if p := e.mine(t, e.other, 0); p.ThreadID != first.ID {
+		t.Errorf("the user's thread %d, want %d", p.ThreadID, first.ID)
+	}
+
+	// Empty: not in the inbox. After the admin's first message: there, and the user is notified.
+	if rows := e.threads(t, ""); len(rows) != 0 {
+		t.Fatalf("an empty thread is listed: %+v", rows)
+	}
+	e.write(t, e.admin, first.ID, "Здравствуйте!")
+	e.svc.Wait()
+	if rows := e.threads(t, ""); len(rows) != 1 || rows[0].ID != first.ID || *rows[0].Preview != "Здравствуйте!" {
+		t.Errorf("after the first message: %+v", rows)
+	}
+	if pushes := e.push.all(); len(pushes) != 1 || pushes[0].to[0] != e.other {
+		t.Errorf("the user was not notified: %+v", pushes)
+	}
+}
+
+func TestSupport_AdminOpenValidationAndAccess(t *testing.T) {
+	e := newSupportEnv()
+	ghost := uuid.New()
+	e.repo.missing = map[uuid.UUID]bool{ghost: true}
+
+	w := e.as(e.admin, "POST", "/admin/support/threads", fmt.Sprintf(`{"user_id":"%s"}`, ghost))
+	if w.Code != 404 || !strings.Contains(w.Body.String(), `"user_not_found"`) {
+		t.Errorf("unknown user: %d %s", w.Code, w.Body)
+	}
+	for _, body := range []string{`{}`, `{"user_id":"nope"}`, `{"user_id":""}`, `x`} {
+		if w := e.as(e.admin, "POST", "/admin/support/threads", body); w.Code != 400 {
+			t.Errorf("%s: %d, want 400", body, w.Code)
+		}
+	}
+	if w := e.as(e.user, "POST", "/admin/support/threads", fmt.Sprintf(`{"user_id":"%s"}`, e.other)); w.Code != 403 {
+		t.Errorf("a non-admin: %d, want 403", w.Code)
+	}
+	if len(e.repo.threads) != 0 {
+		t.Error("a refused request created a thread")
 	}
 }

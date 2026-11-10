@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
+	"learnwords/internal/service"
 )
 
 func TestSupport_OneThreadPerUser_EvenAtOnce(t *testing.T) {
@@ -215,5 +216,49 @@ func TestSupport_PurchaseThreadsAreNotSupportThreads_PhotosAndCascade(t *testing
 		+ (SELECT count(*) FROM chat_messages WHERE thread_id IN ($1, $2)) + (SELECT count(*) FROM chat_images WHERE thread_id IN ($1, $2))`,
 		mine.ID, purchaseThread).Scan(&n); err != nil || n != 0 {
 		t.Errorf("left behind after deleting the user: %d %v", n, err)
+	}
+}
+
+func TestSupport_AdminOpen_CreatesOnceForAnyUser_EmptyThreadNotListed(t *testing.T) {
+	f := newMoveFixture(t)
+	admin := addUser(t, f, "admin", false)
+	r, ctx := NewSupportRepository(f.pool), context.Background()
+	svc := service.NewSupportService(r, nil, nil)
+
+	th, err := svc.AdminOpen(ctx, f.user)
+	if err != nil || th.UserID != f.user || th.Kind != "support" || th.Unread != 0 || th.LastMessage != nil || th.UserEmail == "" {
+		t.Fatalf("open: %+v %v", th, err)
+	}
+	again, err := svc.AdminOpen(ctx, f.user)
+	if err != nil || again.ID != th.ID {
+		t.Errorf("second open: %+v %v", again, err)
+	}
+	var n int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM chat_messages WHERE thread_id = $1`, th.ID).Scan(&n); err != nil || n != 0 {
+		t.Errorf("%d messages, want none (%v)", n, err)
+	}
+	list := func() bool {
+		ts, err := r.Threads(ctx, false, 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, x := range ts {
+			if x.ID == th.ID {
+				return true
+			}
+		}
+		return false
+	}
+	if list() {
+		t.Error("an empty thread is in the inbox")
+	}
+	if _, err := svc.AdminPost(ctx, admin, th.ID, "Здравствуйте", nil); err != nil {
+		t.Fatal(err)
+	}
+	if !list() {
+		t.Error("the thread is not in the inbox after the admin's message")
+	}
+	if _, err := svc.AdminOpen(ctx, uuid.New()); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown user: %v", err)
 	}
 }

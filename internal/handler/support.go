@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -118,6 +119,34 @@ func (h *SupportHandler) AdminThreads(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"threads": mapSlice(ts, newSupportThreadView)})
+}
+
+// AdminOpen handles POST /api/admin/support/threads {user_id} → the user's support thread in the shape
+// of an item of the list (unread 0, preview null while it has no messages), created when the user
+// never wrote. Idempotent; nothing is sent to the user. 400 for a missing or malformed user_id, 404
+// user_not_found.
+func (h *SupportHandler) AdminOpen(c *gin.Context) {
+	var req struct {
+		UserID string `json:"user_id"`
+	}
+	if !bindSmallJSON(c, &req) {
+		return
+	}
+	uid, err := uuid.Parse(req.UserID)
+	if err != nil {
+		badRequest(c, "user_id must be a user id")
+		return
+	}
+	t, err := h.svc.AdminOpen(c.Request.Context(), uid)
+	if errors.Is(err, domain.ErrNotFound) {
+		c.AbortWithStatusJSON(http.StatusNotFound, errorResponse{Error: "user not found", Code: "user_not_found"})
+		return
+	}
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, newSupportThreadView(t))
 }
 
 // AdminMessages handles GET /api/admin/support/threads/:id/messages?after=<id> → {thread, messages}:

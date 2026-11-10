@@ -109,6 +109,17 @@ func (s *SupportService) UserImage(ctx context.Context, userID uuid.UUID, messag
 	return img, nil
 }
 
+// AdminOpen returns the support thread of any user, creating it when they never wrote (ErrNotFound
+// when there is no such user). It sends nothing and writes no message: the thread shows in the
+// inbox after the admin's first one.
+func (s *SupportService) AdminOpen(ctx context.Context, userID uuid.UUID) (domain.ChatThread, error) {
+	t, err := s.repo.EnsureThread(ctx, userID) // a missing user is ErrNotFound (the thread's foreign key)
+	if err != nil {
+		return domain.ChatThread{}, err
+	}
+	return s.repo.Thread(ctx, t.ID)
+}
+
 // Threads: the admins' list of support threads.
 func (s *SupportService) Threads(ctx context.Context, unreadOnly bool) ([]domain.ChatThread, error) {
 	return s.repo.Threads(ctx, unreadOnly, supportThreadListLimit)

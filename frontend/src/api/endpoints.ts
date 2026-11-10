@@ -413,6 +413,8 @@ export const supportApi = {
 
 /** The admins' side of support: every thread; reading a thread does not mark it read — read() does. */
 export const adminSupportApi = {
+  /** Opens (creating it when the user never wrote) the support thread of any user; nothing is sent. 404 user_not_found. */
+  open: (userId: string) => api.post<SupportThread>('/admin/support/threads', { user_id: userId }).then((r) => r.data),
   threads: (unreadOnly = false) =>
     api.get<{ threads: SupportThread[] }>('/admin/support/threads', { params: unreadOnly ? { unread: 1 } : {} }).then((r) => r.data.threads),
   messages: (id: number, after = 0) =>
