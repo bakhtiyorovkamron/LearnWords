@@ -52,6 +52,14 @@ describe('SupportPage', () => {
     expect(supportApi.messages).toHaveBeenCalledWith(0)
   })
 
+  it('the chat has its own header (Support, reply time); the page heading is screen-reader only on phones', async () => {
+    renderPage()
+    const header = await screen.findByTestId('chat-thread-header')
+    expect(within(header).getByRole('heading', { name: 'Support' })).toBeTruthy()
+    expect(within(header).getByText('We usually reply within an hour')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { name: 'Support' })[0].className).toContain('max-md:sr-only')
+  })
+
   it('sending is disabled while the message is empty; text sends and shows', async () => {
     vi.mocked(supportApi.post).mockResolvedValue(msg({ body: 'The photos do not come' }))
     renderPage()
@@ -71,7 +79,7 @@ describe('SupportPage', () => {
   it('a hidden message is the warning for its author', async () => {
     vi.mocked(supportApi.messages).mockResolvedValue(page([msg({ hidden: true, hidden_reason: 'card_number', body: null })]))
     renderPage()
-    expect((await screen.findByTestId('chat-hidden')).textContent).toBe('Message hidden: it looks like a card number. Do not send bank details.')
+    expect((await screen.findByTestId('chat-hidden')).textContent).toContain('Message hidden: it looks like a card number. Do not send bank details.')
   })
 
   it('the team\'s replies are labelled Support; too many messages says to wait', async () => {
@@ -81,7 +89,7 @@ describe('SupportPage', () => {
     renderPage()
     const log = await screen.findByRole('log')
     expect(await within(log).findByText('Hi! How can we help?')).toBeTruthy()
-    expect(within(log).getByText('Support')).toBeTruthy()
+    expect(within(log).getByRole('group', { name: 'Support' })).toBeTruthy()
     fireEvent.change(box(), { target: { value: 'one more' } })
     fireEvent.click(sendBtn())
     expect((await screen.findByRole('alert')).textContent).toBe('Too many messages. Please wait a few minutes.')

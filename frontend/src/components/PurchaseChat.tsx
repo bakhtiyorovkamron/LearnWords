@@ -46,7 +46,8 @@ export function PurchaseChat({ side, requestId }: { side: ChatSide; requestId: s
         <StatusPill status={r.status} />
       </header>
       <ChatThreadView side={side} messages={messages} send={send} open={chatOpen(r.status)}
-        {...(side === 'user' ? { seenFloor: r.readMarker, onSeen: (id: number) => { markRead.purchase(r.id, id).catch(() => undefined) } } : {})}
+        readMarker={r.readMarker} otherReadMarker={r.otherReadMarker}
+        {...(side === 'user' ? { onSeen: (id: number) => { markRead.purchase(r.id, id).catch(() => undefined) } } : {})}
         otherLabel={side === 'admin' ? t('chat.buyer') : t('chat.support')}
         photo={{ key: ['purchase-chat-image', side, r.id], load: (mid) => api.image(r.id, mid) }}
         systemText={(m) => (m.event === 'paid' ? t('chat.systemPaid', { count: r.amount })

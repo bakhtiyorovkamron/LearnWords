@@ -87,7 +87,7 @@ describe('AdminPage: the Support tab', () => {
 
     const log = await screen.findByRole('log')
     expect(await within(log).findByText('Since yesterday')).toBeTruthy()
-    expect(within(log).getAllByText('User').length).toBe(2)
+    expect(within(log).getAllByRole('group', { name: 'User' }).length).toBe(1) // one group: close in time, one author
     expect(adminSupportApi.messages).toHaveBeenCalledWith(1, 0)
     expect(screen.getByRole('textbox', { name: 'Describe your question…' })).toBeTruthy()
 
@@ -116,5 +116,38 @@ describe('AdminPage: the Support tab', () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: /^Support/ }))
     expect(await screen.findByText('No conversations yet.')).toBeTruthy()
+  })
+
+  it('a list row: the initial, bold preview when unread, the time on the right (HH:MM today, Yesterday, else day + month)', async () => {
+    const y = new Date(); y.setDate(y.getDate() - 1)
+    const old = new Date(2020, 2, 5, 12)
+    vi.mocked(adminSupportApi.threads).mockResolvedValue([
+      thread({ id: 1, user_email: 'anna@x.co', unread: 2, preview: 'New one' }),
+      thread({ id: 2, user_email: 'bob@x.co', unread: 0, preview: 'Old one', last_message_at: y.toISOString() }),
+      thread({ id: 3, user_email: 'cy@x.co', unread: 0, preview: 'Older', last_message_at: old.toISOString() }),
+    ])
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /^Support/ }))
+    const anna = await screen.findByTestId('support-thread-1')
+    expect(within(anna).getByText('A')).toBeTruthy()
+    expect(within(anna).getByText('New one').className).toContain('font-bold')
+    expect(within(screen.getByTestId('support-thread-2')).getByText('Old one').className).not.toContain('font-bold')
+    expect(within(anna).getByText(/^\d{2}:\d{2}$/)).toBeTruthy()
+    expect(within(screen.getByTestId('support-thread-2')).getByText('Yesterday')).toBeTruthy()
+    expect(within(screen.getByTestId('support-thread-3')).getByText(/5 Mar/)).toBeTruthy()
+  })
+
+  it('the open thread has a header with the email and a back button to the list', async () => {
+    vi.mocked(adminSupportApi.messages).mockResolvedValue({ read_message_id: 0, other_read_message_id: 0,
+      thread: thread({ id: 1 }), messages: [message({ id: 10 })] })
+    vi.mocked(adminSupportApi.read).mockResolvedValue(thread({ id: 1 }))
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /^Support/ }))
+    fireEvent.click(await screen.findByTestId('support-thread-1'))
+    const header = await screen.findByTestId('chat-thread-header')
+    expect(within(header).getByRole('heading', { name: 'anna@x.co' })).toBeTruthy()
+    fireEvent.click(within(header).getByRole('button', { name: 'Back to the list' }))
+    expect(screen.queryByTestId('chat-thread-header')).toBeNull()
+    expect(screen.getByText('Choose a conversation in the list.')).toBeTruthy()
   })
 })

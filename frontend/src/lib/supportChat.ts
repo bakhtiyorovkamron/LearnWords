@@ -10,6 +10,9 @@ export const SUPPORT_POLL_MS = 5_000
 
 const always = () => true
 
+/** An admin's thread with the two read markers (the admins' own, and the user's). */
+export type AdminThreadMeta = SupportThread & { readMarker: number; otherReadMarker: number }
+
 /**
  * The caller's own support thread (made by the server on the first read): re-read every 5 s while
  * the screen is open and visible, and again when the page or the window comes back.
@@ -18,7 +21,7 @@ export function useSupportChat() {
   const source = useMemo(() => ({
     fetch: async (after: number) => {
       const page = await supportApi.messages(after)
-      return { meta: { threadId: page.thread_id, readMarker: page.read_message_id }, messages: page.messages }
+      return { meta: { threadId: page.thread_id, readMarker: page.read_message_id, otherReadMarker: page.other_read_message_id }, messages: page.messages }
     },
     post: (draft: ChatDraft) => supportApi.post(draft),
   }), [])
@@ -30,7 +33,7 @@ export function useAdminSupportThread(id: number) {
   const source = useMemo(() => ({
     fetch: async (after: number) => {
       const page = await adminSupportApi.messages(id, after)
-      return { meta: page.thread as SupportThread, messages: page.messages }
+      return { meta: { ...page.thread, readMarker: page.read_message_id, otherReadMarker: page.other_read_message_id } as AdminThreadMeta, messages: page.messages }
     },
     post: (draft: ChatDraft) => adminSupportApi.post(id, draft),
   }), [id])

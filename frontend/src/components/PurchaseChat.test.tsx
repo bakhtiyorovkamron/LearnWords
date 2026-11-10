@@ -121,7 +121,7 @@ describe('PurchaseChat', () => {
     await act(() => vi.advanceTimersByTimeAsync(CHAT_POLL_MS))
     expect(buyerChatApi.messages).toHaveBeenLastCalledWith('r1', first.id)
     expect(await within(log()).findByText('checking')).toBeTruthy()
-    expect(within(log()).getByText('Support')).toBeTruthy()
+    expect(within(log()).getByRole('group', { name: 'Support' })).toBeTruthy() // the group's label; no text above the message
 
     const paidLine = msg({ author: 'system', mine: false, body: 'Оплата подтверждена, +35 фото', event: 'paid' })
     vi.mocked(buyerChatApi.messages).mockResolvedValueOnce(page([paidLine], 'paid'))
@@ -162,7 +162,7 @@ describe('PurchaseChat', () => {
     vi.mocked(buyerChatApi.messages).mockResolvedValue(page([msg({ hidden: true, hidden_reason: 'card_number', body: null })]))
     renderChat()
     const warn = await screen.findByTestId('chat-hidden')
-    expect(warn.textContent).toBe('Message hidden: it looks like a card number. Do not send bank details.')
+    expect(warn.textContent).toContain('Message hidden: it looks like a card number. Do not send bank details.')
   })
 
   it('a card number just sent comes back hidden: the warning shows at once', async () => {
@@ -183,7 +183,7 @@ describe('PurchaseChat', () => {
     renderChat('admin')
     expect((await screen.findByTestId('chat-hidden-badge')).textContent).toBe('Hidden: looks like a card number')
     expect(screen.queryByText('card 8600 0000 0000 0000')).toBeNull()
-    expect(within(log()).getByText('Buyer')).toBeTruthy()
+    expect(within(log()).getByRole('group', { name: 'Buyer' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Show' }))
     expect(screen.getByText('card 8600 0000 0000 0000')).toBeTruthy()
     expect(buyerChatApi.messages).not.toHaveBeenCalled()

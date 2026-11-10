@@ -1,3 +1,4 @@
+import { LifeBuoy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { supportApi } from '../api/endpoints'
 import { ChatThreadView } from '../components/ChatThread'
@@ -17,14 +18,16 @@ export function SupportPage() {
   const markRead = useMarkRead()
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-12rem)] min-h-[26rem] max-w-xl flex-col gap-3">
-      <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg">{t('support.title')}</h1>
-      <div className="glass flex min-h-0 flex-1 flex-col p-4">
+    <div className="mx-auto flex h-[calc(100dvh-var(--nav-h)-2rem-env(safe-area-inset-top))] max-w-xl flex-col gap-3 md:h-[calc(100dvh-12rem)] md:min-h-[26rem]">
+      <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg max-md:sr-only">{t('support.title')}</h1>
+      <div className="glass flex min-h-0 flex-1 flex-col p-3 sm:p-4">
         {thread.error && !thread.data ? <ErrorState error={thread.error} />
           : !thread.data ? <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
           : (
             <ChatThreadView side="user" messages={messages} send={send} open
-              seenFloor={thread.data.meta.readMarker} onSeen={(id) => { markRead.support(id).catch(() => undefined) }}
+              readMarker={thread.data.meta.readMarker} otherReadMarker={thread.data.meta.otherReadMarker}
+              header={{ title: t('chat.support'), subtitle: t('support.replyTime'), avatar: <LifeBuoy size={20} aria-hidden="true" /> }}
+              onSeen={(id) => { markRead.support(id).catch(() => undefined) }}
               otherLabel={t('chat.support')}
               photo={{ key: ['support-chat-image'], load: (mid) => supportApi.image(mid) }}
               texts={{
