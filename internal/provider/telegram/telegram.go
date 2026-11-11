@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"learnwords/internal/domain"
 )
 
 const defaultBaseURL = "https://api.telegram.org"
@@ -31,9 +33,19 @@ func (c *Client) WithBaseURL(u string) *Client {
 	return c
 }
 
-// SendMessage writes plain text to a chat.
-func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
-	return c.call(ctx, "sendMessage", map[string]any{"chat_id": chatID, "text": text})
+// ErrBotBlocked and RetryAfterError are what a send returns for HTTP 403 and 429 (see domain).
+var ErrBotBlocked = domain.ErrBotBlocked
+
+type RetryAfterError = domain.RetryAfterError
+
+// SendMessage writes plain text (no parse_mode) to a chat, with an optional inline link button
+// under it. A 403 is ErrBotBlocked, a 429 a *RetryAfterError.
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, button *domain.TelegramButton) error {
+	body := map[string]any{"chat_id": chatID, "text": text}
+	if button != nil {
+		body["reply_markup"] = map[string]any{"inline_keyboard": [][]map[string]string{{{"text": button.Text, "url": button.URL}}}}
+	}
+	return c.call(ctx, "sendMessage", body)
 }
 
 // SetWebhook registers url; Telegram then sends secret in X-Telegram-Bot-Api-Secret-Token.
@@ -45,10 +57,14 @@ func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
 
 func (c *Client) call(ctx context.Context, method string, body any) error {
 	err := c.do(ctx, method, body)
-	if err != nil {
-		return errors.New(Redact(err.Error(), c.token))
+	if err == nil {
+		return nil
 	}
-	return nil
+	var retry *domain.RetryAfterError
+	if errors.Is(err, domain.ErrBotBlocked) || errors.As(err, &retry) {
+		return err // built from Telegram's description only: no token in it
+	}
+	return errors.New(Redact(err.Error(), c.token))
 }
 
 func (c *Client) do(ctx context.Context, method string, body any) error {
@@ -69,8 +85,17 @@ func (c *Client) do(ctx context.Context, method string, body any) error {
 	var out struct {
 		OK          bool   `json:"ok"`
 		Description string `json:"description"`
+		Parameters  struct {
+			RetryAfter int `json:"retry_after"`
+		} `json:"parameters"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&out)
+	switch resp.StatusCode {
+	case http.StatusForbidden:
+		return fmt.Errorf("%w: %s", domain.ErrBotBlocked, out.Description)
+	case http.StatusTooManyRequests:
+		return &domain.RetryAfterError{Seconds: max(out.Parameters.RetryAfter, 1)}
+	}
 	if resp.StatusCode != http.StatusOK || !out.OK {
 		return fmt.Errorf("telegram %s: status %d: %s", method, resp.StatusCode, out.Description)
 	}

@@ -28,12 +28,25 @@ type TelegramRepository interface {
 	// Telegram chat bound now; chatID is that chat.
 	UsedCodeChat(ctx context.Context, code string) (chatID int64, found bool, err error)
 	// ChatID: the private chat the bot bound to the user (found = false when none).
+	// A blocked user (telegram_blocked_at set) has no usable chat: found = false.
 	ChatID(ctx context.Context, userID uuid.UUID) (chatID int64, found bool, err error)
+	// MarkBlocked: Telegram refused a message to the user with 403 (telegram_blocked_at = now()).
+	MarkBlocked(ctx context.Context, userID uuid.UUID) error
+	// ClearChatBlocked: the chat wrote to the bot again, so it is not blocked.
+	ClearChatBlocked(ctx context.Context, chatID int64) error
+	// SetChatLang stores the Telegram language (ru | uz | en) of the user bound to the chat, if any.
+	SetChatLang(ctx context.Context, chatID int64, lang string) error
+	// SetChatNotifications is /stop and /resume; linked = false when no user is bound to the chat.
+	SetChatNotifications(ctx context.Context, chatID int64, enabled bool) (linked bool, err error)
+	// SetNotifications is the user's own switch (the profile).
+	SetNotifications(ctx context.Context, userID uuid.UUID, enabled bool) error
 }
 
 // TelegramBot is the Bot API (provider/telegram).
 type TelegramBot interface {
-	SendMessage(ctx context.Context, chatID int64, text string) error
+	// SendMessage writes plain text, with an optional link button. A 403 is domain.ErrBotBlocked, a
+	// 429 a *domain.RetryAfterError.
+	SendMessage(ctx context.Context, chatID int64, text string, button *domain.TelegramButton) error
 	SetWebhook(ctx context.Context, url, secret string) error
 }
 
@@ -92,7 +105,8 @@ func (s *TelegramService) CreateLink(ctx context.Context, userID uuid.UUID) (dom
 }
 
 // NotifyUser writes text to the user's linked Telegram chat. sent = false (no error) when the bot
-// is not configured or the user has no chat linked.
+// is not configured or the user has no chat linked (or blocked the bot). The user's broadcast switch
+// (/stop) does not matter here: it covers broadcasts only. A 403 marks the user as blocked.
 func (s *TelegramService) NotifyUser(ctx context.Context, userID uuid.UUID, text string) (bool, error) {
 	if !s.Enabled() {
 		return false, nil
@@ -101,10 +115,20 @@ func (s *TelegramService) NotifyUser(ctx context.Context, userID uuid.UUID, text
 	if err != nil || !found {
 		return false, err
 	}
-	if err := s.bot.SendMessage(ctx, chat, text); err != nil {
+	if err := s.bot.SendMessage(ctx, chat, text, nil); err != nil {
+		if errors.Is(err, domain.ErrBotBlocked) {
+			if merr := s.repo.MarkBlocked(ctx, userID); merr != nil {
+				slog.WarnContext(ctx, "telegram: marking blocked failed", "err", merr)
+			}
+		}
 		return false, err
 	}
 	return true, nil
+}
+
+// SetNotifications is the user's own switch for broadcasts (the profile).
+func (s *TelegramService) SetNotifications(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	return s.repo.SetNotifications(ctx, userID, enabled)
 }
 
 // RegisterWebhook points the bot at url (no-op when the bot or the url is not configured).
@@ -131,10 +155,29 @@ func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
 		}
 	}
 	text := strings.TrimSpace(m.Text)
+	cmd := command(text)
 	var reply string
 	switch {
 	case text == "/start":
+		s.rememberChat(ctx, m.Chat.ID, lang, true)
 		reply = botText(lang, botHint)
+	case cmd == "/stop" || cmd == "/resume":
+		enabled := cmd == "/resume"
+		linked, err := s.repo.SetChatNotifications(ctx, m.Chat.ID, enabled)
+		if err != nil {
+			slog.ErrorContext(ctx, "telegram: switching notifications failed", "err", err)
+			return
+		}
+		switch {
+		case !linked:
+			reply = botText(lang, botHint)
+		case enabled:
+			s.rememberChat(ctx, m.Chat.ID, lang, true)
+			reply = botText(lang, botResumed)
+		default:
+			s.rememberChat(ctx, m.Chat.ID, lang, false)
+			reply = botText(lang, botStopped)
+		}
 	case strings.HasPrefix(text, "/start "):
 		code := strings.TrimSpace(strings.TrimPrefix(text, "/start "))
 		bound, granted := false, 0
@@ -145,6 +188,11 @@ func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
 				slog.ErrorContext(ctx, "telegram: bind failed", "err", err)
 				return
 			}
+		}
+		if bound {
+			s.rememberChat(ctx, m.Chat.ID, lang, false) // linking clears "blocked" itself
+		} else if s.alreadyBoundHere(ctx, code, m.Chat.ID) {
+			s.rememberChat(ctx, m.Chat.ID, lang, true)
 		}
 		switch {
 		case bound && granted > 0:
@@ -159,8 +207,33 @@ func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
 	default:
 		return
 	}
-	if err := s.bot.SendMessage(ctx, m.Chat.ID, reply); err != nil {
+	if err := s.bot.SendMessage(ctx, m.Chat.ID, reply, nil); err != nil {
 		slog.WarnContext(ctx, "telegram: reply failed", "err", err)
+	}
+}
+
+// command is the bot command of a message ("/stop@yodla_bot now" → "/stop"), "" for plain text.
+func command(text string) string {
+	if !strings.HasPrefix(text, "/") {
+		return ""
+	}
+	word := strings.Fields(text)[0]
+	if i := strings.IndexByte(word, '@'); i >= 0 {
+		word = word[:i]
+	}
+	return strings.ToLower(word)
+}
+
+// rememberChat stores the Telegram language of the user bound to the chat and, with unblock, clears
+// "blocked" (the chat wrote to the bot, so it can receive messages). Failures are only logged.
+func (s *TelegramService) rememberChat(ctx context.Context, chatID int64, languageCode string, unblock bool) {
+	if err := s.repo.SetChatLang(ctx, chatID, domain.TelegramLang(languageCode)); err != nil {
+		slog.WarnContext(ctx, "telegram: saving the language failed", "err", err)
+	}
+	if unblock {
+		if err := s.repo.ClearChatBlocked(ctx, chatID); err != nil {
+			slog.WarnContext(ctx, "telegram: clearing blocked failed", "err", err)
+		}
 	}
 }
 
@@ -187,15 +260,19 @@ const (
 	botHint
 	botLinkedBonus // %d: the photo credits given
 	botAlreadyLinked
+	botStopped
+	botResumed
 )
 
-var botTexts = map[string][5]string{
+var botTexts = map[string][7]string{
 	"ru": {
 		"Готово! Telegram подключён к вашему аккаунту yodla.",
 		"Код устарел или уже использован. Нажмите «Подключить» в профиле ещё раз.",
 		"Чтобы подключить Telegram, откройте профиль на yodla.fun и нажмите «Подключить».",
 		"Готово! Telegram подключён к вашему аккаунту yodla. В подарок: +%d фото для добавления слов.",
 		"Telegram уже подключён ✅",
+		"Уведомления выключены. Включить: /resume",
+		"Уведомления включены. Выключить: /stop",
 	},
 	"uz": {
 		"Tayyor! Telegram yodla hisobingizga ulandi.",
@@ -203,6 +280,8 @@ var botTexts = map[string][5]string{
 		"Telegramni ulash uchun yodla.fun saytida profilni oching va «Ulash» tugmasini bosing.",
 		"Tayyor! Telegram yodla hisobingizga ulandi. Sovg‘a: so‘z qo‘shish uchun +%d ta surat.",
 		"Telegram allaqachon ulangan ✅",
+		"Bildirishnomalar o‘chirildi. Yoqish: /resume",
+		"Bildirishnomalar yoqildi. O‘chirish: /stop",
 	},
 	"en": {
 		"Done! Telegram is now connected to your yodla account.",
@@ -210,6 +289,8 @@ var botTexts = map[string][5]string{
 		"To connect Telegram, open your profile on yodla.fun and press Connect.",
 		"Done! Telegram is now connected to your yodla account. Your gift: +%d photos for adding words.",
 		"Telegram is already connected ✅",
+		"Notifications are off. Turn them on: /resume",
+		"Notifications are on. Turn them off: /stop",
 	},
 }
 

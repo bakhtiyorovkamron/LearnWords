@@ -140,6 +140,11 @@ func run() error {
 			}()
 		}
 	}
+	// One worker sends the admins' broadcasts; ones a restart cut off are marked interrupted first.
+	broadcastSvc := service.NewTelegramBroadcastService(postgres.NewTelegramBroadcastRepository(pool), bot, telegramSvc.Enabled())
+	if err := broadcastSvc.Start(ctx); err != nil {
+		slog.Error("telegram: starting the broadcast worker failed", "err", err)
+	}
 	// After the Telegram service: an admin's chat message reaches the buyer in Telegram when linked.
 	purchaseSvc := service.NewPurchaseService(postgres.NewPurchaseRepository(pool), featureRepo, pushSvc, telegramSvc, domain.PaymentInfo{
 		CardNumber: cfg.PaymentCardNumber, CardHolder: cfg.PaymentCardHolder, Telegram: cfg.PaymentTelegram,
@@ -200,6 +205,7 @@ func run() error {
 		Hero:        handler.NewHeroHandler(heroSvc),
 		Purchases:   handler.NewPurchaseHandler(purchaseSvc),
 		Support:     handler.NewSupportHandler(supportSvc),
+		Broadcasts:  handler.NewTelegramBroadcastHandler(broadcastSvc),
 		ChatUnread:  handler.NewChatUnreadHandler(service.NewChatUnreadService(postgres.NewChatUnreadRepository(pool))),
 		UserStatus:  adminRepo,
 		Ctx:         ctx,
@@ -239,7 +245,8 @@ func run() error {
 	shCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	err = srv.Shutdown(shCtx)
-	purchaseSvc.Wait() // purchase pushes still on their way
-	supportSvc.Wait()  // support notifications still on their way
+	purchaseSvc.Wait()  // purchase pushes still on their way
+	broadcastSvc.Wait() // the broadcast worker (stopped with ctx; an unfinished broadcast stays interrupted)
+	supportSvc.Wait()   // support notifications still on their way
 	return err
 }

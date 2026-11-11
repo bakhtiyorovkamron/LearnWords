@@ -38,7 +38,8 @@ func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, er
 		       GREATEST(w.last_at, rl.last_at, s.last_at),
 		       f.rating,
 		       COALESCE(pd.cnt, 0),
-		       u.full_name, u.phone, u.telegram_username, u.telegram_chat_id IS NOT NULL
+		       u.full_name, u.phone, u.telegram_username, u.telegram_chat_id IS NOT NULL,
+		       u.telegram_notifications, u.telegram_blocked_at IS NOT NULL
 		FROM users u
 		LEFT JOIN (SELECT user_id, count(*) AS cnt, max(created_at) AS last_at
 		           FROM word_cards GROUP BY user_id) w ON w.user_id = u.id
@@ -54,7 +55,7 @@ func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, er
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.AdminUser, error) {
 		var u domain.AdminUser
-		err := row.Scan(&u.ID, &u.Email, &u.Role, &u.IsBanned, &u.CreatedAt, &u.WordsCount, &u.LastActivityAt, &u.Rating, &u.PushDevices, &u.FullName, &u.Phone, &u.Telegram.Username, &u.Telegram.Connected)
+		err := row.Scan(&u.ID, &u.Email, &u.Role, &u.IsBanned, &u.CreatedAt, &u.WordsCount, &u.LastActivityAt, &u.Rating, &u.PushDevices, &u.FullName, &u.Phone, &u.Telegram.Username, &u.Telegram.Connected, &u.Telegram.Notifications, &u.Telegram.Blocked)
 		return u, err
 	})
 }

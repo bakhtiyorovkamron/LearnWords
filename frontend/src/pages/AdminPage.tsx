@@ -14,6 +14,7 @@ import { PurchaseChat } from '../components/PurchaseChat'
 import { CloseButton, useScrimClose } from '../components/Sheet'
 import { CHAT_POLL_MS } from '../lib/purchaseChat'
 import { AdminSupport, useSupportThreads } from '../components/AdminSupport'
+import { AdminTelegram } from '../components/AdminTelegram'
 import { Segmented } from '../components/Segmented'
 
 type SortKey = 'email' | 'created_at' | 'words_count' | 'last_activity_at'
@@ -30,7 +31,7 @@ export function AdminPage() {
   return <AdminTabs myId={me.data!.id} />
 }
 
-type AdminTab = 'overview' | 'support'
+type AdminTab = 'overview' | 'support' | 'telegram'
 
 // Two tabs: everything that was here (overview) and the support inbox; the support tab shows how
 // many user messages wait unread.
@@ -40,6 +41,10 @@ function AdminTabs({ myId }: { myId: string }) {
   // A user whose thread to open: set by the user card's "Write", taken over by the support tab.
   const [writeTo, setWriteTo] = useState<string | null>(null)
   const write = (userId: string) => { setWriteTo(userId); setTab('support') }
+  // The same for "Write on Telegram": the Telegram tab with that user selected.
+  const [telegramTo, setTelegramTo] = useState<string | null>(null)
+  const writeTelegram = (userId: string) => { setTelegramTo(userId); setTab('telegram') }
+  const telegramTaken = useCallback(() => setTelegramTo(null), [])
   const written = useCallback(() => setWriteTo(null), [])
   const unread = (useSupportThreads().data ?? []).reduce((n, th) => n + th.unread, 0)
   const supportLabel = unread > 0 ? `${t('admin.tabs.support')} · ${unread}` : t('admin.tabs.support')
@@ -51,7 +56,7 @@ function AdminTabs({ myId }: { myId: string }) {
         <p className="mt-1 text-[15px] text-muted">{t('admin.subtitle')}</p>
       </div>
       <Segmented<AdminTab> value={tab} onChange={setTab} label={t('admin.tabs.label')}
-        options={[['overview', t('admin.tabs.overview')], ['support', supportLabel]] as const} />
+        options={[['overview', t('admin.tabs.overview')], ['support', supportLabel], ['telegram', t('admin.tabs.telegram')]] as const} />
       {tab === 'overview' ? (
         <>
           <StatsBlock />
@@ -59,9 +64,10 @@ function AdminTabs({ myId }: { myId: string }) {
           <PushPanel />
           <WordCheckJobPanel />
           <PurchasesBlock />
-          <UsersTable myId={myId} onWrite={write} />
+          <UsersTable myId={myId} onWrite={write} onWriteTelegram={writeTelegram} />
         </>
-      ) : <AdminSupport startWith={writeTo} onStarted={written} />}
+      ) : tab === 'support' ? <AdminSupport startWith={writeTo} onStarted={written} />
+        : <AdminTelegram preselect={telegramTo} onPreselected={telegramTaken} />}
     </div>
   )
 }
@@ -426,7 +432,7 @@ function PurchaseRow({ p, busy, onApprove, onReject, onChat }: {
   )
 }
 
-function UsersTable({ myId, onWrite }: { myId: string; onWrite: (userId: string) => void }) {
+function UsersTable({ myId, onWrite, onWriteTelegram }: { myId: string; onWrite: (userId: string) => void; onWriteTelegram: (userId: string) => void }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading, error } = useQuery({ queryKey: ['admin', 'users'], queryFn: adminApi.users })
@@ -553,7 +559,7 @@ function UsersTable({ myId, onWrite }: { myId: string; onWrite: (userId: string)
           {!rows.length && <p className="py-6 text-center text-muted">{t('admin.nothingFound')}</p>}
         </div>
       )}
-      {opened && <AdminUserModal user={opened} onClose={() => setOpened(null)} onWrite={onWrite} />}
+      {opened && <AdminUserModal user={opened} onClose={() => setOpened(null)} onWrite={onWrite} onWriteTelegram={onWriteTelegram} />}
     </section>
   )
 }

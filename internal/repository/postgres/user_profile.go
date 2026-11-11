@@ -14,10 +14,10 @@ import (
 // Telegram is connected and the credits connecting it gave.
 func (r *UserRepository) Profile(ctx context.Context, id uuid.UUID) (domain.Profile, error) {
 	var p domain.Profile
-	err := r.pool.QueryRow(ctx, `SELECT u.full_name, u.phone, u.telegram_username, u.telegram_chat_id IS NOT NULL,
+	err := r.pool.QueryRow(ctx, `SELECT u.full_name, u.phone, u.telegram_username, u.telegram_chat_id IS NOT NULL, u.telegram_notifications,
 		       COALESCE((SELECT b.credits FROM telegram_bonuses b WHERE b.user_id = u.id), 0)
 		FROM users u WHERE u.id = $1`, id).
-		Scan(&p.FullName, &p.Phone, &p.TelegramUsername, &p.TelegramConnected, &p.TelegramBonus)
+		Scan(&p.FullName, &p.Phone, &p.TelegramUsername, &p.TelegramConnected, &p.TelegramNotifications, &p.TelegramBonus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Profile{}, domain.ErrNotFound
 	}

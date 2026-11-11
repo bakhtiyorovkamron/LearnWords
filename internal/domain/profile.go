@@ -25,6 +25,8 @@ type Profile struct {
 	TelegramUsername *string // set by the bot only (nil when the Telegram account has none)
 	// TelegramConnected: the bot has bound a private chat (users.telegram_chat_id is set).
 	TelegramConnected bool
+	// TelegramNotifications: the user's own switch for broadcasts (/stop and /resume, the profile).
+	TelegramNotifications bool
 	// TelegramBonus: photo credits the user got for connecting Telegram (0 = none).
 	TelegramBonus int
 }

@@ -41,6 +41,7 @@ type RouterDeps struct {
 	Purchases   *PurchaseHandler
 	Support     *SupportHandler
 	ChatUnread  *ChatUnreadHandler
+	Broadcasts  *TelegramBroadcastHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -185,6 +186,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/me/profile", d.Profile.Get)
 		protected.PUT("/me/profile", d.Profile.Update)
 		protected.POST("/me/telegram/link", telegramLinkLimit, d.Telegram.Link)
+		protected.PUT("/me/telegram/notifications", d.Telegram.SetNotifications)
 		protected.GET("/me", d.Admin.Me)
 		protected.GET("/me/purchases", d.Purchases.Overview)
 		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)
@@ -212,6 +214,10 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		admin.GET("/feedback", d.Admin.Feedback)
 		admin.GET("/push", d.Push.AdminStats)
 		admin.POST("/push", adminPushLimit, d.Push.AdminSend)
+		admin.GET("/telegram/audience", d.Broadcasts.Audience)
+		admin.POST("/telegram/broadcasts", adminPushLimit, d.Broadcasts.Create)
+		admin.GET("/telegram/broadcasts", d.Broadcasts.List)
+		admin.GET("/telegram/broadcasts/:id", d.Broadcasts.Get)
 		admin.DELETE("/users/:id", d.Admin.DeleteUser)
 		admin.PATCH("/users/:id/ban", d.Admin.Ban)
 		admin.GET("/users/:id/features", d.Admin.UserFeatures)

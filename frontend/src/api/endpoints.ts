@@ -284,7 +284,11 @@ export interface Profile {
    * available: the bot is configured (false: connecting answers 503 telegram_unavailable).
    * bonus_offer: photo credits connecting would give now; bonus: the ones connecting gave (0 = none).
    */
-  telegram: { connected: boolean; username: string | null; available: boolean; bonus_offer: number; bonus: number }
+  telegram: {
+    connected: boolean; username: string | null; available: boolean; bonus_offer: number; bonus: number
+    /** The user's own switch for broadcasts (news and reminders) in Telegram. */
+    notifications?: boolean // absent (an older server) counts as on
+  }
 }
 
 export const profileApi = {
@@ -295,6 +299,37 @@ export const profileApi = {
 // Linking Telegram: a one-time deep link to the bot (10 minutes); the bot binds the account.
 export const telegramApi = {
   link: () => api.post<{ url: string; expires_at: string }>('/me/telegram/link').then((r) => r.data),
+  /** The user's switch for broadcasts (204). Support and order messages in Telegram are not affected. */
+  setNotifications: (enabled: boolean) => api.put('/me/telegram/notifications', { enabled }).then(() => undefined),
+}
+
+/** Who linked Telegram and who of them can get a broadcast (opted_out: /stop; blocked: blocked the bot). */
+export interface TelegramAudience { linked: number; reachable: number; opted_out: number; blocked: number }
+export type BroadcastTarget = 'me' | 'all' | 'users'
+export type BroadcastStatus = 'queued' | 'running' | 'done' | 'interrupted'
+export interface TelegramBroadcast {
+  id: number; kind: string; target: BroadcastTarget
+  text: { ru: string; uz: string | null; en: string | null }
+  button: { text: string; url: string } | null
+  status: BroadcastStatus; total: number; sent: number; failed: number; blocked: number
+  created_at: string; finished_at: string | null
+}
+export interface BroadcastRequest {
+  target: BroadcastTarget
+  user_ids?: string[]
+  text: { ru: string; uz?: string; en?: string }
+  button?: { text: string; url: string }
+}
+/**
+ * The admins' Telegram broadcasts. Every call answers 503 telegram_unavailable without a bot; create:
+ * 400 telegram_not_linked ("me" without the admin's Telegram), 409 broadcast_running (a second "all").
+ */
+export const telegramBroadcastApi = {
+  audience: () => api.get<TelegramAudience>('/admin/telegram/audience').then((r) => r.data),
+  create: (body: BroadcastRequest) =>
+    api.post<{ broadcast: TelegramBroadcast; skipped: number }>('/admin/telegram/broadcasts', body).then((r) => r.data),
+  list: () => api.get<{ broadcasts: TelegramBroadcast[] }>('/admin/telegram/broadcasts').then((r) => r.data.broadcasts),
+  get: (id: number) => api.get<TelegramBroadcast>(`/admin/telegram/broadcasts/${id}`).then((r) => r.data),
 }
 
 export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker'
@@ -473,7 +508,7 @@ export interface AdminUser {
   push_devices?: number // browsers/devices subscribed to Web Push
   full_name?: string | null // profile (read-only here)
   phone?: string | null
-  telegram?: { connected: boolean; username: string | null }
+  telegram?: { connected: boolean; username: string | null; notifications?: boolean; blocked?: boolean }
 }
 
 export interface FeedbackItem { email: string; rating: number; comment: string; created_at: string }

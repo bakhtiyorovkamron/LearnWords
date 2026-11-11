@@ -26,11 +26,13 @@ func NewProfileHandler(store ProfileStore, telegramAvailable bool) *ProfileHandl
 }
 
 type telegramStatus struct {
-	Connected  bool    `json:"connected"`
-	Username   *string `json:"username"`
-	Available  bool    `json:"available"`   // false: no bot, connecting answers 503 telegram_unavailable
-	BonusOffer int     `json:"bonus_offer"` // photo credits connecting would give now (0 = none)
-	Bonus      int     `json:"bonus"`       // photo credits connecting gave (0 = none)
+	Connected bool `json:"connected"`
+	// Notifications: the user's switch for broadcasts (news and reminders) in Telegram.
+	Notifications bool    `json:"notifications"`
+	Username      *string `json:"username"`
+	Available     bool    `json:"available"`   // false: no bot, connecting answers 503 telegram_unavailable
+	BonusOffer    int     `json:"bonus_offer"` // photo credits connecting would give now (0 = none)
+	Bonus         int     `json:"bonus"`       // photo credits connecting gave (0 = none)
 }
 
 type profileResponse struct {
@@ -40,7 +42,7 @@ type profileResponse struct {
 }
 
 func (h *ProfileHandler) response(p domain.Profile) profileResponse {
-	tg := telegramStatus{Connected: p.TelegramConnected, Username: p.TelegramUsername, Available: h.telegramAvailable, Bonus: p.TelegramBonus}
+	tg := telegramStatus{Connected: p.TelegramConnected, Username: p.TelegramUsername, Available: h.telegramAvailable, Bonus: p.TelegramBonus, Notifications: p.TelegramNotifications}
 	if h.telegramAvailable {
 		tg.BonusOffer = p.TelegramBonusOffer()
 	}

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, LifeBuoy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { profileApi, type Profile } from '../api/endpoints'
+import { profileApi, telegramApi, type Profile } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { formatPhoneInput, phoneForApi } from '../lib/phone'
 import { useTelegramConnect } from '../lib/telegramConnect'
@@ -147,6 +147,38 @@ function TelegramRow() {
       {!tg.connected && tg.unavailable && <p role="status" className="text-sm text-muted">{t('profile.telegramUnavailable')}</p>}
       {!tg.connected && tg.waiting && <p role="status" data-testid="telegram-waiting" className="text-sm text-muted">{t('profile.telegramWaiting')}</p>}
       {tg.error && <p role="alert" className="text-sm text-danger">{errorMessage(tg.error)}</p>}
+      {tg.connected && <NotificationsSwitch />}
+    </div>
+  )
+}
+
+/**
+ * "News and reminders in Telegram": the user's own switch for broadcasts (the bot's /stop and /resume do
+ * the same). Support and order messages are not affected. Optimistic: it flips at once and goes back on an error.
+ */
+function NotificationsSwitch() {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const profile = useQuery({ queryKey: ['profile'], queryFn: profileApi.get })
+  const on = profile.data?.telegram.notifications ?? true
+  const set = useMutation({
+    mutationFn: (enabled: boolean) => telegramApi.setNotifications(enabled),
+    onMutate: async (enabled) => {
+      await qc.cancelQueries({ queryKey: ['profile'] })
+      const previous = qc.getQueryData<Profile>(['profile'])
+      qc.setQueryData<Profile>(['profile'], (p) => (p ? { ...p, telegram: { ...p.telegram, notifications: enabled } } : p))
+      return { previous }
+    },
+    onError: (_e, _v, ctx) => { if (ctx?.previous) qc.setQueryData(['profile'], ctx.previous) },
+  })
+  return (
+    <div>
+      <label className="flex cursor-pointer items-center justify-between gap-3">
+        <span className="text-sm font-medium text-fg">{t('profile.telegramNotifications')}</span>
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => set.mutate(e.target.checked)}
+          className="h-5 w-5 shrink-0 accent-[var(--accent)]" />
+      </label>
+      {set.error && <p role="alert" className="mt-1.5 text-sm text-danger">{errorMessage(set.error)}</p>}
     </div>
   )
 }

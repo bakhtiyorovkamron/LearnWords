@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"learnwords/internal/domain"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,10 +31,20 @@ func (r *nopTelegramRepo) UsedCodeChat(context.Context, string) (int64, bool, er
 func (r *nopTelegramRepo) ChatID(context.Context, uuid.UUID) (int64, bool, error) {
 	return 0, false, nil
 }
+func (r *nopTelegramRepo) MarkBlocked(context.Context, uuid.UUID) error            { return nil }
+func (r *nopTelegramRepo) ClearChatBlocked(context.Context, int64) error           { return nil }
+func (r *nopTelegramRepo) SetChatLang(context.Context, int64, string) error        { return nil }
+func (r *nopTelegramRepo) SetNotifications(context.Context, uuid.UUID, bool) error { return nil }
+func (r *nopTelegramRepo) SetChatNotifications(context.Context, int64, bool) (bool, error) {
+	return false, nil
+}
 
 type countingBot struct{ sent int }
 
-func (b *countingBot) SendMessage(context.Context, int64, string) error { b.sent++; return nil }
+func (b *countingBot) SendMessage(context.Context, int64, string, *domain.TelegramButton) error {
+	b.sent++
+	return nil
+}
 func (b *countingBot) SetWebhook(context.Context, string, string) error { return nil }
 
 const hookSecret = "hook-secret-123"

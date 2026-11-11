@@ -34,11 +34,15 @@ type memTelegram struct {
 	bonusChat map[int64]bool
 	bonusUser map[uuid.UUID]int
 	usedErr   error // UsedCodeChat fails with it
+	blocked   map[uuid.UUID]bool
+	lang      map[uuid.UUID]string
+	notif     map[uuid.UUID]bool // false = switched off (absent = on)
 }
 
 func newMemTelegram() *memTelegram {
 	return &memTelegram{codes: map[string]*memLinkCode{}, chat: map[uuid.UUID]int64{}, name: map[uuid.UUID]*string{}, taken: map[string]bool{},
-		bonusChat: map[int64]bool{}, bonusUser: map[uuid.UUID]int{}}
+		bonusChat: map[int64]bool{}, bonusUser: map[uuid.UUID]int{}, blocked: map[uuid.UUID]bool{}, lang: map[uuid.UUID]string{},
+		notif: map[uuid.UUID]bool{}}
 }
 
 func (m *memTelegram) ReplaceLinkCode(_ context.Context, user uuid.UUID, code string, expires time.Time) error {
@@ -71,6 +75,7 @@ func (m *memTelegram) BindTelegram(_ context.Context, code string, chatID int64,
 		}
 	}
 	m.chat[c.user], m.name[c.user] = chatID, username
+	delete(m.blocked, c.user)
 	m.binds++
 	if bonus <= 0 || m.bonusChat[chatID] || m.bonusUser[c.user] > 0 {
 		return true, 0, nil
@@ -83,7 +88,58 @@ func (m *memTelegram) ChatID(_ context.Context, user uuid.UUID) (int64, bool, er
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	chat, ok := m.chat[user]
-	return chat, ok, nil
+	return chat, ok && !m.blocked[user], nil
+}
+
+func (m *memTelegram) userOf(chat int64) (uuid.UUID, bool) {
+	for u, c := range m.chat {
+		if c == chat {
+			return u, true
+		}
+	}
+	return uuid.Nil, false
+}
+
+func (m *memTelegram) MarkBlocked(_ context.Context, user uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blocked[user] = true
+	return nil
+}
+
+func (m *memTelegram) ClearChatBlocked(_ context.Context, chat int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if u, ok := m.userOf(chat); ok {
+		delete(m.blocked, u)
+	}
+	return nil
+}
+
+func (m *memTelegram) SetChatLang(_ context.Context, chat int64, lang string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if u, ok := m.userOf(chat); ok {
+		m.lang[u] = lang
+	}
+	return nil
+}
+
+func (m *memTelegram) SetChatNotifications(_ context.Context, chat int64, enabled bool) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.userOf(chat)
+	if ok {
+		m.notif[u] = enabled
+	}
+	return ok, nil
+}
+
+func (m *memTelegram) SetNotifications(_ context.Context, user uuid.UUID, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.notif[user] = enabled
+	return nil
 }
 
 func (m *memTelegram) UsedCodeChat(_ context.Context, code string) (int64, bool, error) {
@@ -101,20 +157,25 @@ func (m *memTelegram) UsedCodeChat(_ context.Context, code string) (int64, bool,
 }
 
 type sentMessage struct {
-	chat int64
-	text string
+	chat   int64
+	text   string
+	button *domain.TelegramButton
 }
 
 type fakeBot struct {
 	mu   sync.Mutex
 	sent []sentMessage
 	hook [2]string
+	err  error // every send fails with it
 }
 
-func (b *fakeBot) SendMessage(_ context.Context, chat int64, text string) error {
+func (b *fakeBot) SendMessage(_ context.Context, chat int64, text string, button *domain.TelegramButton) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.sent = append(b.sent, sentMessage{chat, text})
+	if b.err != nil {
+		return b.err
+	}
+	b.sent = append(b.sent, sentMessage{chat, text, button})
 	return nil
 }
 func (b *fakeBot) SetWebhook(_ context.Context, url, secret string) error {
@@ -499,5 +560,105 @@ func TestTelegram_NotifyUser(t *testing.T) {
 	off := NewTelegramService(repo, nil, "")
 	if sent, err := off.NotifyUser(ctx, linked, "hello"); sent || err != nil {
 		t.Errorf("no bot: sent=%v err=%v", sent, err)
+	}
+}
+
+// --- broadcasts: /stop, /resume, languages, blocking -----------------------------------------
+
+func TestTelegram_StopAndResume(t *testing.T) {
+	svc, repo, bot, _ := newTelegramFixture()
+	ctx, user := context.Background(), uuid.New()
+	repo.chat[user] = 777
+
+	svc.HandleUpdate(ctx, update(t, "private", "/stop", "", "ru"))
+	if on, set := repo.notif[user]; !set || on {
+		t.Fatalf("notifications after /stop: %v %v", on, set)
+	}
+	if got := bot.sent[0]; got.chat != 777 || got.text != "Уведомления выключены. Включить: /resume" {
+		t.Errorf("reply %+v", got)
+	}
+	svc.HandleUpdate(ctx, update(t, "private", "/resume", "", "ru"))
+	if !repo.notif[user] || bot.sent[1].text != "Уведомления включены. Выключить: /stop" {
+		t.Errorf("after /resume: %v %q", repo.notif[user], bot.sent[1].text)
+	}
+	// In the user's language, also with the bot's name after the command.
+	svc.HandleUpdate(ctx, update(t, "private", "/stop@yodla_bot", "", "en"))
+	if repo.notif[user] || bot.sent[2].text != "Notifications are off. Turn them on: /resume" {
+		t.Errorf("en: %v %q", repo.notif[user], bot.sent[2].text)
+	}
+	svc.HandleUpdate(ctx, update(t, "private", "/resume", "", "uz"))
+	if !strings.Contains(bot.sent[3].text, "yoqildi") {
+		t.Errorf("uz reply %q", bot.sent[3].text)
+	}
+	// Groups are ignored; an unlinked chat gets the hint and changes nothing.
+	n := len(bot.sent)
+	svc.HandleUpdate(ctx, update(t, "group", "/stop", "", "ru"))
+	if len(bot.sent) != n {
+		t.Error("answered in a group")
+	}
+	repo.chat = map[uuid.UUID]int64{}
+	svc.HandleUpdate(ctx, update(t, "private", "/stop", "", "ru"))
+	if len(bot.sent) != n+1 || strings.Contains(bot.sent[n].text, "/resume") {
+		t.Errorf("unlinked reply %+v", bot.sent[n:])
+	}
+}
+
+func TestTelegram_SavesTheLanguageAndClearsBlockedOnStart(t *testing.T) {
+	svc, repo, _, now := newTelegramFixture()
+	ctx, user := context.Background(), uuid.New()
+	// At link time.
+	link, _ := svc.CreateLink(ctx, user)
+	svc.HandleUpdate(ctx, update(t, "private", "/start "+link.Code, "anna", "uz-UZ"))
+	if repo.lang[user] != "uz" {
+		t.Errorf("language after linking: %q", repo.lang[user])
+	}
+	// Later messages update it; anything unknown is Russian.
+	svc.HandleUpdate(ctx, update(t, "private", "/stop", "", "en-US"))
+	if repo.lang[user] != "en" {
+		t.Errorf("language after /stop: %q", repo.lang[user])
+	}
+	svc.HandleUpdate(ctx, update(t, "private", "/resume", "", "de"))
+	if repo.lang[user] != "ru" {
+		t.Errorf("unknown language: %q", repo.lang[user])
+	}
+	// A bare /start from a blocked chat clears the block.
+	repo.blocked[user] = true
+	svc.HandleUpdate(ctx, update(t, "private", "/start", "", "ru"))
+	if repo.blocked[user] {
+		t.Error("/start did not clear blocked")
+	}
+	// So does linking again.
+	repo.blocked[user] = true
+	link2, _ := svc.CreateLink(ctx, user)
+	svc.HandleUpdate(ctx, update(t, "private", "/start "+link2.Code, "anna", "ru"))
+	if repo.blocked[user] {
+		t.Error("linking did not clear blocked")
+	}
+	_ = now
+}
+
+func TestTelegram_NotifyUser_IgnoresTheBroadcastSwitch_ButSkipsAndMarksBlocked(t *testing.T) {
+	svc, repo, bot, _ := newTelegramFixture()
+	ctx, user := context.Background(), uuid.New()
+	repo.chat[user] = 55
+	repo.notif[user] = false // /stop: broadcasts only
+	if sent, err := svc.NotifyUser(ctx, user, "reply from support"); !sent || err != nil {
+		t.Fatalf("with notifications off: %v %v", sent, err)
+	}
+	if len(bot.sent) != 1 || bot.sent[0].text != "reply from support" || bot.sent[0].button != nil {
+		t.Errorf("sent %+v", bot.sent)
+	}
+	// A 403 marks the user blocked; from then on nothing is sent.
+	bot.err = domain.ErrBotBlocked
+	if sent, err := svc.NotifyUser(ctx, user, "x"); sent || !errors.Is(err, domain.ErrBotBlocked) {
+		t.Errorf("403: %v %v", sent, err)
+	}
+	if !repo.blocked[user] {
+		t.Error("a 403 did not mark the user blocked")
+	}
+	bot.err = nil
+	n := len(bot.sent)
+	if sent, _ := svc.NotifyUser(ctx, user, "y"); sent || len(bot.sent) != n {
+		t.Error("sent to a blocked user")
 	}
 }

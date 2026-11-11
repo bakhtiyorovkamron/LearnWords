@@ -50,7 +50,7 @@ func TestProfile_GetEmpty(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	if got := w.Body.String(); got != `{"full_name":null,"phone":null,"telegram":{"connected":false,"username":null,"available":true,"bonus_offer":2,"bonus":0}}` {
+	if got := w.Body.String(); got != `{"full_name":null,"phone":null,"telegram":{"connected":false,"notifications":false,"username":null,"available":true,"bonus_offer":2,"bonus":0}}` {
 		t.Errorf("body = %s", got)
 	}
 }
@@ -84,7 +84,7 @@ func getProfileBody(t *testing.T, r *gin.Engine) string {
 // The bonus on offer goes once Telegram is connected or the gift was had; without a bot nothing is
 // on offer and available is false.
 func TestProfile_TelegramAvailabilityAndBonus(t *testing.T) {
-	const tg = `"telegram":{"connected":%v,"username":null,"available":%v,"bonus_offer":%d,"bonus":%d}`
+	const tg = `"telegram":{"connected":%v,"notifications":false,"username":null,"available":%v,"bonus_offer":%d,"bonus":%d}`
 	for _, c := range []struct {
 		name      string
 		p         domain.Profile

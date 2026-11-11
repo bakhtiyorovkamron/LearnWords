@@ -58,4 +58,7 @@ func NewTelegramStats(total, connected, connectedLast7d int) TelegramStats {
 type Telegram struct {
 	Connected bool    `json:"connected"`
 	Username  *string `json:"username"`
+	// Notifications: the user's switch for broadcasts; Blocked: they blocked the bot.
+	Notifications bool `json:"notifications"`
+	Blocked       bool `json:"blocked"`
 }

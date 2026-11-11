@@ -38,6 +38,26 @@ func (h *TelegramHandler) Link(c *gin.Context) {
 	c.JSON(http.StatusOK, link)
 }
 
+// SetNotifications handles PUT /api/me/telegram/notifications {enabled: bool} → 204: the user's own
+// switch for broadcasts (news and reminders). Chat notifications (support, orders) are not affected.
+func (h *TelegramHandler) SetNotifications(c *gin.Context) {
+	var req struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if !bindSmallJSON(c, &req) {
+		return
+	}
+	if req.Enabled == nil {
+		badRequest(c, "enabled is required")
+		return
+	}
+	if err := h.svc.SetNotifications(c.Request.Context(), userID(c), *req.Enabled); err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // Webhook handles POST /api/telegram/webhook (called by Telegram, no user auth). The secret header
 // must match TELEGRAM_WEBHOOK_SECRET (401 otherwise, also when no secret is configured). Any update
 // it accepts is answered 200, whatever happened inside: Telegram resends on anything else.

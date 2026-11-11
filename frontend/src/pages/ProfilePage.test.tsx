@@ -9,7 +9,7 @@ import { ProfilePage } from './ProfilePage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn() }, purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() }, chatUnreadApi: { mine: vi.fn(), admin: vi.fn() } }
+  return { ...mod, profileApi: { get: vi.fn(), update: vi.fn() }, telegramApi: { link: vi.fn(), setNotifications: vi.fn() }, purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() }, chatUnreadApi: { mine: vi.fn(), admin: vi.fn() } }
 })
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: true }) }))
 
@@ -241,5 +241,49 @@ describe('ProfilePage: support', () => {
     expect((await screen.findByTestId('badge-support')).textContent).toBe('9+')
     expect((await screen.findByTestId('badge-request-r2')).textContent).toBe('2')
     expect(screen.queryByTestId('badge-request-r1')).toBeNull()
+  })
+
+  describe('Telegram notifications switch', () => {
+    const connected = { ...empty, telegram: { ...tgStatus, connected: true, username: 'anna', bonus_offer: 0, notifications: true } }
+    const sw = () => screen.findByRole('switch', { name: 'News and reminders in Telegram' }) as Promise<HTMLInputElement>
+
+    it('only for a connected user', async () => {
+      renderPage()
+      await screen.findByLabelText('Name')
+      expect(screen.queryByRole('switch')).toBeNull()
+    })
+
+    it('shows the saved state; turning it off calls the API at once (optimistic)', async () => {
+      vi.mocked(profileApi.get).mockResolvedValue(connected)
+      let done!: () => void
+      vi.mocked(telegramApi.setNotifications).mockReturnValue(new Promise((r) => { done = () => r(undefined) }))
+      renderPage()
+      const s = await sw()
+      expect(s.checked).toBe(true)
+      fireEvent.click(s)
+      await waitFor(() => expect(telegramApi.setNotifications).toHaveBeenCalledWith(false))
+      await waitFor(() => expect((screen.getByRole('switch') as HTMLInputElement).checked).toBe(false)) // before the answer
+      await act(async () => done())
+      expect((screen.getByRole('switch') as HTMLInputElement).checked).toBe(false)
+    })
+
+    it('goes back and says why when the call fails', async () => {
+      vi.mocked(profileApi.get).mockResolvedValue(connected)
+      vi.mocked(telegramApi.setNotifications).mockRejectedValue(apiError('boom', 500))
+      renderPage()
+      fireEvent.click(await sw())
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('boom'))
+      expect((screen.getByRole('switch') as HTMLInputElement).checked).toBe(true) // rolled back
+    })
+
+    it('an off switch can be turned on', async () => {
+      vi.mocked(profileApi.get).mockResolvedValue({ ...connected, telegram: { ...connected.telegram, notifications: false } })
+      vi.mocked(telegramApi.setNotifications).mockResolvedValue(undefined)
+      renderPage()
+      const s = await sw()
+      expect(s.checked).toBe(false)
+      fireEvent.click(s)
+      await waitFor(() => expect(telegramApi.setNotifications).toHaveBeenCalledWith(true))
+    })
   })
 })

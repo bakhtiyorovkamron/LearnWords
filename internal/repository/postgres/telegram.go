@@ -35,10 +35,11 @@ func (r *TelegramRepository) ReplaceLinkCode(ctx context.Context, userID uuid.UU
 	})
 }
 
-// ChatID returns the Telegram chat bound to the user (found = false when none, or no such user).
+// ChatID returns the Telegram chat bound to the user (found = false when none, no such user, or the
+// user blocked the bot).
 func (r *TelegramRepository) ChatID(ctx context.Context, userID uuid.UUID) (int64, bool, error) {
 	var chat *int64
-	err := r.pool.QueryRow(ctx, `SELECT telegram_chat_id FROM users WHERE id = $1`, userID).Scan(&chat)
+	err := r.pool.QueryRow(ctx, `SELECT telegram_chat_id FROM users WHERE id = $1 AND telegram_blocked_at IS NULL`, userID).Scan(&chat)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && chat == nil) {
 		return 0, false, nil
 	}
@@ -87,7 +88,7 @@ func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chat
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE users SET telegram_chat_id = $2, telegram_username = $3, telegram_linked_at = $4,
-			updated_at = now() WHERE id = $1`, userID, chatID, username, now); err != nil {
+			telegram_blocked_at = NULL, updated_at = now() WHERE id = $1`, userID, chatID, username, now); err != nil {
 			return err
 		}
 		bound = true
@@ -110,4 +111,37 @@ func (r *TelegramRepository) BindTelegram(ctx context.Context, code string, chat
 		return false, 0, err
 	}
 	return bound, granted, nil
+}
+
+// MarkBlocked: Telegram refused a message to the user with 403.
+func (r *TelegramRepository) MarkBlocked(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET telegram_blocked_at = now() WHERE id = $1 AND telegram_chat_id IS NOT NULL`, userID)
+	return err
+}
+
+// ClearChatBlocked: the chat wrote to the bot again.
+func (r *TelegramRepository) ClearChatBlocked(ctx context.Context, chatID int64) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET telegram_blocked_at = NULL WHERE telegram_chat_id = $1 AND telegram_blocked_at IS NOT NULL`, chatID)
+	return err
+}
+
+// SetChatLang stores the Telegram language (ru | uz | en) of the user bound to the chat.
+func (r *TelegramRepository) SetChatLang(ctx context.Context, chatID int64, lang string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET telegram_lang = $2 WHERE telegram_chat_id = $1 AND telegram_lang IS DISTINCT FROM $2`, chatID, lang)
+	return err
+}
+
+// SetChatNotifications switches broadcasts for the user bound to the chat (/stop, /resume).
+func (r *TelegramRepository) SetChatNotifications(ctx context.Context, chatID int64, enabled bool) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET telegram_notifications = $2 WHERE telegram_chat_id = $1`, chatID, enabled)
+	return tag.RowsAffected() > 0, err
+}
+
+// SetNotifications is the user's own switch for broadcasts.
+func (r *TelegramRepository) SetNotifications(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET telegram_notifications = $2 WHERE id = $1`, userID, enabled)
+	if err == nil && tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return err
 }

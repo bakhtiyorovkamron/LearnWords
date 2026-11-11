@@ -9,7 +9,9 @@ import { dateLocale } from '../i18n'
 import { toast } from './Toaster'
 
 /** Card of one user in the admin panel: facts about the account and the per-user features. */
-export function AdminUserModal({ user, onClose, onWrite }: { user: AdminUser; onClose: () => void; onWrite?: (userId: string) => void }) {
+export function AdminUserModal({ user, onClose, onWrite, onWriteTelegram }: {
+  user: AdminUser; onClose: () => void; onWrite?: (userId: string) => void; onWriteTelegram?: (userId: string) => void
+}) {
   const { t } = useTranslation()
   const features = useQuery({ queryKey: ['admin', 'user-features', user.id], queryFn: () => adminApi.userFeatures(user.id) })
   const date = (iso: string) => new Date(iso).toLocaleDateString(dateLocale())
@@ -45,6 +47,18 @@ export function AdminUserModal({ user, onClose, onWrite }: { user: AdminUser; on
         </section>
 
         <div className="flex flex-wrap justify-end gap-2">
+          {onWriteTelegram && user.telegram?.connected && (() => {
+            const hint = user.telegram.blocked ? t('admin.telegram.hintBlocked') : user.telegram.notifications === false ? t('admin.telegram.hintOptedOut') : null
+            return (
+              <span className="flex flex-col items-end gap-1">
+                <button type="button" className="btn-ghost" disabled={hint !== null} aria-describedby={hint ? 'tg-write-hint' : undefined}
+                  onClick={() => { onClose(); onWriteTelegram(user.id) }}>
+                  <Send size={16} aria-hidden="true" />{t('admin.telegram.writeTelegram')}
+                </button>
+                {hint && <span id="tg-write-hint" className="text-xs text-muted">{hint}</span>}
+              </span>
+            )
+          })()}
           {onWrite && (
             <button type="button" className="btn-primary" onClick={() => { onClose(); onWrite(user.id) }}>
               <Pencil size={16} aria-hidden="true" />{t('support.write')}
