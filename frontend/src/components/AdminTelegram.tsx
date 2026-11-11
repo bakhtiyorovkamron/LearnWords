@@ -332,7 +332,7 @@ function AutoRules() {
 }
 
 function RuleCard({ rule }: { rule: TelegramRule }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const daily = rule.send_at !== null
   const [enabled, setEnabled] = useState(rule.enabled)
