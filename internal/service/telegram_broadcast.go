@@ -42,6 +42,8 @@ type TelegramBroadcastRepository interface {
 	RefreshCounters(ctx context.Context, id int64) error
 	Finish(ctx context.Context, id int64, status string) error
 	InterruptUnfinished(ctx context.Context) error
+	// MarkAutoSent: an automatic message of this kind reached the user (reminder counters).
+	MarkAutoSent(ctx context.Context, kind string, userID uuid.UUID) error
 	List(ctx context.Context, limit int) ([]domain.TelegramBroadcast, error)
 	Get(ctx context.Context, id int64) (domain.TelegramBroadcast, error)
 }
@@ -217,6 +219,14 @@ func (s *TelegramBroadcastService) Start(ctx context.Context) error {
 	return nil
 }
 
+// Wake tells the worker a broadcast was queued (it also looks by itself every few seconds).
+func (s *TelegramBroadcastService) Wake() {
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
+}
+
 // Wait blocks until the worker has stopped (tests; graceful shutdown).
 func (s *TelegramBroadcastService) Wait() { s.wg.Wait() }
 
@@ -309,6 +319,9 @@ func (s *TelegramBroadcastService) deliver(ctx context.Context, b domain.Telegra
 		return domain.RecipientFailed
 	}
 	text := b.Text.For(r.Lang)
+	if r.Params != nil {
+		text = domain.RenderTemplate(text, r.Params) // an automatic message: fill in this user's values
+	}
 	err := s.bot.SendMessage(ctx, *r.ChatID, text, b.Button)
 	var retry *domain.RetryAfterError
 	if errors.As(err, &retry) {
@@ -319,6 +332,11 @@ func (s *TelegramBroadcastService) deliver(ctx context.Context, b domain.Telegra
 	}
 	switch {
 	case err == nil:
+		if strings.HasPrefix(b.Kind, "auto:") {
+			if merr := s.repo.MarkAutoSent(ctx, b.Kind, r.UserID); merr != nil {
+				slog.WarnContext(ctx, "telegram: counting an automatic message failed", "err", merr)
+			}
+		}
 		return domain.RecipientSent
 	case ctx.Err() != nil:
 		return ""

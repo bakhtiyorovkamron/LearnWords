@@ -16,6 +16,8 @@ type errorResponse struct {
 	Error string `json:"error"`
 	// Code is a stable machine-readable reason for the few errors a client reacts to specially.
 	Code string `json:"code,omitempty"`
+	// Field: with a validation error of one field of a form (a Telegram rule): which one.
+	Field string `json:"field,omitempty"`
 	// FolderID: with own_folder — the caller's own folder, so the client can open it.
 	FolderID string `json:"folder_id,omitempty"`
 	// Limit: with daily_limit — the daily limit that was reached.
@@ -38,6 +40,11 @@ func writeError(c *gin.Context, err error) {
 	status, msg := http.StatusInternalServerError, "internal error"
 	switch {
 	case errors.Is(err, domain.ErrValidation):
+		var re *domain.RuleError
+		if errors.As(err, &re) {
+			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: re.Msg, Code: re.Code, Field: re.Field})
+			return
+		}
 		status, msg = http.StatusBadRequest, err.Error()
 	case errors.Is(err, domain.ErrNotFound):
 		status, msg = http.StatusNotFound, "not found"

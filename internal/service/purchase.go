@@ -73,12 +73,25 @@ type PurchaseService struct {
 	credits  CreditStore
 	push     Notifier         // nil = no notifications
 	telegram TelegramNotifier // nil = chat notifications by push only
+	events   PurchaseEvents   // nil = no Telegram messages for decisions
 	payment  domain.PaymentInfo
 	wg       sync.WaitGroup // notifications in flight
 }
 
 func NewPurchaseService(repo PurchaseRepository, credits CreditStore, push Notifier, telegram TelegramNotifier, payment domain.PaymentInfo) *PurchaseService {
 	return &PurchaseService{repo: repo, credits: credits, push: push, telegram: telegram, payment: payment}
+}
+
+// PurchaseEvents sends the Telegram messages of the purchase_paid / purchase_rejected rules (the
+// TelegramRulesService). sent = true when Telegram took the message.
+type PurchaseEvents interface {
+	SendPurchaseEvent(ctx context.Context, key string, p domain.PurchaseRequest) (sent bool)
+}
+
+// WithEvents adds the Telegram messages of the purchase rules to Approve and Reject.
+func (s *PurchaseService) WithEvents(e PurchaseEvents) *PurchaseService {
+	s.events = e
+	return s
 }
 
 // Available: there is a way to pay — a card to transfer to, or a Telegram contact where the
@@ -148,14 +161,42 @@ func (s *PurchaseService) Approve(ctx context.Context, adminID, id uuid.UUID) (d
 	if err != nil {
 		return domain.PurchaseRequest{}, err
 	}
-	s.notify(ctx, func(context.Context) ([]uuid.UUID, error) { return []uuid.UUID{p.UserID}, nil },
-		"Фото начислены", fmt.Sprintf("+%d фото уже на счету", p.Amount))
+	// One message per decision: the rule's Telegram text when it is on and Telegram took it, else the
+	// push as before.
+	s.decided(ctx, domain.RulePurchasePaid, p, "Фото начислены", fmt.Sprintf("+%d фото уже на счету", p.Amount))
 	return p, nil
+}
+
+// decided tells the buyer about a decision in the background (a slow Telegram or push must not hold up
+// the admin; a failure is only logged). The rule's text goes first; the push (title "" = none) only
+// when no Telegram message went out.
+func (s *PurchaseService) decided(ctx context.Context, rule string, p domain.PurchaseRequest, pushTitle, pushBody string) {
+	if s.events == nil {
+		if pushTitle != "" {
+			s.notify(ctx, func(context.Context) ([]uuid.UUID, error) { return []uuid.UUID{p.UserID}, nil }, pushTitle, pushBody)
+		}
+		return
+	}
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), purchaseNotifyTimeout)
+		defer cancel()
+		if s.events.SendPurchaseEvent(ctx, rule, p) || pushTitle == "" {
+			return
+		}
+		s.notify(ctx, func(context.Context) ([]uuid.UUID, error) { return []uuid.UUID{p.UserID}, nil }, pushTitle, pushBody)
+	}()
 }
 
 // Reject: no money arrived. The request becomes rejected, no credits.
 func (s *PurchaseService) Reject(ctx context.Context, adminID, id uuid.UUID) (domain.PurchaseRequest, error) {
-	return s.repo.Reject(ctx, id, adminID)
+	p, err := s.repo.Reject(ctx, id, adminID)
+	if err != nil {
+		return domain.PurchaseRequest{}, err
+	}
+	s.decided(ctx, domain.RulePurchaseRejected, p, "", "") // nothing was sent before: only the rule's Telegram text
+	return p, nil
 }
 
 // Grant is an admin correction of a user's balance (amount may be negative, never below 0 in

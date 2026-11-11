@@ -146,6 +146,10 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 		userID, wordID, correct); err != nil {
 		return nil, err
 	}
+	// A review answers the Telegram reminders: they start again from zero.
+	if _, err := tx.Exec(ctx, `UPDATE users SET telegram_reminders_unanswered = 0 WHERE id = $1 AND telegram_reminders_unanswered <> 0`, userID); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}

@@ -324,6 +324,37 @@ export interface BroadcastRequest {
  * The admins' Telegram broadcasts. Every call answers 503 telegram_unavailable without a bot; create:
  * 400 telegram_not_linked ("me" without the admin's Telegram), 409 broadcast_running (a second "all").
  */
+/**
+ * An automatic Telegram notification. send_at "HH:MM" (daily rules; null for the event rules); text with
+ * {placeholders} (the allowed ones in `placeholders`); last_run_on "YYYY-MM-DD", last_sent: what that run sent.
+ */
+export interface TelegramRule {
+  key: 'review_reminder' | 'comeback' | 'purchase_paid' | 'purchase_rejected'
+  enabled: boolean
+  send_at: string | null
+  text: { ru: string; uz: string | null; en: string | null }
+  button: { text: string; url: string } | null
+  placeholders: string[]
+  last_run_on: string | null
+  last_sent: number | null
+}
+export interface TelegramRuleUpdate {
+  enabled: boolean
+  send_at?: string
+  text: { ru: string; uz?: string; en?: string }
+  button?: { text: string; url: string }
+}
+/**
+ * Rules: update → 400 {code, field}: invalid_placeholder (ru/uz/en), invalid_send_at (send_at; also 22:00–08:00),
+ * invalid_text, invalid_button. preview: daily rules only. test: 204, 400 telegram_not_linked.
+ */
+export const telegramRulesApi = {
+  list: () => api.get<TelegramRule[]>('/admin/telegram/rules').then((r) => r.data),
+  update: (key: string, body: TelegramRuleUpdate) => api.put<TelegramRule>(`/admin/telegram/rules/${key}`, body).then((r) => r.data),
+  preview: (key: string) => api.get<{ recipients: number }>(`/admin/telegram/rules/${key}/preview`).then((r) => r.data.recipients),
+  test: (key: string) => api.post(`/admin/telegram/rules/${key}/test`).then(() => undefined),
+}
+
 export const telegramBroadcastApi = {
   audience: () => api.get<TelegramAudience>('/admin/telegram/audience').then((r) => r.data),
   create: (body: BroadcastRequest) =>

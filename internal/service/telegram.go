@@ -306,3 +306,6 @@ func botText(languageCode string, m botMessage) string {
 	}
 	return t[m]
 }
+
+// isBlocked: Telegram refused a message with 403.
+func isBlocked(err error) bool { return errors.Is(err, domain.ErrBotBlocked) }

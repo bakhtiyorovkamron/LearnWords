@@ -143,7 +143,7 @@ func (r *TelegramBroadcastRepository) PendingRecipients(ctx context.Context, id 
 	rows, err := r.pool.Query(ctx, `
 		SELECT r.user_id, u.telegram_chat_id, COALESCE(u.telegram_lang, 'ru'),
 		       COALESCE(u.telegram_chat_id IS NOT NULL AND ($3 OR (u.telegram_notifications AND u.telegram_blocked_at IS NULL AND NOT u.is_banned)), false),
-		       COALESCE(u.telegram_blocked_at IS NOT NULL, false)
+		       COALESCE(u.telegram_blocked_at IS NOT NULL, false), r.params
 		FROM telegram_broadcast_recipients r LEFT JOIN users u ON u.id = r.user_id
 		WHERE r.broadcast_id = $1 AND r.status = 'pending'
 		ORDER BY r.user_id LIMIT $2`, id, limit, target == domain.BroadcastTargetMe)
@@ -152,7 +152,7 @@ func (r *TelegramBroadcastRepository) PendingRecipients(ctx context.Context, id 
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.BroadcastRecipient, error) {
 		var x domain.BroadcastRecipient
-		err := row.Scan(&x.UserID, &x.ChatID, &x.Lang, &x.Reachable, &x.Blocked)
+		err := row.Scan(&x.UserID, &x.ChatID, &x.Lang, &x.Reachable, &x.Blocked, &x.Params)
 		return x, err
 	})
 }
@@ -207,4 +207,18 @@ func (r *TelegramBroadcastRepository) Get(ctx context.Context, id int64) (domain
 		return domain.TelegramBroadcast{}, domain.ErrNotFound
 	}
 	return b, err
+}
+
+// MarkAutoSent records that an automatic message reached the user: a review reminder counts as
+// unanswered until they review, a comeback message is sent once per absence.
+func (r *TelegramBroadcastRepository) MarkAutoSent(ctx context.Context, kind string, userID uuid.UUID) error {
+	switch kind {
+	case "auto:" + domain.RuleReviewReminder:
+		_, err := r.pool.Exec(ctx, `UPDATE users SET telegram_reminders_unanswered = telegram_reminders_unanswered + 1 WHERE id = $1`, userID)
+		return err
+	case "auto:" + domain.RuleComeback:
+		_, err := r.pool.Exec(ctx, `UPDATE users SET telegram_comeback_sent_at = now() WHERE id = $1`, userID)
+		return err
+	}
+	return nil
 }

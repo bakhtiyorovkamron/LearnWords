@@ -93,6 +93,7 @@ interface ApiErrorBody {
   error?: string
   code?: string // stable reason: own_folder, lang_mismatch
   folder_id?: string
+  field?: string // with a validation error of one form field (a Telegram rule)
   message?: string
   retry_after_seconds?: number
   limit?: number // with daily_limit
@@ -135,8 +136,8 @@ export function errorMessage(err: unknown): string {
 }
 
 /** HTTP status, machine-readable code, (own_folder) folder id and (daily_limit) limit and credits of an API error. */
-export function apiErrorInfo(err: unknown): { status?: number; code?: string; folderId?: string; limit?: number; credits?: number } {
+export function apiErrorInfo(err: unknown): { status?: number; code?: string; field?: string; folderId?: string; limit?: number; credits?: number } {
   if (!axios.isAxiosError(err)) return {}
   const body = err.response?.data as ApiErrorBody | undefined
-  return { status: err.response?.status, code: body?.code, folderId: body?.folder_id, limit: body?.limit, credits: body?.credits }
+  return { status: err.response?.status, code: body?.code, field: body?.field, folderId: body?.folder_id, limit: body?.limit, credits: body?.credits }
 }

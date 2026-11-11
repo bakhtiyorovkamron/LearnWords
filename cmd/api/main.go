@@ -145,10 +145,18 @@ func run() error {
 	if err := broadcastSvc.Start(ctx); err != nil {
 		slog.Error("telegram: starting the broadcast worker failed", "err", err)
 	}
+	// The automatic notifications: a scheduler for the daily rules (APP_TIMEZONE), the purchase rules on events.
+	appLoc, err := time.LoadLocation(cfg.AppTimezone)
+	if err != nil {
+		slog.Warn("invalid APP_TIMEZONE, using UTC", "tz", cfg.AppTimezone)
+		appLoc = time.UTC
+	}
+	rulesSvc := service.NewTelegramRulesService(postgres.NewTelegramRulesRepository(pool), bot, telegramSvc.Enabled(), appLoc, broadcastSvc.Wake)
+	rulesSvc.Start(ctx)
 	// After the Telegram service: an admin's chat message reaches the buyer in Telegram when linked.
 	purchaseSvc := service.NewPurchaseService(postgres.NewPurchaseRepository(pool), featureRepo, pushSvc, telegramSvc, domain.PaymentInfo{
 		CardNumber: cfg.PaymentCardNumber, CardHolder: cfg.PaymentCardHolder, Telegram: cfg.PaymentTelegram,
-	})
+	}).WithEvents(rulesSvc)
 	if !purchaseSvc.Available() {
 		slog.Warn("neither PAYMENT_CARD_NUMBER nor PAYMENT_TELEGRAM is set: buying photos is off (purchase endpoints answer 503)")
 	}
@@ -206,6 +214,7 @@ func run() error {
 		Purchases:   handler.NewPurchaseHandler(purchaseSvc),
 		Support:     handler.NewSupportHandler(supportSvc),
 		Broadcasts:  handler.NewTelegramBroadcastHandler(broadcastSvc),
+		Rules:       handler.NewTelegramRulesHandler(rulesSvc),
 		ChatUnread:  handler.NewChatUnreadHandler(service.NewChatUnreadService(postgres.NewChatUnreadRepository(pool))),
 		UserStatus:  adminRepo,
 		Ctx:         ctx,
@@ -246,6 +255,7 @@ func run() error {
 	defer cancel()
 	err = srv.Shutdown(shCtx)
 	purchaseSvc.Wait()  // purchase pushes still on their way
+	rulesSvc.Wait()     // the scheduler (stopped with ctx)
 	broadcastSvc.Wait() // the broadcast worker (stopped with ctx; an unfinished broadcast stays interrupted)
 	supportSvc.Wait()   // support notifications still on their way
 	return err

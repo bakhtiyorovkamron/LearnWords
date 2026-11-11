@@ -40,6 +40,7 @@ func (f *fakeBroadcastRepo) MarkUserBlocked(context.Context, uuid.UUID) error   
 func (f *fakeBroadcastRepo) RefreshCounters(context.Context, int64) error                 { return nil }
 func (f *fakeBroadcastRepo) Finish(context.Context, int64, string) error                  { return nil }
 func (f *fakeBroadcastRepo) InterruptUnfinished(context.Context) error                    { return nil }
+func (f *fakeBroadcastRepo) MarkAutoSent(context.Context, string, uuid.UUID) error        { return nil }
 func (f *fakeBroadcastRepo) List(context.Context, int) ([]domain.TelegramBroadcast, error) {
 	return nil, nil
 }

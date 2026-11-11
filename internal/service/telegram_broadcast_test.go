@@ -20,6 +20,7 @@ type memBroadcasts struct {
 	recs    map[int64][]*memRecipient
 	next    int64
 	blocked map[uuid.UUID]bool
+	auto    []string // "<kind> <user>" of every automatic message sent
 }
 
 type memRecipient struct {
@@ -133,6 +134,13 @@ func (m *memBroadcasts) InterruptUnfinished(context.Context) error {
 			b.Status = domain.BroadcastInterrupted
 		}
 	}
+	return nil
+}
+
+func (m *memBroadcasts) MarkAutoSent(_ context.Context, kind string, user uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.auto = append(m.auto, kind+" "+user.String())
 	return nil
 }
 

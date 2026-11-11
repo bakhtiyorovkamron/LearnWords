@@ -19,6 +19,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     },
     adminSupportApi: { threads: vi.fn(async () => []), messages: vi.fn(), post: vi.fn(), image: vi.fn(), read: vi.fn(), open: vi.fn() },
     telegramBroadcastApi: { audience: vi.fn(), create: vi.fn(), list: vi.fn(), get: vi.fn() },
+    telegramRulesApi: { list: vi.fn(async () => []), update: vi.fn(), preview: vi.fn(), test: vi.fn() },
   }
 })
 

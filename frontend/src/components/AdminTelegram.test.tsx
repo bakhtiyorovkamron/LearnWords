@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { adminApi, telegramBroadcastApi, type AdminUser, type TelegramBroadcast } from '../api/endpoints'
+import { adminApi, telegramBroadcastApi, telegramRulesApi, type AdminUser, type TelegramBroadcast } from '../api/endpoints'
 import { AdminTelegram, BROADCAST_POLL_MS } from './AdminTelegram'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
@@ -12,6 +12,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     ...mod,
     adminApi: { users: vi.fn() },
     telegramBroadcastApi: { audience: vi.fn(), create: vi.fn(), list: vi.fn(), get: vi.fn() },
+    telegramRulesApi: { list: vi.fn(), update: vi.fn(), preview: vi.fn(), test: vi.fn() },
   }
 })
 
@@ -40,6 +41,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.mocked(telegramBroadcastApi.audience).mockResolvedValue({ linked: 140, reachable: 131, opted_out: 6, blocked: 3 })
   vi.mocked(telegramBroadcastApi.list).mockResolvedValue([])
+  vi.mocked(telegramRulesApi.list).mockResolvedValue([])
   vi.mocked(telegramBroadcastApi.create).mockResolvedValue({ broadcast: broadcast(), skipped: 0 })
   vi.mocked(telegramBroadcastApi.get).mockResolvedValue(broadcast())
   vi.mocked(adminApi.users).mockResolvedValue([

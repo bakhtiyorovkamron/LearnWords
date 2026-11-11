@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Send, X } from 'lucide-react'
+import { Save, Send, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { adminApi, telegramBroadcastApi, type BroadcastTarget, type TelegramBroadcast } from '../api/endpoints'
+import { adminApi, telegramBroadcastApi, telegramRulesApi, type BroadcastTarget, type TelegramBroadcast, type TelegramRule } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
 
@@ -14,6 +14,11 @@ export const DEFAULT_BUTTON_URL = 'https://yodla.fun'
 
 export const BROADCASTS_KEY = ['admin', 'telegram', 'broadcasts'] as const
 export const AUDIENCE_KEY = ['admin', 'telegram', 'audience'] as const
+export const RULES_KEY = ['admin', 'telegram', 'rules'] as const
+
+/** The daily rules' time: 08:00 to 21:59 (nothing goes out at night). */
+export const RULE_TIME_MIN = '08:00'
+export const RULE_TIME_MAX = '21:59'
 
 const active = (b: TelegramBroadcast | undefined) => b?.status === 'queued' || b?.status === 'running'
 
@@ -60,6 +65,7 @@ export function AdminTelegram({ preselect, onPreselected }: { preselect?: string
           ) : <div className="h-5 w-2/3 animate-pulse rounded bg-surface-2" />}
         <BroadcastForm reachable={audience.data?.reachable ?? 0} preselect={preselect} onPreselected={onPreselected} />
       </section>
+      <AutoRules />
       <History />
     </div>
   )
@@ -288,7 +294,11 @@ function History() {
         {rows.map((b) => (
           <li key={b.id} data-testid={`broadcast-${b.id}`} className="space-y-0.5 py-3 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-xs text-faint tabular-nums">{new Date(b.created_at).toLocaleString(dateLocale())} · {t(`admin.telegram.target_${b.target}`)}</span>
+              <span className="text-xs text-faint tabular-nums">
+                {new Date(b.created_at).toLocaleString(dateLocale())} · {b.kind.startsWith('auto:')
+                  ? <span data-testid={`broadcast-rule-${b.id}`}>{t('admin.telegram.rules.autoLabel', { rule: t(`admin.telegram.rules.items.${b.kind.slice(5)}.title`) })}</span>
+                  : t(`admin.telegram.target_${b.target}`)}
+              </span>
               <span className="text-xs text-muted">{t(`admin.telegram.status.${b.status}`)}</span>
             </div>
             <p className="break-words text-fg">{b.text.ru.length > 80 ? `${b.text.ru.slice(0, 80)}…` : b.text.ru}</p>
@@ -297,5 +307,208 @@ function History() {
         ))}
       </ul>
     </section>
+  )
+}
+
+type RuleField = 'ru' | 'uz' | 'en'
+
+/** "Automatic": one card per rule — switch, time, texts with placeholder chips, button, save and a sample. */
+function AutoRules() {
+  const { t } = useTranslation()
+  const rules = useQuery({ queryKey: RULES_KEY, queryFn: telegramRulesApi.list, retry: false })
+  return (
+    <section className="glass space-y-4 p-6" aria-labelledby="tg-rules-title">
+      <div>
+        <h2 id="tg-rules-title" className="text-lg font-bold text-fg">{t('admin.telegram.rules.title')}</h2>
+        <p className="text-sm text-muted">{t('admin.telegram.rules.intro')}</p>
+      </div>
+      {rules.error && <p role="alert" className="text-sm text-danger">{errorMessage(rules.error)}</p>}
+      {!rules.data && !rules.error && <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />}
+      <div className="space-y-4">
+        {rules.data?.map((rule) => <RuleCard key={rule.key} rule={rule} />)}
+      </div>
+    </section>
+  )
+}
+
+function RuleCard({ rule }: { rule: TelegramRule }) {
+  const { t, i18n } = useTranslation()
+  const qc = useQueryClient()
+  const daily = rule.send_at !== null
+  const [enabled, setEnabled] = useState(rule.enabled)
+  const [at, setAt] = useState(rule.send_at ?? '')
+  const [text, setText] = useState({ ru: rule.text.ru, uz: rule.text.uz ?? '', en: rule.text.en ?? '' })
+  const [langs, setLangs] = useState(false)
+  const [btnText, setBtnText] = useState(rule.button?.text ?? '')
+  const [btnUrl, setBtnUrl] = useState(rule.button?.url ?? DEFAULT_BUTTON_URL)
+  const [errors, setErrors] = useState<Partial<Record<RuleField | 'send_at' | 'button' | 'form', string>>>({})
+  const [saved, setSaved] = useState(false)
+  const [testSent, setTestSent] = useState(false)
+  const area = useRef<Record<RuleField, HTMLTextAreaElement | null>>({ ru: null, uz: null, en: null })
+  const active = useRef<RuleField>('ru')
+  const cursor = useRef<{ field: RuleField; at: number } | null>(null)
+
+  useEffect(() => { // after a chip was inserted: the cursor goes behind it
+    const c = cursor.current
+    const el = c && area.current[c.field]
+    if (c && el) { el.focus(); el.setSelectionRange(c.at, c.at); cursor.current = null }
+  }, [text])
+
+  const preview = useQuery({
+    queryKey: [...RULES_KEY, 'preview', rule.key], queryFn: () => telegramRulesApi.preview(rule.key), enabled: daily, retry: false,
+  })
+
+  const hasButton = btnText.trim() !== ''
+  const timeOk = !daily || (at >= RULE_TIME_MIN && at <= RULE_TIME_MAX)
+  const buttonOk = !hasButton || (btnText.trim().length <= BROADCAST_BUTTON_MAX && isHttpsUrl(btnUrl))
+  const valid = text.ru.trim() !== '' && timeOk && buttonOk
+
+  const save = useMutation({
+    mutationFn: () => telegramRulesApi.update(rule.key, {
+      enabled, ...(daily && { send_at: at }),
+      text: { ru: text.ru.trim(), ...(text.uz.trim() && { uz: text.uz.trim() }), ...(text.en.trim() && { en: text.en.trim() }) },
+      ...(hasButton && { button: { text: btnText.trim(), url: btnUrl.trim() } }),
+    }),
+    onMutate: () => { setErrors({}); setSaved(false) },
+    onSuccess: () => { setSaved(true); void qc.invalidateQueries({ queryKey: RULES_KEY }) },
+    onError: (e) => {
+      const { code, field } = apiErrorInfo(e)
+      const allowed = rule.placeholders.map((p) => `{${p}}`).join(' ')
+      if (code === 'invalid_placeholder' && (field === 'ru' || field === 'uz' || field === 'en')) {
+        setErrors({ [field]: t('admin.telegram.rules.err.invalid_placeholder', { allowed }) })
+        if (field !== 'ru') setLangs(true)
+      } else if (code === 'invalid_send_at') setErrors({ send_at: t('admin.telegram.rules.err.invalid_send_at', { from: RULE_TIME_MIN, to: RULE_TIME_MAX }) })
+      else if (code === 'invalid_text' && (field === 'ru' || field === 'uz' || field === 'en')) {
+        setErrors({ [field]: t('admin.telegram.rules.err.invalid_text', { max: BROADCAST_TEXT_MAX }) })
+        if (field !== 'ru') setLangs(true)
+      } else if (code === 'invalid_button') setErrors({ button: t('admin.telegram.buttonUrlInvalid') })
+      else setErrors({ form: errorMessage(e) })
+    },
+  })
+  const test = useMutation({
+    mutationFn: () => telegramRulesApi.test(rule.key),
+    onMutate: () => { setErrors({}); setTestSent(false) },
+    onSuccess: () => setTestSent(true),
+    onError: (e) => setErrors({ form: apiErrorInfo(e).code === 'telegram_not_linked' ? t('admin.telegram.errNotLinked') : errorMessage(e) }),
+  })
+
+  function setField(f: RuleField, v: string) {
+    setText((x) => ({ ...x, [f]: v.slice(0, BROADCAST_TEXT_MAX) }))
+    setSaved(false)
+    setErrors((e) => ({ ...e, [f]: undefined }))
+  }
+  function insert(name: string) {
+    const f: RuleField = langs || active.current === 'ru' ? active.current : 'ru'
+    const el = area.current[f]
+    const value = text[f]
+    const start = el?.selectionStart ?? value.length
+    const end = el?.selectionEnd ?? value.length
+    const token = `{${name}}`
+    cursor.current = { field: f, at: start + token.length }
+    setField(f, value.slice(0, start) + token + value.slice(end))
+  }
+
+  const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-faint'
+  const fieldArea = (f: RuleField, id: string, text_: string, rows: number) => (
+    <div>
+      <label className={label} htmlFor={id}>{text_}</label>
+      <textarea id={id} rows={rows} className="field text-base" value={text[f]} ref={(el) => { area.current[f] = el }}
+        onFocus={() => { active.current = f }} onChange={(e) => setField(f, e.target.value)} aria-invalid={errors[f] ? true : undefined} />
+      {errors[f] && <p role="alert" data-testid={`rule-error-${rule.key}-${f}`} className="mt-1 text-sm text-danger">{errors[f]}</p>}
+    </div>
+  )
+  const lastRun = rule.last_run_on
+    ? t('admin.telegram.rules.lastRun', {
+        date: new Intl.DateTimeFormat(dateLocale(), { day: 'numeric', month: 'long' }).format(new Date(`${rule.last_run_on}T12:00:00`)),
+        sent: rule.last_sent ?? 0,
+      })
+    : t('admin.telegram.rules.neverRun')
+
+  return (
+    <article data-testid={`rule-${rule.key}`} className="space-y-3 rounded-2xl border border-line p-4">
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-fg">{t(`admin.telegram.rules.items.${rule.key}.title`)}</h3>
+          <p className="text-sm text-muted">{t(`admin.telegram.rules.items.${rule.key}.desc`)}</p>
+        </div>
+        <label className="flex shrink-0 items-center gap-2 text-sm text-fg">
+          <span>{t('admin.telegram.rules.enabled')}</span>
+          <input type="checkbox" role="switch" checked={enabled} aria-label={`${t('admin.telegram.rules.enabled')}: ${t(`admin.telegram.rules.items.${rule.key}.title`)}`}
+            onChange={(e) => { setEnabled(e.target.checked); setSaved(false) }} className="h-5 w-5 accent-[var(--accent)]" />
+        </label>
+      </header>
+
+      {daily && (
+        <div>
+          <label className={label} htmlFor={`rule-time-${rule.key}`}>{t('admin.telegram.rules.sendAt')}</label>
+          <input id={`rule-time-${rule.key}`} type="time" min={RULE_TIME_MIN} max={RULE_TIME_MAX} step={60} className="field w-auto text-base" value={at}
+            onChange={(e) => { setAt(e.target.value); setSaved(false); setErrors((x) => ({ ...x, send_at: undefined })) }} aria-invalid={!timeOk || errors.send_at ? true : undefined} />
+          <p className="mt-1 text-xs text-faint">{t('admin.telegram.rules.sendAtHint', { from: RULE_TIME_MIN, to: RULE_TIME_MAX })}</p>
+          {(errors.send_at || !timeOk) && (
+            <p role="alert" data-testid={`rule-error-${rule.key}-send_at`} className="mt-1 text-sm text-danger">
+              {errors.send_at ?? t('admin.telegram.rules.err.invalid_send_at', { from: RULE_TIME_MIN, to: RULE_TIME_MAX })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {fieldArea('ru', `rule-ru-${rule.key}`, t('admin.telegram.fieldRu'), 3)}
+      <div className="flex flex-wrap items-center gap-2" data-testid={`rule-chips-${rule.key}`}>
+        <span className="text-xs text-faint">{t('admin.telegram.rules.placeholders')}</span>
+        {rule.placeholders.map((p) => (
+          <button key={p} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(p)}
+            aria-label={t('admin.telegram.rules.insert', { name: `{${p}}` })}
+            className="rounded-full bg-surface-2 px-2.5 py-0.5 font-mono text-xs text-fg hover:opacity-80">{`{${p}}`}</button>
+        ))}
+      </div>
+
+      <div>
+        <button type="button" aria-expanded={langs} onClick={() => setLangs((v) => !v)} className="text-sm font-semibold text-accent-text hover:underline">
+          {t('admin.telegram.otherLangs')}
+        </button>
+        {langs && (
+          <div className="mt-2 space-y-3">
+            {fieldArea('uz', `rule-uz-${rule.key}`, t('admin.telegram.fieldUz'), 2)}
+            {fieldArea('en', `rule-en-${rule.key}`, t('admin.telegram.fieldEn'), 2)}
+          </div>
+        )}
+      </div>
+
+      <fieldset className="space-y-2 rounded-xl border border-line p-3">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-faint">{t('admin.telegram.button')}</legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={label} htmlFor={`rule-btn-text-${rule.key}`}>{t('admin.telegram.buttonLabel')}</label>
+            <input id={`rule-btn-text-${rule.key}`} className="field text-base" value={btnText} maxLength={BROADCAST_BUTTON_MAX}
+              onChange={(e) => { setBtnText(e.target.value); setSaved(false) }} />
+          </div>
+          <div>
+            <label className={label} htmlFor={`rule-btn-url-${rule.key}`}>{t('admin.telegram.buttonUrl')}</label>
+            <input id={`rule-btn-url-${rule.key}`} className="field text-base" type="url" inputMode="url" value={btnUrl}
+              onChange={(e) => { setBtnUrl(e.target.value); setSaved(false) }} aria-invalid={hasButton && !isHttpsUrl(btnUrl) ? true : undefined} />
+          </div>
+        </div>
+        {(errors.button || (hasButton && !isHttpsUrl(btnUrl))) && (
+          <p role="alert" data-testid={`rule-error-${rule.key}-button`} className="text-sm text-danger">{t('admin.telegram.buttonUrlInvalid')}</p>
+        )}
+      </fieldset>
+
+      {daily && (
+        <div className="space-y-0.5 text-sm text-muted">
+          <p data-testid={`rule-preview-${rule.key}`}>{preview.data !== undefined ? t('admin.telegram.rules.preview', { count: preview.data }) : '…'}</p>
+          <p data-testid={`rule-last-${rule.key}`}>{lastRun}</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-primary" disabled={!valid || save.isPending} onClick={() => save.mutate()}>
+          <Save size={16} aria-hidden="true" />{t('admin.telegram.rules.save')}
+        </button>
+        <button type="button" className="btn-ghost" disabled={test.isPending} onClick={() => test.mutate()}>{t('admin.telegram.rules.testMe')}</button>
+        {saved && <span role="status" className="text-sm text-muted">{t('admin.telegram.rules.saved')}</span>}
+        {testSent && <span role="status" className="text-sm text-muted">{t('admin.telegram.rules.testSent')}</span>}
+      </div>
+      {errors.form && <p role="alert" className="text-sm text-danger">{errors.form}</p>}
+    </article>
   )
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
@@ -114,6 +115,8 @@ type BroadcastRecipient struct {
 	Lang      string
 	Reachable bool
 	Blocked   bool
+	// Params: the placeholders' values of an automatic broadcast (nil for a manual one: its text is sent as written).
+	Params map[string]string
 }
 
 // TelegramAudience: how many users linked Telegram, and who of them can get a broadcast.
@@ -193,4 +196,95 @@ type TelegramLink struct {
 	Code      string    `json:"-"`
 	URL       string    `json:"url"`
 	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// The automatic notification rules (telegram_rules).
+const (
+	RuleReviewReminder   = "review_reminder"
+	RuleComeback         = "comeback"
+	RulePurchasePaid     = "purchase_paid"
+	RulePurchaseRejected = "purchase_rejected"
+
+	// RuleWindow: a daily rule that was due more than this long ago is skipped for the day.
+	RuleWindow = 3 * time.Hour
+	// Quiet hours: a daily rule never goes out from RuleQuietFrom to RuleQuietTo local time.
+	RuleQuietFromHour = 22
+	RuleQuietToHour   = 8
+	// RuleMaxUnanswered: reminders in a row without a review after which a user gets no more.
+	RuleMaxUnanswered = 3
+	// RuleAbsenceDays: no activity for this long makes the "come back" message due.
+	RuleAbsenceDays = 7
+)
+
+// RuleDef describes one rule: whether it runs every day at send_at, and the placeholders its text may use.
+type RuleDef struct {
+	Key          string
+	Daily        bool
+	Placeholders []string
+}
+
+var RuleDefs = []RuleDef{
+	{RuleReviewReminder, true, []string{"name", "count"}},
+	{RuleComeback, true, []string{"name", "count"}},
+	{RulePurchasePaid, false, []string{"name", "code", "amount"}},
+	{RulePurchaseRejected, false, []string{"name", "code", "amount"}},
+}
+
+// RuleDefOf returns the rule with this key.
+func RuleDefOf(key string) (RuleDef, bool) {
+	for _, d := range RuleDefs {
+		if d.Key == key {
+			return d, true
+		}
+	}
+	return RuleDef{}, false
+}
+
+// TelegramRule is an automatic notification an admin switches on and edits. SendAt is "HH:MM" local
+// time (daily rules only); LastRunOn the local day it last ran ("2006-01-02"); LastSent the messages
+// sent by that run.
+type TelegramRule struct {
+	Key          string          `json:"key"`
+	Enabled      bool            `json:"enabled"`
+	SendAt       *string         `json:"send_at"`
+	Text         BroadcastText   `json:"text"`
+	Button       *TelegramButton `json:"button"`
+	Placeholders []string        `json:"placeholders"`
+	LastRunOn    *string         `json:"last_run_on"`
+	LastSent     *int            `json:"last_sent"`
+}
+
+// RuleError is a validation error of one field of a rule (400 with a code and the field).
+type RuleError struct {
+	Code  string // invalid_placeholder, invalid_send_at, invalid_text, invalid_button
+	Field string // ru, uz, en, send_at, button
+	Msg   string
+}
+
+func (e *RuleError) Error() string { return e.Msg }
+func (e *RuleError) Unwrap() error { return ErrValidation }
+
+var placeholderRe = regexp.MustCompile(`\{([^{}]*)\}`)
+var spacesRe = regexp.MustCompile(` {2,}`)
+
+// Placeholders returns the names used in {braces} in text.
+func Placeholders(text string) []string {
+	var out []string
+	for _, m := range placeholderRe.FindAllStringSubmatch(text, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+// RenderTemplate fills {name}-style placeholders from params; an unknown one is left as it is. A
+// leading ", " (an empty {name} at the start) and double spaces are cleaned up.
+func RenderTemplate(text string, params map[string]string) string {
+	out := placeholderRe.ReplaceAllStringFunc(text, func(m string) string {
+		if v, ok := params[m[1:len(m)-1]]; ok {
+			return v
+		}
+		return m
+	})
+	out = strings.TrimSpace(spacesRe.ReplaceAllString(out, " "))
+	return strings.TrimSpace(strings.TrimPrefix(out, ", "))
 }

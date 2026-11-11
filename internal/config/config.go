@@ -41,6 +41,8 @@ type Config struct {
 	// TelegramWebhookURL: TELEGRAM_WEBHOOK_URL, the public https://<domain>/api/telegram/webhook.
 	// Set → the webhook is registered with Telegram on start.
 	TelegramWebhookURL string
+	// AppTimezone: APP_TIMEZONE (default Asia/Tashkent), the clock of the automatic Telegram notifications.
+	AppTimezone string
 }
 
 func Load() (*Config, error) {
@@ -71,6 +73,7 @@ func Load() (*Config, error) {
 		TelegramBotUsername:   telegramUsername(os.Getenv("TELEGRAM_BOT_USERNAME")),
 		TelegramWebhookSecret: strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_SECRET")),
 		TelegramWebhookURL:    strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_URL")),
+		AppTimezone:           env("APP_TIMEZONE", "Asia/Tashkent"),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")
