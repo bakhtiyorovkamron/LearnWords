@@ -190,7 +190,7 @@ func TestImport_KeepsTheSourceTranslationLanguageAndCache(t *testing.T) {
 	owner.exec(t, `DELETE FROM word_translations WHERE word_id = $1`, w) // the source's cache lacks its own row
 	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
 
-	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil || res.Added != 1 {
 		t.Fatal(res, err)
 	}
@@ -358,7 +358,7 @@ func TestImportShared_CopiesTheExampleLanguage_AndKeepsAForeignExampleOutOfTheCa
 	owner.exec(t, `DELETE FROM word_translations WHERE word_id = $1`, word)
 	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
 
-	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil || res.Added != 1 {
 		t.Fatalf("%+v %v", res, err)
 	}

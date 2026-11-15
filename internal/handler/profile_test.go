@@ -24,13 +24,22 @@ func (m *memProfile) SetProfile(_ context.Context, _ uuid.UUID, name string, pho
 	return nil
 }
 
+// memWords is the profile's word status (service.WordLimit in production).
+type memWords struct{ s domain.WordsStatus }
+
+func (m memWords) Status(context.Context, uuid.UUID) (domain.WordsStatus, error) { return m.s, nil }
+
 func profileRouter(m *memProfile) *gin.Engine { return profileRouterBot(m, true) }
 
 func profileRouterBot(m *memProfile, telegramAvailable bool) *gin.Engine {
+	return profileRouterWords(m, memWords{}, telegramAvailable)
+}
+
+func profileRouterWords(m *memProfile, words WordsStatusReader, telegramAvailable bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set(userIDKey, uuid.New()) })
-	h := NewProfileHandler(m, telegramAvailable)
+	h := NewProfileHandler(m, words, telegramAvailable)
 	r.GET("/me/profile", h.Get)
 	r.PUT("/me/profile", h.Update)
 	return r
@@ -50,7 +59,7 @@ func TestProfile_GetEmpty(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	if got := w.Body.String(); got != `{"full_name":null,"phone":null,"telegram":{"connected":false,"notifications":false,"username":null,"available":true,"bonus_offer":2,"bonus":0}}` {
+	if got := w.Body.String(); got != `{"full_name":null,"phone":null,"telegram":{"connected":false,"notifications":false,"username":null,"available":true,"bonus_offer":2,"bonus":0},"words":{"count":0,"limit":null}}` {
 		t.Errorf("body = %s", got)
 	}
 }

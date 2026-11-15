@@ -15,11 +15,20 @@ import (
 type fakeContexts struct {
 	saved   []domain.WordCard
 	context domain.Context
+	quota   domain.WordQuota // what the guard sees, like the repository reads it in the transaction
+	guarded bool             // a guard was passed (the rule is on)
 }
 
-func (f *fakeContexts) CreateWithCards(_ context.Context, c *domain.Context, cards []domain.WordCard) error {
+func (f *fakeContexts) CreateWithCards(_ context.Context, c *domain.Context, cards []domain.WordCard, guard domain.WordGuard) error {
+	if guard != nil {
+		f.guarded = true
+		if err := guard(f.quota, len(cards)); err != nil {
+			return err
+		}
+	}
 	f.context = *c
 	f.saved = append(f.saved, cards...)
+	f.quota.Words += len(cards)
 	return nil
 }
 

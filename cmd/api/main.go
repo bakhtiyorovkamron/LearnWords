@@ -101,13 +101,6 @@ func run() error {
 	// Services
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.AccessTTL, cfg.RefreshTTL)
 	authSvc := service.NewAuthService(userRepo, tokens)
-	// New users get the "Introductions" folder; if the content can't be loaded they just don't.
-	if starterSvc, err := service.NewStarterService(contextRepo); err != nil {
-		slog.Error("starter folder is off", "err", err)
-	} else {
-		authSvc.SetStarter(starterSvc)
-	}
-	contextSvc := service.NewContextService(contextRepo, cardRepo, providers)
 	storySvc := service.NewStoryService(postgres.NewStoryRepository(pool), storyGen, storyTranslator, storyProofreader)
 	adminRepo := postgres.NewAdminRepository(pool)
 	featureRepo := postgres.NewFeatureRepository(pool)
@@ -140,6 +133,19 @@ func run() error {
 			}()
 		}
 	}
+	// Without a linked Telegram a user may have WORDS_WITHOUT_TELEGRAM words (off without a bot): one
+	// rule for every path that adds words.
+	wordLimit := service.NewWordLimit(userRepo, cfg.WordsWithoutTelegram, telegramSvc.Enabled())
+	if telegramSvc.Enabled() && cfg.WordsWithoutTelegram > 0 {
+		slog.Info("word limit without Telegram is on", "limit", cfg.WordsWithoutTelegram)
+	}
+	// New users get the "Introductions" folder; if the content can't be loaded they just don't.
+	if starterSvc, err := service.NewStarterService(contextRepo); err != nil {
+		slog.Error("starter folder is off", "err", err)
+	} else {
+		authSvc.SetStarter(starterSvc.WithWordLimit(wordLimit))
+	}
+	contextSvc := service.NewContextService(contextRepo, cardRepo, providers).WithWordLimit(wordLimit)
 	// One worker sends the admins' broadcasts; ones a restart cut off are marked interrupted first.
 	broadcastSvc := service.NewTelegramBroadcastService(postgres.NewTelegramBroadcastRepository(pool), bot, telegramSvc.Enabled())
 	if err := broadcastSvc.Start(ctx); err != nil {
@@ -197,7 +203,7 @@ func run() error {
 		Stats:       handler.NewStatsHandler(service.NewStatsService(postgres.NewStatsRepository(pool))),
 		Stories:     handler.NewStoryHandler(storySvc, featureSvc),
 		Settings:    handler.NewSettingsHandler(userRepo),
-		Profile:     handler.NewProfileHandler(userRepo, telegramSvc.Enabled()),
+		Profile:     handler.NewProfileHandler(userRepo, wordLimit, telegramSvc.Enabled()),
 		Telegram:    handler.NewTelegramHandler(telegramSvc, cfg.TelegramWebhookSecret),
 		Admin:       handler.NewAdminHandler(adminRepo, userRepo, featureSvc, feedbackRepo),
 		Collection:  handler.NewCollectionHandler(cardRepo),
@@ -205,7 +211,7 @@ func run() error {
 		WordMove:    handler.NewWordMoveHandler(cardRepo),
 		WordDelete:  handler.NewWordDeleteHandler(cardRepo),
 		Folders:     handler.NewFolderHandler(folderRepo),
-		Shared:      handler.NewSharedHandler(folderRepo),
+		Shared:      handler.NewSharedHandler(folderRepo, wordLimit),
 		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
 		Feedback:    handler.NewFeedbackHandler(feedbackRepo),
 		Push:        handler.NewPushHandler(pushSvc),

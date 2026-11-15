@@ -182,8 +182,9 @@ func uniqueFolderName(name string, taken []string) string {
 // ImportShared copies a shared folder into callerID's account, in ONE transaction: a new folder
 // (imported_from = the source) plus a copy of every word the caller does not have yet — context,
 // card, the word_translations rows. Progress is NOT copied: the words start fresh in box 1. No AI
-// is involved. Any failure rolls everything back, including the new folder.
-func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID, callerLang, token string, maxFolders int) (*domain.ImportResult, error) {
+// is involved. Any failure rolls everything back, including the new folder. guard is the word limit
+// (nil = off), checked for all the new words at once: a folder that does not fit is not imported.
+func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID, callerLang, token string, maxFolders int, guard domain.WordGuard) (*domain.ImportResult, error) {
 	var res domain.ImportResult
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		var srcID, ownerID uuid.UUID
@@ -270,7 +271,13 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 			return err
 		}
 
-		now := time.Now().UTC()
+		// First which words are new, then the word limit for all of them at once: the whole folder
+		// fits, or nothing is imported — never a part of it.
+		type pick struct {
+			i int // position in the source, keeps its order
+			s src
+		}
+		var add []pick
 		for i, s := range words {
 			forms := spellings(s.word)
 			// A source card with no translation (old data) is not copied: it could not be asked as a question.
@@ -285,8 +292,17 @@ func (r *FolderRepository) ImportShared(ctx context.Context, callerID uuid.UUID,
 			for _, f := range forms {
 				have[f] = true // the same word twice in the source is added once
 			}
+			add = append(add, pick{i: i, s: s})
+		}
+		if err := guardWords(ctx, tx, callerID, len(add), guard); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC()
+		for _, p := range add {
+			s := p.s
 			ctxID, cardID := uuid.New(), uuid.New()
-			created := now.Add(time.Duration(i) * time.Microsecond) // keeps the source order
+			created := now.Add(time.Duration(p.i) * time.Microsecond) // keeps the source order
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO contexts (id, user_id, source_text, language, created_at, meaning)
 				VALUES ($1, $2, $3, $4, $5, $6)`,

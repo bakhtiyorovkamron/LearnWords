@@ -20,16 +20,24 @@ type fakeShared struct {
 	gotLang string
 	gotTok  string
 	gotCall string // caller's language
+	// The word limit as the repository applies it: the guard sees quota and newWords at once.
+	quota    domain.WordQuota
+	newWords int
 }
 
 func (f *fakeShared) GetShared(_ context.Context, token, lang string) (*domain.SharedFolder, error) {
 	f.gotTok, f.gotLang = token, lang
 	return f.folder, f.err
 }
-func (f *fakeShared) ImportShared(ctx context.Context, _ uuid.UUID, callerLang, token string, _ int) (*domain.ImportResult, error) {
+func (f *fakeShared) ImportShared(ctx context.Context, _ uuid.UUID, callerLang, token string, _ int, guard domain.WordGuard) (*domain.ImportResult, error) {
 	f.gotTok, f.gotCall = token, callerLang
 	if f.err != nil {
 		return nil, f.err
+	}
+	if guard != nil {
+		if err := guard(f.quota, f.newWords); err != nil {
+			return nil, err
+		}
 	}
 	return &domain.ImportResult{FolderID: uuid.New(), Added: 3, Skipped: 1}, nil
 }
@@ -39,7 +47,7 @@ const goodToken = "aB3dE5gH7k"
 func sharedRouter(f *fakeShared, callerLang string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := NewSharedHandler(f)
+	h := NewSharedHandler(f, nil)
 	r.GET("/api/shared/:token", h.Get) // public: no user in the context at all
 	r.POST("/api/shared/:token/import", func(c *gin.Context) {
 		c.Set(userIDKey, uuid.New())
@@ -220,7 +228,7 @@ func TestFolderShareEndpoints(t *testing.T) {
 func TestSharedRoutes_Wiring(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	f := &fakeShared{folder: &domain.SharedFolder{Name: "Tiere", Words: []domain.SharedWord{}}}
-	r := NewRouter(RouterDeps{Shared: NewSharedHandler(f), Folders: &FolderHandler{}, CORSOrigins: []string{"http://localhost"}, Ctx: context.Background()})
+	r := NewRouter(RouterDeps{Shared: NewSharedHandler(f, nil), Folders: &FolderHandler{}, CORSOrigins: []string{"http://localhost"}, Ctx: context.Background()})
 	if w := do(r, http.MethodGet, "/api/shared/"+goodToken, nil); w.Code != 200 {
 		t.Errorf("public preview without a token: %d %s", w.Code, w.Body)
 	}

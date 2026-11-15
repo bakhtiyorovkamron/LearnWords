@@ -18,17 +18,29 @@ func NewContextRepository(pool *pgxpool.Pool) *ContextRepository {
 
 const contextCols = `id, user_id, source_text, language, created_at, meaning`
 
-// CreateWithCards stores a context and its word cards atomically.
-func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard) error {
+// CreateWithCards stores a context and its word cards atomically. guard is the word limit (nil =
+// off), checked in the same transaction before the insert.
+func (r *ContextRepository) CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard, guard domain.WordGuard) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if err := guardWords(ctx, tx, c.UserID, len(cards), guard); err != nil {
+			return err
+		}
 		return insertContext(ctx, tx, c, cards)
 	})
 }
 
 // CreateFolderWithContexts creates a folder and fills it with contexts and cards — the same inserts
-// as CreateWithCards — in ONE transaction: either the whole folder is there or nothing is.
-func (r *ContextRepository) CreateFolderWithContexts(ctx context.Context, f *domain.Folder, items []domain.ContextWithCards) error {
+// as CreateWithCards — in ONE transaction: either the whole folder is there or nothing is. guard
+// (the word limit, nil = off) is checked for all the cards at once: they fit, or nothing is created.
+func (r *ContextRepository) CreateFolderWithContexts(ctx context.Context, f *domain.Folder, items []domain.ContextWithCards, guard domain.WordGuard) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		n := 0
+		for _, it := range items {
+			n += len(it.Cards)
+		}
+		if err := guardWords(ctx, tx, f.UserID, n, guard); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO folders (id, user_id, name, color, created_at) VALUES ($1, $2, $3, $4, $5)`,
 			f.ID, f.UserID, f.Name, f.Color, f.CreatedAt); err != nil {

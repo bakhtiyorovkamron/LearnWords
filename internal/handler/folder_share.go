@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"learnwords/internal/domain"
+	"learnwords/internal/service"
 )
 
 // shareURL: the public link to a folder, on the host the request came in on (Caddy forwards Host
@@ -71,12 +72,17 @@ func (h *FolderHandler) DisableShare(c *gin.Context) {
 
 type SharedStore interface {
 	GetShared(ctx context.Context, token, lang string) (*domain.SharedFolder, error)
-	ImportShared(ctx context.Context, callerID uuid.UUID, callerLang, token string, maxFolders int) (*domain.ImportResult, error)
+	ImportShared(ctx context.Context, callerID uuid.UUID, callerLang, token string, maxFolders int, guard domain.WordGuard) (*domain.ImportResult, error)
 }
 
-type SharedHandler struct{ store SharedStore }
+type SharedHandler struct {
+	store SharedStore
+	words *service.WordLimit // nil = no word limit
+}
 
-func NewSharedHandler(store SharedStore) *SharedHandler { return &SharedHandler{store: store} }
+func NewSharedHandler(store SharedStore, words *service.WordLimit) *SharedHandler {
+	return &SharedHandler{store: store, words: words}
+}
 
 // Tokens are exactly 10 base62 characters; anything else is a 404 without touching the database.
 var shareTokenRe = regexp.MustCompile(`^[0-9A-Za-z]{10}$`)
@@ -130,14 +136,15 @@ func (h *SharedHandler) Get(c *gin.Context) {
 }
 
 // Import handles POST /api/shared/:token/import — copies the folder into the caller's account.
-// 404 bad token, 409 own folder, 422 lang_mismatch, 400 too many folders.
+// 404 bad token, 409 own folder, 422 lang_mismatch, 400 too many folders, 403 telegram_required
+// (the new words do not all fit the limit without Telegram: nothing is imported).
 func (h *SharedHandler) Import(c *gin.Context) {
 	token, ok := sharedToken(c)
 	if !ok {
 		return
 	}
 	ctx := c.Request.Context()
-	res, err := h.store.ImportShared(ctx, userID(c), domain.LangFrom(ctx), token, maxFolders)
+	res, err := h.store.ImportShared(ctx, userID(c), domain.LangFrom(ctx), token, maxFolders, h.words.Guard())
 	if err != nil {
 		writeError(c, err)
 		return

@@ -182,7 +182,7 @@ func TestImportShared_CopiesWordsAndTranslations_SkipsExisting_NoProgress(t *tes
 	me.addUserWord(t, me.user, "Hund")
 	me.addUserWord(t, me.user, "das Haus")
 
-	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,11 +256,11 @@ func TestImportShared_NameCollisionAndRepeat(t *testing.T) {
 		me.pool.QueryRow(ctx, `SELECT name FROM folders WHERE id = $1`, id).Scan(&n) //nolint:errcheck
 		return n
 	}
-	first, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	first, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil || nameOf(first.FolderID) != "Tiere (2)" {
 		t.Fatalf("first: %v %q", err, nameOf(first.FolderID))
 	}
-	second, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	second, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil || nameOf(second.FolderID) != "Tiere (3)" {
 		t.Fatalf("second: %v %q", err, nameOf(second.FolderID))
 	}
@@ -285,22 +285,22 @@ func TestImportShared_Refusals(t *testing.T) {
 	owner.sourceWord(t, owner.user, src, "Katze", "кошка")
 	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
 
-	_, err := owner.repo.ImportShared(ctx, owner.user, "de", tok, 100)
+	_, err := owner.repo.ImportShared(ctx, owner.user, "de", tok, 100, nil)
 	if id, ok := domain.IsOwnFolder(err); !errors.Is(err, domain.ErrOwnFolder) || !ok || id != src {
 		t.Errorf("own folder: %v", err)
 	}
-	if _, err := me.repo.ImportShared(ctx, me.user, "en", tok, 100); !errors.Is(err, domain.ErrLangMismatch) {
+	if _, err := me.repo.ImportShared(ctx, me.user, "en", tok, 100, nil); !errors.Is(err, domain.ErrLangMismatch) {
 		t.Errorf("language mismatch: %v", err)
 	}
-	if _, err := me.repo.ImportShared(ctx, me.user, "de", "Zzzzzzzzzz", 100); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := me.repo.ImportShared(ctx, me.user, "de", "Zzzzzzzzzz", 100, nil); !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("unknown token: %v", err)
 	}
 	me.folder(t, me.user)
-	if _, err := me.repo.ImportShared(ctx, me.user, "de", tok, 1); !errors.Is(err, domain.ErrValidation) {
+	if _, err := me.repo.ImportShared(ctx, me.user, "de", tok, 1, nil); !errors.Is(err, domain.ErrValidation) {
 		t.Errorf("folder limit: %v", err)
 	}
 	owner.repo.DisableShare(ctx, owner.user, src) //nolint:errcheck
-	if _, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil); !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("disabled link: %v", err)
 	}
 	// Every refusal left the importer with nothing new.
@@ -331,7 +331,7 @@ func TestImportShared_RollsBackOnError(t *testing.T) {
 		owner.pool.Exec(ctx, `DROP FUNCTION IF EXISTS lw_test_reject_boom()`)     //nolint:errcheck
 	})
 
-	if _, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100); err == nil {
+	if _, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil); err == nil {
 		t.Fatal("expected the import to fail")
 	}
 	for _, q := range []string{
@@ -357,7 +357,7 @@ func TestImportShared_SkipsCardsWithoutATranslation(t *testing.T) {
 	owner.sourceWord(t, owner.user, src, "Haus", "   ")
 	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
 
-	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -25,10 +26,18 @@ type ContextService struct {
 	contexts ContextRepository
 	cards    WordCardRepository
 	p        Providers
+	words    *WordLimit // nil = no word limit
 }
 
 func NewContextService(contexts ContextRepository, cards WordCardRepository, p Providers) *ContextService {
 	return &ContextService{contexts: contexts, cards: cards, p: p}
+}
+
+// WithWordLimit turns on the limit without Telegram for every word created here (the add page, the
+// search and the photo import, which saves through the search).
+func (s *ContextService) WithWordLimit(l *WordLimit) *ContextService {
+	s.words = l
+	return s
 }
 
 // Limits of a saved word or phrase (in runes). Longer text goes through the photo import.
@@ -106,7 +115,10 @@ func (s *ContextService) Create(ctx context.Context, userID uuid.UUID, in Create
 		return nil, fmt.Errorf("%w: example too long", domain.ErrValidation)
 	}
 
-	if err := s.contexts.CreateWithCards(ctx, &c, []domain.WordCard{card}); err != nil {
+	if err := s.contexts.CreateWithCards(ctx, &c, []domain.WordCard{card}, s.words.Guard()); err != nil {
+		if errors.Is(err, domain.ErrTelegramRequired) {
+			return nil, err // the user's limit, not a failure
+		}
 		return nil, s.fail(span, "save context", err)
 	}
 	// No example entered manually: generate one in the background after saving.

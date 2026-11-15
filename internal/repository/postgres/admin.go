@@ -31,6 +31,7 @@ func (r *AdminRepository) UserStatus(ctx context.Context, id uuid.UUID) (string,
 }
 
 // ListUsers returns all users with word counts and last activity (latest review, word or story).
+// The word count is userWords, the same count the word limit without Telegram uses.
 func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT u.id, u.email, u.role, u.is_banned, u.created_at,
@@ -41,8 +42,8 @@ func (r *AdminRepository) ListUsers(ctx context.Context) ([]domain.AdminUser, er
 		       u.full_name, u.phone, u.telegram_username, u.telegram_chat_id IS NOT NULL,
 		       u.telegram_notifications, u.telegram_blocked_at IS NOT NULL
 		FROM users u
-		LEFT JOIN (SELECT user_id, count(*) AS cnt, max(created_at) AS last_at
-		           FROM word_cards GROUP BY user_id) w ON w.user_id = u.id
+		LEFT JOIN LATERAL (SELECT count(*) AS cnt, max(created_at) AS last_at
+		                   `+userWords("u.id")+`) w ON true
 		LEFT JOIN (SELECT user_id, max(reviewed_at) AS last_at
 		           FROM review_logs GROUP BY user_id) rl ON rl.user_id = u.id
 		LEFT JOIN (SELECT user_id, max(created_at) AS last_at

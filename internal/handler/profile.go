@@ -16,13 +16,19 @@ type ProfileStore interface {
 	SetProfile(ctx context.Context, id uuid.UUID, fullName string, phone *string) error
 }
 
+// WordsStatusReader is the user's word count and the limit without Telegram (service.WordLimit).
+type WordsStatusReader interface {
+	Status(ctx context.Context, userID uuid.UUID) (domain.WordsStatus, error)
+}
+
 type ProfileHandler struct {
 	store             ProfileStore
+	words             WordsStatusReader
 	telegramAvailable bool // the bot is configured (linking works)
 }
 
-func NewProfileHandler(store ProfileStore, telegramAvailable bool) *ProfileHandler {
-	return &ProfileHandler{store: store, telegramAvailable: telegramAvailable}
+func NewProfileHandler(store ProfileStore, words WordsStatusReader, telegramAvailable bool) *ProfileHandler {
+	return &ProfileHandler{store: store, words: words, telegramAvailable: telegramAvailable}
 }
 
 type telegramStatus struct {
@@ -39,25 +45,35 @@ type profileResponse struct {
 	FullName *string        `json:"full_name"`
 	Phone    *string        `json:"phone"`
 	Telegram telegramStatus `json:"telegram"`
+	// Words: the count and the limit without Telegram (limit null: none for this user — linked,
+	// admin, or the rule is off).
+	Words domain.WordsStatus `json:"words"`
 }
 
-func (h *ProfileHandler) response(p domain.Profile) profileResponse {
+func (h *ProfileHandler) response(p domain.Profile, words domain.WordsStatus) profileResponse {
 	tg := telegramStatus{Connected: p.TelegramConnected, Username: p.TelegramUsername, Available: h.telegramAvailable, Bonus: p.TelegramBonus, Notifications: p.TelegramNotifications}
 	if h.telegramAvailable {
 		tg.BonusOffer = p.TelegramBonusOffer()
 	}
-	return profileResponse{FullName: p.FullName, Phone: p.Phone, Telegram: tg}
+	return profileResponse{FullName: p.FullName, Phone: p.Phone, Telegram: tg, Words: words}
 }
 
 // Get handles GET /api/me/profile →
-// {"full_name", "phone", "telegram": {"connected", "username", "available", "bonus_offer", "bonus"}}.
+// {"full_name", "phone", "telegram": {"connected", "username", "available", "bonus_offer", "bonus"},
+// "words": {"count", "limit"}}.
 func (h *ProfileHandler) Get(c *gin.Context) {
-	p, err := h.store.Profile(c.Request.Context(), userID(c))
+	ctx := c.Request.Context()
+	p, err := h.store.Profile(ctx, userID(c))
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, h.response(p))
+	words, err := h.words.Status(ctx, userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, h.response(p, words))
 }
 
 // Update handles PUT /api/me/profile {"full_name", "phone"}. The name is required (2..80 characters);

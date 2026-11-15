@@ -137,7 +137,7 @@ func TestExampleGapAnswer_CopiedByAFolderImport(t *testing.T) {
 	owner.exec(t, `UPDATE word_cards SET example_sentence = 'Die Suppe ___ gut.', example_gap_answer = 'schmeckt' WHERE id = $1`, id)
 	tok, _ := owner.repo.EnableShare(ctx, owner.user, src)
 
-	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100)
+	res, err := me.repo.ImportShared(ctx, me.user, "de", tok, 100, nil)
 	if err != nil || res.Added != 1 {
 		t.Fatalf("import: %+v, %v", res, err)
 	}

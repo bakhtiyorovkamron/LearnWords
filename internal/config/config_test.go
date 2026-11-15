@@ -35,3 +35,25 @@ func TestLoad_PaymentEnv(t *testing.T) {
 		t.Errorf("payment config: %q %q %q", c.PaymentCardNumber, c.PaymentCardHolder, c.PaymentTelegram)
 	}
 }
+
+func TestLoad_WordsWithoutTelegram(t *testing.T) {
+	t.Setenv("JWT_SECRET", "0123456789abcdef0123456789abcdef")
+	for in, want := range map[string]int{
+		"":     50, // default
+		"50":   50,
+		" 30 ": 30,
+		"0":    0, // the rule is off
+		"off":  0,
+		"abc":  50, // a typo keeps the default, it does not switch the limit off
+		"-5":   50,
+	} {
+		t.Setenv("WORDS_WITHOUT_TELEGRAM", in)
+		c, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.WordsWithoutTelegram != want {
+			t.Errorf("WORDS_WITHOUT_TELEGRAM=%q → %d, want %d", in, c.WordsWithoutTelegram, want)
+		}
+	}
+}

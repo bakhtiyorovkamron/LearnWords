@@ -20,10 +20,13 @@ type errorResponse struct {
 	Field string `json:"field,omitempty"`
 	// FolderID: with own_folder — the caller's own folder, so the client can open it.
 	FolderID string `json:"folder_id,omitempty"`
-	// Limit: with daily_limit — the daily limit that was reached.
+	// Limit: with daily_limit — the daily limit that was reached; with telegram_required — the most
+	// words allowed without a linked Telegram.
 	Limit *int `json:"limit,omitempty"`
 	// Credits: with daily_limit — the purchased balance (always present there, also when 0).
 	Credits *int `json:"credits,omitempty"`
+	// Words: with telegram_required — how many words the user has now (always present there, also when 0).
+	Words *int `json:"words,omitempty"`
 }
 
 // requestLogAttrs: what an operator needs to find a failed request — error text, method, path
@@ -73,6 +76,13 @@ func writeError(c *gin.Context, err error) {
 		return
 	case errors.Is(err, domain.ErrFeatureDisabled):
 		c.AbortWithStatusJSON(http.StatusForbidden, errorResponse{Error: "this feature is disabled for your account", Code: "feature_disabled"})
+		return
+	case errors.Is(err, domain.ErrTelegramRequired):
+		resp := errorResponse{Error: "link Telegram to add more words", Code: "telegram_required"}
+		if limit, words, ok := domain.WordLimitOf(err); ok {
+			resp.Limit, resp.Words = &limit, &words
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, resp)
 		return
 	case errors.Is(err, domain.ErrDailyLimit):
 		resp := errorResponse{Error: "daily limit reached", Code: "daily_limit"}

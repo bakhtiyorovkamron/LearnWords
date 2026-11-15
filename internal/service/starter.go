@@ -11,9 +11,10 @@ import (
 	"learnwords/internal/starter"
 )
 
-// StarterStore saves the starter folder with all its words in one transaction.
+// StarterStore saves the starter folder with all its words in one transaction (guard: the word
+// limit, nil = off).
 type StarterStore interface {
-	CreateFolderWithContexts(ctx context.Context, f *domain.Folder, items []domain.ContextWithCards) error
+	CreateFolderWithContexts(ctx context.Context, f *domain.Folder, items []domain.ContextWithCards, guard domain.WordGuard) error
 }
 
 // StarterService gives a new user the "Introductions" folder: everyday phrases in the language they
@@ -22,6 +23,7 @@ type StarterService struct {
 	store   StarterStore
 	content *starter.Content
 	now     func() time.Time
+	words   *WordLimit // nil = no word limit
 }
 
 func NewStarterService(store StarterStore) (*StarterService, error) {
@@ -30,6 +32,13 @@ func NewStarterService(store StarterStore) (*StarterService, error) {
 		return nil, err
 	}
 	return &StarterService{store: store, content: c, now: time.Now}, nil
+}
+
+// WithWordLimit counts the starter words against the limit without Telegram like any others: a
+// starter folder larger than the limit is not given (registration still succeeds).
+func (s *StarterService) WithWordLimit(l *WordLimit) *StarterService {
+	s.words = l
+	return s
 }
 
 // StarterPartOfSpeech marks the starter cards as phrases (no lemma, no article).
@@ -64,7 +73,7 @@ func (s *StarterService) Create(ctx context.Context, userID uuid.UUID, learningL
 		}
 		items = append(items, domain.ContextWithCards{Context: c, Cards: []domain.WordCard{card}})
 	}
-	if err := s.store.CreateFolderWithContexts(ctx, folder, items); err != nil {
+	if err := s.store.CreateFolderWithContexts(ctx, folder, items, s.words.Guard()); err != nil {
 		return fmt.Errorf("create the starter folder: %w", err)
 	}
 	return nil

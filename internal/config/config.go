@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -43,6 +44,9 @@ type Config struct {
 	TelegramWebhookURL string
 	// AppTimezone: APP_TIMEZONE (default Asia/Tashkent), the clock of the automatic Telegram notifications.
 	AppTimezone string
+	// WordsWithoutTelegram: WORDS_WITHOUT_TELEGRAM (default 50), the most words a user without a
+	// linked Telegram may have. 0 switches the limit off; it is also off while the bot is not configured.
+	WordsWithoutTelegram int
 }
 
 func Load() (*Config, error) {
@@ -74,6 +78,8 @@ func Load() (*Config, error) {
 		TelegramWebhookSecret: strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_SECRET")),
 		TelegramWebhookURL:    strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_URL")),
 		AppTimezone:           env("APP_TIMEZONE", "Asia/Tashkent"),
+
+		WordsWithoutTelegram: wordLimit(os.Getenv("WORDS_WITHOUT_TELEGRAM"), 50),
 	}
 	if len(c.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be set and at least 32 characters long")
@@ -114,6 +120,22 @@ func telegramUsername(v string) string {
 		}
 	}
 	return strings.TrimSuffix(strings.TrimPrefix(v, "@"), "/")
+}
+
+// wordLimit: a count of words; "0" or "off" (see isOff) is 0 (no limit). Empty, not a number or
+// negative falls back to def: a typo must not silently switch the limit off.
+func wordLimit(v string, def int) int {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	if isOff(v) {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n < 0 {
+		return def
+	}
+	return n
 }
 
 // isOff: "false", "0", "no", "off" (any case).

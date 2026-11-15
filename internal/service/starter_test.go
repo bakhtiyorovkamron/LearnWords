@@ -16,11 +16,17 @@ type memStarterStore struct {
 	folder *domain.Folder
 	items  []domain.ContextWithCards
 	err    error
+	quota  domain.WordQuota
 }
 
-func (m *memStarterStore) CreateFolderWithContexts(_ context.Context, f *domain.Folder, items []domain.ContextWithCards) error {
+func (m *memStarterStore) CreateFolderWithContexts(_ context.Context, f *domain.Folder, items []domain.ContextWithCards, guard domain.WordGuard) error {
 	if m.err != nil {
 		return m.err
+	}
+	if guard != nil {
+		if err := guard(m.quota, len(items)); err != nil {
+			return err
+		}
 	}
 	m.folder, m.items = f, items
 	return nil

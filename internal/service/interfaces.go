@@ -18,7 +18,8 @@ type UserRepository interface {
 }
 
 type ContextRepository interface {
-	CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard) error
+	// CreateWithCards runs guard (the word limit, nil = off) inside the insert's transaction.
+	CreateWithCards(ctx context.Context, c *domain.Context, cards []domain.WordCard, guard domain.WordGuard) error
 }
 
 type WordCardRepository interface {
