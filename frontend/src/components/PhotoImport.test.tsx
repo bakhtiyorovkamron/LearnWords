@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { AxiosError, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { foldersApi, meApi, photoApi, purchasesApi, searchApi, type Me, type PhotoWord, type PurchaseOverview, type PurchaseRequest } from '../api/endpoints'
+import { foldersApi, meApi, photoApi, profileApi, purchasesApi, searchApi, type Me, type PhotoWord, type PurchaseOverview, type PurchaseRequest } from '../api/endpoints'
 import * as photoLib from '../lib/photo'
 import { handOffPhoto, takeHandedOffPhoto } from '../lib/photoHandoff'
 import * as toaster from './Toaster'
@@ -24,7 +24,17 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     searchApi: { add: vi.fn() },
     foldersApi: { list: vi.fn(), create: vi.fn() },
     purchasesApi: { overview: vi.fn(), create: vi.fn(), cancel: vi.fn() },
+    profileApi: { get: vi.fn(), update: vi.fn() },
+    telegramApi: { link: vi.fn() },
   }
+})
+
+// The connect prompt's flow reads the profile; no limit, not connected.
+const tgProfile = { full_name: null, phone: null, words: { count: 50, limit: 50 },
+  telegram: { connected: false, username: null, available: true, bonus_offer: 0, bonus: 0 } }
+const telegramRequired = (limit: number, words: number) => Object.assign(new Error('403'), {
+  isAxiosError: true,
+  response: { status: 403, data: { error: 'link Telegram to add more words', code: 'telegram_required', limit, words } },
 })
 
 const feature = (enabled: boolean, limit: number | null = null, remaining: number | null = null, credits = 0) =>
@@ -64,6 +74,7 @@ beforeEach(async () => {
   vi.mocked(foldersApi.create).mockImplementation(async (name) => ({ id: 'new-id', name, color: 'lime' }) as never)
   vi.mocked(photoApi.import).mockResolvedValue({ words, remaining: 3, credits: 0 })
   vi.mocked(searchApi.add).mockResolvedValue({} as never)
+  vi.mocked(profileApi.get).mockResolvedValue(tgProfile)
   // Buying is off unless a test turns it on (no card on the server): the screen is as before.
   vi.mocked(purchasesApi.overview).mockRejectedValue(fail(503, { error: 'payments are not configured', code: 'payments_unavailable' }))
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
@@ -492,5 +503,25 @@ describe('PhotoImport: bought photos', () => {
     expect(query.observers[0].options.refetchIntervalInBackground).toBe(false) // not while the tab is hidden
     qc.setQueryData(['purchases'], overview([request({ status: 'paid' })]))
     expect(interval(query)).toBe(false)
+  })
+})
+
+describe('PhotoImport: the word limit without Telegram', () => {
+  it('telegram_required while adding: the connect prompt instead of "could not read the photo"; the words before it stay added', async () => {
+    vi.mocked(searchApi.add).mockResolvedValueOnce({} as never).mockRejectedValueOnce(telegramRequired(50, 50))
+    renderIt()
+    await pick(png())
+    fireEvent.click(await screen.findByRole('button', { name: 'Add 2' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('You have added 50 words. Link Telegram to add without a limit.')
+    expect(within(screen.getByTestId('telegram-required')).getByRole('button', { name: 'Link Telegram' })).toBeTruthy()
+    expect(screen.queryByText(/Could not read the photo/)).toBeNull()
+    expect(searchApi.add).toHaveBeenCalledTimes(2) // stopped at the refusal
+    expect(screen.getAllByText('already added')).toHaveLength(2) // Katze (before) and der Hund (just added)
+  })
+
+  it('disabled (the page is at the limit): no photo is read, so none is used up', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(<QueryClientProvider client={qc}><MemoryRouter><PhotoImport disabled /></MemoryRouter></QueryClientProvider>)
+    expect(await screen.findByRole('button', { name: /Choose a photo/ })).toBeDisabled()
   })
 })

@@ -382,6 +382,10 @@
     "folderStats": "O‘rganilgan: {{learned}} · bugun: {{due}}",
     "noDueToday": "Bugun takrorlash yo‘q",
     "listTitle": "So‘zlar",
-    "actions": "Amallar"
+    "actions": "Amallar",
+    "limitNear": "Telegramsiz {{limit}} ta so‘z qo‘shish mumkin. Qoldi: {{left}}.",
+    "limitReached": "Siz {{limit}} ta so‘z qo‘shdingiz. Cheklovsiz qo‘shish uchun Telegramni ulang.",
+    "limitImport": "Bu papkada limitgacha qolganidan ({{left}}) ko‘p so‘z bor. Import qilish uchun Telegramni ulang.",
+    "connect": "Telegramni ulash"
   }
 }

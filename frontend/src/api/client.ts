@@ -96,8 +96,9 @@ interface ApiErrorBody {
   field?: string // with a validation error of one form field (a Telegram rule)
   message?: string
   retry_after_seconds?: number
-  limit?: number // with daily_limit
+  limit?: number // with daily_limit; with telegram_required: the words allowed without Telegram
   credits?: number // with daily_limit: the bought balance (0 = none left either)
+  words?: number // with telegram_required: how many words the user has now
 }
 
 /** True when the backend rejected the request with 429 (rate limit). */
@@ -115,6 +116,11 @@ export function rateLimitMessage(err: unknown): string {
   return body?.message ?? i18n.t('common.rateLimited', { seconds: 60 })
 }
 
+/** True when adding words was refused until Telegram is linked (403 telegram_required: the word limit). */
+export function isTelegramRequired(err: unknown): boolean {
+  return apiErrorInfo(err).code === 'telegram_required'
+}
+
 /** True for the two per-user feature errors (403 feature_disabled, 429 daily_limit). */
 export function isFeatureError(err: unknown): boolean {
   const code = apiErrorInfo(err).code
@@ -124,6 +130,7 @@ export function isFeatureError(err: unknown): boolean {
 export function errorMessage(err: unknown): string {
   const code = apiErrorInfo(err).code
   if (code === 'feature_disabled') return i18n.t('errors.featureDisabled')
+  if (code === 'telegram_required') return i18n.t('words.limitReached', { limit: apiErrorInfo(err).limit ?? '' })
   if (code === 'daily_limit') {
     const limit = (axios.isAxiosError(err) ? (err.response?.data as ApiErrorBody | undefined)?.limit : undefined) ?? ''
     return i18n.t('errors.dailyLimit', { limit })
@@ -135,9 +142,12 @@ export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : i18n.t('common.unknownError')
 }
 
-/** HTTP status, machine-readable code, (own_folder) folder id and (daily_limit) limit and credits of an API error. */
-export function apiErrorInfo(err: unknown): { status?: number; code?: string; field?: string; folderId?: string; limit?: number; credits?: number } {
+/**
+ * HTTP status, machine-readable code, (own_folder) folder id, (daily_limit) limit and credits and
+ * (telegram_required) limit and words of an API error.
+ */
+export function apiErrorInfo(err: unknown): { status?: number; code?: string; field?: string; folderId?: string; limit?: number; credits?: number; words?: number } {
   if (!axios.isAxiosError(err)) return {}
   const body = err.response?.data as ApiErrorBody | undefined
-  return { status: err.response?.status, code: body?.code, field: body?.field, folderId: body?.folder_id, limit: body?.limit, credits: body?.credits }
+  return { status: err.response?.status, code: body?.code, field: body?.field, folderId: body?.folder_id, limit: body?.limit, credits: body?.credits, words: body?.words }
 }

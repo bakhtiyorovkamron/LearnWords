@@ -382,6 +382,10 @@
     "folderStats": "{{learned}} learned · {{due}} due today",
     "noDueToday": "Nothing due today",
     "listTitle": "Words",
-    "actions": "Actions"
+    "actions": "Actions",
+    "limitNear": "Without Telegram you can add {{limit}} words. Left: {{left}}.",
+    "limitReached": "You have added {{limit}} words. Link Telegram to add without a limit.",
+    "limitImport": "This folder has more words than you have left ({{left}}). Link Telegram to import it.",
+    "connect": "Link Telegram"
   }
 }

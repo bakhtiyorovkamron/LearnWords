@@ -4,7 +4,7 @@ import { Camera, Check, CircleAlert, Clock, Folder as FolderIcon, ShoppingBag } 
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { foldersApi, photoApi, searchApi, type Me, type PhotoImportResult, type PhotoWord, type PurchaseOverview } from '../api/endpoints'
-import { apiErrorInfo, errorMessage, isFeatureError } from '../api/client'
+import { apiErrorInfo, errorMessage, isFeatureError, isTelegramRequired } from '../api/client'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
@@ -14,6 +14,7 @@ import { pendingRequest, usePurchaseOverview } from '../lib/purchases'
 import { BuySheet, type BuyMode } from './BuySheet'
 import { FOLDER_COLORS, FolderSelect, useFolders } from './Folders'
 import { toast } from './Toaster'
+import { TelegramRequiredPrompt } from './WordLimitNotice'
 
 /**
  * "Add from a photo": take or choose a picture of a textbook page, review the words found, add the
@@ -65,7 +66,11 @@ function todayLabel(d = new Date()): string {
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}`
 }
 
-export function PhotoImport() {
+/**
+ * disabled: the user is at the word limit without Telegram (the page says so above): no photo is read
+ * — it would use up a photo for words that cannot be added — and nothing is added.
+ */
+export function PhotoImport({ disabled = false }: { disabled?: boolean } = {}) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const qc = useQueryClient()
@@ -143,7 +148,8 @@ export function PhotoImport() {
       setResult(null)
     },
     onSettled: () => {
-      for (const k of ['contexts', 'cards', 'collection', 'review-due', 'folders', 'stories', 'stats']) {
+      // 'profile': the word count (and the limit without Telegram, also after a telegram_required).
+      for (const k of ['contexts', 'cards', 'collection', 'review-due', 'folders', 'stories', 'stats', 'profile']) {
         void qc.invalidateQueries({ queryKey: [k] })
       }
     },
@@ -168,7 +174,7 @@ export function PhotoImport() {
   // A photo chosen on the Home page: read it right away, once.
   useEffect(() => {
     const file = takeHandedOffPhoto()
-    if (file && isOn('photo_import')) choose(file)
+    if (file && isOn('photo_import') && !disabled) choose(file)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -207,7 +213,9 @@ export function PhotoImport() {
   // Photos rejected before or after the AI look: the daily limit was not used.
   const rejection = err instanceof PhotoQualityError ? REJECTIONS[err.reason] : REJECTION_CODES[apiErrorInfo(err).code ?? '']
   const limitInSheet = canBuy && apiErrorInfo(err).code === 'daily_limit' // the sheet says it instead
-  if (err && !localError && !limitInSheet) {
+  // The word limit without Telegram: the connect card instead of an error (the words before it are added).
+  const wordLimitHit = isTelegramRequired(add.error)
+  if (err && !localError && !limitInSheet && !wordLimitHit) {
     const status = apiErrorInfo(err).status
     shown = rejection ? t(rejection)
       : isFeatureError(err) ? errorMessage(err)
@@ -225,7 +233,7 @@ export function PhotoImport() {
       <div className="flex flex-wrap items-center gap-3">
         <input ref={input} type="file" accept="image/*" className="hidden" data-testid="photo-input"
           onChange={(e) => choose(e.target.files?.[0])} />
-        <button type="button" className="btn-primary" disabled={read.isPending || add.isPending || exhausted}
+        <button type="button" className="btn-primary" disabled={read.isPending || add.isPending || exhausted || disabled}
           onClick={() => input.current?.click()}>
           {read.isPending ? t('photo.reading') : (
             <><Camera size={18} aria-hidden="true" />{result ? t('photo.another') : t('photo.choose')}</>
@@ -317,13 +325,18 @@ export function PhotoImport() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="btn-primary" disabled={!chosen.length || add.isPending}
+            <button type="button" className="btn-primary" disabled={!chosen.length || add.isPending || disabled}
               onClick={() => add.mutate(chosen)}>
               {add.isPending ? t('photo.adding') : t('photo.add', { count: chosen.length })}
             </button>
           </div>
         </div>
       ))}
+
+      {/* disabled: the page's card above says it already. */}
+      {wordLimitHit && !disabled && (
+        <TelegramRequiredPrompt announce text={t('words.limitReached', { limit: apiErrorInfo(add.error).limit ?? '' })} />
+      )}
 
       {shown && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger">

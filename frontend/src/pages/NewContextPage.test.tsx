@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { contextsApi, foldersApi, meApi, wordCheckApi, wordsApi } from '../api/endpoints'
+import { contextsApi, foldersApi, meApi, profileApi, telegramApi, wordCheckApi, wordsApi, type Profile } from '../api/endpoints'
 import * as toaster from '../components/Toaster'
 import { NewContextPage } from './NewContextPage'
 
@@ -17,7 +17,15 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     photoApi: { import: vi.fn() },
     wordCheckApi: { check: vi.fn() },
     wordsApi: { generateExample: vi.fn() },
+    profileApi: { get: vi.fn(), update: vi.fn() },
+    telegramApi: { link: vi.fn() },
   }
+})
+
+// GET /me/profile: the word count and the limit without Telegram (null = none).
+const profileWith = (count: number, limit: number | null, connected = false): Profile => ({
+  full_name: null, phone: null, words: { count, limit },
+  telegram: { connected, username: null, available: true, bonus_offer: 0, bonus: 0 },
 })
 const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
 
@@ -47,9 +55,10 @@ beforeEach(async () => {
     context: { id: 'ctx1', source_text: 'Ich freue mich' },
     cards: [{ id: 'c1', word: 'Ich freue mich' }],
   } as never)
+  vi.mocked(profileApi.get).mockResolvedValue(profileWith(3, null))
   vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('NewContextPage', () => {
   it('after saving it stays on the page, clears the form but keeps the folder, and offers to open it', async () => {
@@ -155,5 +164,62 @@ describe('NewContextPage: the generate button on phones', () => {
     expect(row.className).toContain('sm:flex-row')
     expect(row.className).toContain('sm:justify-between')
     expect(row.querySelector('label')).toBeTruthy() // the label is its own line, not inside the button
+  })
+})
+
+describe('NewContextPage: the word limit without Telegram', () => {
+  const fields = () => screen.getByTestId('new-word-fields') as HTMLFieldSetElement
+  const choosePhoto = () => screen.getByRole('button', { name: /Choose a photo/ }) as HTMLButtonElement
+
+  it('at the limit the form and the photo import are disabled; once the profile says connected they work again, no reload', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const tab = { location: { href: '' }, opener: window, closed: false, close: vi.fn() }
+    vi.stubGlobal('open', vi.fn(() => tab))
+    vi.mocked(telegramApi.link).mockResolvedValue({ url: 'https://t.me/yodla_bot?start=YL-1', expires_at: '' })
+    vi.mocked(profileApi.get).mockResolvedValue(profileWith(50, 50))
+    try {
+      renderPage()
+      expect((await screen.findByTestId('telegram-required')).textContent).toContain('You have added 50 words.')
+      expect(fields().disabled).toBe(true)
+      expect(textbox()).toBeDisabled()
+      expect(screen.getByRole('button', { name: /^Add$/ })).toBeDisabled()
+      expect(choosePhoto()).toBeDisabled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Link Telegram' }))
+      await waitFor(() => expect(tab.location.href).toBe('https://t.me/yodla_bot?start=YL-1'))
+      vi.mocked(profileApi.get).mockResolvedValue(profileWith(50, null, true))
+      await act(() => vi.advanceTimersByTimeAsync(3_000)) // the connect flow polls the profile
+
+      await waitFor(() => expect(screen.queryByTestId('telegram-required')).toBeNull())
+      expect(fields().disabled).toBe(false)
+      expect(textbox()).not.toBeDisabled()
+      expect(choosePhoto()).not.toBeDisabled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a few words before the limit: the quiet line, the form still works', async () => {
+    vi.mocked(profileApi.get).mockResolvedValue(profileWith(42, 50))
+    renderPage()
+    expect((await screen.findByTestId('word-limit-near')).textContent).toContain('Left: 8.')
+    expect(fields().disabled).toBe(false)
+  })
+
+  it('telegram_required on save: the connect prompt instead of a raw error', async () => {
+    vi.mocked(profileApi.get).mockResolvedValue(profileWith(49, 50)) // the cache did not know yet
+    vi.mocked(contextsApi.create).mockRejectedValue(Object.assign(new Error('403'), {
+      isAxiosError: true,
+      response: { status: 403, data: { error: 'link Telegram to add more words', code: 'telegram_required', limit: 50, words: 50 } },
+    }))
+    renderPage()
+    await screen.findByTestId('word-limit-near')
+    fireEvent.change(textbox(), { target: { value: 'Hund' } })
+    fireEvent.change(field(/mean/i), { target: { value: 'собака' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/ }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('You have added 50 words. Link Telegram to add without a limit.')
+    expect(within(screen.getByTestId('telegram-required')).getByRole('button', { name: 'Link Telegram' })).toBeTruthy()
+    expect(screen.queryByText('link Telegram to add more words')).toBeNull()
   })
 })

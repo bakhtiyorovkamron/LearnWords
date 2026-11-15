@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { authApi, sharedApi } from '../api/endpoints'
+import { authApi, profileApi, sharedApi } from '../api/endpoints'
 import * as toaster from '../components/Toaster'
 import { AuthPage } from './AuthPage'
 import { SharedFolderPage } from './SharedFolderPage'
@@ -17,7 +17,17 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     sharedApi: { get: vi.fn(), import: vi.fn() },
     authApi: { login: vi.fn(), register: vi.fn() },
     settingsApi: { get: vi.fn().mockResolvedValue({}), setLanguage: vi.fn() },
+    profileApi: { get: vi.fn(), update: vi.fn() },
+    telegramApi: { link: vi.fn() },
   }
+})
+
+// The connect prompt's flow reads the profile; no limit, not connected.
+const tgProfile = { full_name: null, phone: null, words: { count: 50, limit: 50 },
+  telegram: { connected: false, username: null, available: true, bonus_offer: 0, bonus: 0 } }
+const telegramRequired = (limit: number, words: number) => Object.assign(new Error('403'), {
+  isAxiosError: true,
+  response: { status: 403, data: { error: 'link Telegram to add more words', code: 'telegram_required', limit, words } },
 })
 
 const TOKEN = 'aB3dE5gH7k'
@@ -58,6 +68,7 @@ beforeEach(async () => {
   toast = vi.spyOn(toaster, 'toast').mockImplementation(() => undefined)
   vi.mocked(sharedApi.get).mockResolvedValue(shared)
   vi.mocked(sharedApi.import).mockResolvedValue({ folder_id: 'new-folder', added: 2, skipped: 0 })
+  vi.mocked(profileApi.get).mockResolvedValue(tgProfile)
   vi.mocked(authApi.login).mockImplementation(async () => { authed = true; return {} as never })
   vi.mocked(authApi.register).mockImplementation(async () => { authed = true; return {} as never })
 })
@@ -139,5 +150,18 @@ describe('/s/:token', () => {
     vi.mocked(sharedApi.get).mockRejectedValue(Object.assign(new Error('x'), { isAxiosError: true, response: { status: 404, data: {} } }))
     renderApp()
     expect(await screen.findByText('This link is invalid or was turned off')).toBeTruthy()
+  })
+})
+
+describe('/s/:token: the word limit without Telegram', () => {
+  it('a folder that does not fit: says how many words are left, with the connect button; nothing is imported', async () => {
+    authed = true
+    vi.mocked(sharedApi.import).mockRejectedValue(telegramRequired(50, 45))
+    renderApp()
+    fireEvent.click(await screen.findByRole('button', { name: /Add to my words/ }))
+    expect((await screen.findByRole('alert')).textContent).toBe('This folder has more words than you have left (5). Link Telegram to import it.')
+    expect(within(screen.getByTestId('telegram-required')).getByRole('button', { name: 'Link Telegram' })).toBeTruthy()
+    expect(screen.queryByText(/Could not save/)).toBeNull()
+    expect(toast).not.toHaveBeenCalled()
   })
 })

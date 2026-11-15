@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Folder as FolderIcon, Plus, Search, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { searchApi, type WordInfo } from '../api/endpoints'
-import { errorMessage, isFeatureError, isRateLimited, rateLimitMessage } from '../api/client'
+import { apiErrorInfo, errorMessage, isFeatureError, isRateLimited, isTelegramRequired, rateLimitMessage } from '../api/client'
 import { FolderSelect } from '../components/Folders'
+import { TelegramRequiredPrompt } from '../components/WordLimitNotice'
 import { toast } from '../components/Toaster'
 import { useLearningLang } from '../lib/learningLang'
 import { useFeatures } from '../lib/features'
@@ -119,11 +120,14 @@ function WordResult({ info }: { info: WordInfo }) {
     onSuccess: () => {
       setAdded(true)
       toast(t('search.added'))
-      for (const k of ['contexts', 'cards', 'collection', 'review-due', 'folders', 'stories', 'stats']) {
+      for (const k of ['contexts', 'cards', 'collection', 'review-due', 'folders', 'stories', 'stats', 'profile']) {
         qc.invalidateQueries({ queryKey: [k] })
       }
     },
-    onError: (e) => { if (status(e) === 409) setAdded(true) }, // added meanwhile (other tab)
+    onError: (e) => {
+      if (status(e) === 409) setAdded(true) // added meanwhile (other tab)
+      if (isTelegramRequired(e)) void qc.invalidateQueries({ queryKey: ['profile'] }) // the add page's notice
+    },
   })
 
   const row = (label: string, value: string | null) => value && (
@@ -244,7 +248,9 @@ function WordResult({ info }: { info: WordInfo }) {
             : add.isPending ? t('search.adding') : <><Plus size={18} aria-hidden="true" />{t('search.add')}</>}
         </button>
       </footer>
-      {add.error && status(add.error) !== 409 && (
+      {add.error && isTelegramRequired(add.error) ? (
+        <TelegramRequiredPrompt announce text={t('words.limitReached', { limit: apiErrorInfo(add.error).limit ?? '' })} />
+      ) : add.error && status(add.error) !== 409 && (
         <p className="text-sm text-danger">{isRateLimited(add.error) ? rateLimitMessage(add.error) : t('search.addFailed', { error: errorMessage(add.error) })}</p>
       )}
     </article>

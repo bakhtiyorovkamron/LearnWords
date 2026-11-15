@@ -12,6 +12,7 @@ import { Logo } from '../components/Logo'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { FolderDot } from '../components/Folders'
 import { toast } from '../components/Toaster'
+import { TelegramRequiredPrompt } from '../components/WordLimitNotice'
 
 // «Import after login»: set when a logged-out visitor presses «Add to my words», read once after
 // they come back from /login or /register (a reload or the register redirect must not lose it).
@@ -46,7 +47,7 @@ export function SharedFolderPage() {
     mutationFn: () => sharedApi.import(token),
     onSuccess: (res) => {
       // The same caches that adding words refreshes, plus stats / hero / the training queue.
-      for (const key of ['contexts', 'cards', 'stories', 'folders', 'collection', 'stats', 'hero', 'review-due']) {
+      for (const key of ['contexts', 'cards', 'stories', 'folders', 'collection', 'stats', 'hero', 'review-due', 'profile']) {
         void qc.invalidateQueries({ queryKey: [key] })
       }
       toast(t('shared.added', { added: res.added, skipped: res.skipped }))
@@ -75,8 +76,11 @@ export function SharedFolderPage() {
 
   const notFound = folder.isError && apiErrorInfo(folder.error).status === 404
   const failure = importFolder.error ? apiErrorInfo(importFolder.error) : null
+  // The folder does not fit the word limit without Telegram (nothing was imported): how many would.
+  const limitHit = failure?.code === 'telegram_required'
+  const left = Math.max(0, (failure?.limit ?? 0) - (failure?.words ?? 0))
   let failureText: string | null = null
-  if (failure) {
+  if (failure && !limitHit) {
     failureText = failure.status === 404 ? t('shared.notFound')
       : failure.code === 'own_folder' ? t('shared.own')
       : failure.code === 'lang_mismatch' ? t('shared.langMismatch')
@@ -112,6 +116,7 @@ export function SharedFolderPage() {
                 {importFolder.isPending ? t('common.loading')
                   : <><Download size={18} aria-hidden="true" />{isAuthenticated ? t('shared.add') : t('shared.loginToAdd')}</>}
               </button>
+              {limitHit && <TelegramRequiredPrompt announce text={t('words.limitImport', { left })} />}
               {failureText && (
                 <div className="rounded-xl border border-danger bg-surface-2 px-4 py-2 text-sm text-danger" role="alert">
                   {failureText}

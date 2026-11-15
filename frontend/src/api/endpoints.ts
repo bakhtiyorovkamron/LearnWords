@@ -289,6 +289,11 @@ export interface Profile {
     /** The user's own switch for broadcasts (news and reminders) in Telegram. */
     notifications?: boolean // absent (an older server) counts as on
   }
+  /**
+   * The user's words and the limit without Telegram: limit null = none for this user (Telegram
+   * linked, an admin, or the rule is off). Absent on an older server: no limit.
+   */
+  words?: { count: number; limit: number | null }
 }
 
 export const profileApi = {

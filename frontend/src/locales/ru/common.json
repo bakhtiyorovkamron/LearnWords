@@ -390,6 +390,10 @@
     "folderStats": "Выучено: {{learned}} · на сегодня: {{due}}",
     "noDueToday": "На сегодня слов нет",
     "listTitle": "Слова",
-    "actions": "Действия"
+    "actions": "Действия",
+    "limitNear": "Без Telegram можно добавить {{limit}} слов. Осталось: {{left}}.",
+    "limitReached": "Вы добавили {{limit}} слов. Подключите Telegram, чтобы добавлять без ограничений.",
+    "limitImport": "В этой папке больше слов, чем осталось до лимита ({{left}}). Подключите Telegram, чтобы импортировать её.",
+    "connect": "Подключить Telegram"
   }
 }
