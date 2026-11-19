@@ -627,6 +627,20 @@ export const reviewApi = {
     api.post<Progress>(`/review/${id}/answer`, { correct }).then((r) => r.data),
 }
 
+export type PracticeMode = 'hard' | 'random' | 'recent'
+
+// Free practice after the daily review: the whole collection (or one folder), never touches the
+// Leitner boxes. exclude = the words just asked (≤ 50), left out of the batch.
+export const practiceApi = {
+  words: (mode: PracticeMode, folder: FolderSelection = '', limit: SessionSize = '20', exclude: string[] = []) =>
+    api
+      .get<{ cards: DueCard[] }>('/practice/words', {
+        params: { mode, limit, folder_id: folder || undefined, exclude_ids: exclude.length ? exclude.slice(0, 50).join(',') : undefined },
+      })
+      .then((r) => r.data.cards),
+  answer: (id: string, correct: boolean) => api.post(`/practice/${id}/answer`, { correct }).then(() => undefined),
+}
+
 
 export const cardsApi = {
   list: () => api.get<Page<WordCard>>('/word-cards', { params: { limit: 100 } }).then((r) => r.data.items),

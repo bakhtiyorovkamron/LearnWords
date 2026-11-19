@@ -2,8 +2,10 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"learnwords/internal/service"
 )
@@ -17,13 +19,21 @@ func NewPracticeHandler(svc *service.ReviewService) *PracticeHandler {
 	return &PracticeHandler{svc: svc}
 }
 
-// Words handles GET /api/practice/words?mode=hard|random|recent&limit=10|20|50|all[&folder_id=].
+// MaxPracticeExclude caps exclude_ids: the client sends the words it asked last, never more.
+const MaxPracticeExclude = 50
+
+// Words handles GET /api/practice/words?mode=hard|random|recent&limit=10|20|50|all[&folder_id=]
+// [&exclude_ids=<uuid>,<uuid>,...] — the excluded words (the ones just asked) are left out.
 func (h *PracticeHandler) Words(c *gin.Context) {
 	folder, ok := parseFolderFilter(c)
 	if !ok {
 		return
 	}
-	cards, err := h.svc.Practice(c.Request.Context(), userID(c), c.Query("mode"), c.Query("limit"), folder)
+	exclude, ok := parseExcludeIDs(c)
+	if !ok {
+		return
+	}
+	cards, err := h.svc.Practice(c.Request.Context(), userID(c), c.Query("mode"), c.Query("limit"), folder, exclude)
 	if err != nil {
 		writeError(c, err)
 		return
@@ -50,4 +60,27 @@ func (h *PracticeHandler) Answer(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// parseExcludeIDs reads exclude_ids: comma separated uuids, at most MaxPracticeExclude; empty
+// parts are skipped, an invalid id or too many → 400.
+func parseExcludeIDs(c *gin.Context) ([]uuid.UUID, bool) {
+	var ids []uuid.UUID
+	for _, part := range strings.Split(c.Query("exclude_ids"), ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		id, err := uuid.Parse(part)
+		if err != nil {
+			badRequest(c, "invalid exclude_ids")
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) > MaxPracticeExclude {
+		badRequest(c, "too many exclude_ids")
+		return nil, false
+	}
+	return ids, true
 }

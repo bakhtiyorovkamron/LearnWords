@@ -25,6 +25,10 @@ interface Props {
   onNext: () => void
   corner?: ReactNode // the training hero, left of the question label
   progress?: Progress | null // the server's answer to this question (box and next review); review mode
+  // Free practice: no end, so a counter of the answers instead of "3/10", the badge above the
+  // question, and the exit button calls onExit instead of going Home.
+  practice?: { answered: number; correct: number }
+  onExit?: () => void
 }
 
 const BOX_SEGMENTS = 5
@@ -34,7 +38,7 @@ const BOX_SEGMENTS = 5
 //
 // Every format uses the card's OWN stored translation (and example translation) — whatever the
 // interface language is now; nothing is looked up or generated at training time.
-export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner, progress }: Props) {
+export function QuizQuestion({ item, pool, position, total, saving, error, onAnswer, onNext, corner, progress, practice, onExit }: Props) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const learning = useLearningLang()
@@ -103,16 +107,31 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
   return (
     <div className={`mx-auto max-w-xl ${answered ? 'pb-72' : ''}`}>
       <div className="flex h-11 items-center gap-3">
-        <button type="button" onClick={() => navigate('/')} aria-label={t('training.exit')} title={t('training.exit')}
+        <button type="button" onClick={onExit ?? (() => navigate('/'))} aria-label={t('training.exit')} title={t('training.exit')}
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted transition hover:bg-surface-2">
           <X size={22} aria-hidden="true" />
         </button>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-track" role="progressbar"
-          aria-valuemin={0} aria-valuemax={total} aria-valuenow={position - (answered ? 0 : 1)}>
-          <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${doneShare}%` }} />
-        </div>
-        <span className="text-sm tabular-nums text-muted">{position}/{total}</span>
+        {practice ? (
+          <span data-testid="practice-counter" className="flex-1 text-right text-sm tabular-nums text-muted">
+            {t('practice.answered', { count: practice.answered, correct: practice.correct })}
+          </span>
+        ) : (
+          <>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-track" role="progressbar"
+              aria-valuemin={0} aria-valuemax={total} aria-valuenow={position - (answered ? 0 : 1)}>
+              <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${doneShare}%` }} />
+            </div>
+            <span className="text-sm tabular-nums text-muted">{position}/{total}</span>
+          </>
+        )}
       </div>
+
+      {practice && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span data-testid="practice-badge" className="rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold text-accent-text">{t('practice.badge')}</span>
+          <span className="text-xs text-muted">{t('practice.badgeHint')}</span>
+        </div>
+      )}
 
       <div className="mt-4 flex items-center gap-3">
         {corner}
@@ -212,7 +231,7 @@ export function QuizQuestion({ item, pool, position, total, saving, error, onAns
           {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
           <button type="button" autoFocus disabled={saving} onClick={onNext} className="btn-primary mt-4 h-[52px] w-full rounded-[14px]">
-            {position === total ? t('quiz.finish') : t('training.continue')}
+            {!practice && position === total ? t('quiz.finish') : t('training.continue')}
           </button>
         </div>
       )}

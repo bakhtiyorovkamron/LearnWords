@@ -23,6 +23,10 @@ interface Props {
   moreCount?: number
   onMore?: () => void
   moreLoading?: boolean
+  // Offered "Keep training" (free practice): the ghost next to "N more", the primary when nothing is due.
+  onPractice?: () => void
+  // The end of free practice: its numbers, no "N more"; the goal is today's, unchanged by practice.
+  practice?: boolean
 }
 
 function MistakeRow({ card }: { card: DueCard }) {
@@ -51,7 +55,7 @@ function MistakeRow({ card }: { card: DueCard }) {
  * The end of a session: the goal ring, this week with the streak, three numbers, the words that were
  * missed, and what to do next. The week and the streak are live (the stats refetch after the answers).
  */
-export function ReviewResult({ correct, total, mistakes, bestStreak, minutes, goal, moreCount = 0, onMore, moreLoading }: Props) {
+export function ReviewResult({ correct, total, mistakes, bestStreak, minutes, goal, moreCount = 0, onMore, moreLoading, onPractice, practice = false }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const g = useTodayGoal()
@@ -59,7 +63,8 @@ export function ReviewResult({ correct, total, mistakes, bestStreak, minutes, go
   const wrong = total - correct
   const met = goal.done >= goal.target
   const shown = expanded ? mistakes : mistakes.slice(0, FIRST_MISTAKES)
-  const hasMore = moreCount > 0
+  const hasMore = !practice && moreCount > 0
+  const canPractice = !practice && !!onPractice
   const min = t('result.minutes', { count: minutes })
 
   const subtitle = met
@@ -70,7 +75,16 @@ export function ReviewResult({ correct, total, mistakes, bestStreak, minutes, go
 
   const primary = 'btn-primary h-[52px] w-full rounded-[14px]'
   const ghost = 'btn-ghost h-[52px] w-full rounded-[14px]'
-  const done = <button type="button" onClick={() => navigate('/')} className={met || !hasMore ? primary : ghost}>{t('home.sheetDone')}</button>
+  // Nothing due any more: "Keep training" leads, Done steps back.
+  const practiceFirst = canPractice && !hasMore
+  const done = (
+    <button type="button" onClick={() => navigate('/')} className={!practiceFirst && (met || !hasMore) ? primary : ghost}>{t('home.sheetDone')}</button>
+  )
+  const keepTraining = canPractice && (
+    <button type="button" onClick={onPractice} className={practiceFirst ? primary : ghost}>
+      {t('practice.more')}<ArrowRight size={18} aria-hidden="true" />
+    </button>
+  )
   const more = hasMore && (
     <button type="button" onClick={onMore} disabled={moreLoading} className={`${met ? ghost : primary} disabled:opacity-60`}>
       {moreLoading ? t('common.loading') : <>{moreLabel}<ArrowRight size={18} aria-hidden="true" /></>}
@@ -136,7 +150,7 @@ export function ReviewResult({ correct, total, mistakes, bestStreak, minutes, go
       )}
 
       <div className="mt-auto space-y-2.5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-6">
-        {met ? <>{done}{more}</> : <>{more}{done}</>}
+        {practiceFirst ? <>{keepTraining}{done}</> : met ? <>{done}{more}{keepTraining}</> : <>{more}{done}{keepTraining}</>}
       </div>
     </div>
   )

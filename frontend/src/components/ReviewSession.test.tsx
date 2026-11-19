@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { cardsApi, foldersApi, heroApi, meApi, reviewApi, settingsApi, statsApi } from '../api/endpoints'
+import { cardsApi, foldersApi, heroApi, meApi, practiceApi, reviewApi, settingsApi, statsApi } from '../api/endpoints'
 import type { DueCard, WordCard } from '../api/types'
 import { ContextsPage } from '../pages/ContextsPage'
 import { ReviewSession } from './ReviewSession'
@@ -14,6 +14,7 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     ...mod,
     meApi: { get: vi.fn() },
     reviewApi: { due: vi.fn(), answer: vi.fn() },
+    practiceApi: { words: vi.fn(), answer: vi.fn() },
     cardsApi: { list: vi.fn() },
     foldersApi: { list: vi.fn() },
     heroApi: { ...mod.heroApi, get: vi.fn() },
@@ -56,6 +57,8 @@ beforeEach(async () => {
   vi.mocked(cardsApi.list).mockResolvedValue([1, 2, 3, 4].map(card))
   vi.mocked(reviewApi.due).mockResolvedValue({ cards: [due(1)], total: 1 })
   vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 2, is_learned: false } as never)
+  vi.mocked(practiceApi.answer).mockResolvedValue(undefined)
+  servePractice(100)
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
@@ -111,16 +114,16 @@ describe('ReviewSession: /train starts at once', () => {
 })
 
 describe('ReviewSession: nothing due', () => {
-  it('a card with the hero icon, the come-back text and a link Home — and no practice button', async () => {
+  it('a card with the hero icon, the primary "Train", the come-back hint under it and a link Home', async () => {
     vi.mocked(reviewApi.due).mockResolvedValue({ cards: [], total: 0 })
     renderSession('/train?size=12')
     expect(await screen.findByText('No words to review today')).toBeTruthy()
+    expect((await screen.findByRole('button', { name: 'Train' })).className).toContain('btn-primary')
     expect(screen.getByText('Come back tomorrow or add new words.')).toBeTruthy()
     const home = screen.getByRole('link', { name: 'Back to home' })
     expect(home.getAttribute('href')).toBe('/')
-    expect(home.className).toContain('btn-primary')
+    expect(home.className).toContain('btn-ghost')
     expect(screen.queryByRole('progressbar')).toBeNull()
-    expect(screen.queryByRole('button', { name: /Practice/ })).toBeNull()
   })
 
   it('in a folder the text says so', async () => {
@@ -221,11 +224,12 @@ describe('ReviewSession: the result', () => {
     expect(screen.getByRole('button', { name: /1 word more/ })).toBeTruthy()
   })
 
-  it('nothing is left: only "Done", as the primary button', async () => {
+  it('nothing is left: "Keep training" is the primary button, "Done" the ghost, no "N more"', async () => {
     await finish(2, '2')
     await screen.findByText('Training complete')
-    expect(screen.queryByRole('button', { name: /more/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-primary')
+    expect(screen.queryByRole('button', { name: /words more/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Keep training' }).className).toContain('btn-primary')
+    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-ghost')
   })
 
   it('"more" asks the next portion with the same folder and size', async () => {
@@ -328,5 +332,153 @@ describe('ReviewSession: the screens use icons, not emoji', () => {
     renderSession('/train')
     await screen.findByText('No words to review today')
     expect(document.querySelector('svg.text-accent-text')).not.toBeNull()
+  })
+})
+
+// The practice server: a collection of `total` words, at most `batch` per request, without the excluded ones.
+function servePractice(total: number, batch = 20) {
+  vi.mocked(practiceApi.words).mockImplementation(async (_mode, _folder, _limit, exclude = []) =>
+    Array.from({ length: total }, (_, i) => due(i + 1)).filter((c) => !exclude.includes(c.id)).slice(0, batch))
+}
+
+/** Answers the question on screen (right or wrong, or by the word), presses Continue and returns the word asked. */
+async function answerOne(how: boolean | ((word: string) => boolean) = true): Promise<string> {
+  const word = (await screen.findByText(/^Wort\d+$/)).textContent!
+  const right = typeof how === 'function' ? how(word) : how
+  const options = await screen.findAllByRole('button', { name: /слово\d/ })
+  fireEvent.click(options.find((o) => right === (o.textContent === `слово${word.slice(4)}`))!)
+  fireEvent.click(await screen.findByRole('button', { name: 'Continue' }))
+  return word
+}
+
+describe('ReviewSession: free practice', () => {
+  async function finishReview() {
+    vi.mocked(reviewApi.due).mockResolvedValue({ cards: [due(1)], total: 1 })
+    vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 2, is_learned: false, next_review_at: '2030-01-01' } as never)
+    renderSession('/train?size=1')
+    const options = await screen.findAllByRole('button', { name: /слово\d/ })
+    fireEvent.click(options.find((o) => o.textContent === 'слово1')!)
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish' }))
+    await screen.findByText(/Training complete|Goal reached/)
+  }
+
+  it('after the last due word "Keep training" starts practice; its answers go to practiceApi, never reviewApi', async () => {
+    await finishReview()
+    expect(reviewApi.answer).toHaveBeenCalledTimes(1)
+    vi.mocked(reviewApi.answer).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep training' }))
+    expect(await screen.findByTestId('practice-badge')).toBeTruthy()
+    expect(screen.getByText('Answers do not change your review schedule')).toBeTruthy()
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.getByTestId('practice-counter').textContent).toBe('Answers: 0 · correct 0')
+    // The due word just answered is not brought straight back.
+    expect(practiceApi.words).toHaveBeenCalledWith('hard', '', '20', ['c1'])
+    const first = await answerOne(true)
+    expect(first).not.toBe('Wort1')
+    await answerOne(false)
+    await waitFor(() => expect(practiceApi.answer).toHaveBeenCalledTimes(2))
+    expect(practiceApi.answer).toHaveBeenNthCalledWith(1, 'c2', true)
+    expect(reviewApi.answer).not.toHaveBeenCalled()
+    expect(screen.getByTestId('practice-counter').textContent).toBe('Answers: 2 · correct 1')
+  })
+
+  it('"End training" shows the practice result: its numbers, no "N more", no "Keep training"; the goal is unchanged', async () => {
+    renderSession('/train?mode=practice')
+    await answerOne(true)
+    await answerOne(true)
+    await answerOne(false)
+    fireEvent.click(screen.getByRole('button', { name: 'End training' }))
+    expect(await screen.findByText('Training complete')).toBeTruthy()
+    expect(screen.getByText('20 words to the goal · 1 min')).toBeTruthy() // practice adds nothing to the goal
+    expect(screen.getByText('correct').previousElementSibling!.textContent).toBe('2')
+    expect(screen.getByText('wrong').previousElementSibling!.textContent).toBe('1')
+    expect(screen.getByTestId('mistakes').textContent).toContain('Wort3')
+    expect(screen.queryByRole('button', { name: /words more|Keep training/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-primary')
+    expect(reviewApi.answer).not.toHaveBeenCalled()
+  })
+
+  it('with nothing due the empty screen starts practice', async () => {
+    vi.mocked(reviewApi.due).mockResolvedValue({ cards: [], total: 0 })
+    renderSession('/train')
+    fireEvent.click(await screen.findByRole('button', { name: 'Train' }))
+    expect(await screen.findByTestId('practice-badge')).toBeTruthy()
+    await answerOne()
+    await waitFor(() => expect(practiceApi.answer).toHaveBeenCalledTimes(1))
+    expect(reviewApi.answer).not.toHaveBeenCalled()
+  })
+
+  it('/train?mode=practice opens practice directly, in the folder of the link', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 500, due_today: 30 }, folders: [{ id: 'f1', total: 10 }] } as never)
+    renderSession('/train?mode=practice&folder=f1')
+    expect(await screen.findByTestId('practice-badge')).toBeTruthy()
+    expect(practiceApi.words).toHaveBeenCalledWith('hard', 'f1', '20', [])
+    expect(where()).toBe('/train?mode=practice&folder=f1')
+  })
+
+  it('the next batch is asked before the current one ends: hard first, then random and hard in turn', async () => {
+    servePractice(100, 5)
+    renderSession('/train?mode=practice')
+    await screen.findByText(/^Wort\d+$/) // the 1st on screen, 4 queued
+    expect(practiceApi.words).toHaveBeenCalledTimes(1)
+    await answerOne() // the 2nd on screen, 3 left after it → the next batch is on its way
+    await waitFor(() => expect(practiceApi.words).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText(/^Wort\d+$/)).toBeTruthy()
+    expect(vi.mocked(practiceApi.words).mock.calls[1][0]).toBe('random')
+    expect(vi.mocked(practiceApi.words).mock.calls[1][3]).toEqual(expect.arrayContaining(['c1', 'c2', 'c3', 'c4', 'c5']))
+    for (let i = 0; i < 5; i++) await answerOne()
+    await waitFor(() => expect(practiceApi.words).toHaveBeenCalledTimes(3))
+    expect(vi.mocked(practiceApi.words).mock.calls[2][0]).toBe('hard')
+    expect(screen.queryByText(/^Wort\d+$/)).toBeTruthy() // never a loading screen in between
+  })
+
+  it('a large collection: no word comes back within 15 questions', async () => {
+    servePractice(100)
+    renderSession('/train?mode=practice')
+    const asked: string[] = []
+    for (let i = 0; i < 45; i++) asked.push(await answerOne())
+    asked.forEach((w, i) => expect(asked.slice(Math.max(0, i - 15), i)).not.toContain(w))
+  })
+
+  it('a small collection: words repeat, but never twice in a row', async () => {
+    servePractice(5)
+    renderSession('/train?mode=practice')
+    const asked: string[] = []
+    for (let i = 0; i < 30; i++) asked.push(await answerOne())
+    asked.slice(1).forEach((w, i) => expect(w).not.toBe(asked[i]))
+    expect(new Set(asked).size).toBe(5)
+  })
+
+  it('a wrong answer comes back 3-5 questions later, once — even when it is wrong again', async () => {
+    servePractice(100)
+    renderSession('/train?mode=practice')
+    const asked = [await answerOne(false)]
+    for (let i = 1; i < 20; i++) asked.push(await answerOne((w) => w !== asked[0])) // the replay is wrong again
+    const at = asked.map((w, i) => (w === asked[0] ? i : -1)).filter((i) => i >= 0)
+    expect(at).toHaveLength(2)
+    expect(at[1]).toBeGreaterThanOrEqual(3)
+    expect(at[1]).toBeLessThanOrEqual(5)
+  })
+
+  it('fewer than 4 words: no practice button anywhere, the lacking hint instead', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 3, due_today: 0 }, folders: [] } as never)
+    vi.mocked(cardsApi.list).mockResolvedValue([1, 2, 3].map(card))
+    vi.mocked(reviewApi.due).mockResolvedValue({ cards: [], total: 0 })
+    renderSession('/train')
+    expect(await screen.findByText('No words to review today')).toBeTruthy()
+    expect(await screen.findByText(/Add more words/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Train' })).toBeNull()
+    cleanup()
+
+    renderSession('/train?mode=practice')
+    expect(await screen.findByText(/Add more words/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Train' })).toBeNull()
+    expect(practiceApi.words).not.toHaveBeenCalled()
+  })
+
+  it('fewer than 4 words: the review result offers no "Keep training"', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue({ all: { total: 3, due_today: 1 }, folders: [] } as never)
+    await finishReview()
+    expect(screen.queryByRole('button', { name: 'Keep training' })).toBeNull()
   })
 })

@@ -184,7 +184,12 @@ func (r *ReviewRepository) MarkGoalDay(ctx context.Context, userID uuid.UUID, to
 //     input, so it is safe to splice into the ORDER BY.
 //   - "random": random order.
 //   - "recent": most recently added first.
-func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, mode string, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error) {
+//
+// Words in exclude (the ones the client just asked) are left out.
+func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, mode string, limit int, folder *domain.FolderFilter, exclude []uuid.UUID) ([]domain.DueCard, error) {
+	if exclude == nil {
+		exclude = []uuid.UUID{}
+	}
 	folderOnly, noFolder := folderWhere(folder)
 	order := "random()"
 	switch mode {
@@ -206,8 +211,9 @@ func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, 
 		WHERE w.user_id = $1
 		  AND ($3::uuid IS NULL OR w.folder_id = $3::uuid)
 		  AND (NOT $4::bool OR w.folder_id IS NULL)
+		  AND NOT (w.id = ANY($5::uuid[]))
 		ORDER BY `+order+`
-		LIMIT $2`, userID, limit, folderOnly, noFolder)
+		LIMIT $2`, userID, limit, folderOnly, noFolder, exclude)
 	if err != nil {
 		return nil, err
 	}

@@ -18,7 +18,7 @@ const DIRECTIONS = ['de_ru', 'ru_de'] as const
 
 /**
  * "Cards": the flashcard deck of one folder (?folder=<id|none>, all words without it). The legacy
- * links of the old Cards tab still work: ?start=1[&size=N] → /train, ?practice=1 → /, ?tab=all → /words.
+ * links of the old Cards tab still work: ?start=1[&size=N] → /train, ?practice=1 → /train?mode=practice, ?tab=all → /words.
  */
 export function CardsDeckPage() {
   const { t, i18n } = useTranslation()
@@ -47,7 +47,7 @@ export function CardsDeckPage() {
     const size = parseUrlSize(params.get('size'))
     return <Navigate to={size ? `/train?size=${size}` : '/train'} replace />
   }
-  if (params.get('practice') === '1') return <Navigate to="/" replace />
+  if (params.get('practice') === '1') return <Navigate to="/train?mode=practice" replace />
   if (params.get('tab') === 'all') {
     return <Navigate to={folder ? `/words/${encodeURIComponent(folder)}` : '/words'} replace />
   }

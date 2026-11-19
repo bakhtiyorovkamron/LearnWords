@@ -387,5 +387,13 @@
     "limitReached": "You have added {{limit}} words. Link Telegram to add without a limit.",
     "limitImport": "This folder has more words than you have left ({{left}}). Link Telegram to import it.",
     "connect": "Link Telegram"
+  },
+  "practice": {
+    "more": "Keep training",
+    "start": "Train",
+    "badge": "Free practice",
+    "badgeHint": "Answers do not change your review schedule",
+    "answered": "Answers: {{count}} · correct {{correct}}",
+    "nothingDueHint": "Today's review is done. Train as much as you like."
   }
 }

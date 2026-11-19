@@ -387,5 +387,13 @@
     "limitReached": "Siz {{limit}} ta so‘z qo‘shdingiz. Cheklovsiz qo‘shish uchun Telegramni ulang.",
     "limitImport": "Bu papkada limitgacha qolganidan ({{left}}) ko‘p so‘z bor. Import qilish uchun Telegramni ulang.",
     "connect": "Telegramni ulash"
+  },
+  "practice": {
+    "more": "Mashq qilishni davom ettirish",
+    "start": "Mashq qilish",
+    "badge": "Erkin mashq",
+    "badgeHint": "Javoblar takrorlash jadvalini o‘zgartirmaydi",
+    "answered": "Javoblar: {{count}} · to‘g‘ri {{correct}}",
+    "nothingDueHint": "Bugungi takrorlash bajarildi. Xohlagancha mashq qilishingiz mumkin."
   }
 }

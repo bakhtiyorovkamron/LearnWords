@@ -143,7 +143,7 @@ func TestPaused_StayOutOfTheGeneralQueue_ButTheFolderTrainsThem(t *testing.T) {
 	}
 
 	// Practice works on them and does not unpause.
-	if words, _ := f.review.PracticeWords(ctx, f.user, "recent", 50, nil); len(words) != 15 {
+	if words, _ := f.review.PracticeWords(ctx, f.user, "recent", 50, nil, nil); len(words) != 15 {
 		t.Errorf("practice offers %d words, want 15", len(words))
 	}
 	if err := f.reviews.AnswerPractice(ctx, f.user, cards[1].ID, true); err != nil {

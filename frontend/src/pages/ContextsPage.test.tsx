@@ -159,15 +159,25 @@ describe('Home: the goal card', () => {
     expect(screen.getByText('3 words')).toBeTruthy()
   })
 
-  it('nothing due and nothing done → "Nothing to review today", no ring, no button; the week stays', async () => {
+  it('nothing due and nothing done → "Nothing to review today", no ring, "Train" opens free practice; the week stays', async () => {
     vi.mocked(statsApi.get).mockResolvedValue(weekOf(0) as never)
     vi.mocked(foldersApi.list).mockResolvedValue(list(40, 0))
     renderHome()
     expect(await screen.findByText('Nothing to review today')).toBeTruthy()
-    expect(screen.getByText('More words will be due tomorrow.')).toBeTruthy()
+    expect(screen.getByText("Today's review is done. Train as much as you like.")).toBeTruthy()
     expect(screen.queryByTestId('goal-ring')).toBeNull()
     expect(screen.getByTestId('week-strip')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Practice/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Train' }))
+    await waitFor(() => expect(where()).toBe('/train?mode=practice'))
+  })
+
+  it('nothing due and fewer than 4 words → no "Train" button', async () => {
+    vi.mocked(statsApi.get).mockResolvedValue(weekOf(0) as never)
+    vi.mocked(foldersApi.list).mockResolvedValue(list(3, 0))
+    renderHome()
+    expect(await screen.findByText('Nothing to review today')).toBeTruthy()
+    expect(screen.getByText('More words will be due tomorrow.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Train' })).toBeNull()
   })
 
   it('no words at all → the empty text; no ring, no week', async () => {

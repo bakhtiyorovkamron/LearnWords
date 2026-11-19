@@ -60,7 +60,8 @@ type ReviewRepository interface {
 		fn func(p domain.Progress) domain.Progress) (*domain.Progress, error)
 	// PracticeWords draws a pool for extra practice from the WHOLE collection (not just due
 	// words) — practice exists precisely so there's something to do when nothing is due.
-	PracticeWords(ctx context.Context, userID uuid.UUID, mode string, limit int, folder *domain.FolderFilter) ([]domain.DueCard, error)
+	// Words in exclude are left out.
+	PracticeWords(ctx context.Context, userID uuid.UUID, mode string, limit int, folder *domain.FolderFilter, exclude []uuid.UUID) ([]domain.DueCard, error)
 	// LogPractice records a practice answer for streak/activity purposes only. It must never
 	// update word_progress — see postgres.ReviewRepository.LogPractice's implementation.
 	LogPractice(ctx context.Context, userID, wordID uuid.UUID, correct bool) error
@@ -117,9 +118,10 @@ func (s *ReviewService) Answer(ctx context.Context, userID, wordID uuid.UUID, co
 
 // Practice returns up to NormalizeSessionSize(sessionSize) words for EXTRA practice — drawn
 // from the whole collection, not limited to what's due today — ordered per
-// NormalizePracticeMode(mode) (hardest first / random / most recently added).
-func (s *ReviewService) Practice(ctx context.Context, userID uuid.UUID, mode, sessionSize string, folder *domain.FolderFilter) ([]domain.DueCard, error) {
-	return s.repo.PracticeWords(ctx, userID, NormalizePracticeMode(mode), NormalizeSessionSize(sessionSize), folder)
+// NormalizePracticeMode(mode) (hardest first / random / most recently added), without the words
+// in exclude (the ones the client just asked).
+func (s *ReviewService) Practice(ctx context.Context, userID uuid.UUID, mode, sessionSize string, folder *domain.FolderFilter, exclude []uuid.UUID) ([]domain.DueCard, error) {
+	return s.repo.PracticeWords(ctx, userID, NormalizePracticeMode(mode), NormalizeSessionSize(sessionSize), folder, exclude)
 }
 
 // AnswerPractice logs a practice answer for the daily-activity streak only. It deliberately

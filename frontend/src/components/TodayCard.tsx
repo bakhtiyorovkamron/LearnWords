@@ -6,9 +6,11 @@ import { minutesFor } from '../lib/dailyGoal'
 import { streakLine, useTodayGoal } from '../lib/todayGoal'
 import { GoalRing } from './GoalRing'
 import { GoalSheet } from './GoalSheet'
+import { useFolderList } from './Folders'
 import { weekDays, WeekStrip } from './WeekStrip'
 
 const MORE_STEP = 20 // "20 more" once the goal is met
+const MIN_PRACTICE_WORDS = 4 // fewer: no real answer options, so no free practice
 
 /**
  * Home's "Today" card: the daily goal as a ring, what is left, the main button and this week's strip.
@@ -19,6 +21,8 @@ export function TodayCard() {
   const navigate = useNavigate()
   const g = useTodayGoal()
   const [editing, setEditing] = useState(false)
+  const folders = useFolderList()
+  const canPractice = (folders.data?.all.total ?? 0) >= MIN_PRACTICE_WORDS
 
   if (!g.ready) return <div className="glass h-[330px] animate-pulse rounded-[20px]" aria-busy="true" />
 
@@ -42,7 +46,12 @@ export function TodayCard() {
         <div className="space-y-2 py-1">
           <CircleCheck size={32} aria-hidden="true" className="text-accent-text" />
           <p className="text-[19px] font-semibold text-fg">{t('home.nothingDue')}</p>
-          <p className="text-muted">{t('home.nothingDueHint')}</p>
+          <p className="text-muted">{canPractice ? t('practice.nothingDueHint') : t('home.nothingDueHint')}</p>
+          {canPractice && (
+            <button type="button" onClick={() => navigate('/train?mode=practice')} className="btn-primary !mt-4 h-[52px] w-full rounded-[14px]">
+              {t('practice.start')}<ArrowRight size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
       ) : (
         <>

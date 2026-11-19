@@ -76,6 +76,7 @@ type fakeReviewRepoForPractice struct {
 	lastLogCorrect   bool
 	practiceWords    []domain.DueCard
 	goalChecks       int // MarkGoalDay calls
+	lastExclude      []uuid.UUID
 }
 
 func (f *fakeReviewRepoForPractice) ListDue(context.Context, uuid.UUID, time.Time, int, *domain.FolderFilter) ([]domain.DueCard, error) {
@@ -89,7 +90,8 @@ func (f *fakeReviewRepoForPractice) Apply(context.Context, uuid.UUID, uuid.UUID,
 	f.applyCalls++
 	return &domain.Progress{}, nil
 }
-func (f *fakeReviewRepoForPractice) PracticeWords(context.Context, uuid.UUID, string, int, *domain.FolderFilter) ([]domain.DueCard, error) {
+func (f *fakeReviewRepoForPractice) PracticeWords(_ context.Context, _ uuid.UUID, _ string, _ int, _ *domain.FolderFilter, exclude []uuid.UUID) ([]domain.DueCard, error) {
+	f.lastExclude = exclude
 	return f.practiceWords, nil
 }
 func (f *fakeReviewRepoForPractice) MarkGoalDay(context.Context, uuid.UUID, time.Time) error {

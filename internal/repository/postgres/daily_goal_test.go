@@ -195,3 +195,25 @@ func TestMigration40_UpAndDown(t *testing.T) {
 		t.Error("up did not recreate the table")
 	}
 }
+
+// Practice leaves out the words the client just asked (exclude_ids).
+func TestPracticeWords_Exclude(t *testing.T) {
+	f := newGoalFixture(t)
+	ctx := context.Background()
+	ids := f.words(t, 5)
+	got, err := f.repo.PracticeWords(ctx, f.user, "random", 50, nil, ids[:3])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d words, want 2", len(got))
+	}
+	for _, c := range got {
+		if c.ID == ids[0] || c.ID == ids[1] || c.ID == ids[2] {
+			t.Errorf("excluded word %s came back", c.ID)
+		}
+	}
+	if all, _ := f.repo.PracticeWords(ctx, f.user, "hard", 50, nil, nil); len(all) != 5 {
+		t.Errorf("without exclude: %d words, want 5", len(all))
+	}
+}

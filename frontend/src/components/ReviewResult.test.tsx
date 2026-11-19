@@ -195,3 +195,27 @@ describe('ReviewResult: the mistakes list', () => {
     expect(screen.queryByRole('button', { name: 'Listen' })).toBeNull()
   })
 })
+
+describe('ReviewResult: free practice', () => {
+  it('words still due: "N more" stays as it was, "Keep training" is the ghost after it', () => {
+    const onPractice = vi.fn()
+    renderResult({ goal: { done: 5, target: 20 }, onPractice })
+    expect(screen.getByRole('button', { name: /12 words more/ }).className).toContain('btn-primary')
+    const keep = screen.getByRole('button', { name: 'Keep training' })
+    expect(keep.className).toContain('btn-ghost')
+    fireEvent.click(keep)
+    expect(onPractice).toHaveBeenCalledTimes(1)
+  })
+
+  it('nothing due any more: "Keep training" is the primary, Done the ghost', () => {
+    renderResult({ moreCount: 0, onPractice: vi.fn() })
+    expect(screen.getByRole('button', { name: 'Keep training' }).className).toContain('btn-primary')
+    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-ghost')
+  })
+
+  it('the practice result: no "N more", no "Keep training", Done is the primary', () => {
+    renderResult({ practice: true, moreCount: 12, onPractice: vi.fn() })
+    expect(screen.queryByRole('button', { name: /words more|Keep training/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Done' }).className).toContain('btn-primary')
+  })
+})

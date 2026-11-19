@@ -216,10 +216,10 @@ describe('the legacy links of the old Cards tab', () => {
     expect(where()).toBe('/train')
   })
 
-  it('?practice=1 → Home', async () => {
+  it('?practice=1 → free practice (/train?mode=practice)', async () => {
     renderDeck('/cards?practice=1')
-    expect(await screen.findByText('HOME SCREEN')).toBeTruthy()
-    expect(where()).toBe('/')
+    expect(await screen.findByText('TRAIN SCREEN')).toBeTruthy()
+    expect(where()).toBe('/train?mode=practice')
   })
 
   it('?tab=all → /words, and with &folder=X → /words/X', async () => {
