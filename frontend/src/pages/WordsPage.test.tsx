@@ -118,6 +118,18 @@ describe('WordsPage: the hub', () => {
     expect(where()).toBe('/train?folder=f2&size=7')
   })
 
+  it('nothing due but enough words: a muted ▶ to free practice; a folder of 3 words has none', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue(data([folder(16), folder(2, { total: 3 })]) as never) // 32 words, 3 words
+    renderWords()
+    await screen.findByText('Folder 16')
+    const practice = screen.getByRole('button', { name: 'Practice: Folder 16' })
+    expect(practice.className).toContain('text-muted')
+    expect(practice.className).not.toContain('text-accent-text')
+    expect(screen.queryByRole('button', { name: /Folder 2/ })).toBeNull()
+    fireEvent.click(practice)
+    expect(where()).toBe('/train?mode=practice&folder=f16')
+  })
+
   it('the ▶ size is capped at 20', async () => {
     vi.mocked(foldersApi.list).mockResolvedValue(data([folder(3, { due_today: 35 })]) as never)
     renderWords()

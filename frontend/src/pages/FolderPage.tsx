@@ -21,6 +21,7 @@ import { NothingFound, WordList } from '../components/WordList'
 import { useDebounced } from '../lib/useDebounced'
 import { useMoveWords } from '../lib/moveWords'
 import { useDeleteWords, useVisibleCards } from '../lib/deleteWords'
+import { MIN_PRACTICE_WORDS } from '../lib/practiceQueue'
 
 const PAGE = 48
 const squareButton = 'grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
@@ -111,7 +112,10 @@ export function FolderPage() {
   const trainUrl = isNone ? '/train?folder=none&size=20'
     : isAll ? `/train?size=${Math.min(due, 20)}`
     : `/train?folder=${encodeURIComponent(param)}&size=${Math.min(due, 20)}`
-  const trainDisabled = !isNone && due === 0
+  // Nothing due today: free practice of the same words instead — given enough of them for real options.
+  const practice = !isNone && due === 0
+  const practiceUrl = isAll ? '/train?mode=practice' : `/train?mode=practice&folder=${encodeURIComponent(param)}`
+  const tooFew = practice && total < MIN_PRACTICE_WORDS
   const cardsUrl = isAll ? '/cards' : `/cards?folder=${encodeURIComponent(param)}`
 
   const filtersActive = status !== 'all' || period !== 'all' || !!search
@@ -180,8 +184,12 @@ export function FolderPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {trainDisabled ? (
-            <button type="button" disabled className="btn-ghost h-12 flex-1 rounded-[14px] opacity-60">{t('words.noDueToday')}</button>
+          {tooFew ? (
+            <button type="button" disabled className="btn-ghost h-12 flex-1 rounded-[14px] opacity-60">{t('practice.needWords')}</button>
+          ) : practice ? (
+            <button type="button" onClick={() => navigate(practiceUrl)} className="btn-primary h-12 flex-1 rounded-[14px]">
+              <Play size={14} fill="currentColor" aria-hidden="true" />{t('practice.start')}
+            </button>
           ) : (
             <button type="button" onClick={() => navigate(trainUrl)} className="btn-primary h-12 flex-1 rounded-[14px]">
               <Play size={14} fill="currentColor" aria-hidden="true" />{t('folders.train')}

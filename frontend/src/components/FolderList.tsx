@@ -4,6 +4,7 @@ import { Link2, Play, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from './ErrorState'
 import { FolderDot, FolderFormModal, shortFolderName, useFolderList } from './Folders'
+import { canTrainFolder, folderTrainLabelKey, folderTrainUrl } from '../lib/folderTraining'
 
 const VISIBLE_FOLDERS = 6
 
@@ -59,11 +60,11 @@ export function FolderList() {
               {f.share_token && <Link2 size={14} aria-label={t('share.isShared')} role="img" className="shrink-0 text-faint" />}
               <span className="text-sm tabular-nums text-muted">{f.total}</span>
             </Link>
-            {/* A sibling of the link, never inside it. No due words: an empty spacer keeps the counts aligned. */}
-            {f.due_today > 0 ? (
-              <button type="button" aria-label={t('folders.trainFolder', { name: f.name })}
-                onClick={() => navigate(`/train?folder=${encodeURIComponent(f.id)}&size=${Math.min(f.due_today, 20)}`)}
-                className="mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface-2 text-accent-text">
+            {/* A sibling of the link, never inside it. Due words: review them; none: free practice (muted).
+                Too few words for either: an empty spacer keeps the counts aligned. */}
+            {canTrainFolder(f) ? (
+              <button type="button" aria-label={t(folderTrainLabelKey(f), { name: f.name })} onClick={() => navigate(folderTrainUrl(f))}
+                className={`mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface-2 ${f.due_today > 0 ? 'text-accent-text' : 'text-muted'}`}>
                 <Play size={14} fill="currentColor" aria-hidden="true" />
               </button>
             ) : (

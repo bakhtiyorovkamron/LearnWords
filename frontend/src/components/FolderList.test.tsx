@@ -118,6 +118,21 @@ describe('FolderList', () => {
     expect(where()).toBe('/train?folder=f2&size=7')
   })
 
+  it('nothing due but enough words: a muted ▶ that opens free practice; 3 words: no ▶, only the spacer', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue(data([folder(3, { name: 'Small' }), folder(32, { name: 'Big' }), folder(9, { due_today: 2 })]))
+    renderList()
+    await screen.findByText('Big')
+    const practice = screen.getByRole('button', { name: 'Practice: Big' })
+    expect(practice.className).toContain('text-muted')
+    expect(practice.className).not.toContain('text-accent-text')
+    expect(screen.getByRole('button', { name: 'Train “Folder 9”' }).className).toContain('text-accent-text')
+    const row3 = rows().find((a) => a.textContent?.includes('Small'))!.parentElement!
+    expect(row3.querySelector('button')).toBeNull()
+    expect(row3.lastElementChild!.className).toContain('w-11')
+    fireEvent.click(practice)
+    expect(where()).toBe('/train?mode=practice&folder=f32')
+  })
+
   it('the ▶ size is capped at 20', async () => {
     vi.mocked(foldersApi.list).mockResolvedValue(data([folder(3, { due_today: 35 })]))
     renderList()

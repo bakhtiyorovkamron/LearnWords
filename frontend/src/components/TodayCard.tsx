@@ -7,10 +7,10 @@ import { streakLine, useTodayGoal } from '../lib/todayGoal'
 import { GoalRing } from './GoalRing'
 import { GoalSheet } from './GoalSheet'
 import { useFolderList } from './Folders'
+import { MIN_PRACTICE_WORDS } from '../lib/practiceQueue'
 import { weekDays, WeekStrip } from './WeekStrip'
 
 const MORE_STEP = 20 // "20 more" once the goal is met
-const MIN_PRACTICE_WORDS = 4 // fewer: no real answer options, so no free practice
 
 /**
  * Home's "Today" card: the daily goal as a ring, what is left, the main button and this week's strip.

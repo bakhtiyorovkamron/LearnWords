@@ -16,11 +16,10 @@ import { ReviewHero, TrainingHero } from './TrainingHero'
 import { ErrorState } from './ErrorState'
 import { useTodayGoal } from '../lib/todayGoal'
 import { setTrainingOpen } from '../lib/trainingState'
-import { batchMode, nextBatch, PRACTICE_BATCH, PREFETCH_AT, RECENT_WINDOW, replayOffset } from '../lib/practiceQueue'
+import { batchMode, MIN_PRACTICE_WORDS, nextBatch, PRACTICE_BATCH, PREFETCH_AT, RECENT_WINDOW, replayOffset } from '../lib/practiceQueue'
 import { useFolderList } from './Folders'
 
 const DEFAULT_SIZE = 20
-const MIN_PRACTICE_WORDS = 4 // fewer: no real answer options (quiz.lacking), so no practice
 const ASKED_KEPT = 50 // the practice ids kept on the client (the exclude list is cut from it)
 
 // The training: /train?size=N&folder=<id|none>. The URL is the only input — N words (1..50, 20 without

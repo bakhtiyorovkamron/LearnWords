@@ -81,9 +81,27 @@ describe('FolderPage: a folder', () => {
     expect(where()).toBe('/train?folder=f1&size=20')
   })
 
-  it('nothing due → the button is ghost, disabled, and says so', async () => {
-    renderFolder('/words/f2')
-    const button = await screen.findByRole('button', { name: 'Nothing due today' }) as HTMLButtonElement
+  it('nothing due, 32 words → the primary "Train" opens free practice of this folder', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue(folderList({ total: 32, due_today: 0 }) as never)
+    renderFolder('/words/f1')
+    const button = await screen.findByRole('button', { name: 'Train' }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    expect(button.className).toContain('btn-primary')
+    fireEvent.click(button)
+    expect(where()).toBe('/train?mode=practice&folder=f1')
+  })
+
+  it('nothing due in "All words" → free practice of the whole collection', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue({ ...folderList(), all: { ...folderList().all, due_today: 0 } } as never)
+    renderFolder('/words/all')
+    fireEvent.click(await screen.findByRole('button', { name: 'Train' }))
+    expect(where()).toBe('/train?mode=practice')
+  })
+
+  it('nothing due and only 3 words → a disabled ghost button: at least 4 words are needed', async () => {
+    vi.mocked(foldersApi.list).mockResolvedValue(folderList({ total: 3, due_today: 0 }) as never)
+    renderFolder('/words/f1')
+    const button = await screen.findByRole('button', { name: 'Add at least 4 words' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
     expect(button.className).toContain('btn-ghost')
     expect(screen.queryByRole('button', { name: 'Train' })).toBeNull()

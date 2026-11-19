@@ -380,7 +380,6 @@
     "back": "Papkalarga qaytish",
     "pickFolder": "Papkani tanlang",
     "folderStats": "O‘rganilgan: {{learned}} · bugun: {{due}}",
-    "noDueToday": "Bugun takrorlash yo‘q",
     "listTitle": "So‘zlar",
     "actions": "Amallar",
     "limitNear": "Telegramsiz {{limit}} ta so‘z qo‘shish mumkin. Qoldi: {{left}}.",
@@ -394,6 +393,8 @@
     "badge": "Erkin mashq",
     "badgeHint": "Javoblar takrorlash jadvalini o‘zgartirmaydi",
     "answered": "Javoblar: {{count}} · to‘g‘ri {{correct}}",
-    "nothingDueHint": "Bugungi takrorlash bajarildi. Xohlagancha mashq qilishingiz mumkin."
+    "nothingDueHint": "Bugungi takrorlash bajarildi. Xohlagancha mashq qilishingiz mumkin.",
+    "needWords": "Kamida 4 ta so‘z kerak",
+    "trainFolder": "Mashq qilish: {{name}}"
   }
 }

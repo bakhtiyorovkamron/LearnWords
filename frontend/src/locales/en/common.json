@@ -380,7 +380,6 @@
     "back": "Back to folders",
     "pickFolder": "Choose a folder",
     "folderStats": "{{learned}} learned · {{due}} due today",
-    "noDueToday": "Nothing due today",
     "listTitle": "Words",
     "actions": "Actions",
     "limitNear": "Without Telegram you can add {{limit}} words. Left: {{left}}.",
@@ -394,6 +393,8 @@
     "badge": "Free practice",
     "badgeHint": "Answers do not change your review schedule",
     "answered": "Answers: {{count}} · correct {{correct}}",
-    "nothingDueHint": "Today's review is done. Train as much as you like."
+    "nothingDueHint": "Today's review is done. Train as much as you like.",
+    "needWords": "Add at least 4 words",
+    "trainFolder": "Practice: {{name}}"
   }
 }

@@ -12,6 +12,7 @@ import { NothingFound, WordList } from '../components/WordList'
 import { WordFixes } from '../components/WordFixes'
 import { useDebounced } from '../lib/useDebounced'
 import { useVisibleCards } from '../lib/deleteWords'
+import { canTrainFolder, folderTrainLabelKey, folderTrainUrl } from '../lib/folderTraining'
 
 const PAGE = 48
 const tile = 'relative min-h-[128px] rounded-[18px] border border-line bg-surface p-3.5'
@@ -76,12 +77,11 @@ export function WordsPage() {
           <p className="mt-2 line-clamp-2 text-base font-semibold leading-snug text-fg" title={f.name}>{f.name}</p>
           <p className="mt-0.5 text-sm text-muted">{t('folders.wordsCount', { count: f.total })}</p>
         </Link>
-        <LearnedBar learned={f.learned_count} total={f.total} className={`mt-3 ${f.due_today > 0 ? 'mr-12' : ''}`} />
-        {/* A sibling of the link, never inside it. */}
-        {f.due_today > 0 && (
-          <button type="button" aria-label={t('folders.trainFolder', { name: f.name })}
-            onClick={() => navigate(`/train?folder=${encodeURIComponent(f.id)}&size=${Math.min(f.due_today, 20)}`)}
-            className="absolute bottom-2.5 right-2.5 grid h-10 w-10 place-items-center rounded-full bg-surface-2 text-accent-text">
+        <LearnedBar learned={f.learned_count} total={f.total} className={`mt-3 ${canTrainFolder(f) ? 'mr-12' : ''}`} />
+        {/* A sibling of the link, never inside it. Due words: review them; none: free practice (muted). */}
+        {canTrainFolder(f) && (
+          <button type="button" aria-label={t(folderTrainLabelKey(f), { name: f.name })} onClick={() => navigate(folderTrainUrl(f))}
+            className={`absolute bottom-2.5 right-2.5 grid h-10 w-10 place-items-center rounded-full bg-surface-2 ${f.due_today > 0 ? 'text-accent-text' : 'text-muted'}`}>
             <Play size={14} fill="currentColor" aria-hidden="true" />
           </button>
         )}

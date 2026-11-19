@@ -5,6 +5,8 @@ import type { PracticeMode } from '../api/endpoints'
 // are left; a word asked in the last RECENT_WINDOW questions is not asked again (when the collection
 // is large enough); a word answered wrong comes back REPLAY_MIN..REPLAY_MAX questions later, once.
 export const PRACTICE_BATCH = '20'
+// Fewer words in the collection / the folder: no real answer options (quiz.lacking), so no practice.
+export const MIN_PRACTICE_WORDS = 4
 export const PREFETCH_AT = 3
 export const RECENT_WINDOW = 15
 export const REPLAY_MIN = 3
