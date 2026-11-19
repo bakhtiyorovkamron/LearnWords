@@ -982,7 +982,7 @@ describe('FlipCards: focus mode', () => {
     expect(cardButton().style.width).toBe('calc(100% - 16px)')
     expect(cardButton().style.height).toBe('calc(100% - 16px)')
     expect(cardButton().style.top).toBe('8px')
-    expect(cardButton().style.transition).toMatch(/left 340ms.*width 340ms.*height 340ms/)
+    expect(cardButton().style.transition).toMatch(/left 340ms.*\bw-13\b.*\bh-13\b/)
     expect(screen.getByTestId('deck-stage').style.touchAction).toBe('none')
   })
 
@@ -1099,5 +1099,97 @@ describe('FlipCards: focus mode', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('FlipCards: the size transition', () => {
+  const RESIZE_MS = 340 + 20 // FOCUS_RESIZE_MS plus its margin
+  const focusOn = () => fireEvent.click(screen.getByRole('button', { name: 'Full-screen card' }))
+  const mode = () => screen.getByTestId('deck-focus-state').textContent
+  const transitions = () => Array.from(document.querySelectorAll<HTMLElement>('[data-offset]')).map((b) => b.style.transition)
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }))
+  afterEach(() => vi.useRealTimers())
+
+  it('a focus switch animates the size for FOCUS_RESIZE_MS, then the transition is gone', () => {
+    view()
+    focusOn()
+    expect(cardButton().style.transition).toMatch(/left 340ms/)
+    act(() => { vi.advanceTimersByTime(RESIZE_MS - 1) })
+    expect(cardButton().style.transition).toMatch(/left 340ms/)
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(cardButton().style.transition).toBe('')
+  })
+
+  it('leaving focus mode animates the size too, and it is gone afterwards', () => {
+    view()
+    focusOn()
+    act(() => { vi.advanceTimersByTime(RESIZE_MS) })
+    fireEvent.pointerDown(track(), { clientX: 200, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 200, clientY: 300, pointerId: 1 })
+    fireEvent.pointerUp(window, { clientX: 200, clientY: 300, pointerId: 1 })
+    expect(mode()).toBe('normal')
+    expect(cardButton().style.transition).toMatch(/width 340ms/)
+    act(() => { vi.advanceTimersByTime(RESIZE_MS) })
+    expect(cardButton().style.transition).toBe('')
+  })
+
+  it('a swipe right after the switch: no DeckCard has a transition once the swipe settles', () => {
+    view()
+    focusOn() // the swipe comes before the size transition has ended
+    swipe(-300)
+    settle()
+    expect(counter()).toBe('2 / 5')
+    expect(transitions().every((t) => t === '')).toBe(true)
+  })
+
+  it('a pointerdown during the size transition removes it at once', () => {
+    view()
+    focusOn()
+    expect(cardButton().style.transition).not.toBe('')
+    fireEvent.pointerDown(track(), { clientX: 200, pointerId: 1 })
+    expect(cardButton().style.transition).toBe('')
+  })
+
+  it('a key slide during the size transition removes it at once', () => {
+    view()
+    focusOn()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(transitions().every((t) => t === '')).toBe(true)
+  })
+
+  it('a scrubber jump during the size transition removes it at once', () => {
+    const ref = { current: null as FlipCardsHandle | null }
+    render(<Deck ref={(h) => { ref.current = h }} cards={cards(10)} direction="de_ru" resetKey="k" />, { wrapper })
+    sized()
+    focusOn()
+    expect(cardButton().style.transition).not.toBe('')
+    act(() => ref.current!.jumpTo(1))
+    expect(transitions().every((t) => t === '')).toBe(true)
+  })
+
+  it('reduced motion: a focus switch has no size transition at all', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    view()
+    focusOn()
+    expect(cardButton().style.transition).toBe('')
+  })
+
+  it('the text width follows focus in the same render, and follows a stage resize', () => {
+    let resized = () => {}
+    const observed: Element[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(cb: () => void) { resized = cb }
+      observe(el: Element) { observed.push(el) }
+      disconnect() {}
+    })
+    view({ cards: [card(1, { word: 'Grundschule' })] })
+    const word = () => cardButton().querySelector<HTMLElement>('[data-testid="deck-word"]')!
+    expect(fontPx(word())).toBe(48) // normal: 364 px of text
+    focusOn()
+    expect(fontPx(word())).toBe(58) // focus: 508 − 16 − 56 = 436 px, in the very render that switched focus
+    Object.defineProperty(screen.getByTestId('deck-stage'), 'clientWidth', { configurable: true, value: 418 })
+    act(() => resized())
+    expect(fontPx(word())).toBe(46) // focus on a 418 px stage: 402 − 56 = 346 px
+    expect(observed).toEqual([screen.getByTestId('deck-stage')]) // no observer on a face
   })
 })
