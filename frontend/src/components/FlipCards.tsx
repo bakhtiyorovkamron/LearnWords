@@ -31,7 +31,12 @@ const FOCUS_RESIZE_MS = 340
 const FOCUS_EXIT_PX = 90 // a downward drag longer than this leaves focus mode
 const FOCUS_FOLLOW = 0.7 // the card follows a downward drag at this share of the finger
 const FOCUS_SPRING_BACK_MS = 220
-const FOCUS_SOUND_BOTTOM_PX = FOCUS_INSET + 34 // the in-card sound button, from the stage's bottom
+// The in-card sound button and the exit chip, from the card's bottom edge: 34 px, or 12 px above the
+// bottom safe area where that is higher, so they never sit on the home indicator (the card itself may).
+const FOCUS_CONTROLS_GAP = 'max(34px, env(safe-area-inset-bottom) + 12px)'
+/** A focus control's `bottom` in the stage: FOCUS_INSET to the card's edge, the gap, and extraPx more. */
+const focusBottom = (extraPx = 0) => `calc(${FOCUS_INSET}px + ${FOCUS_CONTROLS_GAP}${extraPx ? ` + ${extraPx}px` : ''})`
+const FOCUS_SOUND_PX = 72 // h-18
 const FOCUS_CHIP_MS = 2600
 const FOCUS_CHIP_KEY = 'yodla.focusExitShown' // how many times the exit chip was shown
 const FOCUS_CHIP_TIMES = 2
@@ -556,6 +561,12 @@ export const FlipCards = forwardRef<FlipCardsHandle, {
     observer.observe(el)
     return () => observer.disconnect()
   }, [shown])
+  // A focus switch may change the stage's width too (from md up it drops its 500 px cap; on phones it
+  // keeps it): measured again before the paint, so the switch's first frame already has the right text
+  // width in both directions. The observer's own setState would render only after that frame.
+  useLayoutEffect(() => {
+    if (stage.current) setStageWidth(stage.current.clientWidth)
+  }, [focus])
 
   // The size transition of a focus switch is over after FOCUS_RESIZE_MS (and a margin).
   useEffect(() => {
@@ -704,7 +715,8 @@ export const FlipCards = forwardRef<FlipCardsHandle, {
     <div className="flex min-h-0 flex-1 flex-col">
       {/* The stage takes the height that is left, 320–720 px; the card width stays as it was. From md up it
           is centred and only as wide as the card plus a thin peek of each neighbour (420 card → 412 + ~30).
-          Focus mode: the whole height and width; touch-action none lets a downward drag reach the page. */}
+          Focus mode: the whole height and width (the page gives it the screen below the status bar);
+          touch-action none lets a downward drag reach the page. */}
       <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage" data-focus={focus || undefined}
         className={`relative -mx-4 flex-1 overflow-hidden ${focus ? 'min-h-0' : 'max-h-[720px] min-h-[320px] md:mx-auto md:w-full md:max-w-[500px]'}`}
         style={{ touchAction: focus ? 'none' : 'pan-y' }}>
@@ -739,14 +751,14 @@ export const FlipCards = forwardRef<FlipCardsHandle, {
               a press on it neither flips the card nor starts a drag. */}
           {focusSound && (
             <button type="button" data-testid="deck-focus-sound" data-deck-tool="" onClick={say} onPointerDown={(e) => e.stopPropagation()}
-              aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')} style={{ bottom: FOCUS_SOUND_BOTTOM_PX }}
+              aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')} style={{ bottom: focusBottom() }}
               className="absolute left-1/2 z-10 grid h-18 w-18 -translate-x-1/2 place-items-center rounded-full bg-accent text-on-accent shadow-[var(--shadow-card)] transition active:scale-95">
               <Volume2 size={30} aria-hidden="true" />
             </button>
           )}
         </div>
         {focus && chip && (
-          <span data-testid="deck-focus-chip" role="status" style={{ bottom: FOCUS_SOUND_BOTTOM_PX + (focusSound ? 72 + 12 : 0) }}
+          <span data-testid="deck-focus-chip" role="status" style={{ bottom: focusBottom(focusSound ? FOCUS_SOUND_PX + 12 : 0) }}
             className="pointer-events-none absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-2 px-3.5 py-2 text-[13px] font-semibold text-muted shadow-[var(--shadow-card)]">
             <ArrowDown size={14} aria-hidden="true" />{t('cards.focusExit')}
           </span>

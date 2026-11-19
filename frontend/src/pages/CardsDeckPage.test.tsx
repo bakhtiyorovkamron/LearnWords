@@ -76,6 +76,10 @@ function scrub(n: number, release = true) {
   if (release) fireEvent.pointerUp(range)
 }
 const many = (n: number) => Array.from({ length: n }, (_, i) => row(i + 1))
+// jsdom cannot evaluate env(): the deck page's height is checked by its classes.
+const classes = () => screen.getByTestId('deck-page').className.split(/\s+/)
+const NORMAL_HEIGHT = 'h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)]'
+const FOCUS_HEIGHT = 'h-[calc(100dvh-env(safe-area-inset-top))]'
 
 describe('CardsDeckPage: full screen', () => {
   it('fits the screen without the shell: no --nav-h / --header-h terms, the stage takes what is left (≤ 720 px)', async () => {
@@ -84,8 +88,10 @@ describe('CardsDeckPage: full screen', () => {
     expect(page.className).toContain('flex-col')
     expect(page.className).toContain('overflow-hidden')
     expect(page.className).toContain('max-w-3xl')
-    expect(page.className).toContain('h-[calc(100dvh-env(safe-area-inset-top)-2rem)]')
-    expect(page.className).toContain('md:h-[calc(100dvh-5rem)]')
+    // Both safe areas on phones: the scrubber stays above the home indicator.
+    expect(classes()).toContain(NORMAL_HEIGHT)
+    expect(classes()).toContain('md:h-[calc(100dvh-5rem)]')
+    expect(classes()).not.toContain('-my-4')
     expect(page.className).not.toMatch(/--nav-h|--header-h/)
     const stage = await screen.findByTestId('deck-stage')
     expect(stage.className).toMatch(/\bflex-1\b/)
@@ -343,6 +349,17 @@ describe('focus mode on the page', () => {
     expect(screen.getByTestId('deck-topbar')).toBeTruthy()
     expect(screen.getByRole('slider')).toBeTruthy()
     expect(where()).toBe('/cards') // the first Esc only left focus mode
+  })
+
+  it('cancels main\'s vertical padding and takes the screen below the status bar; leaving it puts the normal height back', async () => {
+    renderDeck('/cards')
+    fireEvent.click(await screen.findByRole('button', { name: 'Full-screen card' }))
+    expect(classes()).toEqual(expect.arrayContaining(['-my-4', 'md:-my-10', FOCUS_HEIGHT, 'md:h-dvh']))
+    expect(classes()).not.toContain(NORMAL_HEIGHT)
+    expect(classes()).not.toContain('md:h-[calc(100dvh-5rem)]')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(classes()).toEqual(expect.arrayContaining([NORMAL_HEIGHT, 'md:h-[calc(100dvh-5rem)]']))
+    for (const gone of ['-my-4', 'md:-my-10', FOCUS_HEIGHT, 'md:h-dvh']) expect(classes()).not.toContain(gone)
   })
 
   it('F toggles it, and so does "а" (the same key in the Russian layout); Ctrl+F does not', async () => {

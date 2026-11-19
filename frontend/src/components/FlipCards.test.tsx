@@ -93,6 +93,8 @@ function settle() {
   for (let n = 0; n < 250 && clock.queue.size; n++) frame()
   expect(clock.queue.size).toBe(0)
 }
+/** A style value as jsdom keeps it, without its spaces and the stars it puts round max()'s commas. */
+const css = (value: string) => value.replace(/[\s*]/g, '')
 const trackX = () => parseFloat(/translate3d\((-?[\d.e-]+)px/.exec(track().style.transform)![1])
 
 const finger = {
@@ -862,23 +864,23 @@ describe('FlipCards: the text fits the card', () => {
     expect(fontPx(long)).toBeGreaterThanOrEqual(26)
   })
 
-  it('the size follows the measured face: its width without the padding', () => {
-    const style = document.head.appendChild(document.createElement('style'))
-    style.textContent = '[data-face] { padding-left: 28px; padding-right: 28px }'
+  it('the size follows the measured stage: the card width without the face padding', () => {
     let resized = () => {}
     vi.stubGlobal('ResizeObserver', class {
       constructor(cb: () => void) { resized = cb }
       observe() {}
       disconnect() {}
     })
-    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(285)
-    view({ cards: [card(1, { word: 'Grundschule' })] })
-    expect(fontPx(words()[0])).toBe(30) // 229 / (11 × 0.68): measured before the first paint
-    clientWidth.mockReturnValue(418)
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(418)
+    try {
+      view({ cards: [card(1, { word: 'Grundschule' })] })
+      expect(fontPx(words()[0])).toBe(36) // a 418 px stage: card 330 − 56 = 274 px / (11 × 0.68), measured before the first paint
+    } finally {
+      clientWidth.mockRestore() // never leaks into the next tests, even when an assertion fails
+    }
+    Object.defineProperty(screen.getByTestId('deck-stage'), 'clientWidth', { configurable: true, value: 508 })
     act(() => resized())
-    expect(fontPx(words()[0])).toBe(48) // 362 / (11 × 0.68)
-    clientWidth.mockRestore()
-    style.remove()
+    expect(fontPx(words()[0])).toBe(48) // a 508 px stage: card 420 − 56 = 364 px / (11 × 0.68)
   })
 
   it('an example is at most 3 lines, on both sides, and may break anywhere', () => {
@@ -982,7 +984,7 @@ describe('FlipCards: focus mode', () => {
     expect(cardButton().style.width).toBe('calc(100% - 16px)')
     expect(cardButton().style.height).toBe('calc(100% - 16px)')
     expect(cardButton().style.top).toBe('8px')
-    expect(cardButton().style.transition).toMatch(/left 340ms.*\bw-13\b.*\bh-13\b/)
+    expect(cardButton().style.transition).toMatch(/left 340ms.*width 340ms.*height 340ms.*top 340ms/)
     expect(screen.getByTestId('deck-stage').style.touchAction).toBe('none')
   })
 
@@ -1009,17 +1011,27 @@ describe('FlipCards: focus mode', () => {
     expect(side('native').querySelector<HTMLElement>('[lang="ru"]')!.style.fontSize).toBe('60px')
   })
 
-  it('the in-card sound: 72 px, lime, 34 px above the card bottom; reads the word; DE → RU on both sides', () => {
+  it('the in-card sound: 72 px, lime, 34 px above the card bottom (more over the home indicator); reads the word; DE → RU on both sides', () => {
     view({ focus: true })
     const sound = screen.getByTestId('deck-focus-sound')
     expect(sound.className).toMatch(/\bh-18\b.*\bw-18\b/)
     expect(sound.className).toContain('bg-accent')
-    expect(sound.style.bottom).toBe('42px') // 8 px inset + 34 px
+    // 8 px inset to the card's edge, then 34 px or 12 px above the bottom safe area, whichever is higher.
+    expect(css(sound.style.bottom)).toBe('calc(8px+max(34px,env(safe-area-inset-bottom)+12px))')
     fireEvent.click(sound)
     expect((speakApi.speak.mock.calls[0][0] as { text: string }).text).toBe('Wort1')
     expect(visible().dataset.side).toBe('learning') // the press did not flip the card
     fireEvent.click(cardButton())
     expect(screen.getByTestId('deck-focus-sound')).toBeTruthy() // the translation side, as the back
+  })
+
+  it('the exit chip clears the home indicator too: above the in-card sound, or where the sound would be', () => {
+    view({ focus: true }) // DE → RU: the sound is on the front
+    // 8 + 72 + 12 px above the gap (jsdom folds the plain px terms into one).
+    expect(css(screen.getByTestId('deck-focus-chip').style.bottom)).toBe('calc(92px+max(34px,env(safe-area-inset-bottom)+12px))')
+    cleanup()
+    view({ direction: 'ru_de', focus: true }) // no sound on this front
+    expect(css(screen.getByTestId('deck-focus-chip').style.bottom)).toBe('calc(8px+max(34px,env(safe-area-inset-bottom)+12px))')
   })
 
   it('RU → DE: no in-card sound on the front (it would give the answer away), there once flipped', () => {
@@ -1183,6 +1195,7 @@ describe('FlipCards: the size transition', () => {
       disconnect() {}
     })
     view({ cards: [card(1, { word: 'Grundschule' })] })
+    act(() => resized()) // the stage is 508 px wide now (view)
     const word = () => cardButton().querySelector<HTMLElement>('[data-testid="deck-word"]')!
     expect(fontPx(word())).toBe(48) // normal: 364 px of text
     focusOn()
@@ -1191,5 +1204,55 @@ describe('FlipCards: the size transition', () => {
     act(() => resized())
     expect(fontPx(word())).toBe(46) // focus on a 418 px stage: 402 − 56 = 346 px
     expect(observed).toEqual([screen.getByTestId('deck-stage')]) // no observer on a face
+  })
+
+  describe('the text width after a switch, both ways', () => {
+    let resized = () => {}
+    beforeEach(() => {
+      vi.stubGlobal('ResizeObserver', class {
+        constructor(cb: () => void) { resized = cb }
+        observe() {}
+        disconnect() {}
+      })
+    })
+    const word = () => cardButton().querySelector<HTMLElement>('[data-testid="deck-word"]')!
+    const stageWidth = (px: number) =>
+      Object.defineProperty(screen.getByTestId('deck-stage'), 'clientWidth', { configurable: true, value: px })
+    const leave = () => { // a downward drag over 90 px
+      fireEvent.pointerDown(track(), { clientX: 200, clientY: 100, pointerId: 1 })
+      fireEvent.pointerMove(window, { clientX: 200, clientY: 300, pointerId: 1 })
+      fireEvent.pointerUp(window, { clientX: 200, clientY: 300, pointerId: 1 })
+    }
+
+    it('a phone (the stage keeps its width, only its height changes): right in the render of the switch', () => {
+      view({ cards: [card(1, { word: 'Grundschule' })] })
+      stageWidth(390)
+      act(() => resized())
+      expect(fontPx(word())).toBe(32) // normal: card 302 − 56 = 246 px / (11 × 0.68)
+      focusOn()
+      expect(fontPx(word())).toBe(42) // focus: 390 − 16 − 56 = 318 px
+      act(() => resized()) // the page grew taller: the observer fires, the width is the same
+      expect(fontPx(word())).toBe(42)
+      leave()
+      expect(mode()).toBe('normal')
+      expect(fontPx(word())).toBe(32)
+      act(() => resized())
+      expect(fontPx(word())).toBe(32)
+    })
+
+    it('from md up (the stage drops its 500 px cap in focus mode): re-measured before the paint', () => {
+      view({ cards: [card(1, { word: 'Geschwindigkeit' })] })
+      stageWidth(500)
+      act(() => resized())
+      expect(fontPx(word())).toBe(34) // normal: card 412 − 56 = 356 px / (15 × 0.68)
+      stageWidth(800) // what the layout of the focus switch gives the stage
+      focusOn()
+      expect(fontPx(word())).toBe(71) // 800 − 16 − 56 = 728 px, before the observer has fired (not 41 from 500 px)
+      stageWidth(500)
+      leave()
+      expect(fontPx(word())).toBe(34) // back to 356 px, not 35 from the 800 px stage
+      act(() => resized())
+      expect(fontPx(word())).toBe(34)
+    })
   })
 })

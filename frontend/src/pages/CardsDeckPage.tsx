@@ -248,12 +248,20 @@ export function CardsDeckPage() {
       onSelect: () => setDirection(direction === 'de_ru' ? 'ru_de' : 'de_ru') },
   ]
 
-  // Exactly the screen, never scrolling: the viewport minus the top safe area and main's padding
-  // (py-4 on phones, md:py-10). The shell is hidden here, so nothing else takes height.
+  // Exactly the screen, never scrolling; the shell is hidden here, so nothing else takes height.
+  // Normal: the viewport minus both safe areas (the scrubber stays above the home indicator) and main's
+  // padding (py-4 = 2rem on phones); from md up minus main's md:py-10 = 5rem (no safe area there).
+  // Focus: the page cancels main's vertical padding (-my-4 md:-my-10) and is the viewport minus the top
+  // safe area (md: the whole viewport). The card keeps FOCUS_INSET on every side, so the gap under the
+  // status bar is the gap at the sides; it may run under the home indicator, its controls clear it.
+  // Both change at once on a switch; only the card's size animates (FlipCards).
   // Top bar → the deck (takes the rest) → its controls → the scrubber. Focus mode: the deck alone.
+  const pageHeight = focusMode
+    ? '-my-4 h-[calc(100dvh-env(safe-area-inset-top))] md:-my-10 md:h-dvh'
+    : 'h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] md:h-[calc(100dvh-5rem)]'
   return (
     <div data-testid="deck-page"
-      className="mx-auto flex h-[calc(100dvh-env(safe-area-inset-top)-2rem)] max-w-3xl flex-col gap-3 overflow-hidden md:h-[calc(100dvh-5rem)]">
+      className={`mx-auto flex max-w-3xl flex-col gap-3 overflow-hidden ${pageHeight}`}>
       {!focusMode && (
         <div data-testid="deck-topbar" className="relative flex h-11 shrink-0 items-center justify-between">
           <button type="button" onClick={close} aria-label={t('cards.close')} title={t('cards.close')} className={`-ml-2.5 ${round}`}>
