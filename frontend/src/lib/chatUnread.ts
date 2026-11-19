@@ -6,6 +6,7 @@ import { chatUnreadApi, adminSupportApi, buyerChatApi, supportApi, type ChatUnre
 import { toast } from '../components/Toaster'
 import { useAuth } from '../auth/AuthContext'
 import { usePageVisible } from './pageVisible'
+import { isTrainingOpen } from './trainingState'
 
 export const CHAT_UNREAD_KEY = ['chat-unread'] as const
 export const ADMIN_CHAT_UNREAD_KEY = ['chat-unread', 'admin'] as const
@@ -84,7 +85,8 @@ export function useChatUnreadToasts(data: ChatUnread | undefined) {
     if (!data) return
     const before = prev.current
     prev.current = data
-    if (!before) return
+    // Nothing over a training or the cards deck: the counts move on, the toast is skipped.
+    if (!before || isTrainingOpen()) return
     const open = t('chat.open')
     if (data.support > before.support && pathname !== '/support') {
       toast(t('chat.toastSupport'), { ms: CHAT_TOAST_MS, action: { label: open, onClick: () => navigate('/support') } })

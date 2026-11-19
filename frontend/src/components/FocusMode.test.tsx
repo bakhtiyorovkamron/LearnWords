@@ -6,6 +6,7 @@ import i18n from '../i18n'
 import { collectionApi, foldersApi, heroApi, meApi, settingsApi } from '../api/endpoints'
 import { setTrainingOpen } from '../lib/trainingState'
 import { TrainPage } from '../pages/TrainPage'
+import { CardsDeckPage } from '../pages/CardsDeckPage'
 import { Layout } from './Layout'
 import { setMoreMenuOpen } from '../lib/moreMenu'
 
@@ -28,7 +29,11 @@ function renderApp(path = '/train') {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
-        <Routes><Route element={<Layout />}><Route path="/train" element={<TrainPage />} /></Route></Routes>
+        <Routes><Route element={<Layout />}>
+          <Route path="/train" element={<TrainPage />} />
+          <Route path="/cards" element={<CardsDeckPage />} />
+          <Route path="/words" element={<div>WORDS</div>} />
+        </Route></Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -90,6 +95,23 @@ describe('focus mode: during a training session the shell steps aside', () => {
     expect(document.getElementById('more-sheet')).not.toBeNull()
     act(() => setTrainingOpen(true))
     expect(document.getElementById('more-sheet')).toBeNull()
+  })
+
+  it('on /cards the header, the bottom nav, the footer and the More sheet are not rendered; on /words they are', async () => {
+    renderApp('/cards')
+    expect(await screen.findByTestId('deck-page')).toBeTruthy()
+    expect(navs()).toHaveLength(0)
+    expect(header()).toBeNull()
+    expect(footer()).toBeNull()
+    act(() => setMoreMenuOpen(true))
+    expect(document.getElementById('more-sheet')).toBeNull()
+    cleanup()
+    act(() => setMoreMenuOpen(false))
+    renderApp('/words')
+    expect(await screen.findByText('WORDS')).toBeTruthy()
+    expect(navs()).toHaveLength(2)
+    expect(header()).not.toBeNull()
+    expect(footer()).not.toBeNull()
   })
 
   it('setting the same state twice does not notify twice', async () => {

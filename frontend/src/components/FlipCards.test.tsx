@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Profiler } from 'react'
+import { forwardRef, Profiler, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import type { CollectionCard } from '../api/types'
-import { FlipCards } from './FlipCards'
+import { FlipCards, type FlipCardsHandle } from './FlipCards'
 
 const card = (n: number, over: Partial<CollectionCard> = {}): CollectionCard => ({
   id: `c${n}`, context_id: 'x', word: `Wort${n}`, translation: `слово${n}`, transcription: '', language: 'de', created_at: '',
@@ -54,9 +54,24 @@ const PAGE_PX = 434
 function sized() {
   Object.defineProperty(screen.getByTestId('deck-stage'), 'clientWidth', { configurable: true, value: STAGE_PX })
 }
-function view(props: Partial<Parameters<typeof FlipCards>[0]> = {}) {
+type DeckProps = React.ComponentProps<typeof FlipCards> & { total?: number }
+/** The deck as the page uses it: the counter (the page's top bar) follows onIndexChange; focus mode is state. */
+const Deck = forwardRef<FlipCardsHandle, DeckProps>(function Deck({ total, focus: focusProp, onIndexChange, onFocusChange, ...props }, ref) {
+  const [i, setI] = useState(0)
+  const [focus, setFocus] = useState(focusProp ?? false)
+  return (
+    <>
+      <span data-testid="deck-counter">{i + 1} / {total ?? props.cards.length}</span>
+      <span data-testid="deck-focus-state">{focus ? 'focus' : 'normal'}</span>
+      <FlipCards ref={ref} {...props} focus={focus}
+        onIndexChange={(n) => { setI(n); onIndexChange?.(n) }}
+        onFocusChange={(f) => { setFocus(f); onFocusChange?.(f) }} />
+    </>
+  )
+})
+function view(props: Partial<DeckProps> = {}) {
   const list = props.cards ?? cards()
-  const r = render(<FlipCards cards={list} total={props.total ?? list.length} direction="de_ru" resetKey="k" {...props} />, { wrapper })
+  const r = render(<Deck cards={list} direction="de_ru" resetKey="k" {...props} />, { wrapper })
   sized()
   return r
 }
@@ -278,7 +293,7 @@ describe('FlipCards: moving', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     settle(); expect(counter()).toBe('2 / 5')
     fireEvent.click(cardButton())
-    rerender(<FlipCards cards={cards()} total={5} direction="de_ru" resetKey="other" />)
+    rerender(<Deck cards={cards()} direction="de_ru" resetKey="other" />)
     settle(); expect(counter()).toBe('1 / 5')
     expect(visible().dataset.side).toBe('learning')
   })
@@ -337,35 +352,27 @@ describe('FlipCards: the controls under the deck', () => {
     expect((speakApi.speak.mock.calls[0][0] as { lang: string }).lang).toBe('en-US')
   })
 
-  it('under the controls the counter reads "i / total" with the folder total; there are no pager dots', async () => {
-    view({ cards: cards(8), total: 403 })
-    const under = screen.getByTestId('deck-counter')
-    expect(under.textContent).toBe('1 / 403')
-    expect(under.className).toContain('text-[13px]')
-    expect(under.className).toContain('text-muted')
+  it('the counter is no part of the deck any more: the page shows it from onIndexChange', async () => {
+    const onIndexChange = vi.fn()
+    view({ cards: cards(8), onIndexChange })
+    expect(document.querySelectorAll('[data-testid="deck-counter"]')).toHaveLength(1) // the harness's own
+    expect(within(screen.getByTestId('deck-stage').parentElement!).queryByText(/\d+ \/ \d+/)).toBeNull()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     settle()
-    expect(under.textContent).toBe('2 / 403')
+    expect(onIndexChange).toHaveBeenLastCalledWith(1)
     expect(screen.queryByTestId('deck-pager')).toBeNull()
   })
 
-  it('the row is ← 🔊 ⟳ →, 64px tall; ← and → are 52px and on every width, move, and stop at the ends', async () => {
+  it('the row is ⟳ 🔊 ⤢, 64px tall: flip and focus are 52px, no ← → buttons any more', async () => {
     view({ cards: cards(2) })
     const row = screen.getByTestId('deck-controls')
     expect(row.className).toContain('h-16')
-    expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Back', 'Listen', 'Flip the card', 'Next'])
-    const back = within(row).getByRole('button', { name: 'Back' }) as HTMLButtonElement
-    const next = within(row).getByRole('button', { name: 'Next' }) as HTMLButtonElement
-    for (const b of [back, next]) {
-      expect(b.className).toMatch(/\bh-13\b.*\bw-13\b/)
-      expect(b.className).not.toMatch(/\bhidden\b|md:grid/) // phones too
-    }
-    expect(back.disabled).toBe(true)
-    fireEvent.click(next)
+    expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Flip the card', 'Listen', 'Full-screen card'])
+    for (const name of ['Flip the card', 'Full-screen card']) expect(within(row).getByRole('button', { name }).className).toMatch(/\bh-13\b.*\bw-13\b/)
+    expect(within(row).queryByRole('button', { name: /Back|Next/ })).toBeNull()
+    expect(document.querySelector('.lucide-chevron-left, .lucide-chevron-right')).toBeNull()
+    fireEvent.keyDown(window, { key: 'ArrowRight' }) // the keys still move
     settle(); expect(counter()).toBe('2 / 2')
-    expect(next.disabled).toBe(true)
-    fireEvent.click(back)
-    settle(); expect(counter()).toBe('1 / 2')
   })
 
   it('⟳ flips the card like a tap on it', () => {
@@ -396,7 +403,7 @@ describe('FlipCards: the controls under the deck', () => {
 describe('FlipCards: the spring', () => {
   it('a drag moves the track 1:1 in the DOM, with no React render per move', () => {
     const onRender = vi.fn()
-    render(<Profiler id="deck" onRender={onRender}><FlipCards cards={cards()} total={5} direction="de_ru" resetKey="k" /></Profiler>, { wrapper })
+    render(<Profiler id="deck" onRender={onRender}><FlipCards cards={cards()} direction="de_ru" resetKey="k" /></Profiler>, { wrapper })
     sized()
     const renders = onRender.mock.calls.length
     finger.down(200)
@@ -632,7 +639,7 @@ describe('FlipCards: the spring', () => {
     const { rerender } = view()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     frame(); frame()
-    rerender(<FlipCards cards={cards()} total={5} direction="de_ru" resetKey="other" />)
+    rerender(<Deck cards={cards()} direction="de_ru" resetKey="other" />)
     expect(clock.queue.size).toBe(0)
     expect(trackX()).toBe(0)
     expect(counter()).toBe('1 / 5')
@@ -915,5 +922,182 @@ describe('FlipCards: the counter', () => {
     expect(screen.getAllByText('1 / 5')).toEqual([screen.getByTestId('deck-counter')])
     expect(screen.queryByText('2 / 5')).toBeNull() // the neighbour has none either
     expect(screen.getAllByTestId('deck-box').length).toBeGreaterThan(0) // the box bars stay
+  })
+})
+
+describe('FlipCards: jumpTo (the scrubber)', () => {
+  const ref = { current: null as FlipCardsHandle | null }
+  function viewRef(props: Partial<DeckProps> = {}) {
+    const list = props.cards ?? cards(10)
+    render(<Deck ref={(h) => { ref.current = h }} cards={list} direction="de_ru" resetKey="k" {...props} />, { wrapper })
+    sized()
+  }
+
+  it('one card away it slides like a swipe, on the spring', () => {
+    viewRef()
+    act(() => ref.current!.jumpTo(1))
+    expect(clock.queue.size).toBe(1)
+    settle(); expect(counter()).toBe('2 / 10')
+  })
+
+  it('further away it fades out, changes the card face up, and fades back in', async () => {
+    viewRef()
+    fireEvent.click(cardButton())
+    act(() => ref.current!.jumpTo(6))
+    expect(track().style.opacity).toBe('0')
+    expect(counter()).toBe('1 / 10') // not yet: only after the fade-out
+    await waitFor(() => expect(counter()).toBe('7 / 10'))
+    expect(track().style.opacity).toBe('1')
+    expect(visible().dataset.side).toBe('learning')
+    expect(visible().textContent).toContain('Wort7')
+  })
+
+  it('reduced motion: no fade, the card changes at once; a target past the loaded cards stops at the last', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    viewRef()
+    act(() => ref.current!.jumpTo(5))
+    expect(counter()).toBe('6 / 10')
+    expect(track().style.opacity).toBe('')
+    act(() => ref.current!.jumpTo(99))
+    expect(counter()).toBe('10 / 10')
+  })
+})
+
+describe('FlipCards: focus mode', () => {
+  const focusOn = () => fireEvent.click(screen.getByRole('button', { name: 'Full-screen card' }))
+  const vertical = {
+    down: (y: number) => fireEvent.pointerDown(track(), { clientX: 200, clientY: y, pointerId: 1 }),
+    move: (x: number, y: number) => fireEvent.pointerMove(window, { clientX: x, clientY: y, pointerId: 1 }),
+    up: (x: number, y: number) => fireEvent.pointerUp(window, { clientX: x, clientY: y, pointerId: 1 }),
+  }
+  const mode = () => screen.getByTestId('deck-focus-state').textContent
+
+  it('⤢ asks for focus mode; then the controls are gone and the card fills the stage but 8 px', () => {
+    const onFocusChange = vi.fn()
+    view({ onFocusChange })
+    expect(cardButton().style.width.replace(/\s+/g, '')).toMatch(/^min\(420px\*?,\*?calc\(100%-88px\)\)$/)
+    focusOn()
+    expect(onFocusChange).toHaveBeenCalledWith(true)
+    expect(screen.queryByTestId('deck-controls')).toBeNull()
+    expect(cardButton().style.width).toBe('calc(100% - 16px)')
+    expect(cardButton().style.height).toBe('calc(100% - 16px)')
+    expect(cardButton().style.top).toBe('8px')
+    expect(cardButton().style.transition).toMatch(/left 340ms.*width 340ms.*height 340ms/)
+    expect(screen.getByTestId('deck-stage').style.touchAction).toBe('none')
+  })
+
+  it('outside focus mode the stage keeps pan-y and the 320–720 px height', () => {
+    view()
+    const stage = screen.getByTestId('deck-stage')
+    expect(stage.style.touchAction).toBe('pan-y')
+    expect(stage.className).toContain('max-h-[720px]')
+    expect(stage.className).toContain('min-h-[320px]')
+  })
+
+  it('only the article and the word, only the translation: no labels, divider, examples, box bars or hints', () => {
+    view({ cards: [card(1, { word: 'das Bett', article: 'das', transcription: '[bɛt]' }), card(2)], focus: true })
+    const learning = side('learning')
+    expect(learning.textContent).toBe('dasBett')
+    expect(side('native').textContent).toBe('слово1')
+    expect(cardButton().querySelectorAll('.line-clamp-3')).toHaveLength(0)
+    expect(screen.queryByTestId('deck-box')).toBeNull()
+  })
+
+  it('larger maximum sizes: the word up to 80 px, the translation up to 60 px', () => {
+    view({ cards: [card(1, { word: 'Ja', translation: 'да' })], focus: true })
+    expect(cardButton().querySelector<HTMLElement>('[data-testid="deck-word"]')!.style.fontSize).toBe('80px')
+    expect(side('native').querySelector<HTMLElement>('[lang="ru"]')!.style.fontSize).toBe('60px')
+  })
+
+  it('the in-card sound: 72 px, lime, 34 px above the card bottom; reads the word; DE → RU on both sides', () => {
+    view({ focus: true })
+    const sound = screen.getByTestId('deck-focus-sound')
+    expect(sound.className).toMatch(/\bh-18\b.*\bw-18\b/)
+    expect(sound.className).toContain('bg-accent')
+    expect(sound.style.bottom).toBe('42px') // 8 px inset + 34 px
+    fireEvent.click(sound)
+    expect((speakApi.speak.mock.calls[0][0] as { text: string }).text).toBe('Wort1')
+    expect(visible().dataset.side).toBe('learning') // the press did not flip the card
+    fireEvent.click(cardButton())
+    expect(screen.getByTestId('deck-focus-sound')).toBeTruthy() // the translation side, as the back
+  })
+
+  it('RU → DE: no in-card sound on the front (it would give the answer away), there once flipped', () => {
+    view({ direction: 'ru_de', focus: true })
+    expect(screen.queryByTestId('deck-focus-sound')).toBeNull()
+    fireEvent.click(cardButton())
+    expect(screen.getByTestId('deck-focus-sound')).toBeTruthy()
+  })
+
+  it('a press on the in-card sound starts no drag', () => {
+    view({ focus: true })
+    fireEvent.pointerDown(screen.getByTestId('deck-focus-sound'), { clientX: 200, clientY: 300 })
+    vertical.move(200, 450)
+    expect(track().style.transform).not.toContain('scale')
+    vertical.up(200, 450)
+    expect(mode()).toBe('focus')
+  })
+
+  it('a downward drag over 90 px leaves focus mode; the card follows at 0.7 and a bit smaller meanwhile', () => {
+    view({ focus: true })
+    vertical.down(100)
+    vertical.move(205, 200)
+    expect(track().style.transform).toMatch(/translate3d\(0px,70px,0\) scale\(0\.9/)
+    vertical.up(205, 200)
+    expect(mode()).toBe('normal')
+    expect(visible().dataset.side).toBe('learning') // the release was no tap
+  })
+
+  it('a shorter one springs back and stays in focus mode', () => {
+    view({ focus: true })
+    vertical.down(100)
+    vertical.move(200, 160)
+    vertical.up(200, 160)
+    expect(mode()).toBe('focus')
+    expect(track().style.transform).toBe('translate3d(0px,0,0)')
+    expect(visible().dataset.side).toBe('learning')
+  })
+
+  it('a horizontal swipe still pages in focus mode; an upward or sideways drag never leaves it', () => {
+    view({ focus: true })
+    vertical.down(300)
+    vertical.move(-200, 330) // mostly horizontal, a little down
+    finger.wait(300)
+    vertical.up(-200, 330)
+    settle()
+    expect(counter()).toBe('2 / 5')
+    expect(mode()).toBe('focus')
+    vertical.down(300)
+    vertical.move(200, 100) // up
+    vertical.up(200, 100)
+    expect(mode()).toBe('focus')
+  })
+
+  it('outside focus mode a downward drag does nothing', () => {
+    view()
+    vertical.down(100)
+    vertical.move(200, 300)
+    vertical.up(200, 300)
+    expect(track().style.transform).not.toContain('scale')
+    expect(counter()).toBe('1 / 5')
+  })
+
+  it('the exit chip shows the first two times focus mode opens, for 2.6 s', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      for (let n = 1; n <= 3; n++) {
+        view({ focus: true })
+        if (n <= 2) {
+          expect(screen.getByTestId('deck-focus-chip').textContent).toBe('Swipe down to exit')
+          act(() => { vi.advanceTimersByTime(2600) })
+          expect(screen.queryByTestId('deck-focus-chip')).toBeNull()
+        } else {
+          expect(screen.queryByTestId('deck-focus-chip')).toBeNull()
+        }
+        cleanup()
+      }
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -297,3 +297,21 @@
 @media (prefers-reduced-motion: reduce) {
   .hero-svg, .hero-svg *, .hero-bubble, .hero-bar * { animation: none !important; transition: none !important; }
 }
+
+/* The deck scrubber: a native range, a 4 px track filled with the accent up to the knob (--fill),
+   a 22 px knob. The input itself is 44 px tall so it is easy to grab. */
+.deck-range { -webkit-appearance: none; appearance: none; height: 44px; background: transparent; cursor: pointer; touch-action: none; }
+.deck-range:focus-visible { outline: none; }
+.deck-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--track) var(--fill, 0%));
+}
+.deck-range::-moz-range-track { height: 4px; border-radius: 999px; background: var(--track); }
+.deck-range::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--accent); }
+.deck-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 999px;
+  background: var(--accent); border: 3px solid var(--bg); box-shadow: var(--shadow-card);
+}
+.deck-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 999px; background: var(--accent); border: 3px solid var(--bg); box-sizing: border-box; }
+.deck-range:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+.deck-range:focus-visible::-moz-range-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }

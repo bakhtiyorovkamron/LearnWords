@@ -149,7 +149,15 @@
     "flip": "Flip the card",
     "emptyFolder": "This folder has no words yet",
     "pickFolder": "Which folder?",
-    "sideNative": { "ru": "Russian", "en": "English", "uz": "Uzbek" }
+    "sideNative": { "ru": "Russian", "en": "English", "uz": "Uzbek" },
+    "close": "Close cards",
+    "options": "Deck options",
+    "folder": "Folder",
+    "direction": "Direction",
+    "jump": "Go to card",
+    "position": "{{n}} of {{total}}",
+    "focus": "Full-screen card",
+    "focusExit": "Swipe down to exit"
   },
   "collection": { "found": "Found: {{count}}",
     "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned", "title": "Filter", "reset": "Reset", "done": "Done" },

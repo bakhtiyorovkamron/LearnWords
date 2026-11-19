@@ -6,6 +6,7 @@ import i18n from '../i18n'
 import { chatUnreadApi, meApi, type ChatUnread, type Me } from '../api/endpoints'
 import { CHAT_UNREAD_KEY } from '../lib/chatUnread'
 import { setMoreMenuOpen } from '../lib/moreMenu'
+import { setTrainingOpen } from '../lib/trainingState'
 import { Layout } from './Layout'
 
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ isAuthenticated: true }) }))
@@ -55,7 +56,7 @@ beforeEach(async () => {
   vi.mocked(chatUnreadApi.mine).mockResolvedValue(unread(0))
   vi.mocked(chatUnreadApi.admin).mockResolvedValue({ support: 4, purchases: 1, total: 5 })
 })
-afterEach(() => { cleanup(); setMoreMenuOpen(false); vi.clearAllMocks() })
+afterEach(() => { cleanup(); setMoreMenuOpen(false); setTrainingOpen(false); vi.clearAllMocks() })
 
 describe('Layout: unread badges', () => {
   it('no badges without unread messages', async () => {
@@ -152,6 +153,21 @@ describe('Layout: new-message toast', () => {
     await grow(unread(1))
     await grow(unread(0))
     expect(screen.queryByText('Support wrote to you')).toBeNull()
+  })
+
+  it('no toast over a training or the cards deck (the training flag); the next growth after it shows one', async () => {
+    renderLayout('/cards')
+    await firstLoad()
+    const toasts = () => screen.queryAllByText('Support wrote to you').length
+    const before = toasts() // the toast store is shared: one from an earlier test may still be up
+    act(() => setTrainingOpen(true))
+    await grow(unread(1))
+    await act(() => new Promise((r) => setTimeout(r, 20))) // react-query hands the new data over on a later tick
+    expect(toasts()).toBe(before)
+    expect(screen.queryByTestId('badge-home')).toBeNull() // the badges went with the shell
+    act(() => setTrainingOpen(false))
+    await grow(unread(2))
+    await waitFor(() => expect(toasts()).toBe(before + 1))
   })
 
   it('one toast for one growth, not again while the number stays', async () => {

@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { ChevronLeft, ChevronRight, RotateCw, Volume2 } from 'lucide-react'
+import { ArrowDown, Maximize2, RotateCw, Volume2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CollectionCard } from '../api/types'
 import { ARTICLE_COLOR, splitArticle } from '../lib/article'
@@ -23,6 +23,19 @@ const FAST_PX_PER_S = 2500 // faster than this a flick may skip a card
 const RUBBER = 0.55 // iOS's rubber band constant
 const HAPTIC_MS = 8
 const CARD_WIDTH = 'min(420px, calc(100% - 88px))'
+// Focus mode: the card is the whole stage but a margin of FOCUS_INSET px all round; the neighbours wait
+// just off-screen, the same GAP away.
+const FOCUS_INSET = 8
+const FOCUS_CARD_WIDTH = `calc(100% - ${FOCUS_INSET * 2}px)`
+const FOCUS_RESIZE_MS = 340
+const FOCUS_EXIT_PX = 90 // a downward drag longer than this leaves focus mode
+const FOCUS_FOLLOW = 0.7 // the card follows a downward drag at this share of the finger
+const FOCUS_SPRING_BACK_MS = 220
+const FOCUS_SOUND_BOTTOM_PX = FOCUS_INSET + 34 // the in-card sound button, from the stage's bottom
+const FOCUS_CHIP_MS = 2600
+const FOCUS_CHIP_KEY = 'yodla.focusExitShown' // how many times the exit chip was shown
+const FOCUS_CHIP_TIMES = 2
+const JUMP_FADE_MS = 130
 const AROUND = 2 // cards kept rendered on each side: a quick second slide never meets a blank card
 const BACKFACE_HIDDEN = { backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as const
 const PRESERVE_3D = { transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' } as const
@@ -37,6 +50,8 @@ const DEFAULT_TEXT_WIDTH = 300 // px of a face without its padding, until it is 
 const MIN_FONT_PX = 26
 const WORD_MAX_PX = 64
 const TRANSLATION_MAX_PX = 52
+const FOCUS_WORD_MAX_PX = 80
+const FOCUS_TRANSLATION_MAX_PX = 60
 const EXAMPLE_FIT = 'line-clamp-3 wrap-anywhere hyphens-auto'
 
 const reducedMotion = () =>
@@ -67,6 +82,18 @@ function useFirstVisitsHints(): boolean {
   return show
 }
 
+/** Shows the "swipe down to exit" chip the first FOCUS_CHIP_TIMES times focus mode opens. */
+function takeFocusChip(): boolean {
+  try {
+    const n = Number(localStorage.getItem(FOCUS_CHIP_KEY)) || 0
+    if (n >= FOCUS_CHIP_TIMES) return false
+    localStorage.setItem(FOCUS_CHIP_KEY, String(n + 1))
+    return true
+  } catch {
+    return false // nothing to count in: better no chip than one every time
+  }
+}
+
 type Direction = 'de_ru' | 'ru_de'
 type Point = { x: number; t: number }
 
@@ -95,6 +122,17 @@ function Face({ className, children }: { className: string; children: React.Reac
 
 const label = 'text-xs font-bold uppercase tracking-[0.12em] text-faint'
 
+/** Where a card sits at `offset` from the current one: normal (420 px at most) or focus (the whole stage). */
+function cardBox(focus: boolean, offset: number): React.CSSProperties {
+  const width = focus ? FOCUS_CARD_WIDTH : CARD_WIDTH
+  const inset = focus ? FOCUS_INSET : 0
+  return {
+    width, left: `calc(50% + (${width} + ${GAP}px) * ${offset})`, top: inset, height: `calc(100% - ${inset * 2}px)`,
+    // The switch to and from focus mode grows / shrinks the card; nothing else of it ever animates here.
+    transition: reducedMotion() ? undefined : `left ${FOCUS_RESIZE_MS}ms ease, width ${FOCUS_RESIZE_MS}ms ease, height ${FOCUS_RESIZE_MS}ms ease, top ${FOCUS_RESIZE_MS}ms ease`,
+  }
+}
+
 /**
  * The font that keeps the longest single word of `text` on one line of a face: phrases still wrap
  * between their words. Only a word too long even at MIN_FONT_PX may hyphenate — `hyphens: auto` is
@@ -114,6 +152,7 @@ type DeckCardProps = {
   flipped: boolean // only ever true for the current card
   showHints: boolean
   textWidth: number // px of a face without its padding
+  focus: boolean // focus mode: only the word / the translation, larger, on a full-screen card
   onTap: (offset: number) => void
 }
 
@@ -125,7 +164,7 @@ type DeckCardProps = {
  * from screen readers. memo: the props are the card from the list and plain values, so a flip renders
  * the current card only.
  */
-const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, showHints, textWidth, onTap }: DeckCardProps) {
+const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, showHints, textWidth, focus, onTap }: DeckCardProps) {
   const { t, i18n } = useTranslation()
   const learning = useLearningLang()
   const current = offset === 0
@@ -138,7 +177,7 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
   const translation = card.translation || '—'
   const nativeLang = card.translation_language ?? i18n.language
   // Only the current card carries small UI (box bars, hints): a neighbour shows just its word and example.
-  const hint = (key: string) => current && showHints && (
+  const hint = (key: string) => current && showHints && !focus && (
     <span className="absolute bottom-6 flex items-center gap-1.5 text-[13px] text-faint">
       <RotateCw size={14} aria-hidden="true" />{t(key)}
     </span>
@@ -146,21 +185,22 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
 
   const learningSide = (
     <Face className="bg-surface">
-      {current && (
+      {current && !focus && (
         <span className="absolute left-6 top-6 flex gap-1" data-testid="deck-box" aria-hidden="true">
           {Array.from({ length: 5 }, (_, k) => (
             <span key={k} data-filled={k < filled} className={`h-[5px] w-4 rounded-full ${k < filled ? 'bg-accent' : 'bg-dot-off'}`} />
           ))}
         </span>
       )}
-      <span className={label}>{t('cards.sideLearning', learning.vars)}</span>
+      {/* Focus mode keeps only the article and the word. */}
+      {!focus && <span className={label}>{t('cards.sideLearning', learning.vars)}</span>}
       <span lang={card.language} className="block">
-        {article && <span className={`mt-4 block font-serif text-[26px] ${ARTICLE_COLOR[article]}`}>{article}</span>}
-        <span data-testid="deck-word" lang={card.language} style={fitted(rest, textWidth, WORD_MAX_PX)}
-          className={`${article ? '' : 'mt-4 '}block wrap-anywhere font-serif font-medium leading-none text-fg`}>{rest}</span>
+        {article && <span className={`${focus ? '' : 'mt-4 '}block font-serif text-[26px] ${ARTICLE_COLOR[article]}`}>{article}</span>}
+        <span data-testid="deck-word" lang={card.language} style={fitted(rest, textWidth, focus ? FOCUS_WORD_MAX_PX : WORD_MAX_PX)}
+          className={`${article || focus ? '' : 'mt-4 '}block wrap-anywhere font-serif font-medium leading-none text-fg`}>{rest}</span>
       </span>
-      {card.transcription && <span className="mt-3 block font-mono text-[15px] text-muted">{card.transcription}</span>}
-      {card.example_sentence && (
+      {!focus && card.transcription && <span className="mt-3 block font-mono text-[15px] text-muted">{card.transcription}</span>}
+      {!focus && card.example_sentence && (
         <>
           <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
           <span className={`${EXAMPLE_FIT} font-serif text-xl leading-snug text-fg`} lang={card.language}>
@@ -173,10 +213,10 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
   )
   const nativeSide = (
     <Face className="bg-surface-2">
-      <span className={label}>{t(`cards.sideNative.${nativeLang}`)}</span>
-      <span lang={nativeLang} style={fitted(translation, textWidth, TRANSLATION_MAX_PX)}
-        className="mt-5 block wrap-anywhere font-bold leading-tight tracking-[-0.02em] text-accent-text">{translation}</span>
-      {card.example_translation && (
+      {!focus && <span className={label}>{t(`cards.sideNative.${nativeLang}`)}</span>}
+      <span lang={nativeLang} style={fitted(translation, textWidth, focus ? FOCUS_TRANSLATION_MAX_PX : TRANSLATION_MAX_PX)}
+        className={`${focus ? '' : 'mt-5 '}block wrap-anywhere font-bold leading-tight tracking-[-0.02em] text-accent-text`}>{translation}</span>
+      {!focus && card.example_translation && (
         <>
           <span className="my-6 block h-0.5 w-10 rounded-full bg-line" />
           <span lang={nativeLang} className={`${EXAMPLE_FIT} text-[19px] leading-snug text-fg`}>{card.example_translation}</span>
@@ -193,8 +233,8 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
       aria-hidden={current || near ? undefined : true} tabIndex={current || near ? undefined : -1}
       // A neighbour clips here, at the card's own rounded edge. Never the current card: it flips, and
       // its turning corners leave the button.
-      style={{ width: CARD_WIDTH, left: `calc(50% + (${CARD_WIDTH} + ${GAP}px) * ${offset})`, transform: 'translateX(-50%)', perspective: 1200, overflow: current ? undefined : 'hidden' }}
-      className="absolute inset-y-0 block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
+      style={{ ...cardBox(focus, offset), transform: 'translateX(-50%)', perspective: 1200, overflow: current ? undefined : 'hidden' }}
+      className="absolute block rounded-[32px] border border-line shadow-[var(--shadow-card)]">
       {/* Nothing between the button (the perspective) and the faces may clip, fade, filter or
           will-change anything but transform: Safari would flatten the 3D and show a face mirrored.
           Only the current card animates its flip: one that stops being current is on its front at once. */}
@@ -217,13 +257,20 @@ const DeckCard = memo(function DeckCard({ card, offset, direction, flipped, show
  * It fills the rest of its parent (a flex column of a fixed height): the stage stretches, the controls
  * row stays under it.
  */
-export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearEnd }: {
+export interface FlipCardsHandle {
+  /** Goes to the card at index (of the loaded ones): one card away it slides, further it fades. */
+  jumpTo: (index: number) => void
+}
+
+export const FlipCards = forwardRef<FlipCardsHandle, {
   cards: CollectionCard[]
-  total: number // all cards of the folder (the counter), more than are loaded so far
   direction?: Direction // which side is shown first
   resetKey: string // changes with the folder / direction → back to the first card
   onNearEnd?: () => void // load the next page before the user reaches the last card
-}) {
+  onIndexChange?: (index: number) => void // the deck index: the counter and the scrubber follow it
+  focus?: boolean // focus mode: the card fills the stage, only the word and the sound
+  onFocusChange?: (focus: boolean) => void // ⤢ turns it on, a downward drag off
+}>(function FlipCards({ cards, direction = 'de_ru', resetKey, onNearEnd, onIndexChange, focus = false, onFocusChange }, ref) {
   const { t } = useTranslation()
   const showHints = useFirstVisitsHints()
   const [index, setIndex] = useState(0)
@@ -239,7 +286,8 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const aim = useRef<{ delta: number } | null>(null)
   const frame = useRef(0) // the requested animation frame, 0 = none
   const lastFrame = useRef<number | null>(null) // the previous frame's timestamp
-  const drag = useRef<{ x0: number; raw0: number; points: Point[]; moved: boolean; interrupted: boolean } | null>(null)
+  // axis: undecided until the finger has moved TAP_PX; 'y' only for a mostly downward drag in focus mode.
+  const drag = useRef<{ x0: number; y0: number; raw0: number; points: Point[]; moved: boolean; interrupted: boolean; axis: 'x' | 'y' | null } | null>(null)
   const endDrag = useRef<(() => void) | null>(null) // removes the window listeners of the drag in progress
   const suppressClick = useRef(false)
 
@@ -253,6 +301,11 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   iRef.current = i
   const lastRef = useRef(last)
   lastRef.current = last
+  const focusRef = useRef(focus)
+  focusRef.current = focus
+  const fadeTimer = useRef<ReturnType<typeof setTimeout>>()
+  const backTimer = useRef<ReturnType<typeof setTimeout>>()
+  const [chip, setChip] = useState(false)
 
   /** Puts the track at px. */
   const write = useCallback((px: number) => {
@@ -262,7 +315,10 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   }, [])
 
   /** One card's distance: the card and the gap. */
-  const pageWidth = useCallback(() => Math.min(420, Math.max((stage.current?.clientWidth ?? 0) - 88, 0)) + GAP, [])
+  const pageWidth = useCallback(() => {
+    const w = stage.current?.clientWidth ?? 0
+    return (focusRef.current ? Math.max(w - FOCUS_INSET * 2, 0) : Math.min(420, Math.max(w - 88, 0))) + GAP
+  }, [])
 
   const move = useCallback((delta: number) => {
     const next = Math.min(Math.max(iRef.current + delta, 0), lastRef.current)
@@ -363,10 +419,48 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     setIndex(0); setFlipped(false)
   }, [resetKey, halt, write])
 
+  useEffect(() => { onIndexChange?.(i) }, [i, onIndexChange])
+
+  // The scrubber's jump: a neighbour slides in like a swipe; a card further away fades out, the deck
+  // changes, it fades back in (at once under reduced motion).
+  useImperativeHandle(ref, () => ({
+    jumpTo(target: number) {
+      const to = Math.min(Math.max(target, 0), lastRef.current)
+      const delta = to - iRef.current
+      if (!delta) return
+      if (Math.abs(delta) === 1) return slide(delta as 1 | -1)
+      const el = track.current
+      const change = () => {
+        halt()
+        write(0)
+        flushSync(() => { setFlipped(false); setIndex(to) })
+      }
+      clearTimeout(fadeTimer.current)
+      if (reducedMotion() || !el) return change()
+      el.style.transition = `opacity ${JUMP_FADE_MS}ms ease`
+      el.style.opacity = '0'
+      fadeTimer.current = setTimeout(() => {
+        change()
+        el.style.opacity = '1'
+        fadeTimer.current = setTimeout(() => { el.style.transition = '' }, JUMP_FADE_MS)
+      }, JUMP_FADE_MS)
+    },
+  }), [halt, write, slide])
+
+  // The exit chip: the first FOCUS_CHIP_TIMES times focus mode opens, for FOCUS_CHIP_MS.
+  useEffect(() => {
+    if (!focus || !takeFocusChip()) return
+    setChip(true)
+    const timer = setTimeout(() => setChip(false), FOCUS_CHIP_MS)
+    return () => { clearTimeout(timer); setChip(false) }
+  }, [focus])
+
   useEffect(() => { if (onNearEnd && cards.length > 0 && i >= cards.length - 3) onNearEnd() }, [i, cards.length, onNearEnd])
   useEffect(() => () => {
     endDrag.current?.()
     cancelAnimationFrame(frame.current)
+    clearTimeout(fadeTimer.current)
+    clearTimeout(backTimer.current)
   }, [])
 
   // All faces are one width, and only the stage changes it: one observer sizes every card, so a card
@@ -387,8 +481,11 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
     observer.observe(el)
+    // Focus mode resizes the cards, not the stage: the face is watched too.
+    const face = el.querySelector<HTMLElement>('[data-face]')
+    if (face) observer.observe(face)
     return () => observer.disconnect()
-  }, [shown])
+  }, [shown, focus])
 
   // ← → move, Space / Enter flip (not while typing)
   useEffect(() => {
@@ -404,6 +501,23 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [slide, flip])
+
+  /** The card pulled down by a finger dy px below where it started: it follows at FOCUS_FOLLOW, a bit smaller. */
+  const pull = (dy: number) => {
+    const el = track.current
+    if (el) el.style.transform = `translate3d(${x.current}px,${dy * FOCUS_FOLLOW}px,0) scale(${1 - Math.min(dy / 600, 0.06)})`
+  }
+  /** A pull short of FOCUS_EXIT_PX: back up to where it was. */
+  const springBack = () => {
+    const el = track.current
+    if (!el) return
+    if (!reducedMotion()) {
+      el.style.transition = `transform ${FOCUS_SPRING_BACK_MS}ms ease-out`
+      clearTimeout(backTimer.current)
+      backTimer.current = setTimeout(() => { el.style.transition = '' }, FOCUS_SPRING_BACK_MS)
+    }
+    write(x.current)
+  }
 
   /**
    * Where the track is for a finger that has dragged it to raw px: 1:1 inside the deck, the iOS rubber
@@ -440,13 +554,24 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
     const interrupted = aim.current !== null
     if (interrupted) halt()
     const t0 = clock()
-    drag.current = { x0: e.clientX, raw0: rawOf(x.current), points: [{ x: e.clientX, t: t0 }], moved: false, interrupted }
+    drag.current = { x0: e.clientX, y0: e.clientY, raw0: rawOf(x.current), points: [{ x: e.clientX, t: t0 }], moved: false, interrupted, axis: null }
     suppressClick.current = false
     const onMove = (ev: PointerEvent) => {
       const d = drag.current
       if (!d) return
       const t = clock()
       const delta = ev.clientX - d.x0
+      const dy = ev.clientY - d.y0
+      if (!d.axis && Math.max(Math.abs(delta), Math.abs(dy)) >= TAP_PX) {
+        // Only a mostly vertical, downward drag in focus mode pulls the card down; anything else pages.
+        d.axis = focusRef.current && dy > 0 && Math.abs(dy) > Math.abs(delta) ? 'y' : 'x'
+        if (d.axis === 'y') write(follow(d.raw0))
+      }
+      if (d.axis === 'y') {
+        d.moved = true
+        pull(Math.max(dy, 0))
+        return
+      }
       if (Math.abs(delta) >= TAP_PX) d.moved = true
       d.points.push({ x: ev.clientX, t })
       while (d.points.length > 1 && d.points[0].t < t - VELOCITY_WINDOW_MS) d.points.shift() // only the recent ones count
@@ -458,6 +583,13 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
       drag.current = null
       if (!d) return
       if (d.moved || d.interrupted) suppressClick.current = true // the click that follows a drag (or stops a slide) is not a tap
+      if (d.axis === 'y') {
+        if (ev.clientY - d.y0 > FOCUS_EXIT_PX) {
+          write(x.current) // no pull left over: the card grows back to its normal size from where it is
+          onFocusChange?.(false)
+        } else springBack()
+        return
+      }
       const vel = velocity(d.points, ev.clientX, clock())
       // Where the card would coast to decides the page, like paging in a UIScrollView; a very fast flick may skip one.
       const W = pageWidth()
@@ -485,45 +617,63 @@ export function FlipCards({ cards, total, direction = 'de_ru', resetKey, onNearE
   const from = Math.max(i - AROUND, 0)
   const around = cards.slice(from, i + AROUND + 1)
   const circle = 'place-items-center rounded-full border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
+  const say = () => speak(card.word, card.language)
+  // The in-card sound of focus mode: never on a front that would give the answer away (native → word).
+  const focusSound = focus && canSpeak && (!ruFirst || flipped)
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* The stage takes the height that is left, 320–620 px; the card width stays as it was. From md up it
-          is centred and only as wide as the card plus a thin peek of each neighbour (420 card → 412 + ~30). */}
-      <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage"
-        className="relative -mx-4 max-h-[620px] min-h-[320px] flex-1 overflow-hidden md:mx-auto md:w-full md:max-w-[500px]"
-        style={{ touchAction: 'pan-y' }}>
+      {/* The stage takes the height that is left, 320–720 px; the card width stays as it was. From md up it
+          is centred and only as wide as the card plus a thin peek of each neighbour (420 card → 412 + ~30).
+          Focus mode: the whole height and width; touch-action none lets a downward drag reach the page. */}
+      <div ref={stage} onPointerDown={onPointerDown} data-testid="deck-stage" data-focus={focus || undefined}
+        className={`relative -mx-4 flex-1 overflow-hidden ${focus ? 'min-h-0' : 'max-h-[720px] min-h-[320px] md:mx-auto md:w-full md:max-w-[500px]'}`}
+        style={{ touchAction: focus ? 'none' : 'pan-y' }}>
         {/* Its own GPU layer; moved only by write() — React never sets its transform, so a render leaves it be. */}
         <div ref={track} data-testid="deck-track" className="absolute inset-0" style={{ willChange: 'transform' }}>
           {around.map((c, k) => {
             const offset = from + k - i
-            return <DeckCard key={c.id} card={c} offset={offset} direction={direction}
+            return <DeckCard key={c.id} card={c} offset={offset} direction={direction} focus={focus}
               flipped={offset === 0 && flipped} showHints={showHints} textWidth={textWidth} onTap={tap} />
           })}
+          {/* On the current card, sliding with it; not inside the card's button (no nested buttons), and
+              a press on it neither flips the card nor starts a drag. */}
+          {focusSound && (
+            <button type="button" data-testid="deck-focus-sound" onClick={say} onPointerDown={(e) => e.stopPropagation()}
+              aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')} style={{ bottom: FOCUS_SOUND_BOTTOM_PX }}
+              className="absolute left-1/2 z-10 grid h-18 w-18 -translate-x-1/2 place-items-center rounded-full bg-accent text-on-accent shadow-[var(--shadow-card)] transition active:scale-95">
+              <Volume2 size={30} aria-hidden="true" />
+            </button>
+          )}
         </div>
+        {focus && chip && (
+          <span data-testid="deck-focus-chip" role="status" style={{ bottom: FOCUS_SOUND_BOTTOM_PX + (focusSound ? 72 + 12 : 0) }}
+            className="pointer-events-none absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-2 px-3.5 py-2 text-[13px] font-semibold text-muted shadow-[var(--shadow-card)]">
+            <ArrowDown size={14} aria-hidden="true" />{t('cards.focusExit')}
+          </span>
+        )}
       </div>
 
-      {/* The controls: the same big, thumb-friendly row on phones and desktops — ← 🔊 ⟳ →. */}
-      <div className="mt-3 flex shrink-0 flex-col items-center gap-1">
-        <div className="flex h-16 items-center justify-center gap-4" data-testid="deck-controls">
-          <button type="button" onClick={() => slide(-1)} disabled={i === 0} aria-label={t('collection.prev')}
-            className={`grid h-13 w-13 ${circle}`}><ChevronLeft size={24} aria-hidden="true" /></button>
-          {canSpeak ? (
-            // In native → word, listening before the flip would give the answer away.
-            <button type="button" onClick={() => speak(card.word, card.language)} disabled={ruFirst && !flipped}
-              aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')}
-              className="grid h-16 w-16 place-items-center rounded-full bg-accent text-on-accent transition active:scale-95 disabled:opacity-40">
-              <Volume2 size={24} aria-hidden="true" />
-            </button>
-          ) : <span className="h-16 w-0" />}
-          <button type="button" onClick={flip} aria-label={t('cards.flip')} title={t('cards.flip')}
-            className={`grid h-13 w-13 ${circle}`}><RotateCw size={22} aria-hidden="true" /></button>
-          <button type="button" onClick={() => slide(1)} disabled={i >= last} aria-label={t('collection.next')}
-            className={`grid h-13 w-13 ${circle}`}><ChevronRight size={24} aria-hidden="true" /></button>
+      {/* The controls: the same big, thumb-friendly row on phones and desktops — ⟳ 🔊 ⤢. None in focus mode. */}
+      {!focus && (
+        <div className="mt-3 flex shrink-0 flex-col items-center gap-1">
+          <div className="flex h-16 items-center justify-center gap-6" data-testid="deck-controls">
+            <button type="button" onClick={flip} aria-label={t('cards.flip')} title={t('cards.flip')}
+              className={`grid h-13 w-13 ${circle}`}><RotateCw size={22} aria-hidden="true" /></button>
+            {canSpeak ? (
+              // In native → word, listening before the flip would give the answer away.
+              <button type="button" onClick={say} disabled={ruFirst && !flipped}
+                aria-label={t('quiz.listenTitle')} title={t('quiz.listenTitle')}
+                className="grid h-16 w-16 place-items-center rounded-full bg-accent text-on-accent transition active:scale-95 disabled:opacity-40">
+                <Volume2 size={24} aria-hidden="true" />
+              </button>
+            ) : <span className="h-16 w-16" />}
+            <button type="button" onClick={() => onFocusChange?.(true)} aria-label={t('cards.focus')} title={t('cards.focus')}
+              className={`grid h-13 w-13 ${circle}`}><Maximize2 size={20} aria-hidden="true" /></button>
+          </div>
+          {showHints && <p className="text-[13px] text-faint md:hidden">{t('cards.swipeHint')}</p>}
+          <p className="hidden text-[13px] text-faint md:block">{t('collection.keysHint')}</p>
         </div>
-        <span data-testid="deck-counter" className="text-[13px] tabular-nums text-muted">{i + 1} / {total}</span>
-        {showHints && <p className="text-[13px] text-faint md:hidden">{t('cards.swipeHint')}</p>}
-        <p className="hidden text-[13px] text-faint md:block">{t('collection.keysHint')}</p>
-      </div>
+      )}
     </div>
   )
-}
+})

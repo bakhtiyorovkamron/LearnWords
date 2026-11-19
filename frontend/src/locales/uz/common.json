@@ -149,7 +149,15 @@
     "flip": "Kartochkani aylantirish",
     "emptyFolder": "Bu papkada hali so‘z yo‘q",
     "pickFolder": "Qaysi papka?",
-    "sideNative": { "ru": "Ruscha", "en": "Inglizcha", "uz": "O‘zbekcha" }
+    "sideNative": { "ru": "Ruscha", "en": "Inglizcha", "uz": "O‘zbekcha" },
+    "close": "Kartochkalarni yopish",
+    "options": "To‘plam sozlamalari",
+    "folder": "Papka",
+    "direction": "Yo‘nalish",
+    "jump": "Kartochkaga o‘tish",
+    "position": "{{total}} tadan {{n}}-si",
+    "focus": "Kartochka butun ekranda",
+    "focusExit": "Chiqish uchun pastga suring"
   },
   "collection": { "found": "Topildi: {{count}}",
     "filter": { "all": "Hammasi", "new": "Yangi", "learning": "O‘rganyapman", "learned": "O‘rganilgan", "title": "Filtr", "reset": "Tozalash", "done": "Tayyor" },
