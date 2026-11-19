@@ -372,7 +372,7 @@ export const telegramBroadcastApi = {
   get: (id: number) => api.get<TelegramBroadcast>(`/admin/telegram/broadcasts/${id}`).then((r) => r.data),
 }
 
-export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker'
+export type FeatureName = 'photo_import' | 'daily_story' | 'word_search' | 'story_autotranslate' | 'theme_picker' | 'folder_games'
 
 /** A feature as the admin sees it for one user. daily_limit is the effective limit (null = unlimited). */
 export interface FeatureState {
@@ -386,7 +386,8 @@ export interface FeatureState {
   credits: number // bought units left (spent once the free ones of the day run out)
 }
 
-export type MeFeatures = Record<FeatureName, { enabled: boolean; daily_limit: number | null; remaining: number | null; credits: number }>
+// Partial: a feature the server does not know yet is simply missing (useFeatures treats it as absent).
+export type MeFeatures = Partial<Record<FeatureName, { enabled: boolean; daily_limit: number | null; remaining: number | null; credits: number }>>
 
 export interface Me {
   id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang
@@ -643,6 +644,21 @@ export const practiceApi = {
       })
       .then((r) => r.data.cards),
   answer: (id: string, correct: boolean) => api.post(`/practice/${id}/answer`, { correct }).then(() => undefined),
+}
+
+// Folder games (feature folder_games): only each game's best per folder is kept; never the Leitner boxes.
+export type GameName = 'pairs' | 'articles'
+/** A best result: pairs → ms with the penalties (lower is better); articles → points out of best_of. */
+export interface GameRecord { game: GameName; best: number; best_of: number | null; plays: number }
+/** new_record: the first or a better result; previous: the best it beat (null for the first). */
+export interface GameResultResponse { record: GameRecord; new_record: boolean; previous: number | null }
+
+export const gamesApi = {
+  /** folder: 'all' | 'none' | a folder id. */
+  records: (folder: string) =>
+    api.get<{ records: GameRecord[] }>('/games/records', { params: { folder_id: folder } }).then((r) => r.data.records),
+  result: (body: { game: GameName; folder_id: string; score: number; of?: number | null }) =>
+    api.post<GameResultResponse>('/games/result', body).then((r) => r.data),
 }
 
 

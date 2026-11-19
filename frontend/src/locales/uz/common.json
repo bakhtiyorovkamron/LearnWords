@@ -380,7 +380,7 @@
   "buy": {"currency": "so‘m", "cta": "Surat sotib olish", "title": "Bugungi bepul suratlar tugadi", "titleVoluntary": "Surat sotib olish", "subtitle": "Har kuni {{limit}} ta bepul surat beriladi. Sotib olingan suratlarning muddati tugamaydi, ular bepullari tugaganda ishlatiladi.", "pack": "{{n}} ta surat", "perPhoto": "bir surat — {{price}}", "best": "Eng foydali", "payTitle": "Qanday to‘lanadi", "step1": "{{amount}}ni shu kartaga o‘tkazing:", "step2": "O‘tkazma izohiga ushbu kodni yozing:", "step3": "To‘lov kelishi bilan suratlar hisobingizga qo‘shiladi.", "copy": "Nusxalash", "copied": "Nusxalandi", "openTelegram": "Telegramda yozish", "done": "Tayyor", "cancel": "So‘rovni bekor qilish", "unavailable": "Surat sotib olish hozir mavjud emas.", "tooMany": "Sizda to‘lanmagan so‘rovlar bor — avval ularni to‘lang yoki bekor qiling.", "pending": "{{code}} so‘rovi to‘lovni kutmoqda", "paidToast": "+{{n}} ta surat hisobingizda", "payTitleTg": "Telegram orqali to‘lash", "tgStep1": "Quyidagi tugma orqali Telegramimizni oching.", "tgStep2": "U yerga so‘rov kodini yuboring:", "tgStep3": "{{amount}}ni qanday to‘lashni aytamiz. To‘lovdan so‘ng suratlar hisobingizga qo‘shiladi."},
   "push": {"enable": "Bildirishnomalarni yoqish", "enabled": "Bildirishnomalar yoqilgan", "disable": "O‘chirish", "denied": "Brauzerda bildirishnomalar taqiqlangan. Ularni sayt sozlamalarida yoqing.", "iosHint": "iPhone telefonlarida bildirishnomalar yodla «Uy» ekraniga qo‘shilganda ishlaydi: Ulashish → «Uy ekraniga qo‘shish».", "unsupported": "Bu brauzer bildirishnomalarni qo‘llab-quvvatlamaydi."},
   "theme": {"title": "Mavzu", "auto": "Tizimdagidek", "night": "Tungi yashil", "light": "Yorug‘", "graphite": "Grafit", "sand": "Qumrang", "navy": "Tungi ko‘k"},
-  "features": {"photo_import": "Darslik surati", "daily_story": "Kun hikoyasi", "word_search": "AI orqali so‘z qidirish", "story_autotranslate": "O‘z hikoyalarini avtomatik tarjima qilish", "theme_picker": "Mavzu tanlash"},
+  "features": {"photo_import": "Darslik surati", "daily_story": "Kun hikoyasi", "word_search": "AI orqali so‘z qidirish", "story_autotranslate": "O‘z hikoyalarini avtomatik tarjima qilish", "theme_picker": "Mavzu tanlash", "folder_games": "Papkadagi o‘yinlar"},
   "share": {"emptyFolder": "Papka bo‘sh — ulashish uchun so‘z qo‘shing", "isShared": "Havola orqali ulashilgan", "title": "«{{name}}» papkasini ulashish", "hint": "Havolasi bor har kim so‘zlarni ko‘rib, o‘ziga qo‘sha oladi. Sizning natijalaringiz ulashilmaydi.", "copy": "Havolani nusxalash", "copied": "Havola nusxalandi", "telegram": "Telegram orqali yuborish", "telegramText": "yodla.fun saytida nemis tilini o‘rganyapman — mana mening «{{name}}» so‘zlarim", "regenerate": "Yangi havola yaratish", "disable": "Havolani o‘chirish", "disabled": "Havola o‘chirildi", "imports": "O‘ziga qo‘shganlar: {{count}}"},
   "shared": {"words": "So‘zlar: {{count}}", "add": "O‘zimga qo‘shish", "loginToAdd": "So‘zlarni qo‘shish uchun kiring", "added": "Qo‘shildi: {{added}}. Avvaldan bor edi: {{skipped}}", "notFound": "Havola noto‘g‘ri yoki o‘chirilgan", "own": "Bu sizning papkangiz", "langMismatch": "Bu papka boshqa o‘rganish tili uchun", "empty": "Bu papkada hali so‘z yo‘q"},
   "contact": {"title": "Biz bilan bog‘lanish", "question": "Savol yoki muammo bormi? Bizga yozing:", "loginProblem": "Kira olmayapsizmi? Bizga yozing:", "reportProblem": "Muammo haqida xabar berish"},
@@ -410,5 +410,46 @@
     "nothingDueHint": "Bugungi takrorlash bajarildi. Xohlagancha mashq qilishingiz mumkin.",
     "needWords": "Kamida 4 ta so‘z kerak",
     "trainFolder": "Mashq qilish: {{name}}"
+  },
+  "games": {
+    "title": "O‘yinlar",
+    "play": "O‘ynash",
+    "record": "rekord {{value}}",
+    "wordsFromFolder_one": "papkadan {{count}} ta so‘z",
+    "wordsFromFolder_other": "papkadan {{count}} ta so‘z",
+    "pairs": {
+      "name": "Juftlar",
+      "rule": "So‘zni tarjimasi bilan juftlang. Har bir xato 2 soniya qo‘shadi.",
+      "hint": "So‘zni, keyin tarjimasini bosing"
+    },
+    "articles": {
+      "name": "der · die · das",
+      "rule": "Artiklni tanlang: der, die yoki das. Xato qilsangiz, so‘z oxirida yana chiqadi.",
+      "fact": "Papkadagi otlar"
+    },
+    "round": "raund {{n}}/{{total}}",
+    "progress": "{{n}}/{{total}}",
+    "streak": "ketma-ket {{n}}",
+    "notEnough": "Bu o‘yin uchun kamida 4 ta tarjimali so‘z kerak",
+    "notEnoughNouns": "Kamida 4 ta artiklli ot kerak",
+    "back": "Papkaga qaytish",
+    "again": "Yana o‘ynash",
+    "newRecord": "Yangi rekord · avval {{value}}",
+    "firstRecord": "Birinchi rekord",
+    "bestWas": "Rekord: {{value}}",
+    "saveFailed": "Natija saqlanmadi",
+    "stat": {
+      "words_one": "so‘z",
+      "words_other": "so‘z",
+      "mistakes_one": "xato",
+      "mistakes_other": "xato",
+      "penalty": "jarima",
+      "time": "vaqt"
+    },
+    "seconds": "+{{n}} s",
+    "mistakes": "Xatolar",
+    "markRepeat": "Keyinroq takrorlash · {{count}}",
+    "marked": "Birinchi takrorlaymiz · {{count}}",
+    "markNote": "Bu so‘zlar kartochkalarda va mashg‘ulotda birinchi chiqadi."
   }
 }

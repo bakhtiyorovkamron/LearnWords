@@ -112,8 +112,8 @@ func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(states) != 5 || states[0].Feature != domain.FeaturePhotoImport || states[3].Feature != domain.FeatureStoryAutotranslate ||
-		states[4].Feature != domain.FeatureThemePicker {
+	if len(states) != 6 || states[0].Feature != domain.FeaturePhotoImport || states[3].Feature != domain.FeatureStoryAutotranslate ||
+		states[4].Feature != domain.FeatureThemePicker || states[5].Feature != domain.FeatureFolderGames {
 		t.Fatalf("catalog order: %+v", states)
 	}
 	p := states[0]
@@ -122,8 +122,8 @@ func TestFeatures_DefaultsWithoutOverrides(t *testing.T) {
 		t.Errorf("photo_import: %+v", p)
 	}
 	for _, st := range states[1:] {
-		// daily_story is unfinished: off until the admin turns it on (DisabledByDefault)
-		wantOn := st.Feature != domain.FeatureDailyStory
+		// daily_story and folder_games are unfinished: off until the admin turns them on (DisabledByDefault)
+		wantOn := st.Feature != domain.FeatureDailyStory && st.Feature != domain.FeatureFolderGames
 		if st.Enabled != wantOn || st.DailyLimit != nil || st.Remaining != nil {
 			t.Errorf("%s must be unlimited and enabled=%v: %+v", st.Feature, wantOn, st)
 		}

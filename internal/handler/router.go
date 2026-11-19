@@ -33,6 +33,7 @@ type RouterDeps struct {
 	Folders     *FolderHandler
 	Shared      *SharedHandler
 	Search      *SearchHandler
+	Games       *GameHandler
 	Photo       *PhotoHandler
 	Feedback    *FeedbackHandler
 	Push        *PushHandler
@@ -175,6 +176,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.GET("/review/due", d.Review.Due)
 		protected.POST("/review/:id/answer", d.Review.Answer)
 		protected.GET("/practice/words", d.Practice.Words)
+		protected.GET("/games/records", d.Games.Records)
+		protected.POST("/games/result", d.Games.Result)
 		protected.POST("/practice/:id/answer", d.Practice.Answer)
 		protected.GET("/stats", d.Stats.Get)
 		protected.GET("/stories", d.Stories.List)

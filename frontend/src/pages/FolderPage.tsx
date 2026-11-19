@@ -17,11 +17,13 @@ import { Sheet } from '../components/Sheet'
 import { ShareFolderModal } from '../components/ShareFolderModal'
 import { toast } from '../components/Toaster'
 import { Word } from '../components/WordCard'
+import { FolderGames } from '../components/games/FolderGames'
 import { NothingFound, WordList } from '../components/WordList'
 import { useDebounced } from '../lib/useDebounced'
 import { useMoveWords } from '../lib/moveWords'
 import { useDeleteWords, useVisibleCards } from '../lib/deleteWords'
 import { MIN_PRACTICE_WORDS } from '../lib/practiceQueue'
+import { useFeatures } from '../lib/features'
 
 const PAGE = 48
 const squareButton = 'grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border border-line text-fg transition hover:bg-surface-2 disabled:opacity-40'
@@ -37,6 +39,7 @@ export function FolderPage() {
   const qc = useQueryClient()
   const { folder: param = 'all' } = useParams()
   const list = useFolderList()
+  const gamesOn = useFeatures().isEnabled('folder_games')
   const isAll = param === 'all'
   const isNone = param === 'none'
   const folderId = isAll ? '' : param // '' = all words, 'none', or an id
@@ -208,6 +211,8 @@ export function FolderPage() {
         </div>
       </section>
       {remove.error && <p className="text-sm text-danger">{errorMessage(remove.error)}</p>}
+
+      {gamesOn && <FolderGames folder={param} total={total} />}
 
       <div className="flex items-center gap-3">
         <h2 className="flex-1 font-semibold text-fg">{t('words.listTitle')}</h2>

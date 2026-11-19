@@ -380,7 +380,7 @@
   "buy": {"currency": "UZS", "cta": "Buy photos", "title": "Today's free photos are used up", "titleVoluntary": "Buy photos", "subtitle": "You get {{limit}} free photos every day. Bought photos never expire and are used once the free ones run out.", "pack": "{{n}} photos", "perPhoto": "{{price}} per photo", "best": "Best value", "payTitle": "How to pay", "step1": "Transfer {{amount}} to this card:", "step2": "Write this code in the transfer comment:", "step3": "As soon as the transfer arrives, the photos appear on your account.", "copy": "Copy", "copied": "Copied", "openTelegram": "Message us on Telegram", "done": "Done", "cancel": "Cancel request", "unavailable": "Buying photos is not available right now.", "tooMany": "You already have unpaid requests — pay or cancel them first.", "pending": "Request {{code}} is waiting for payment", "paidToast": "+{{n}} photos added to your account", "payTitleTg": "Pay via Telegram", "tgStep1": "Open our Telegram with the button below.", "tgStep2": "Send us this request code there:", "tgStep3": "We'll reply with how to pay {{amount}}. Once it's paid, the photos appear on your account."},
   "push": {"enable": "Turn on notifications", "enabled": "Notifications on", "disable": "Turn off", "denied": "Notifications are blocked in your browser. Allow them in the site settings.", "iosHint": "On iPhone, notifications work after adding yodla to the Home Screen: Share → \"Add to Home Screen\".", "unsupported": "This browser doesn't support notifications."},
   "theme": {"title": "Theme", "auto": "System", "night": "Night green", "light": "Light", "graphite": "Graphite", "sand": "Sand", "navy": "Night blue"},
-  "features": {"photo_import": "Textbook photo", "daily_story": "Daily story", "word_search": "AI word search", "story_autotranslate": "Auto-translation of own stories", "theme_picker": "Theme picker"},
+  "features": {"photo_import": "Textbook photo", "daily_story": "Daily story", "word_search": "AI word search", "story_autotranslate": "Auto-translation of own stories", "theme_picker": "Theme picker", "folder_games": "Folder games"},
   "share": {"emptyFolder": "The folder is empty — add words to share it", "isShared": "Shared via link", "title": "Share folder “{{name}}”", "hint": "Anyone with the link can view the words and add them to their account. Your progress is not shared.", "copy": "Copy link", "copied": "Link copied", "telegram": "Send via Telegram", "telegramText": "I'm learning German on yodla.fun — here are my words “{{name}}”", "regenerate": "Create a new link", "disable": "Turn off link", "disabled": "Link turned off", "imports": "Added by: {{count}}"},
   "shared": {"words": "Words: {{count}}", "add": "Add to my words", "loginToAdd": "Log in to add these words", "added": "Added: {{added}}. Already had: {{skipped}}", "notFound": "This link is invalid or was turned off", "own": "This is your folder", "langMismatch": "This folder is for a different learning language", "empty": "This folder is empty"},
   "contact": {"title": "Contact us", "question": "Questions or problems? Message us:", "loginProblem": "Can't log in? Message us:", "reportProblem": "Report a problem"},
@@ -410,5 +410,46 @@
     "nothingDueHint": "Today's review is done. Train as much as you like.",
     "needWords": "Add at least 4 words",
     "trainFolder": "Practice: {{name}}"
+  },
+  "games": {
+    "title": "Games",
+    "play": "Play",
+    "record": "best {{value}}",
+    "wordsFromFolder_one": "{{count}} word from the folder",
+    "wordsFromFolder_other": "{{count}} words from the folder",
+    "pairs": {
+      "name": "Pairs",
+      "rule": "Match each word with its translation. Every mistake adds 2 seconds.",
+      "hint": "Tap a word, then its translation"
+    },
+    "articles": {
+      "name": "der · die · das",
+      "rule": "Pick the article: der, die or das. Miss one and the word comes back at the end.",
+      "fact": "Nouns from the folder"
+    },
+    "round": "round {{n}} of {{total}}",
+    "progress": "{{n}} of {{total}}",
+    "streak": "streak {{n}}",
+    "notEnough": "This game needs at least 4 words with a translation",
+    "notEnoughNouns": "You need at least 4 nouns with an article",
+    "back": "Back to the folder",
+    "again": "Play again",
+    "newRecord": "New best · was {{value}}",
+    "firstRecord": "Your first best",
+    "bestWas": "Best: {{value}}",
+    "saveFailed": "The result was not saved",
+    "stat": {
+      "words_one": "word",
+      "words_other": "words",
+      "mistakes_one": "mistake",
+      "mistakes_other": "mistakes",
+      "penalty": "penalty",
+      "time": "time"
+    },
+    "seconds": "+{{n}} s",
+    "mistakes": "Mistakes",
+    "markRepeat": "Review later · {{count}}",
+    "marked": "We'll review them first · {{count}}",
+    "markNote": "These words will come first in the cards and in training."
   }
 }

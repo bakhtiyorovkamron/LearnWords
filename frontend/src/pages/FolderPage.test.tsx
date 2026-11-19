@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { collectionApi, foldersApi, wordsApi } from '../api/endpoints'
+import { collectionApi, foldersApi, gamesApi, meApi, wordsApi, type Me } from '../api/endpoints'
 import { commitPendingDeletes, resetDeleteWords } from '../lib/deleteWords'
 import { FolderPage } from './FolderPage'
 
@@ -14,6 +14,8 @@ vi.mock('../api/endpoints', async (importOriginal) => {
     collectionApi: { list: vi.fn(), ids: vi.fn() },
     foldersApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), share: vi.fn() },
     wordsApi: { ...mod.wordsApi, move: vi.fn(), remove: vi.fn() },
+    meApi: { get: vi.fn() },
+    gamesApi: { records: vi.fn(), result: vi.fn() },
   }
 })
 
@@ -29,6 +31,12 @@ const row = (n: number) => ({
   box_level: 1, is_learned: false, next_review_at: new Date().toISOString(), reviewed_today: false,
 })
 
+/** /me with folder_games on or off (and a learning language). */
+const me = (games: boolean, lang: 'de' | 'en' = 'de'): Me => ({
+  id: 'u', email: 'a@b.co', role: 'user', learning_language: lang,
+  features: { folder_games: { enabled: games, daily_limit: null, remaining: null, credits: 0 } },
+})
+
 const Where = () => <div data-testid="where">{useLocation().pathname + useLocation().search}</div>
 function renderFolder(path: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -39,6 +47,7 @@ function renderFolder(path: string) {
         <Routes>
           <Route path="/words/:folder" element={<FolderPage />} />
           <Route path="/words" element={<div>HUB</div>} />
+          <Route path="/games/:game" element={<div>GAME</div>} />
           <Route path="*" element={<div>elsewhere</div>} />
         </Routes>
       </MemoryRouter>
@@ -56,6 +65,8 @@ beforeEach(async () => {
   vi.mocked(collectionApi.list).mockResolvedValue({ items: [row(1), row(2)], total: 8 } as never)
   vi.mocked(collectionApi.ids).mockResolvedValue({ ids: ['c1', 'c2'], total: 2 } as never)
   vi.mocked(wordsApi.move).mockResolvedValue({ moved: 2, previous: [] } as never)
+  vi.mocked(meApi.get).mockResolvedValue(me(false))
+  vi.mocked(gamesApi.records).mockResolvedValue([])
 })
 afterEach(() => { cleanup(); resetDeleteWords(); vi.clearAllMocks() })
 
@@ -380,5 +391,80 @@ describe('FolderPage: the folder sheet and the list controls', () => {
     renderFolder('/words/f1')
     fireEvent.click(await screen.findByRole('button', { name: /Show more/ }))
     await waitFor(() => expect(screen.getAllByTestId('word-row')).toHaveLength(49))
+  })
+})
+
+describe('FolderPage: games (folder_games)', () => {
+  const block = () => screen.queryByRole('heading', { level: 2, name: 'Games' })
+
+  it('no games block while the flag is off', async () => {
+    renderFolder('/words/f1')
+    await screen.findByText('8 words')
+    await waitFor(() => expect(meApi.get).toHaveBeenCalled())
+    await act(async () => {}) // /me has answered
+    expect(block()).toBeNull()
+    expect(screen.queryByTestId('game-tile-pairs')).toBeNull()
+    expect(gamesApi.records).not.toHaveBeenCalled()
+  })
+
+  it('no games block while /me has not loaded yet: a feature off by default never flashes', async () => {
+    vi.mocked(meApi.get).mockReturnValue(new Promise(() => {}))
+    renderFolder('/words/f1')
+    await screen.findByText('8 words')
+    expect(block()).toBeNull()
+  })
+
+  it('on: the block after the summary and before "Words", two tiles, records in the corner', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true))
+    vi.mocked(gamesApi.records).mockResolvedValue([{ game: 'pairs', best: 42_500, best_of: null, plays: 3 }])
+    renderFolder('/words/f1')
+    const title = await screen.findByRole('heading', { level: 2, name: 'Games' })
+    const words = screen.getByRole('heading', { level: 2, name: 'Words' })
+    expect(title.compareDocumentPosition(words) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId('game-tile-pairs').textContent).toContain('Pairs')
+    expect(screen.getByTestId('game-tile-articles').textContent).toContain('der · die · das')
+    expect((await screen.findByTestId('game-record-pairs')).textContent).toBe('0:42')
+    expect(screen.queryByTestId('game-record-articles')).toBeNull() // never played here
+    expect(gamesApi.records).toHaveBeenCalledWith('f1')
+  })
+
+  it('no der · die · das tile for a learning language other than German', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true, 'en'))
+    renderFolder('/words/f1')
+    expect(await screen.findByTestId('game-tile-pairs')).toBeTruthy()
+    expect(screen.queryByTestId('game-tile-articles')).toBeNull()
+  })
+
+  it('a tile opens its sheet: the rule, the words it is played with, the record; Play → /games/pairs?folder=f1', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true))
+    vi.mocked(gamesApi.records).mockResolvedValue([{ game: 'pairs', best: 61_000, best_of: null, plays: 1 }])
+    renderFolder('/words/f1')
+    await screen.findByTestId('game-record-pairs')
+    fireEvent.click(screen.getByTestId('game-tile-pairs'))
+    const sheet = screen.getByRole('dialog', { name: 'Pairs' })
+    expect(within(sheet).getByText('Match each word with its translation. Every mistake adds 2 seconds.')).toBeTruthy()
+    expect(within(sheet).getByText('8 words from the folder')).toBeTruthy() // min(12, 8)
+    expect(within(sheet).getByText('best 1:01')).toBeTruthy()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Play' }))
+    expect(where()).toBe('/games/pairs?folder=f1')
+  })
+
+  it('the der · die · das sheet says it plays the nouns; "all words" opens it with folder=all', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true))
+    renderFolder('/words/all')
+    fireEvent.click(await screen.findByTestId('game-tile-articles'))
+    const sheet = screen.getByRole('dialog', { name: 'der · die · das' })
+    expect(within(sheet).getByText('Nouns from the folder')).toBeTruthy()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Play' }))
+    expect(where()).toBe('/games/articles?folder=all')
+  })
+
+  it('fewer than 4 words in the folder: Play is disabled and says so', async () => {
+    vi.mocked(meApi.get).mockResolvedValue(me(true))
+    vi.mocked(foldersApi.list).mockResolvedValue(folderList({ total: 3 }) as never)
+    renderFolder('/words/f1')
+    fireEvent.click(await screen.findByTestId('game-tile-pairs'))
+    const play = within(screen.getByRole('dialog', { name: 'Pairs' })).getByRole('button', { name: 'Add at least 4 words' })
+    expect((play as HTMLButtonElement).disabled).toBe(true)
   })
 })

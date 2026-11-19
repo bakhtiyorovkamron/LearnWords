@@ -215,6 +215,7 @@ func run() error {
 		Folders:     handler.NewFolderHandler(folderRepo),
 		Shared:      handler.NewSharedHandler(folderRepo, wordLimit),
 		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),
+		Games:       handler.NewGameHandler(service.NewGameService(postgres.NewGameRepository(pool)), featureSvc),
 		Feedback:    handler.NewFeedbackHandler(feedbackRepo),
 		Push:        handler.NewPushHandler(pushSvc),
 		Photo:       handler.NewPhotoHandler(service.NewPhotoImportService(photoReader, cardRepo, featureSvc)),

@@ -13,6 +13,7 @@ const (
 	FeatureWordSearch         = "word_search"
 	FeatureStoryAutotranslate = "story_autotranslate"
 	FeatureThemePicker        = "theme_picker"
+	FeatureFolderGames        = "folder_games"
 )
 
 // FeatureSpec describes a feature in the catalog. DefaultLimit nil = unlimited.
@@ -32,6 +33,7 @@ var FeatureCatalog = []FeatureSpec{
 	{Name: FeatureWordSearch},
 	{Name: FeatureStoryAutotranslate},
 	{Name: FeatureThemePicker},
+	{Name: FeatureFolderGames, DisabledByDefault: true},
 }
 
 // FeatureByName looks a feature up in the catalog.

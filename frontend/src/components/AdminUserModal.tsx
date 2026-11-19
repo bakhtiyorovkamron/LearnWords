@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Camera, Languages, Palette, Pencil, Search, Send, Star, type LucideIcon } from 'lucide-react'
+import { BookOpen, Camera, Gamepad2, Languages, Palette, Pencil, Search, Send, Star, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { adminApi, type AdminUser, type FeatureState } from '../api/endpoints'
 import { errorMessage } from '../api/client'
@@ -74,6 +74,7 @@ export function AdminUserModal({ user, onClose, onWrite, onWriteTelegram }: {
 
 const FEATURE_ICON: Record<string, LucideIcon> = {
   photo_import: Camera, daily_story: BookOpen, word_search: Search, story_autotranslate: Languages, theme_picker: Palette,
+  folder_games: Gamepad2,
 }
 
 /** Five stars, `rating` of them filled; the number is in the aria-label. */

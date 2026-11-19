@@ -6,6 +6,7 @@ import { ContextsPage } from './pages/ContextsPage'
 import { NewContextPage } from './pages/NewContextPage'
 import { CardsDeckPage } from './pages/CardsDeckPage'
 import { FolderPage } from './pages/FolderPage'
+import { GamePage } from './pages/GamePage'
 import { WordsPage } from './pages/WordsPage'
 import { TrainPage } from './pages/TrainPage'
 import { StatsPage } from './pages/StatsPage'
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/cards" element={<CardsDeckPage />} />
           <Route path="/words" element={<WordsPage />} />
           <Route path="/words/:folder" element={<FolderPage />} />
+          <Route path="/games/:game" element={<GamePage />} />
           <Route path="/train" element={<TrainPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/story" element={<StoryPage />} />
