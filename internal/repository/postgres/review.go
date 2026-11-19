@@ -30,6 +30,7 @@ func folderWhere(folder *domain.FolderFilter) (folderOnly *uuid.UUID, noFolder b
 }
 
 // ListDue returns unlearned cards due today, in priority order:
+//  0. marked "review later" on the deck, the newest mark first,
 //  1. overdue (next_review_at strictly before today) OR box 1 (new words / words just missed),
 //  2. everything else due exactly today (box 2-5),
 //
@@ -43,6 +44,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), COALESCE(w.example_gap_answer, ''), w.folder_id
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
+		LEFT JOIN word_repeat_marks m ON m.word_id = w.id
 		WHERE w.user_id = $1
 		  AND COALESCE(p.is_learned, false) = false
 		  AND COALESCE(p.next_review_at, $2::date) <= $2::date
@@ -50,6 +52,7 @@ func (r *ReviewRepository) ListDue(ctx context.Context, userID uuid.UUID, today 
 		  AND (NOT $5::bool OR w.folder_id IS NULL)
 		  AND (NOT w.paused OR $4::uuid IS NOT NULL) -- paused (starter) cards: only when asked by their folder
 		ORDER BY
+		  m.word_id IS NULL, m.marked_at DESC NULLS LAST, -- "review later" marks first, the newest first
 		  CASE WHEN COALESCE(p.next_review_at, $2::date) < $2::date OR COALESCE(p.box_level, 1) = 1 THEN 0 ELSE 1 END,
 		  COALESCE(p.next_review_at, $2::date),
 		  w.created_at
@@ -133,6 +136,10 @@ func (r *ReviewRepository) Apply(ctx context.Context, userID, wordID uuid.UUID, 
 		wordID, p.BoxLevel, p.CorrectStreakAtMax, p.IsLearned, p.NextReviewAt, p.LastReviewedAt); err != nil {
 		return nil, err
 	}
+	// The answer is the review the "review later" mark asked for: the mark goes.
+	if _, err := tx.Exec(ctx, `DELETE FROM word_repeat_marks WHERE word_id = $1`, wordID); err != nil {
+		return nil, err
+	}
 	// The first review answer puts a paused (starter) card into the normal schedule.
 	if _, err := tx.Exec(ctx, `UPDATE word_cards SET paused = false WHERE id = $1 AND paused`, wordID); err != nil {
 		return nil, err
@@ -179,7 +186,7 @@ func (r *ReviewRepository) MarkGoalDay(ctx context.Context, userID uuid.UUID, to
 // PracticeWords returns a pool for extra practice — drawn from the user's WHOLE collection
 // (not filtered by due date or is_learned; that's the point — something to do when nothing is
 // due), ordered per mode:
-//   - "hard": lowest Leitner box first, then most past wrong answers first (both signals of
+//   - "hard": words marked "review later" first (the newest mark first), then lowest Leitner box first, then most past wrong answers first (both signals of
 //     difficulty); mode is always one of NormalizePracticeMode's fixed values, never raw user
 //     input, so it is safe to splice into the ORDER BY.
 //   - "random": random order.
@@ -196,7 +203,7 @@ func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, 
 	case "recent":
 		order = "w.created_at DESC"
 	case "hard":
-		order = "COALESCE(p.box_level, 1) ASC, COALESCE(wr.wrong_count, 0) DESC, w.created_at ASC"
+		order = "m.word_id IS NULL, m.marked_at DESC NULLS LAST, COALESCE(p.box_level, 1) ASC, COALESCE(wr.wrong_count, 0) DESC, w.created_at ASC"
 	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT w.id, w.context_id, w.user_id, w.word, w.translation, w.transcription, w.audio_url,
@@ -204,6 +211,7 @@ func (r *ReviewRepository) PracticeWords(ctx context.Context, userID uuid.UUID, 
 		       COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), COALESCE(w.example_gap_answer, ''), w.folder_id
 		FROM word_cards w
 		LEFT JOIN word_progress p ON p.word_id = w.id
+		LEFT JOIN word_repeat_marks m ON m.word_id = w.id
 		LEFT JOIN (
 			SELECT word_id, count(*) AS wrong_count FROM review_logs
 			WHERE user_id = $1 AND NOT is_correct GROUP BY word_id
@@ -244,4 +252,118 @@ func (r *ReviewRepository) LogPractice(ctx context.Context, userID, wordID uuid.
 		`INSERT INTO review_logs (user_id, word_id, is_correct, session_type) VALUES ($1, $2, $3, 'practice')`,
 		userID, wordID, correct)
 	return err
+}
+
+// MarkRepeat marks the word "review later" and makes it due today without touching its box:
+// next_review_at = LEAST(next_review_at, today), is_learned = false, paused = false. What it
+// changed is stored with the mark (only what it changed), for UnmarkRepeat. A word without a progress
+// row is due already: its progress stays as it is. Already marked: nothing changes and the stored
+// values stay the first ones. Another user's word → domain.ErrNotFound.
+func (r *ReviewRepository) MarkRepeat(ctx context.Context, userID, wordID uuid.UUID, today time.Time) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// The card's row lock serialises two marks (and an unmark) of the same word.
+	var paused bool
+	err = tx.QueryRow(ctx, `SELECT paused FROM word_cards WHERE id = $1 AND user_id = $2 FOR UPDATE`, wordID, userID).Scan(&paused)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var marked bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM word_repeat_marks WHERE word_id = $1)`, wordID).Scan(&marked); err != nil {
+		return err
+	}
+	if marked {
+		return tx.Commit(ctx)
+	}
+
+	var prevNext *time.Time
+	var prevLearned *bool
+	var next time.Time
+	var learned bool
+	err = tx.QueryRow(ctx, `SELECT next_review_at, is_learned FROM word_progress WHERE word_id = $1 FOR UPDATE`, wordID).Scan(&next, &learned)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows): // no progress yet: due today already
+	case err != nil:
+		return err
+	default:
+		if next.After(today) {
+			prevNext = &next
+		}
+		if learned {
+			prevLearned = &learned
+		}
+		if prevNext != nil || prevLearned != nil {
+			if _, err := tx.Exec(ctx,
+				`UPDATE word_progress SET next_review_at = LEAST(next_review_at, $2::date), is_learned = false WHERE word_id = $1`,
+				wordID, today); err != nil {
+				return err
+			}
+		}
+	}
+	if paused {
+		if _, err := tx.Exec(ctx, `UPDATE word_cards SET paused = false WHERE id = $1`, wordID); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO word_repeat_marks (word_id, user_id, prev_next_review_at, prev_is_learned, prev_paused)
+		 VALUES ($1, $2, $3, $4, $5)`, wordID, userID, prevNext, prevLearned, paused); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// UnmarkRepeat removes the mark and puts back what marking changed (only the values it stored).
+// No mark (never marked, or answered since — Apply deletes it): nothing changes, so a newer answer
+// is never overwritten. Another user's word → domain.ErrNotFound.
+func (r *ReviewRepository) UnmarkRepeat(ctx context.Context, userID, wordID uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var one int
+	err = tx.QueryRow(ctx, `SELECT 1 FROM word_cards WHERE id = $1 AND user_id = $2 FOR UPDATE`, wordID, userID).Scan(&one)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var prevNext *time.Time
+	var prevLearned *bool
+	var prevPaused bool
+	err = tx.QueryRow(ctx,
+		`DELETE FROM word_repeat_marks WHERE word_id = $1 RETURNING prev_next_review_at, prev_is_learned, prev_paused`,
+		wordID).Scan(&prevNext, &prevLearned, &prevPaused)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tx.Commit(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	if prevNext != nil {
+		if _, err := tx.Exec(ctx, `UPDATE word_progress SET next_review_at = $2::date WHERE word_id = $1`, wordID, *prevNext); err != nil {
+			return err
+		}
+	}
+	if prevLearned != nil {
+		if _, err := tx.Exec(ctx, `UPDATE word_progress SET is_learned = $2 WHERE word_id = $1`, wordID, *prevLearned); err != nil {
+			return err
+		}
+	}
+	if prevPaused {
+		if _, err := tx.Exec(ctx, `UPDATE word_cards SET paused = true WHERE id = $1`, wordID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

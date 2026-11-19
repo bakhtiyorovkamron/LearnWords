@@ -13,16 +13,22 @@ type CollectionCard struct {
 	// ReviewedToday: the word was answered in a Leitner review today (UTC). Extra practice does
 	// not count — it never touches the schedule.
 	ReviewedToday bool `json:"reviewed_today"`
+	// RepeatMarked: the user marked the word "review later" on the deck and has not answered it
+	// in a review since.
+	RepeatMarked bool `json:"repeat_marked"`
 }
 
 // CollectionFilter: Status "" | all | new | learning | learned; Period "" | all | today | week;
-// Sort "" | date | alpha | progress; Q — substring of word or translation.
+// Sort "" | date | alpha | progress | repeat; Q — substring of word or translation.
 type CollectionFilter struct {
 	Status string
 	Period string
 	Sort   string
-	Q      string
-	Folder *FolderFilter // nil = all words
-	Limit  int
-	Offset int
+	// MarksBefore (sort=repeat): only marks made at or before it put a word first, so marking while
+	// a deck is open never reorders the pages it is still loading.
+	MarksBefore time.Time
+	Q           string
+	Folder      *FolderFilter // nil = all words
+	Limit       int
+	Offset      int
 }

@@ -105,7 +105,7 @@ describe('CardsDeckPage: full screen', () => {
   it('asks for the deck with the collection query (all words, 48 a page) and shows the first card', async () => {
     renderDeck('/cards')
     expect(await screen.findByTestId('deck-card')).toBeTruthy()
-    expect(collectionApi.list).toHaveBeenCalledWith({ status: 'all', period: 'all', sort: 'date', q: '', folder: '', limit: 48, offset: 0 })
+    expect(collectionApi.list).toHaveBeenCalledWith({ status: 'all', period: 'all', sort: 'repeat', q: '', folder: '', limit: 48, offset: 0, marksBefore: expect.any(String) })
     expect(counter()).toBe('1 / 2')
   })
 

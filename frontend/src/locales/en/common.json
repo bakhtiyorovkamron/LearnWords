@@ -157,7 +157,13 @@
     "jump": "Go to card",
     "position": "{{n}} of {{total}}",
     "focus": "Full-screen card",
-    "focusExit": "Swipe down to exit"
+    "focusExit": "Swipe down to exit",
+    "repeat": "Review later",
+    "repeatOn": "We'll review it first",
+    "repeatOff": "Mark removed",
+    "repeatHint": "Didn't remember? Tap here",
+    "repeatFirst": "Marked words first: {{count}}",
+    "repeatError": "Couldn't save the mark"
   },
   "collection": { "found": "Found: {{count}}",
     "filter": { "all": "All", "new": "New", "learning": "Learning", "learned": "Learned", "title": "Filter", "reset": "Reset", "done": "Done" },

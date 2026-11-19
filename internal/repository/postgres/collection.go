@@ -17,12 +17,12 @@ import (
 // Cards without a progress row count as box 1, not learned.
 func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUID, f domain.CollectionFilter) ([]domain.CollectionCard, int, error) {
 	q := collectionFrom(userID, f)
-	order := collectionOrder(f.Sort)
 
 	var total int
 	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+q.from, q.args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+	order := collectionOrder(q, f) // after the count: its arguments belong to the list query only
 
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -31,7 +31,8 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 	             w.language, w.created_at, COALESCE(w.example_sentence, ''), COALESCE(w.example_translation, ''), COALESCE(w.example_gap_answer, ''),
 	             COALESCE(p.box_level, 1), COALESCE(p.is_learned, false), w.folder_id, w.translation_language, w.example_translation_language,
 	             COALESCE(p.next_review_at, ` + todayArg + `::date)::timestamp,
-	             COALESCE(p.last_reviewed_at >= ` + todayArg + `::date::timestamp AT TIME ZONE 'UTC', false)` +
+	             COALESCE(p.last_reviewed_at >= ` + todayArg + `::date::timestamp AT TIME ZONE 'UTC', false),
+	             m.word_id IS NOT NULL` +
 		q.from + ` ORDER BY ` + order + ` LIMIT ` + q.arg(f.Limit) + ` OFFSET ` + q.arg(f.Offset)
 	rows, err := r.pool.Query(ctx, sql, q.args...)
 	if err != nil {
@@ -41,7 +42,7 @@ func (r *WordCardRepository) ListCollection(ctx context.Context, userID uuid.UUI
 		var c domain.CollectionCard
 		err := row.Scan(&c.ID, &c.ContextID, &c.UserID, &c.Word, &c.Translation, &c.Transcription, &c.AudioURL,
 			&c.Language, &c.CreatedAt, &c.ExampleSentence, &c.ExampleTranslation, &c.ExampleGapAnswer, &c.BoxLevel, &c.IsLearned, &c.FolderID, &c.TranslationLanguage, &c.ExampleTranslationLanguage,
-			&c.NextReviewAt, &c.ReviewedToday)
+			&c.NextReviewAt, &c.ReviewedToday, &c.RepeatMarked)
 		return c, err
 	})
 	return items, total, err
@@ -55,7 +56,8 @@ func (r *WordCardRepository) ListCollectionIDs(ctx context.Context, userID uuid.
 	if err := r.pool.QueryRow(ctx, `SELECT count(*)`+q.from, q.args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := r.pool.Query(ctx, `SELECT w.id`+q.from+` ORDER BY `+collectionOrder(f.Sort)+` LIMIT `+q.arg(f.Limit), q.args...)
+	order := collectionOrder(q, f)
+	rows, err := r.pool.Query(ctx, `SELECT w.id`+q.from+` ORDER BY `+order+` LIMIT `+q.arg(f.Limit), q.args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -115,14 +117,21 @@ func collectionFrom(userID uuid.UUID, f domain.CollectionFilter) *collectionQuer
 		}
 	}
 
-	q.from = ` FROM word_cards w LEFT JOIN word_progress p ON p.word_id = w.id WHERE ` + strings.Join(where, " AND ")
+	q.from = ` FROM word_cards w LEFT JOIN word_progress p ON p.word_id = w.id
+		LEFT JOIN word_repeat_marks m ON m.word_id = w.id WHERE ` + strings.Join(where, " AND ")
 	return q
 }
 
-// collectionOrder maps the sort parameter to a fixed whitelist → no SQL injection.
-func collectionOrder(sort string) string {
+// collectionOrder maps the sort parameter to a fixed whitelist → no SQL injection. "repeat" adds
+// its marks_before argument to q.
+func collectionOrder(q *collectionQuery, f domain.CollectionFilter) string {
 	order := "w.created_at DESC"
-	switch sort {
+	switch f.Sort {
+	case "repeat":
+		// Marked first, newest mark first — counting only the marks made by marks_before.
+		before := q.arg(f.MarksBefore)
+		first := "m.marked_at <= " + before + "::timestamptz"
+		order = "(" + first + ") IS TRUE DESC, CASE WHEN " + first + " THEN m.marked_at END DESC NULLS LAST, w.created_at DESC"
 	case "alpha":
 		order = "lower(w.word) ASC, w.created_at DESC"
 	case "progress":

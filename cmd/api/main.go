@@ -168,7 +168,8 @@ func run() error {
 	}
 	supportSvc := service.NewSupportService(postgres.NewSupportRepository(pool), pushSvc, telegramSvc)
 	heroSvc := service.NewHeroService(userRepo, postgres.NewHeroRepository(pool), cfg.HeroEnabled)
-	reviewSvc := service.NewReviewService(postgres.NewReviewRepository(pool))
+	reviewRepo := postgres.NewReviewRepository(pool)
+	reviewSvc := service.NewReviewService(reviewRepo)
 	wordCheckSvc := service.NewWordCheckService(wordChecker, postgres.NewWordCheckCacheRepository(pool), postgres.NewSearchCacheRepository(pool))
 	wordFixSvc := service.NewWordFixService(postgres.NewWordFixRepository(pool), wordCheckSvc)
 
@@ -210,6 +211,7 @@ func run() error {
 		WordEdit:    handler.NewWordEditHandler(cardRepo),
 		WordMove:    handler.NewWordMoveHandler(cardRepo),
 		WordDelete:  handler.NewWordDeleteHandler(cardRepo),
+		WordRepeat:  handler.NewWordRepeatHandler(service.NewRepeatService(reviewRepo)),
 		Folders:     handler.NewFolderHandler(folderRepo),
 		Shared:      handler.NewSharedHandler(folderRepo, wordLimit),
 		Search:      handler.NewSearchHandler(service.NewSearchService(wordLookup, cardRepo, contextSvc, postgres.NewSearchCacheRepository(pool)), featureSvc),

@@ -154,3 +154,34 @@ func TestAnswer_ChecksTheGoal_PracticeNever(t *testing.T) {
 		t.Errorf("practice answer checked the goal (%d)", repo.goalChecks)
 	}
 }
+
+type fakeRepeatRepo struct {
+	marked, unmarked int
+	today            time.Time
+}
+
+func (f *fakeRepeatRepo) MarkRepeat(_ context.Context, _, _ uuid.UUID, today time.Time) error {
+	f.marked++
+	f.today = today
+	return nil
+}
+func (f *fakeRepeatRepo) UnmarkRepeat(context.Context, uuid.UUID, uuid.UUID) error {
+	f.unmarked++
+	return nil
+}
+
+// SetRepeat marks with the same "today" as the review (dateOf), and unmarks without one.
+func TestSetRepeat(t *testing.T) {
+	repo := &fakeRepeatRepo{}
+	s := NewRepeatService(repo)
+	s.now = func() time.Time { return time.Date(2026, 11, 19, 18, 30, 0, 0, time.UTC) }
+	if on, err := s.SetRepeat(context.Background(), uuid.New(), uuid.New(), true); err != nil || !on {
+		t.Fatalf("mark: %v %v", on, err)
+	}
+	if want := time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC); !repo.today.Equal(want) || repo.marked != 1 {
+		t.Errorf("today = %v, want %v", repo.today, want)
+	}
+	if on, err := s.SetRepeat(context.Background(), uuid.New(), uuid.New(), false); err != nil || on || repo.unmarked != 1 {
+		t.Errorf("unmark: %v %v", on, err)
+	}
+}

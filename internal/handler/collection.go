@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ func NewCollectionHandler(store CollectionStore) *CollectionHandler {
 var (
 	collectionStatuses = map[string]bool{"": true, "all": true, "new": true, "learning": true, "learned": true}
 	collectionPeriods  = map[string]bool{"": true, "all": true, "today": true, "week": true}
-	collectionSorts    = map[string]bool{"": true, "date": true, "alpha": true, "progress": true}
+	collectionSorts    = map[string]bool{"": true, "date": true, "alpha": true, "progress": true, "repeat": true}
 )
 
 // parseCollectionFilter reads the filter shared by the list and the id list.
@@ -48,10 +49,20 @@ func parseCollectionFilter(c *gin.Context) (domain.CollectionFilter, bool) {
 		badRequest(c, "search query too long")
 		return f, false
 	}
+	// marks_before (sort=repeat): RFC 3339, now without it.
+	f.MarksBefore = time.Now()
+	if v := c.Query("marks_before"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			badRequest(c, "invalid marks_before")
+			return f, false
+		}
+		f.MarksBefore = t
+	}
 	return f, true
 }
 
-// List handles GET /api/collection?status=&period=&sort=&q=&folder_id=&limit=&offset=
+// List handles GET /api/collection?status=&period=&sort=&q=&folder_id=&limit=&offset=[&marks_before=]
 func (h *CollectionHandler) List(c *gin.Context) {
 	f, ok := parseCollectionFilter(c)
 	if !ok {

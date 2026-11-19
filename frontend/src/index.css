@@ -20,6 +20,9 @@
   --on-accent: #0E1A10;
   --danger: #FF8A7A;
   --streak: #F2A65A;
+  /* the "review later" mark on the cards deck */
+  --mark: #FF9F43;
+  --on-mark: #1A1206;
   --der: #7DD3FC;
   --die: #FDA4AF;
   --das: #6EE7B7;
@@ -44,6 +47,9 @@
   --on-accent: #FFFFFF;
   --danger: #C0392B;
   --streak: #D9822B;
+  /* the "review later" mark on the cards deck */
+  --mark: #D9480F;
+  --on-mark: #FFFFFF;
   --der: #0369A1;
   --die: #BE123C;
   --das: #047857;
@@ -68,6 +74,9 @@
   --on-accent: #08140F;
   --danger: #FF8A7A;
   --streak: #F2A65A;
+  /* the "review later" mark on the cards deck */
+  --mark: #FF9F43;
+  --on-mark: #1A1206;
   --der: #7DD3FC;
   --die: #FDA4AF;
   --das: #6EE7B7;
@@ -92,6 +101,9 @@
   --on-accent: #FFFFFF;
   --danger: #B4432A;
   --streak: #C0652A;
+  /* the "review later" mark on the cards deck */
+  --mark: #C2410C;
+  --on-mark: #FFFFFF;
   --der: #0369A1;
   --die: #BE123C;
   --das: #047857;
@@ -116,6 +128,9 @@
   --on-accent: #10180A;
   --danger: #FF8A7A;
   --streak: #F2A65A;
+  /* the "review later" mark on the cards deck */
+  --mark: #FF9F43;
+  --on-mark: #1A1206;
   --der: #7DD3FC;
   --die: #FDA4AF;
   --das: #6EE7B7;
@@ -145,6 +160,8 @@
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
   --color-streak: var(--streak);
+  --color-mark: var(--mark);
+  --color-on-mark: var(--on-mark);
   --color-der: var(--der);
   --color-die: var(--die);
   --color-das: var(--das);

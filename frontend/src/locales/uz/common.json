@@ -157,7 +157,13 @@
     "jump": "Kartochkaga o‘tish",
     "position": "{{total}} tadan {{n}}-si",
     "focus": "Kartochka butun ekranda",
-    "focusExit": "Chiqish uchun pastga suring"
+    "focusExit": "Chiqish uchun pastga suring",
+    "repeat": "Keyinroq takrorlash",
+    "repeatOn": "Birinchi takrorlaymiz",
+    "repeatOff": "Belgi olib tashlandi",
+    "repeatHint": "Eslay olmadingizmi? Shu yerni bosing",
+    "repeatFirst": "Avval belgilanganlar: {{count}}",
+    "repeatError": "Belgini saqlab bo‘lmadi"
   },
   "collection": { "found": "Topildi: {{count}}",
     "filter": { "all": "Hammasi", "new": "Yangi", "learning": "O‘rganyapman", "learned": "O‘rganilgan", "title": "Filtr", "reset": "Tozalash", "done": "Tayyor" },

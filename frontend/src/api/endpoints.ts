@@ -121,6 +121,10 @@ export const wordsApi = {
     api.post<MoveResult>('/words/move', { word_ids: wordIds, folder_id: folderId }).then((r) => r.data),
   // One word or many (≤ 500). Ids that are already gone are skipped.
   remove: (wordIds: string[]) => api.post<{ deleted: number }>('/words/delete', { word_ids: wordIds }).then((r) => r.data),
+  // The deck's "review later" mark: marking makes the word due today and puts it first; unmarking
+  // undoes exactly that. Both are idempotent.
+  setRepeat: (wordId: string, marked: boolean) =>
+    api.post<{ marked: boolean }>('/words/repeat', { word_id: wordId, marked }).then((r) => r.data),
 }
 
 export interface MoveResult {
@@ -651,6 +655,7 @@ export interface CollectionQuery {
   status: CollectionStatus; period: CollectionPeriod; sort: CollectionSort; q: string
   folder?: FolderSelection
   limit?: number; offset?: number
+  marksBefore?: string // sort 'repeat': only marks made by then (RFC 3339) put a word first
 }
 
 // Filtering/sorting happen on the backend (SQL), one page at a time.
@@ -661,6 +666,7 @@ export const collectionApi = {
         params: {
           status: f.status, period: f.period, sort: f.sort, q: f.q || undefined,
           folder_id: f.folder || undefined, limit: f.limit ?? 48, offset: f.offset ?? 0,
+          marks_before: f.marksBefore || undefined,
         },
       })
       .then((r) => r.data),

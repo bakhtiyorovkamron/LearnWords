@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { Ellipsis, Leaf, Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { collectionApi } from '../api/endpoints'
+import { collectionApi, wordsApi } from '../api/endpoints'
+import type { CollectionCard } from '../api/types'
 import { FolderSheet } from '../components/FolderSheet'
 import { useStoredChoice } from '../components/DirectionToggle'
 import { DeckScrubber } from '../components/DeckScrubber'
 import { ErrorState } from '../components/ErrorState'
+import { toast } from '../components/Toaster'
 import { FlipCards, type FlipCardsHandle } from '../components/FlipCards'
 import { FolderDot, shortFolderName, useFolderList } from '../components/Folders'
 import { splitArticle } from '../lib/article'
@@ -16,6 +18,7 @@ import { parseUrlSize } from '../lib/reviewSessionSize'
 import { setTrainingOpen } from '../lib/trainingState'
 
 const PAGE = 48
+type DeckPage = { items: CollectionCard[]; total: number }
 const DIRECTIONS = ['de_ru', 'ru_de'] as const
 
 const round = 'grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted transition hover:bg-surface-2'
@@ -82,7 +85,13 @@ export function CardsDeckPage() {
   const [jumping, setJumping] = useState(false) // the scrubber waits for pages to load
   const [pendingJump, setPendingJump] = useState<number | null>(null)
   const folders = useFolderList()
+  const qc = useQueryClient()
   const deck = useRef<FlipCardsHandle>(null)
+  // When this deck was opened (again for a new folder): marks made since then do not reorder the
+  // pages still to load — the deck keeps its order while it is open.
+  const [opened, setOpened] = useState(() => ({ folder, at: new Date().toISOString() }))
+  if (opened.folder !== folder) setOpened({ folder, at: new Date().toISOString() })
+  const marksBefore = opened.at
   const moreButton = useRef<HTMLButtonElement>(null)
 
   // The shell (header, bottom nav, More sheet, chat toasts) steps aside, as during a training.
@@ -91,10 +100,12 @@ export function CardsDeckPage() {
     return () => setTrainingOpen(false)
   }, [])
 
+  // Marked "review later" words first (sort=repeat), then the newest words.
+  const deckKey = useMemo(() => ['collection', { status: 'all', period: 'all', sort: 'repeat', search: '', folder, marksBefore }], [folder, marksBefore])
   const query = useInfiniteQuery({
-    queryKey: ['collection', { status: 'all', period: 'all', sort: 'date', search: '', folder }],
+    queryKey: deckKey,
     queryFn: ({ pageParam }) =>
-      collectionApi.list({ status: 'all', period: 'all', sort: 'date', q: '', folder, limit: PAGE, offset: pageParam }),
+      collectionApi.list({ status: 'all', period: 'all', sort: 'repeat', q: '', folder, limit: PAGE, offset: pageParam, marksBefore }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.items.length, 0)
@@ -105,6 +116,35 @@ export function CardsDeckPage() {
   const cards = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data])
   const total = query.data?.pages[0]?.total ?? 0
   const ready = !query.error && !query.isLoading && cards.length > 0
+
+  // On open: "Marked words first: N", N = the marked cards at the head of the first page.
+  const firstPage = query.data?.pages[0]
+  const toasted = useRef('')
+  useEffect(() => {
+    if (!firstPage || query.isPlaceholderData || toasted.current === marksBefore) return
+    toasted.current = marksBefore
+    const n = firstPage.items.findIndex((c) => !c.repeat_marked)
+    const leading = n === -1 ? firstPage.items.length : n
+    if (leading > 0) toast(t('cards.repeatFirst', { count: leading }))
+  }, [firstPage, query.isPlaceholderData, marksBefore, t])
+
+  /**
+   * The mark, optimistically: the card changes inside the cached pages (setQueryData, never a
+   * refetch: nothing may reorder while the deck is open), and goes back if the server says no.
+   */
+  const toggleRepeat = useCallback(async (card: CollectionCard, marked: boolean) => {
+    const set = (v: boolean) => qc.setQueryData<InfiniteData<DeckPage>>(deckKey, (d) => d && {
+      ...d,
+      pages: d.pages.map((p) => ({ ...p, items: p.items.map((c) => (c.id === card.id ? { ...c, repeat_marked: v } : c)) })),
+    })
+    set(marked)
+    try {
+      await wordsApi.setRepeat(card.id, marked)
+    } catch (e) {
+      set(!marked)
+      throw e
+    }
+  }, [qc, deckKey])
 
   // X (and Esc): back where the user came from inside the app, Home when the deck was opened directly.
   const close = useCallback(() => {
@@ -254,6 +294,7 @@ export function CardsDeckPage() {
             onIndexChange={setIndex}
             focus={focusMode}
             onFocusChange={setFocusMode}
+            onToggleRepeat={toggleRepeat}
           />
           {!focusMode && total > 1 && (
             <DeckScrubber index={index} total={total} labelOf={labelOf} onJump={(n) => void jump(n)} busy={jumping || pendingJump !== null} />

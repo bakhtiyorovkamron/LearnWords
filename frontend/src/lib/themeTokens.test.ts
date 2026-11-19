@@ -5,13 +5,13 @@ import { THEME_ACCENT, THEME_BG, type ResolvedTheme } from './theme'
 
 // The values of the design (one row per theme), checked against what index.css really says.
 const NAMES = ['bg', 'surface', 'surface-2', 'line', 'divider', 'fg', 'muted', 'faint', 'track', 'dot-off', 'accent',
-  'accent-text', 'on-accent', 'danger', 'streak', 'der', 'die', 'das'] as const
+  'accent-text', 'on-accent', 'danger', 'streak', 'der', 'die', 'das', 'mark', 'on-mark'] as const
 const TABLE: Record<ResolvedTheme, string[]> = {
-  night:    ['#0E1512', '#151F1B', '#18241C', '#26352F', '#22302A', '#EAF2EC', '#9DB0A5', '#6F847A', '#22302A', '#2C3B34', '#C8F25C', '#C8F25C', '#0E1A10', '#FF8A7A', '#F2A65A', '#7DD3FC', '#FDA4AF', '#6EE7B7'],
-  light:    ['#F6F7F3', '#FFFFFF', '#EDF7F1', '#E1E6DF', '#ECEFEA', '#13201A', '#5B6B62', '#8A968F', '#E1E6DF', '#DCE3DC', '#0E8A5F', '#0B7A54', '#FFFFFF', '#C0392B', '#D9822B', '#0369A1', '#BE123C', '#047857'],
-  graphite: ['#121314', '#1B1C1E', '#1C2924', '#2A2C2F', '#26282B', '#EDEEF0', '#A1A5AB', '#73777D', '#2A2C2F', '#34373B', '#5EE0A8', '#5EE0A8', '#08140F', '#FF8A7A', '#F2A65A', '#7DD3FC', '#FDA4AF', '#6EE7B7'],
-  sand:     ['#F4EFE6', '#FBF8F2', '#E9F0E3', '#E3DACB', '#ECE5D8', '#1E2420', '#6B655B', '#9A9284', '#E3DACB', '#DDD3C2', '#1F5A3A', '#1F5A3A', '#FFFFFF', '#B4432A', '#C0652A', '#0369A1', '#BE123C', '#047857'],
-  navy:     ['#0D1220', '#141B2D', '#18263A', '#232D45', '#1E2840', '#E8ECF5', '#9AA6BF', '#6C7893', '#232D45', '#2A3550', '#C8F25C', '#C8F25C', '#10180A', '#FF8A7A', '#F2A65A', '#7DD3FC', '#FDA4AF', '#6EE7B7'],
+  night:    ['#0E1512', '#151F1B', '#18241C', '#26352F', '#22302A', '#EAF2EC', '#9DB0A5', '#6F847A', '#22302A', '#2C3B34', '#C8F25C', '#C8F25C', '#0E1A10', '#FF8A7A', '#F2A65A', '#7DD3FC', '#FDA4AF', '#6EE7B7', '#FF9F43', '#1A1206'],
+  light:    ['#F6F7F3', '#FFFFFF', '#EDF7F1', '#E1E6DF', '#ECEFEA', '#13201A', '#5B6B62', '#8A968F', '#E1E6DF', '#DCE3DC', '#0E8A5F', '#0B7A54', '#FFFFFF', '#C0392B', '#D9822B', '#0369A1', '#BE123C', '#047857', '#D9480F', '#FFFFFF'],
+  graphite: ['#121314', '#1B1C1E', '#1C2924', '#2A2C2F', '#26282B', '#EDEEF0', '#A1A5AB', '#73777D', '#2A2C2F', '#34373B', '#5EE0A8', '#5EE0A8', '#08140F', '#FF8A7A', '#F2A65A', '#7DD3FC', '#FDA4AF', '#6EE7B7', '#FF9F43', '#1A1206'],
+  sand:     ['#F4EFE6', '#FBF8F2', '#E9F0E3', '#E3DACB', '#ECE5D8', '#1E2420', '#6B655B', '#9A9284', '#E3DACB', '#DDD3C2', '#1F5A3A', '#1F5A3A', '#FFFFFF', '#B4432A', '#C0652A', '#0369A1', '#BE123C', '#047857', '#C2410C', '#FFFFFF'],
+  navy:     ['#0D1220', '#141B2D', '#18263A', '#232D45', '#1E2840', '#E8ECF5', '#9AA6BF', '#6C7893', '#232D45', '#2A3550', '#C8F25C', '#C8F25C', '#10180A', '#FF8A7A', '#F2A65A', '#7DD3FC', '#FDA4AF', '#6EE7B7', '#FF9F43', '#1A1206'],
 }
 const SHADOW: Record<ResolvedTheme, string> = {
   night: 'none', graphite: 'none', navy: 'none',

@@ -79,11 +79,12 @@ export interface CollectionCard extends WordCard {
   is_learned: boolean
   next_review_at: string // RFC 3339, UTC midnight of the review day
   reviewed_today: boolean // answered in a Leitner review today (extra practice doesn't count)
+  repeat_marked?: boolean // marked "review later" on the deck, not answered in a review since
 }
 
 export type CollectionStatus = 'all' | 'new' | 'learning' | 'learned'
 export type CollectionPeriod = 'all' | 'today' | 'week'
-export type CollectionSort = 'date' | 'alpha' | 'progress'
+export type CollectionSort = 'date' | 'alpha' | 'progress' | 'repeat' // repeat: the deck's marked words first
 
 export interface Progress {
   word_id: string
