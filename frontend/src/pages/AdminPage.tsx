@@ -16,6 +16,7 @@ import { CHAT_POLL_MS } from '../lib/purchaseChat'
 import { AdminSupport, useSupportThreads } from '../components/AdminSupport'
 import { AdminTelegram } from '../components/AdminTelegram'
 import { Segmented } from '../components/Segmented'
+import { UserEmail } from '../components/UserEmail'
 
 type SortKey = 'email' | 'created_at' | 'words_count' | 'last_activity_at'
 
@@ -523,7 +524,7 @@ function UsersTable({ myId, onWrite, onWriteTelegram }: { myId: string; onWrite:
                     onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setOpened(u) }}
                     className={`cursor-pointer border-t border-divider hover:bg-surface-2 ${u.is_banned ? 'opacity-60' : ''}`}>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-fg">{u.email}</div>
+                      <UserEmail email={u.email} className="block font-semibold text-fg" />
                       <div className="font-mono text-[10px] text-faint">{u.id}</div>
                     </td>
                     <td className="px-4 py-3 tabular-nums text-muted">{fmt(u.created_at)}</td>

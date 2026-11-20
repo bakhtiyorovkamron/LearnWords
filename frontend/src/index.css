@@ -165,6 +165,9 @@
   --color-der: var(--der);
   --color-die: var(--die);
   --color-das: var(--das);
+  /* Telegram's own blue for "Continue with Telegram": the same in every theme. */
+  --color-telegram: #2AABEE;
+  --color-on-telegram: #FFFFFF;
 }
 
 /* Horizontal strips (folder chips) scroll without a visible bar. */

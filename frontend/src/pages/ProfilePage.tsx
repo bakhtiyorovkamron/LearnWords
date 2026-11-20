@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, LifeBuoy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { profileApi, telegramApi, type Profile } from '../api/endpoints'
+import { meApi, profileApi, telegramApi, type Profile } from '../api/endpoints'
 import { apiErrorInfo, errorMessage } from '../api/client'
 import { formatPhoneInput, phoneForApi } from '../lib/phone'
 import { useTelegramConnect } from '../lib/telegramConnect'
+import { isTelegramEmail } from '../lib/telegramEmail'
 import { formatUZS } from '../lib/money'
 import { usePurchaseOverview } from '../lib/purchases'
 import { ErrorState } from '../components/ErrorState'
@@ -123,10 +124,15 @@ function ProfileForm({ profile }: { profile: Profile }) {
   )
 }
 
-/** Telegram: "Connect" opens the bot at once and waits for it; connected: "Connected · @username". */
+/**
+ * Telegram: "Connect" opens the bot at once and waits for it; connected: "Connected · @username". An
+ * account created by Telegram signs in with it (its email is not a mailbox): it says so instead.
+ */
 function TelegramRow() {
   const { t } = useTranslation()
   const tg = useTelegramConnect()
+  const me = useQuery({ queryKey: ['me'], queryFn: meApi.get, staleTime: 5 * 60_000 })
+  const viaTelegram = isTelegramEmail(me.data?.email)
 
   return (
     <div className="space-y-3">
@@ -134,9 +140,11 @@ function TelegramRow() {
         <div>
           <div className="text-sm font-medium text-muted">{t('profile.telegram')}</div>
           <div data-testid="profile-telegram" className="mt-0.5 text-fg">
-            {tg.connected
-              ? [t('profile.telegramConnected'), tg.username && `@${tg.username}`].filter(Boolean).join(' · ')
-              : t('profile.telegramNotConnected')}
+            {tg.connected && viaTelegram
+              ? t('profile.telegramLogin')
+              : tg.connected
+                ? [t('profile.telegramConnected'), tg.username && `@${tg.username}`].filter(Boolean).join(' · ')
+                : t('profile.telegramNotConnected')}
           </div>
         </div>
         {!tg.connected && (

@@ -18,6 +18,12 @@ export const LEARNING_LANGS: { code: LearningLang; flag: string; name: string; l
   { code: 'ko', flag: '🇰🇷', name: '한국어', locale: 'ko-KR' },
 ]
 
+export interface TelegramLoginStart { url: string; secret: string; expires_at: string }
+/** pending: keep waiting · denied: declined in Telegram · expired: start a new login · ok: signed in. */
+export type TelegramLoginPoll =
+  | { status: 'pending' | 'denied' | 'expired' }
+  | { status: 'ok'; access_token: string; access_expires_at: string; new_user: boolean }
+
 export const authApi = {
   async login(c: Credentials) {
     const { data } = await api.post<AuthResponse>('/auth/login', c)
@@ -28,6 +34,17 @@ export const authApi = {
     const { data } = await api.post<AuthResponse>('/auth/register', c)
     tokenStore.set(data.access_token)
     if (c.learning_language) localStorage.setItem('learning_language', c.learning_language)
+    return data
+  },
+  /** Sign in with Telegram: a login to open in the bot (url) and the secret to poll it with. 503 = no bot. */
+  async telegramStart() {
+    const { data } = await api.post<TelegramLoginStart>('/auth/telegram')
+    return data
+  },
+  /** Polls the login; once confirmed in Telegram the session is stored like login (ok, only once). */
+  async telegramPoll(secret: string) {
+    const { data } = await api.post<TelegramLoginPoll>('/auth/telegram/poll', { secret })
+    if (data.status === 'ok') tokenStore.set(data.access_token)
     return data
   },
   async logout() {
@@ -393,10 +410,16 @@ export interface Me {
   id: string; email: string; role: 'user' | 'admin'; learning_language?: LearningLang
   features?: MeFeatures
   ask_feedback?: boolean // ask for a rating once (account ≥ 2 days old, not answered yet)
+  needs_language?: boolean // created by Telegram, the learning language is not chosen yet: /welcome asks
 }
 
 export const meApi = {
   get: () => api.get<Me>('/me').then((r) => r.data),
+  /** The one question of an account created by Telegram (409 language_chosen after the first answer). */
+  async setLearningLanguage(code: LearningLang) {
+    await api.put('/me/learning-language', { learning_language: code })
+    localStorage.setItem('learning_language', code)
+  },
 }
 
 // Buying photos: the user picks a pack, transfers the money to a card with the request's code in the

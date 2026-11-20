@@ -64,8 +64,10 @@ func (h *AdminHandler) Me(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	// needs_language: an account created by Telegram that still has to choose its learning language
+	// (the app sends it to /welcome).
 	c.JSON(http.StatusOK, gin.H{"id": u.ID, "email": u.Email, "role": u.Role, "learning_language": u.LearningLanguage,
-		"features": features, "ask_feedback": ask})
+		"needs_language": u.NeedsLanguage, "features": features, "ask_feedback": ask})
 }
 
 // Feedback handles GET /api/admin/feedback → {average, count, items} (ratings only, newest first).

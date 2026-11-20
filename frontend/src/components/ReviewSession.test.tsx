@@ -56,7 +56,7 @@ beforeEach(async () => {
   vi.mocked(settingsApi.get).mockResolvedValue({ interface_language: '', review_session_size: '', theme: '' })
   vi.mocked(cardsApi.list).mockResolvedValue([1, 2, 3, 4].map(card))
   vi.mocked(reviewApi.due).mockResolvedValue({ cards: [due(1)], total: 1 })
-  vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 2, is_learned: false } as never)
+  vi.mocked(reviewApi.answer).mockResolvedValue({ box_level: 2, is_learned: false, next_review_at: '2030-01-01' } as never)
   vi.mocked(practiceApi.answer).mockResolvedValue(undefined)
   servePractice(100)
 })

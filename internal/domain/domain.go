@@ -34,8 +34,10 @@ type User struct {
 	Role             string    `json:"role"`
 	IsBanned         bool      `json:"is_banned"`
 	LearningLanguage string    `json:"learning_language"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	// NeedsLanguage: an account created by Telegram that has not chosen its learning language yet.
+	NeedsLanguage bool      `json:"needs_language"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // Context is user-entered text that words are extracted from.

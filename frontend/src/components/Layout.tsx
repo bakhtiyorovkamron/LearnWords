@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { BookOpen, ChartColumn, House, Layers, LifeBuoy, List, LogOut, MessageCircle, Plus, Search, Shield, UserRound, type LucideIcon } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -98,6 +98,9 @@ export function Layout() {
     qc.clear()
     navigate('/login')
   }
+
+  // An account created by Telegram has not chosen its learning language: that question comes first.
+  if (me.data?.needs_language) return <Navigate to="/welcome" replace />
 
   const learningBadge = (
     <span title={learning.name} className="rounded-xl border border-line px-3 py-2 text-sm text-muted">

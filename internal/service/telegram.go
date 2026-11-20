@@ -50,6 +50,14 @@ type TelegramBot interface {
 	SetWebhook(ctx context.Context, url, secret string) error
 }
 
+// TelegramFrom is the Telegram user who sent a message or pressed a button.
+type TelegramFrom struct {
+	Username     string `json:"username"`
+	LanguageCode string `json:"language_code"`
+	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name"`
+}
+
 // TelegramUpdate is the part of a Bot API update the bot reads.
 type TelegramUpdate struct {
 	Message *struct {
@@ -58,11 +66,27 @@ type TelegramUpdate struct {
 			ID   int64  `json:"id"`
 			Type string `json:"type"`
 		} `json:"chat"`
-		From *struct {
-			Username     string `json:"username"`
-			LanguageCode string `json:"language_code"`
-		} `json:"from"`
+		From *TelegramFrom `json:"from"`
 	} `json:"message"`
+	// CallbackQuery: a press on an inline button under one of the bot's messages.
+	CallbackQuery *struct {
+		ID      string        `json:"id"`
+		Data    string        `json:"data"`
+		From    *TelegramFrom `json:"from"`
+		Message *struct {
+			MessageID int64 `json:"message_id"`
+			Chat      struct {
+				ID int64 `json:"id"`
+			} `json:"chat"`
+		} `json:"message"`
+	} `json:"callback_query"`
+}
+
+// TelegramLoginUpdates is the sign-in with Telegram (TelegramLoginService): it gets "/start login_…"
+// and the presses on its "lg:" buttons.
+type TelegramLoginUpdates interface {
+	OnStart(ctx context.Context, chatID int64, code string, from TelegramFrom)
+	OnCallback(ctx context.Context, callbackID string, chatID, messageID int64, data string, from TelegramFrom)
 }
 
 // TelegramService links a site account to Telegram: the profile asks for a deep link
@@ -71,12 +95,19 @@ type TelegramService struct {
 	repo        TelegramRepository
 	bot         TelegramBot // nil = not configured
 	botUsername string
+	login       TelegramLoginUpdates // nil = no sign-in with Telegram
 	now         func() time.Time
 	random      io.Reader // nil = crypto/rand
 }
 
 func NewTelegramService(repo TelegramRepository, bot TelegramBot, botUsername string) *TelegramService {
 	return &TelegramService{repo: repo, bot: bot, botUsername: strings.TrimPrefix(strings.TrimSpace(botUsername), "@"), now: time.Now}
+}
+
+// WithLogin hands "/start login_…" and the sign-in buttons to l (the sign-in with Telegram).
+func (s *TelegramService) WithLogin(l TelegramLoginUpdates) *TelegramService {
+	s.login = l
+	return s
 }
 
 // Enabled: a bot token and its username are configured.
@@ -139,11 +170,25 @@ func (s *TelegramService) RegisterWebhook(ctx context.Context, url, secret strin
 	return s.bot.SetWebhook(ctx, url, secret)
 }
 
-// HandleUpdate reacts to "/start <code>" (bind) and a bare "/start" (a hint) in private chats;
-// everything else is ignored. It never fails the webhook: Telegram would resend the update.
+// HandleUpdate reacts to "/start <code>" (bind), "/start login_…" and its buttons (sign in, handed
+// to the login service) and a bare "/start" (a hint) in private chats; everything else is ignored.
+// It never fails the webhook: Telegram would resend the update.
 func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
+	if !s.Enabled() {
+		return
+	}
+	if q := u.CallbackQuery; q != nil {
+		if s.login != nil && q.Message != nil && q.ID != "" && strings.HasPrefix(q.Data, loginCallbackPrefix) {
+			var from TelegramFrom
+			if q.From != nil {
+				from = *q.From
+			}
+			s.login.OnCallback(ctx, q.ID, q.Message.Chat.ID, q.Message.MessageID, q.Data, from)
+		}
+		return
+	}
 	m := u.Message
-	if m == nil || m.Chat.Type != "private" || !s.Enabled() {
+	if m == nil || m.Chat.Type != "private" {
 		return
 	}
 	lang, username := "", (*string)(nil)
@@ -178,6 +223,14 @@ func (s *TelegramService) HandleUpdate(ctx context.Context, u TelegramUpdate) {
 			s.rememberChat(ctx, m.Chat.ID, lang, false)
 			reply = botText(lang, botStopped)
 		}
+	case strings.HasPrefix(text, "/start "+domain.TelegramLoginPrefix) && s.login != nil:
+		s.rememberChat(ctx, m.Chat.ID, lang, true) // a chat bound to a user: it can receive messages again
+		var from TelegramFrom
+		if m.From != nil {
+			from = *m.From
+		}
+		s.login.OnStart(ctx, m.Chat.ID, strings.TrimSpace(strings.TrimPrefix(text, "/start ")), from)
+		return
 	case strings.HasPrefix(text, "/start "):
 		code := strings.TrimSpace(strings.TrimPrefix(text, "/start "))
 		bound, granted := false, 0
@@ -296,15 +349,19 @@ var botTexts = map[string][7]string{
 
 // botText picks the reply by Telegram's language_code ("ru", "uz", "en-US"…); anything else is English.
 func botText(languageCode string, m botMessage) string {
+	return botTexts[botLang(languageCode)][m]
+}
+
+// botLang maps Telegram's language_code to the bot's languages: ru, uz, anything else en.
+func botLang(languageCode string) string {
 	lang := strings.ToLower(languageCode)
 	if i := strings.IndexAny(lang, "-_"); i >= 0 {
 		lang = lang[:i]
 	}
-	t, ok := botTexts[lang]
-	if !ok {
-		t = botTexts["en"]
+	if lang == "ru" || lang == "uz" {
+		return lang
 	}
-	return t[m]
+	return "en"
 }
 
 // isBlocked: Telegram refused a message with 403.

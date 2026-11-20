@@ -1,4 +1,5 @@
-// Package telegram is a minimal Bot API client: sendMessage and setWebhook. The token is part of
+// Package telegram is a minimal Bot API client: sendMessage (with link or callback buttons),
+// editMessageText, answerCallbackQuery and setWebhook. The token is part of
 // every request URL, so it is scrubbed from every error this package returns.
 package telegram
 
@@ -48,10 +49,33 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, but
 	return c.call(ctx, "sendMessage", body)
 }
 
-// SetWebhook registers url; Telegram then sends secret in X-Telegram-Bot-Api-Secret-Token.
+// InlineButton is a button that sends its callback data back to the bot (see domain).
+type InlineButton = domain.InlineButton
+
+// SendMessageButtons writes plain text with rows of callback buttons under it (the bot gets a
+// callback_query when one is pressed). Errors as SendMessage.
+func (c *Client) SendMessageButtons(ctx context.Context, chatID int64, text string, rows [][]InlineButton) error {
+	return c.call(ctx, "sendMessage", map[string]any{
+		"chat_id": chatID, "text": text, "reply_markup": map[string]any{"inline_keyboard": rows},
+	})
+}
+
+// EditMessageText replaces the text of a message the bot sent; the buttons under it are removed.
+func (c *Client) EditMessageText(ctx context.Context, chatID, messageID int64, text string) error {
+	return c.call(ctx, "editMessageText", map[string]any{"chat_id": chatID, "message_id": messageID, "text": text})
+}
+
+// AnswerCallbackQuery stops the spinner on the pressed button (Telegram expects it for every
+// callback_query).
+func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackID string) error {
+	return c.call(ctx, "answerCallbackQuery", map[string]any{"callback_query_id": callbackID})
+}
+
+// SetWebhook registers url; Telegram then sends secret in X-Telegram-Bot-Api-Secret-Token. The bot
+// reads messages and button presses (the sign-in question).
 func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
 	return c.call(ctx, "setWebhook", map[string]any{
-		"url": url, "secret_token": secret, "allowed_updates": []string{"message"},
+		"url": url, "secret_token": secret, "allowed_updates": []string{"message", "callback_query"},
 	})
 }
 

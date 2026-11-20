@@ -102,3 +102,73 @@ func TestSendMessage_TypedErrors(t *testing.T) {
 		}
 	}
 }
+
+// recordCalls serves {"ok":true} and records each call's method and body.
+func recordCalls(t *testing.T) (*Client, *[]string, *[]map[string]any) {
+	t.Helper()
+	var methods []string
+	var bodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		methods = append(methods, strings.TrimPrefix(r.URL.Path, "/bot"+token+"/"))
+		bodies = append(bodies, body)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(srv.Close)
+	return New(token).WithBaseURL(srv.URL), &methods, &bodies
+}
+
+func TestSendMessageButtons_CallbackButtons(t *testing.T) {
+	c, methods, bodies := recordCalls(t)
+	rows := [][]InlineButton{{{Text: "✅ Да, это я", CallbackData: "lg:y:login_x"}, {Text: "Нет", CallbackData: "lg:n:login_x"}}}
+	if err := c.SendMessageButtons(context.Background(), 7, "Вход в yodla", rows); err != nil {
+		t.Fatal(err)
+	}
+	b := (*bodies)[0]
+	if (*methods)[0] != "sendMessage" || b["chat_id"] != float64(7) || b["text"] != "Вход в yodla" {
+		t.Errorf("%s %v", (*methods)[0], b)
+	}
+	if _, ok := b["parse_mode"]; ok {
+		t.Error("parse_mode is set: messages are plain text")
+	}
+	row := b["reply_markup"].(map[string]any)["inline_keyboard"].([]any)[0].([]any)
+	yes, no := row[0].(map[string]any), row[1].(map[string]any)
+	if yes["text"] != "✅ Да, это я" || yes["callback_data"] != "lg:y:login_x" || no["callback_data"] != "lg:n:login_x" {
+		t.Errorf("buttons %v", row)
+	}
+	if _, ok := yes["url"]; ok {
+		t.Error("a callback button has a url")
+	}
+}
+
+func TestEditMessageTextAndAnswerCallbackQuery(t *testing.T) {
+	c, methods, bodies := recordCalls(t)
+	if err := c.EditMessageText(context.Background(), 7, 55, "Вход отменён."); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AnswerCallbackQuery(context.Background(), "cb-1"); err != nil {
+		t.Fatal(err)
+	}
+	if (*methods)[0] != "editMessageText" || (*bodies)[0]["chat_id"] != float64(7) || (*bodies)[0]["message_id"] != float64(55) ||
+		(*bodies)[0]["text"] != "Вход отменён." {
+		t.Errorf("%s %v", (*methods)[0], (*bodies)[0])
+	}
+	if _, ok := (*bodies)[0]["reply_markup"]; ok {
+		t.Error("the edit keeps buttons: it must remove them")
+	}
+	if (*methods)[1] != "answerCallbackQuery" || (*bodies)[1]["callback_query_id"] != "cb-1" {
+		t.Errorf("%s %v", (*methods)[1], (*bodies)[1])
+	}
+}
+
+func TestSetWebhook_AsksForMessagesAndButtonPresses(t *testing.T) {
+	c, methods, bodies := recordCalls(t)
+	if err := c.SetWebhook(context.Background(), "https://yodla.fun/api/telegram/webhook", "s"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal((*bodies)[0]["allowed_updates"])
+	if (*methods)[0] != "setWebhook" || string(got) != `["message","callback_query"]` || (*bodies)[0]["secret_token"] != "s" {
+		t.Errorf("%s %v", (*methods)[0], (*bodies)[0])
+	}
+}

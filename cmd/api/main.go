@@ -111,12 +111,16 @@ func run() error {
 		slog.Warn("VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set: Web Push is disabled (generate keys with `go run ./cmd/vapidkeys`)")
 	}
 	var bot service.TelegramBot // nil = no bot: the Telegram endpoints answer 503
+	var loginBot service.TelegramLoginBot
 	if cfg.TelegramBotToken != "" {
-		bot = telegram.New(cfg.TelegramBotToken)
+		client := telegram.New(cfg.TelegramBotToken)
+		bot, loginBot = client, client
 	}
-	telegramSvc := service.NewTelegramService(postgres.NewTelegramRepository(pool), bot, cfg.TelegramBotUsername)
+	// Sign in (and up) with Telegram: the bot asks the chat, the browser collects the session.
+	telegramLoginSvc := service.NewTelegramLoginService(postgres.NewTelegramLoginRepository(pool), loginBot, cfg.TelegramBotUsername, userRepo, tokens)
+	telegramSvc := service.NewTelegramService(postgres.NewTelegramRepository(pool), bot, cfg.TelegramBotUsername).WithLogin(telegramLoginSvc)
 	if !telegramSvc.Enabled() {
-		slog.Warn("TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME are not set: linking Telegram is disabled")
+		slog.Warn("TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME are not set: linking Telegram and signing in with it are disabled")
 	} else if cfg.TelegramWebhookURL != "" {
 		if cfg.TelegramWebhookSecret == "" {
 			slog.Warn("TELEGRAM_WEBHOOK_SECRET is not set: the webhook would reject every update, not registering it")
@@ -139,11 +143,14 @@ func run() error {
 	if telegramSvc.Enabled() && cfg.WordsWithoutTelegram > 0 {
 		slog.Info("word limit without Telegram is on", "limit", cfg.WordsWithoutTelegram)
 	}
-	// New users get the "Introductions" folder; if the content can't be loaded they just don't.
+	// New users get the "Introductions" folder; if the content can't be loaded they just don't. An account
+	// created by Telegram gets it once it has chosen its learning language (/welcome).
+	var starter service.StarterCreator // nil = off
 	if starterSvc, err := service.NewStarterService(contextRepo); err != nil {
 		slog.Error("starter folder is off", "err", err)
 	} else {
-		authSvc.SetStarter(starterSvc.WithWordLimit(wordLimit))
+		starter = starterSvc.WithWordLimit(wordLimit)
+		authSvc.SetStarter(starter)
 	}
 	contextSvc := service.NewContextService(contextRepo, cardRepo, providers).WithWordLimit(wordLimit)
 	// One worker sends the admins' broadcasts; ones a restart cut off are marked interrupted first.
@@ -196,7 +203,8 @@ func run() error {
 		ServiceName: cfg.ServiceName,
 		CORSOrigins: cfg.CORSOrigins,
 		Tokens:      tokens,
-		Auth:        handler.NewAuthHandler(authSvc, cfg.CookieSecure),
+		Auth:        handler.NewAuthHandler(authSvc, cfg.CookieSecure).WithTelegramLogin(telegramLoginSvc),
+		Welcome:     handler.NewWelcomeHandler(service.NewLearningLanguageService(userRepo, starter)),
 		Contexts:    handler.NewContextHandler(contextSvc),
 		Review:      handler.NewReviewHandler(reviewSvc),
 		Practice:    handler.NewPracticeHandler(reviewSvc),

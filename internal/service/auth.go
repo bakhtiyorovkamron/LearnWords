@@ -34,7 +34,12 @@ func (s *AuthService) SetStarter(st StarterCreator) { s.starter = st }
 
 // giveStarterFolder never fails the registration: no starter folder is better than a failed sign-up.
 func (s *AuthService) giveStarterFolder(ctx context.Context, userID uuid.UUID, learningLang string) {
-	if s.starter == nil {
+	giveStarterFolder(ctx, s.starter, userID, learningLang)
+}
+
+// giveStarterFolder creates the starter folder with st (nil = off); a failure or a panic is only logged.
+func giveStarterFolder(ctx context.Context, st StarterCreator, userID uuid.UUID, learningLang string) {
+	if st == nil {
 		return
 	}
 	defer func() {
@@ -42,9 +47,44 @@ func (s *AuthService) giveStarterFolder(ctx context.Context, userID uuid.UUID, l
 			slog.ErrorContext(ctx, "starter folder panicked", "user", userID, "panic", r)
 		}
 	}()
-	if err := s.starter.Create(ctx, userID, learningLang); err != nil {
+	if err := st.Create(ctx, userID, learningLang); err != nil {
 		slog.WarnContext(ctx, "starter folder failed", "user", userID, "err", err)
 	}
+}
+
+// FirstLanguageStore sets the learning language of an account created by Telegram (postgres.UserRepository).
+type FirstLanguageStore interface {
+	// SetFirstLearningLanguage sets it and clears needs_language, only while needs_language is set;
+	// false = the account has chosen already (nothing changes).
+	SetFirstLearningLanguage(ctx context.Context, id uuid.UUID, lang string) (bool, error)
+}
+
+// LearningLanguageService is the one question an account created by Telegram is asked (/welcome).
+type LearningLanguageService struct {
+	store   FirstLanguageStore
+	starter StarterCreator // nil = no starter folder
+}
+
+func NewLearningLanguageService(store FirstLanguageStore, starter StarterCreator) *LearningLanguageService {
+	return &LearningLanguageService{store: store, starter: starter}
+}
+
+// Choose sets the learning language, once (ErrLanguageChosen after that, and for every account that
+// chose it at registration), and gives the starter folder in it.
+func (s *LearningLanguageService) Choose(ctx context.Context, userID uuid.UUID, lang string) error {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	if !domain.IsLearningLang(lang) {
+		return fmt.Errorf("%w: learning_language must be one of: de, en, fr, ko", domain.ErrValidation)
+	}
+	ok, err := s.store.SetFirstLearningLanguage(ctx, userID, lang)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return domain.ErrLanguageChosen
+	}
+	giveStarterFolder(ctx, s.starter, userID, lang)
+	return nil
 }
 
 func NewAuthService(users UserRepository, tokens TokenManager) *AuthService {
@@ -54,7 +94,8 @@ func NewAuthService(users UserRepository, tokens TokenManager) *AuthService {
 
 func (s *AuthService) Register(ctx context.Context, email, password, learningLang string) (*domain.User, domain.TokenPair, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
-	if _, err := mail.ParseAddress(email); err != nil {
+	// The Telegram domain is the accounts the bot creates: it is not anyone's mailbox.
+	if _, err := mail.ParseAddress(email); err != nil || domain.IsTelegramEmail(email) {
 		return nil, domain.TokenPair{}, fmt.Errorf("%w: invalid email", domain.ErrValidation)
 	}
 	if len(password) < 8 || len(password) > 72 {

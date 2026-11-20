@@ -17,6 +17,7 @@ import { SupportPage } from './pages/SupportPage'
 import { AdminPage } from './pages/AdminPage'
 import { SearchPage } from './pages/SearchPage'
 import { SharedFolderPage } from './pages/SharedFolderPage'
+import { WelcomePage } from './pages/WelcomePage'
 
 export default function App() {
   return (
@@ -28,6 +29,8 @@ export default function App() {
         <Route path="/register" element={<AuthPage mode="register" />} />
       </Route>
       <Route element={<ProtectedRoute />}>
+        {/* An account created by Telegram chooses its learning language here, without the app shell. */}
+        <Route path="/welcome" element={<WelcomePage />} />
         <Route element={<Layout />}>
           <Route index element={<ContextsPage />} />
           <Route path="/contexts" element={<Navigate to="/" replace />} />

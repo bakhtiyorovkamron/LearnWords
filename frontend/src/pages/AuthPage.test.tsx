@@ -8,7 +8,8 @@ import { AuthPage } from './AuthPage'
 
 vi.mock('../api/endpoints', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../api/endpoints')>()
-  return { ...mod, authApi: { login: vi.fn(), register: vi.fn() } }
+  // The Telegram login stays loading here: these tests are about the email form.
+  return { ...mod, authApi: { login: vi.fn(), register: vi.fn(), telegramStart: vi.fn(() => new Promise(() => {})), telegramPoll: vi.fn() } }
 })
 
 function renderPage(mode: 'login' | 'register') {

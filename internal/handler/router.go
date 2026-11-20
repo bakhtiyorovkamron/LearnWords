@@ -45,6 +45,7 @@ type RouterDeps struct {
 	ChatUnread  *ChatUnreadHandler
 	Broadcasts  *TelegramBroadcastHandler
 	Rules       *TelegramRulesHandler
+	Welcome     *WelcomeHandler
 	UserStatus  UserStatusStore
 	HealthCheck func() error
 	// Ctx stops the rate limiters' cleanup goroutines on shutdown.
@@ -62,6 +63,8 @@ const (
 	photoPerUserPerMin   = 5   // photo import (also capped by the daily photo_import quota)
 	adminPushPerMin      = 5   // admin: send a push notification
 	telegramLinkPerHour  = 5   // Telegram deep links, per user per HOUR
+	telegramLoginPerMin  = 10  // sign-in with Telegram: new logins (each /login and /register view makes one), by IP
+	telegramPollPerMin   = 90  // sign-in with Telegram: the waiting page polls every 2 s, by IP
 	generalPerUserPerMin = 100 // everything else under /api
 )
 
@@ -96,6 +99,8 @@ func NewRouter(d RouterDeps) *gin.Engine {
 	photoLimit := RateLimitByUser(NewRateLimiter(ctx, "photo-import", photoPerUserPerMin, time.Minute))
 	adminPushLimit := RateLimitByUser(NewRateLimiter(ctx, "admin-push", adminPushPerMin, time.Minute))
 	telegramLinkLimit := RateLimitByUser(NewRateLimiter(ctx, "telegram-link", telegramLinkPerHour, time.Hour))
+	telegramLoginLimit := RateLimitByIP(NewRateLimiter(ctx, "telegram-login", telegramLoginPerMin, time.Minute))
+	telegramPollLimit := RateLimitByIP(NewRateLimiter(ctx, "telegram-poll", telegramPollPerMin, time.Minute))
 	checkLimit := RateLimitByUser(NewRateLimiter(ctx, "word-check", checkPerUserPerMin, time.Minute))
 	purchaseLimit := RateLimitByUser(NewRateLimiter(ctx, "purchase", purchasePerUserPerHour, time.Hour))
 	purchaseChatLimiter := RateLimitByUser(NewRateLimiter(ctx, "purchase-chat", purchaseChatLimit, purchaseChatWindow))
@@ -136,6 +141,9 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		a := api.Group("/auth")
 		a.POST("/register", authLimit, d.Auth.Register)
 		a.POST("/login", authLimit, d.Auth.Login)
+		// Sign in (and up) with Telegram: start a login, then poll it with its secret.
+		a.POST("/telegram", telegramLoginLimit, d.Auth.TelegramStart)
+		a.POST("/telegram/poll", telegramPollLimit, d.Auth.TelegramPoll)
 		a.POST("/refresh", d.Auth.Refresh)
 		a.POST("/logout", d.Auth.Logout)
 	}
@@ -194,6 +202,7 @@ func NewRouter(d RouterDeps) *gin.Engine {
 		protected.POST("/me/telegram/link", telegramLinkLimit, d.Telegram.Link)
 		protected.PUT("/me/telegram/notifications", d.Telegram.SetNotifications)
 		protected.GET("/me", d.Admin.Me)
+		protected.PUT("/me/learning-language", d.Welcome.SetLearningLanguage)
 		protected.GET("/me/purchases", d.Purchases.Overview)
 		protected.POST("/me/purchases", purchaseLimit, d.Purchases.Create)
 		protected.DELETE("/me/purchases/:id", d.Purchases.Cancel)

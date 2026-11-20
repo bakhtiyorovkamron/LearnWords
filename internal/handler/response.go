@@ -105,6 +105,9 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrTelegramUnavailable):
 		c.AbortWithStatusJSON(http.StatusServiceUnavailable, errorResponse{Error: "telegram is not configured", Code: "telegram_unavailable"})
 		return
+	case errors.Is(err, domain.ErrLanguageChosen):
+		c.AbortWithStatusJSON(http.StatusConflict, errorResponse{Error: "the learning language is already chosen", Code: "language_chosen"})
+		return
 	case errors.Is(err, domain.ErrTelegramNotLinked):
 		c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "connect Telegram first", Code: "telegram_not_linked"})
 		return

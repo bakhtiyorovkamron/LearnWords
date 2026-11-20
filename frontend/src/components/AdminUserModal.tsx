@@ -7,6 +7,7 @@ import { adminApi, type AdminUser, type FeatureState } from '../api/endpoints'
 import { errorMessage } from '../api/client'
 import { dateLocale } from '../i18n'
 import { toast } from './Toaster'
+import { UserEmail } from './UserEmail'
 
 /** Card of one user in the admin panel: facts about the account and the per-user features. */
 export function AdminUserModal({ user, onClose, onWrite, onWriteTelegram }: {
@@ -28,7 +29,7 @@ export function AdminUserModal({ user, onClose, onWrite, onWriteTelegram }: {
       <div role="dialog" aria-modal="true" aria-labelledby="admin-user-title"
         className="glass max-h-[90vh] w-full max-w-xl space-y-5 overflow-y-auto p-6 text-left">
         <div>
-          <h2 id="admin-user-title" className="break-all text-xl font-bold text-fg">{user.email}</h2>
+          <h2 id="admin-user-title" className="break-all text-xl font-bold text-fg"><UserEmail email={user.email} /></h2>
           <div className="mt-2 space-y-0.5 text-sm text-muted">
             <p>{t('admin.userCard.registered', { date: date(user.created_at) })}</p>
             <p>{t('admin.userCard.words', { n: user.words_count })}</p>

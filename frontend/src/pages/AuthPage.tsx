@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { Camera, Check, Languages, Repeat } from 'lucide-react'
+import { Camera, ChevronLeft, Languages, Loader2, Repeat } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { authApi, LEARNING_LANGS, type LearningLang } from '../api/endpoints'
+import { authApi, type LearningLang } from '../api/endpoints'
 import { errorMessage } from '../api/client'
-import { Flag } from '../components/Flag'
+import { LearningLanguagePicker } from '../components/LearningLanguagePicker'
+import { TelegramIcon, TelegramLoginButton } from '../components/TelegramLoginButton'
+import { Toaster } from '../components/Toaster'
+import { useTelegramLogin } from '../lib/telegramLogin'
 import { Logo } from '../components/Logo'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { ContactLinks } from '../components/ContactLinks'
@@ -41,6 +44,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       : authApi.register({ email, password, learning_language: learningLang }),
     onSuccess: () => navigate(from, { replace: true }),
   })
+  // Sign in (and up) with Telegram: a new account chooses its learning language on /welcome.
+  const tg = useTelegramLogin((newUser) => navigate(newUser ? '/welcome' : from, { replace: true }))
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -55,27 +60,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       ? t('auth.banned')
       : errorMessage(mutation.error))
     : null)
-
-  const languages = (
-    <fieldset className="space-y-2">
-      <legend className="text-sm font-semibold text-fg">{t('auth.learningLanguage')}</legend>
-      <div className="grid grid-cols-2 gap-2">
-        {LEARNING_LANGS.map((l) => {
-          const on = learningLang === l.code
-          return (
-            <button key={l.code} type="button" onClick={() => setLearningLang(l.code)} aria-pressed={on}
-              className={`flex min-h-12 items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-left text-sm transition ${
-                on ? 'border-accent bg-surface-2 text-fg' : 'border-line text-muted hover:text-fg'}`}>
-              <Flag lang={l.code} />
-              <span className="min-w-0 flex-1 truncate font-semibold">{l.name}</span>
-              {on && <Check size={18} aria-hidden="true" className="shrink-0 text-accent-text" />}
-            </button>
-          )
-        })}
-      </div>
-      <p className="text-xs text-faint">{t('auth.learningLanguageHint')}</p>
-    </fieldset>
-  )
 
   return (
     <>
@@ -114,12 +98,43 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
 
         <div className="space-y-4">
+        {tg.waiting ? (
+          <section className="glass relative space-y-5 p-5 pt-14 text-center md:p-8 md:pt-14" aria-labelledby="telegram-wait-title" data-testid="telegram-waiting">
+            <button type="button" onClick={tg.back} aria-label={t('auth.back')}
+              className="absolute left-3 top-3 grid h-10 w-10 place-items-center rounded-xl text-muted transition hover:bg-surface-2 hover:text-fg">
+              <ChevronLeft size={22} aria-hidden="true" />
+            </button>
+            <div className="mx-auto grid h-[72px] w-[72px] place-items-center rounded-full bg-telegram text-on-telegram">
+              <TelegramIcon size={34} />
+            </div>
+            <div className="space-y-2">
+              <h2 id="telegram-wait-title" className="text-2xl font-bold text-fg">{t('auth.telegramWaitTitle')}</h2>
+              <p className="text-sm text-muted">{t('auth.telegramWaitText', { bot: tg.bot })}</p>
+            </div>
+            <p role="status" className="flex items-center justify-center gap-2 text-sm font-semibold text-fg">
+              <Loader2 size={16} aria-hidden="true" className="animate-spin text-accent-text" />{t('auth.telegramWaiting')}
+            </p>
+            <TelegramLoginButton status={tg.status} url={tg.url} label={t('auth.telegramAgain')} onOpen={tg.opened} onRetry={tg.retry} />
+            <p className="text-xs text-faint">{t('auth.telegramLinkLife')}</p>
+          </section>
+        ) : (
         <form onSubmit={submit} className="glass space-y-4 p-5 md:p-8">
           <h2 className="text-2xl font-bold text-fg">{isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}</h2>
           <p className="text-sm text-muted">
             {isLogin ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
           </p>
-          {!isLogin && languages}
+          {tg.status !== 'unavailable' && (
+            <div className="space-y-4">
+              <TelegramLoginButton status={tg.status} url={tg.url} label={t('auth.telegramLogin')} onOpen={tg.opened} onRetry={tg.retry} />
+              {tg.expired && <p role="status" className="text-center text-sm text-muted">{t('auth.telegramExpired')}</p>}
+              <div className="flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-line" />
+                <span className="text-[13px] text-faint">{t('auth.or')}</span>
+                <span className="h-px flex-1 bg-line" />
+              </div>
+            </div>
+          )}
+          {!isLogin && <LearningLanguagePicker value={learningLang} onChange={setLearningLang} />}
           <input className="field" type="email" placeholder={t('auth.email')} autoComplete="email" required
             value={email} onChange={(e) => setEmail(e.target.value)} />
           <PasswordField placeholder={t('auth.password')} autoComplete={isLogin ? 'current-password' : 'new-password'}
@@ -140,12 +155,15 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               {isLogin ? t('auth.registerLink') : t('auth.loginLink')}
             </Link>
           </p>
+          {tg.status !== 'unavailable' && <p className="text-center text-sm text-muted">{t('auth.telegramNewHint')}</p>}
         </form>
+        )}
         <p className="text-center text-sm text-muted">{t('contact.loginProblem')} <ContactLinks /></p>
         </div>
       </div>
       </main>
     </div>
+    <Toaster />
     </>
   )
 }

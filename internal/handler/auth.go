@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -15,6 +16,7 @@ const refreshCookie = "lw_refresh"
 type AuthHandler struct {
 	svc          *service.AuthService
 	cookieSecure bool
+	telegram     TelegramLogin // nil = no sign-in with Telegram
 }
 
 func NewAuthHandler(svc *service.AuthService, cookieSecure bool) *AuthHandler {
@@ -106,4 +108,66 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	h.clearRefreshCookie(c)
 	c.Status(http.StatusNoContent)
+}
+
+// TelegramLogin is the sign-in with Telegram (service.TelegramLoginService).
+type TelegramLogin interface {
+	Start(ctx context.Context, userAgent string) (domain.TelegramLoginStart, error)
+	Poll(ctx context.Context, secret string) (domain.TelegramLoginPoll, error)
+}
+
+// WithTelegramLogin turns the sign-in with Telegram on (without it both endpoints answer 503).
+func (h *AuthHandler) WithTelegramLogin(tg TelegramLogin) *AuthHandler {
+	h.telegram = tg
+	return h
+}
+
+// TelegramStart handles POST /api/auth/telegram → {"url": "https://t.me/<bot>?start=login_…",
+// "secret", "expires_at"}; 503 telegram_unavailable when the bot is not configured. The secret is
+// only in this answer: the browser polls with it.
+func (h *AuthHandler) TelegramStart(c *gin.Context) {
+	if h.telegram == nil {
+		writeError(c, domain.ErrTelegramUnavailable)
+		return
+	}
+	start, err := h.telegram.Start(c.Request.Context(), c.Request.UserAgent())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, start)
+}
+
+// TelegramPoll handles POST /api/auth/telegram/poll {"secret"} → {"status": "pending" | "denied" |
+// "expired"}, or once confirmed in Telegram the refresh cookie (as Login) and {"status": "ok",
+// "access_token", "access_expires_at", "new_user"}. Only the first poll gets the session.
+func (h *AuthHandler) TelegramPoll(c *gin.Context) {
+	if h.telegram == nil {
+		writeError(c, domain.ErrTelegramUnavailable)
+		return
+	}
+	var req struct {
+		Secret string `json:"secret"`
+	}
+	if !bindSmallJSON(c, &req) {
+		return
+	}
+	if req.Secret == "" {
+		badRequest(c, "secret is required")
+		return
+	}
+	res, err := h.telegram.Poll(c.Request.Context(), req.Secret)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	if res.Status != domain.PollOK {
+		c.JSON(http.StatusOK, gin.H{"status": res.Status})
+		return
+	}
+	h.setRefreshCookie(c, res.Tokens)
+	c.JSON(http.StatusOK, gin.H{"status": res.Status, "access_token": res.Tokens.AccessToken,
+		"access_expires_at": res.Tokens.AccessExpiresAt, "new_user": res.NewUser})
 }

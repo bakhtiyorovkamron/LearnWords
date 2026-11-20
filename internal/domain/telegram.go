@@ -39,6 +39,13 @@ type TelegramButton struct {
 	URL  string `json:"url"`
 }
 
+// InlineButton is an inline button that sends CallbackData back to the bot (a callback_query), at
+// most 64 bytes.
+type InlineButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data"`
+}
+
 const (
 	BroadcastTargetMe    = "me"
 	BroadcastTargetAll   = "all"
